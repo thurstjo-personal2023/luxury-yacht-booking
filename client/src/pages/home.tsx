@@ -16,25 +16,27 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 bg-background/95 backdrop-blur-sm z-50 border-b border-border">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div 
-            className="w-24 h-8 bg-contain bg-center bg-no-repeat cursor-pointer"
-            style={{ backgroundImage: 'url(/Etoile_Yachts_v1_2.png)' }}
-            onClick={() => setLocation("/")}
-          />
-          <div className="flex gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => setLocation("/auth")}
-            >
-              Log In
-            </Button>
-            <Button
-              onClick={() => setLocation("/auth")}
-            >
-              Sign Up
-            </Button>
-          </div>
+        <div className="container mx-auto h-16">
+          <nav className="flex items-center justify-between h-full px-4">
+            <div 
+              className="w-32 h-12 bg-contain bg-left bg-no-repeat cursor-pointer"
+              style={{ backgroundImage: 'url(/Etoile_Yachts_v1_2.png)' }}
+              onClick={() => setLocation("/")}
+            />
+            <div className="flex gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => setLocation("/auth")}
+              >
+                Log In
+              </Button>
+              <Button
+                onClick={() => setLocation("/auth")}
+              >
+                Sign Up
+              </Button>
+            </div>
+          </nav>
         </div>
       </header>
 
