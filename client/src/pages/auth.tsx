@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
@@ -47,14 +48,17 @@ export default function Auth() {
       if (isLogin) {
         await signInWithEmail(values.email, values.password);
       } else {
+        if (!values.role) {
+          throw new Error("Please select a role");
+        }
         await signUpWithEmail(values.email, values.password, values.role as UserRole);
       }
       setLocation("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Authentication Error",
-        description: error.message,
+        description: error.message || "An error occurred during authentication",
       });
     }
   }
@@ -63,11 +67,11 @@ export default function Auth() {
     try {
       await signInWithGoogle();
       setLocation("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Google Sign In Error",
-        description: error.message,
+        description: error.message || "An error occurred during Google sign in",
       });
     }
   }
