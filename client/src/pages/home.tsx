@@ -27,11 +27,13 @@ export default function Home() {
               <Button
                 variant="ghost"
                 onClick={() => setLocation("/auth")}
+                className="fixed top-4 right-24 z-50"
               >
                 Log In
               </Button>
               <Button
                 onClick={() => setLocation("/auth")}
+                className="fixed top-4 right-4 z-50"
               >
                 Sign Up
               </Button>
