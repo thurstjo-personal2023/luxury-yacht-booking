@@ -10,36 +10,32 @@ export default function Home() {
     <div className="min-h-screen bg-background pb-20">
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 bg-background/95 backdrop-blur-sm z-50 border-b border-border">
-        <div className="container mx-auto px-4">
-          <nav className="flex items-center justify-between h-16">
-            {/* Logo Container */}
-            <div className="flex-shrink-0">
-              <div 
-                className="w-28 h-10 md:w-32 md:h-12 bg-contain bg-no-repeat cursor-pointer"
-                style={{ backgroundImage: 'url(/Etoile_Yachts_v1_2.png)' }}
-                onClick={() => setLocation("/")}
-                aria-label="Etoile Yachts Logo"
-              />
-            </div>
+        <nav className="flex items-center justify-between h-16">
+          {/* Logo Container */}
+          <div 
+            className="w-28 h-10 md:w-32 md:h-12 bg-contain bg-no-repeat cursor-pointer ml-0"
+            style={{ backgroundImage: 'url(/Etoile_Yachts_v1_2.png)' }}
+            onClick={() => setLocation("/")}
+            aria-label="Etoile Yachts Logo"
+          />
 
-            {/* Auth Buttons */}
-            <div className="flex items-center gap-2 ml-auto">
-              <Button
-                variant="ghost"
-                onClick={() => setLocation("/auth")}
-                className="text-sm px-3 py-2"
-              >
-                Log In
-              </Button>
-              <Button
-                onClick={() => setLocation("/auth")}
-                className="text-sm px-3 py-2"
-              >
-                Sign Up
-              </Button>
-            </div>
-          </nav>
-        </div>
+          {/* Auth Buttons */}
+          <div className="flex items-center gap-2 mr-4">
+            <Button
+              variant="ghost"
+              onClick={() => setLocation("/auth")}
+              className="text-sm px-3 py-2"
+            >
+              Log In
+            </Button>
+            <Button
+              onClick={() => setLocation("/auth")}
+              className="text-sm px-3 py-2"
+            >
+              Sign Up
+            </Button>
+          </div>
+        </nav>
       </header>
 
       {/* Main Content with top padding for fixed header */}
