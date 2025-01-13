@@ -19,11 +19,11 @@ export default function Home() {
         <div className="container mx-auto h-16">
           <nav className="flex items-center justify-between h-full px-4">
             <div 
-              className="w-32 h-12 bg-contain bg-left bg-no-repeat cursor-pointer"
+              className="absolute left-4 top-2 w-32 h-12 bg-contain bg-left bg-no-repeat cursor-pointer"
               style={{ backgroundImage: 'url(/Etoile_Yachts_v1_2.png)' }}
               onClick={() => setLocation("/")}
             />
-            <div className="flex gap-4">
+            <div className="flex gap-4 ml-auto">
               <Button
                 variant="ghost"
                 onClick={() => setLocation("/auth")}
