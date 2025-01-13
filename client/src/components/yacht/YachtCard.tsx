@@ -1,6 +1,6 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 
 export interface YachtCardProps {
   id: string;
@@ -21,7 +21,7 @@ export default function YachtCard({
   location,
   capacity
 }: YachtCardProps) {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
@@ -53,7 +53,7 @@ export default function YachtCard({
       <CardFooter>
         <Button 
           className="w-full"
-          onClick={() => navigate(`/yacht/${id}`)}
+          onClick={() => setLocation(`/yacht/${id}`)}
         >
           View Details
         </Button>

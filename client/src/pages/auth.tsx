@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -13,7 +13,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -32,7 +31,7 @@ const formSchema = z.object({
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -50,7 +49,7 @@ export default function Auth() {
       } else {
         await signUpWithEmail(values.email, values.password, values.role as UserRole);
       }
-      navigate("/dashboard");
+      setLocation("/dashboard");
     } catch (error) {
       toast({
         variant: "destructive",
@@ -63,7 +62,7 @@ export default function Auth() {
   async function handleGoogleSignIn() {
     try {
       await signInWithGoogle();
-      navigate("/dashboard");
+      setLocation("/dashboard");
     } catch (error) {
       toast({
         variant: "destructive",

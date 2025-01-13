@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { auth, db } from "@/config/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,12 +10,12 @@ import type { UserProfile } from "@/lib/auth";
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (!user) {
-        navigate("/auth");
+        setLocation("/auth");
         return;
       }
 
@@ -23,7 +23,7 @@ export default function Dashboard() {
         const userDoc = await getDocs(
           query(collection(db, "users"), where("uid", "==", user.uid))
         );
-        
+
         if (!userDoc.empty) {
           setUserProfile(userDoc.docs[0].data() as UserProfile);
         }
@@ -35,7 +35,7 @@ export default function Dashboard() {
     });
 
     return () => unsubscribe();
-  }, [navigate]);
+  }, [setLocation]);
 
   if (loading) {
     return <DashboardSkeleton />;
@@ -44,7 +44,7 @@ export default function Dashboard() {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-3xl font-bold mb-8">Welcome, {userProfile?.displayName || 'User'}</h1>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {userProfile?.role === 'consumer' && (
           <>
@@ -53,12 +53,12 @@ export default function Dashboard() {
                 <CardTitle>Your Bookings</CardTitle>
               </CardHeader>
               <CardContent>
-                <Button onClick={() => navigate("/yacht-listing")}>
+                <Button onClick={() => setLocation("/yacht-listing")}>
                   Browse Yachts
                 </Button>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader>
                 <CardTitle>Loyalty Points</CardTitle>
@@ -80,7 +80,7 @@ export default function Dashboard() {
                 <Button>Add New Yacht</Button>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader>
                 <CardTitle>Upcoming Bookings</CardTitle>
@@ -102,7 +102,7 @@ export default function Dashboard() {
                 <p>No pending requests</p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader>
                 <CardTitle>Partner Dashboard</CardTitle>
