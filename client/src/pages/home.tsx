@@ -14,7 +14,32 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="relative h-[70vh] overflow-hidden">
+      {/* Fixed Header */}
+      <header className="fixed top-0 left-0 right-0 bg-background/95 backdrop-blur-sm z-50 border-b border-border">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div 
+            className="w-24 h-8 bg-contain bg-center bg-no-repeat cursor-pointer"
+            style={{ backgroundImage: 'url(/Etoile_Yachts_v1_2.png)' }}
+            onClick={() => setLocation("/")}
+          />
+          <div className="flex gap-4">
+            <Button
+              variant="ghost"
+              onClick={() => setLocation("/auth")}
+            >
+              Log In
+            </Button>
+            <Button
+              onClick={() => setLocation("/auth")}
+            >
+              Sign Up
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section with top padding to account for fixed header */}
+      <div className="relative h-[70vh] mt-16">
         <div 
           className="absolute inset-0 bg-cover bg-center animate-fade-in"
           style={{ 
