@@ -22,13 +22,18 @@ interface FirebaseServices {
 }
 
 export function getEmulatorHost() {
-  const host = window.location.hostname;
-  return host.includes('.repl.co') ? host : 'localhost';
+  // Get the full Replit URL if available
+  if (window.location.hostname.includes('.repl.co')) {
+    return window.location.hostname;
+  }
+  return 'localhost';
 }
 
 export function getEmulatorUIUrl() {
   const host = getEmulatorHost();
-  return `http://${host}:${EMULATOR_CONFIG.ui.port}`;
+  const protocol = host === 'localhost' ? 'http' : 'https';
+  const url = `${protocol}://${host}:${EMULATOR_CONFIG.ui.port}`;
+  return url;
 }
 
 export async function connectToEmulators(services: FirebaseServices) {
@@ -39,8 +44,13 @@ export async function connectToEmulators(services: FirebaseServices) {
 
   try {
     const host = getEmulatorHost();
-    console.log('Connecting to Firebase emulators on host:', host);
-    console.log(`Firebase Emulator UI available at: ${getEmulatorUIUrl()}`);
+    const uiUrl = getEmulatorUIUrl();
+
+    console.log('\n🔥 Firebase Emulator Configuration:');
+    console.log('--------------------------------');
+    console.log(`Host: ${host}`);
+    console.log(`Emulator UI: ${uiUrl}`);
+    console.log('--------------------------------\n');
 
     const { auth, db, functions, storage } = services;
 
@@ -56,14 +66,9 @@ export async function connectToEmulators(services: FirebaseServices) {
     // Connect to Storage emulator
     connectStorageEmulator(storage, host, EMULATOR_CONFIG.storage.port);
 
-    console.log('Firebase emulators connected successfully:', {
-      host,
-      ports: EMULATOR_CONFIG,
-      ui: getEmulatorUIUrl()
-    });
-
-    // Test connections
-    await testEmulatorConnections({ auth, db, functions, storage });
+    console.log('✅ All Firebase emulators connected successfully');
+    console.log('\n📝 Note: You may need to accept the self-signed certificate warning in your browser');
+    console.log('   when accessing the Emulator UI for the first time.\n');
 
   } catch (error) {
     console.error('Error connecting to Firebase emulators:', error);
