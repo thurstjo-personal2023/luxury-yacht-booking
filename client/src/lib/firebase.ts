@@ -40,8 +40,8 @@ if (import.meta.env.DEV) {
     const host = window.location.hostname;
     console.log('Connecting to Firebase emulators on host:', host);
 
-    // Connect to Auth emulator on port 3003
-    connectAuthEmulator(auth, `http://${host}:3003`, { disableWarnings: true });
+    // Connect to Auth emulator on port 9099
+    connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
 
     // Connect to Firestore emulator on port 8080
     connectFirestoreEmulator(db, host, 8080);
@@ -55,7 +55,7 @@ if (import.meta.env.DEV) {
     console.log('Firebase emulators connected successfully:', {
       host,
       ports: {
-        auth: 3003,
+        auth: 9099,
         firestore: 8080,
         functions: 5001,
         storage: 9199
