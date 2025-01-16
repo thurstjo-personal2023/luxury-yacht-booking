@@ -1,52 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useLocation } from "wouter";
-import { auth, db } from "@/config/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/lib/auth";
 import type { UserProfile } from "@/lib/auth";
 
 export default function Dashboard() {
-  const [loading, setLoading] = useState(true);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const { user } = useAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (!user) {
-        setLocation("/auth");
-        return;
-      }
+    if (!user) {
+      setLocation("/auth");
+    }
+  }, [user, setLocation]);
 
-      try {
-        const userDoc = await getDocs(
-          query(collection(db, "users"), where("uid", "==", user.uid))
-        );
-
-        if (!userDoc.empty) {
-          setUserProfile(userDoc.docs[0].data() as UserProfile);
-        }
-      } catch (error) {
-        console.error("Error fetching user profile:", error);
-      } finally {
-        setLoading(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [setLocation]);
-
-  if (loading) {
+  if (!user) {
     return <DashboardSkeleton />;
   }
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-8">Welcome, {userProfile?.displayName || 'User'}</h1>
+      <h1 className="text-3xl font-bold mb-8">Welcome, {user.displayName || 'User'}</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {userProfile?.role === 'consumer' && (
+        {user.role === 'consumer' && (
           <>
             <Card>
               <CardHeader>
@@ -70,7 +49,7 @@ export default function Dashboard() {
           </>
         )}
 
-        {userProfile?.role === 'producer' && (
+        {user.role === 'producer' && (
           <>
             <Card>
               <CardHeader>
@@ -92,7 +71,7 @@ export default function Dashboard() {
           </>
         )}
 
-        {userProfile?.role === 'partner' && (
+        {user.role === 'partner' && (
           <>
             <Card>
               <CardHeader>
