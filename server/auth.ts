@@ -52,8 +52,11 @@ nZtFnBk3VTG4vJ5p1RqD+Uk=
 
   // Connect to auth emulator in development
   if (process.env.NODE_ENV !== 'production') {
-    const host = process.env.REPL_SLUG ? `${process.env.REPL_SLUG}.repl.co` : '0.0.0.0';
-    const port = '9099';
+    // Use Replit workspace URL if available, otherwise fallback to localhost
+    const host = process.env.REPL_SLUG 
+      ? `${process.env.REPL_SLUG}.repl.co`
+      : '0.0.0.0';
+    const port = 9099; // Assuming port 9099 for auth emulator
     process.env['FIREBASE_AUTH_EMULATOR_HOST'] = `${host}:${port}`;
     console.log('Firebase Admin initialized in emulator mode:', {
       projectId,

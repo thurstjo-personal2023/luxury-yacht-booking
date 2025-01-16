@@ -1,8 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
-import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
-import { getStorage, connectStorageEmulator } from "firebase/storage";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
+import { getStorage } from "firebase/storage";
+import { connectToEmulators } from './emulators';
 
 // Validate required environment variables
 const requiredEnvVars = [
@@ -27,41 +28,56 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
-export const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const functions = getFunctions(app);
-export const storage = getStorage(app);
+let app: ReturnType<typeof initializeApp> | null = null;
+let auth: ReturnType<typeof getAuth> | null = null;
+let db: ReturnType<typeof getFirestore> | null = null;
+let functions: ReturnType<typeof getFunctions> | null = null;
+let storage: ReturnType<typeof getStorage> | null = null;
 
-// Connect to emulators in development
-if (import.meta.env.DEV) {
+async function initializeFirebase() {
   try {
-    const host = window.location.hostname;
-    console.log('Connecting to Firebase emulators on host:', host);
+    if (!app) {
+      // Initialize Firebase
+      app = initializeApp(firebaseConfig);
 
-    // Connect to Auth emulator on port 9099
-    connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
+      // Initialize services
+      auth = getAuth(app);
+      db = getFirestore(app);
+      functions = getFunctions(app);
+      storage = getStorage(app);
 
-    // Connect to Firestore emulator on port 8080
-    connectFirestoreEmulator(db, host, 8080);
-
-    // Connect to Functions emulator on port 5001
-    connectFunctionsEmulator(functions, host, 5001);
-
-    // Connect to Storage emulator on port 9199
-    connectStorageEmulator(storage, host, 9199);
-
-    console.log('Firebase emulators connected successfully:', {
-      host,
-      ports: {
-        auth: 9099,
-        firestore: 8080,
-        functions: 5001,
-        storage: 9199
+      // Connect to emulators in development
+      if (import.meta.env.DEV) {
+        await connectToEmulators({ 
+          app, 
+          auth: auth!, 
+          db: db!, 
+          functions: functions!, 
+          storage: storage! 
+        });
+        console.log('Firebase emulator suite initialized successfully');
       }
-    });
+    }
+
+    return {
+      app: app!,
+      auth: auth!,
+      db: db!,
+      functions: functions!,
+      storage: storage!
+    };
   } catch (error) {
-    console.error("Error connecting to Firebase emulators:", error);
+    console.error('Failed to initialize Firebase:', error);
+    throw error;
   }
 }
+
+// Initialize services and export them
+const firebaseInstance = await initializeFirebase();
+export const {
+  app: firebaseApp,
+  auth: firebaseAuth,
+  db: firebaseDb,
+  functions: firebaseFunctions,
+  storage: firebaseStorage
+} = firebaseInstance;
