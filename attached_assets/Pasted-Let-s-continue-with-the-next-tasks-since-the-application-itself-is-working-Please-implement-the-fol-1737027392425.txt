@@ -1,0 +1,96 @@
+Let's continue with the next tasks since the application itself is working. Please implement the following use case:
+
+Use Case for Epic 1: First-Time Arrival and Registration
+Use Case Name: User Registration and Role Selection
+Description: This use case describes the process through which a first-time user registers on the Etoile Yachts platform by providing essential information, creating a password, and selecting their role (Consumer, Producer, or Partner). Upon successful registration, the user is redirected to a role-specific onboarding page and receives a welcome email with profile setup instructions. The flow is designed to ensure alignment with the sitemap’s navigation structure, including post-registration redirection to personalized dashboards and access to relevant app sections.
+Actors:
+• Primary Actor: First-Time User (Visitor)
+• Secondary Actor: Etoile Yachts Platform
+Preconditions:
+
+The user has arrived at the Etoile Yachts platform via the home page and selected the registration option.
+The platform is live, accessible, and functioning correctly.
+Postconditions:
+The user is registered and redirected to the appropriate role-specific onboarding page.
+A welcome email is sent to the user with a link to set up their profile.
+Main Flow:
+
+Step 1: The user selects the Register option from the home page or bottom navigation bar.
+Step 2: The system displays the registration form with the following fields:
+o Full Name (Text Input)
+o Email Address (Email Input)
+o Phone Number (Tel Input)
+o Password (Password Input)
+o Role Selection (Radio Buttons: Consumer, Producer, Partner)
+Step 3: The user fills in the required fields and selects their role.
+Step 4: The user clicks the Register button to submit the form.
+Step 5: The system validates the input:
+o Ensures that all required fields are filled.
+o Verifies the email format.
+o Checks the password strength (minimum 8 characters, at least one uppercase letter, one number, and one special character).
+Step 6: Upon successful validation, the system:
+o Creates a new user record in the database.
+o Assigns the selected role to the user.
+o Sends a welcome email to the provided email address.
+Step 7: The system redirects the user to a role-specific onboarding page based on the selected role:
+o Consumer: Redirected to the consumer dashboard, displaying loyalty points, wishlist, and personalized recommendations.
+o Producer: Redirected to the producer dashboard, offering tools for listing services, managing bookings, and tracking earnings.
+o Partner: Redirected to the partner dashboard, showing referral tracking, affiliate commission details, and concierge support tools.
+Alternate Flows:
+Alternate Flow 1: User Fails Input Validation
+
+Step 1: The user submits the registration form with missing or invalid fields.
+Step 2: The system displays error messages indicating the issues:
+o Missing required fields.
+o Invalid email format.
+o Weak password.
+Step 3: The user corrects the errors and resubmits the form.
+Alternate Flow 2: User Already Registered
+Step 1: The user attempts to register with an email that is already in use.
+Step 2: The system displays an error message: “This email is already registered. Please log in or reset your password.”
+Step 3: The user can choose to log in or use the password reset option.
+Exceptions:
+Exception 1: System Error During Registration
+• Description: If there is a system error (e.g., database connection issue) during the registration process, the system displays an error message: “We encountered an issue while processing your registration. Please try again later.”
+• Handling: The system logs the error, and the user is prompted to try again later.
+Exception 2: Email Delivery Failure
+• Description: If the welcome email fails to send, the system retries sending the email up to three times.
+• Handling: If all attempts fail, the system logs the issue, and an alert is sent to the admin for manual follow-up.
+Assumptions:
+
+The user has a valid email address and phone number.
+The platform is optimized for both desktop and mobile devices.
+The user is familiar with basic web interactions (e.g., filling forms, clicking buttons).
+Notes:
+• The registration form should have a clean, intuitive layout to enhance user experience.
+• Tooltips or inline help should be provided for fields like password strength and role selection.
+• Ensure that the registration process is fully responsive and works seamlessly across different devices and screen sizes.
+Wireframe Layout for Registration and Role Selection Page
+Header:
+• Logo (Left)
+• Back Button (Right)
+• Title: "Registration Page" (Centered)
+Main Section: Registration Form
+• Heading: "Registration Form"
+• Fields:
+
+Full Name – Text input field.
+Email Address – Email input field.
+Phone Number – Telephone input field.
+Password – Password input field.
+Section: Role Selection
+• Heading: "Select Your Role"
+• Options:
+Consumer – Radio button.
+Producer – Radio button.
+Partner – Radio button.
+Submit Button:
+• Register Button (Centered, Green Button)
+Footer:
+• Link: "Already have an account? [Login]"
+Wireframe Navigation Consistency with Sitemap
+
+Home Page Navigation: Ensures users can access the registration option from both the home page and the bottom navigation bar.
+Role-Based Onboarding: Redirects users to dashboards consistent with the sitemap’s descriptions of Consumer, Producer, and Partner features.
+Post-Registration Options: Aligns with sitemap sections by offering seamless navigation to loyalty points, listings, and referral management based on user roles.
+This revised use case and wireframe ensure consistency with the Etoile Yachts sitemap by aligning the registration process, role selection, and onboarding flows with the documented navigation structure and user experience goals.
