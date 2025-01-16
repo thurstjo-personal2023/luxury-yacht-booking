@@ -17,8 +17,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
 
 const registerSchema = z.object({
   fullName: z.string().min(1, "Full name is required"),
@@ -78,15 +79,18 @@ export default function RegisterPage() {
         displayName: data.fullName,
       });
 
-      // Store additional user data in Firebase
-      const userData = {
+      // Create user document in Firestore
+      const userDoc = {
         uid: userCredential.user.uid,
         fullName: data.fullName,
         email: data.email,
         phoneNumber: data.phoneNumber,
         role: data.role,
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
+
+      await setDoc(doc(db, "users", userCredential.user.uid), userDoc);
 
       // Redirect based on role
       const dashboardRoutes = {
@@ -105,9 +109,21 @@ export default function RegisterPage() {
       console.error("Registration error:", error);
 
       // Handle Firebase specific errors
-      const errorMessage = error.code === 'auth/email-already-in-use'
-        ? "This email is already registered. Please log in or reset your password."
-        : error.message || "Something went wrong. Please try again.";
+      let errorMessage = "Something went wrong. Please try again.";
+
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = "This email is already registered. Please log in or reset your password.";
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = "Network error. Please check your connection and try again.";
+          break;
+        case 'auth/invalid-email':
+          errorMessage = "Invalid email address.";
+          break;
+        default:
+          errorMessage = error.message;
+      }
 
       toast({
         variant: "destructive",
