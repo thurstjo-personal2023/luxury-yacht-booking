@@ -23,7 +23,6 @@
   "storage": {
     "rules": "storage.rules"
   },
-  "extensions": {},
   "emulators": {
     "auth": {
       "port": 9099,
@@ -37,27 +36,18 @@
       "port": 9199,
       "host": "0.0.0.0"
     },
+    "functions": {
+      "port": 5001,
+      "host": "0.0.0.0"
+    },
     "ui": {
       "enabled": true,
       "port": 4000,
       "host": "0.0.0.0"
     },
-    "dataconnect": {
-      "dataDir": "dataconnect/.dataconnect/pgliteData",
-      "port": 9090,
+    "singleProjectMode": true,
+    "hub": {
       "host": "0.0.0.0"
-    },
-    "functions": {
-      "port": 5001,
-      "host": "0.0.0.0"
-    },
-    "tasks": {
-      "port": 8085,
-      "host": "0.0.0.0"
-    },
-    "singleProjectMode": true
-  },
-  "dataconnect": {
-    "source": "dataconnect"
+    }
   }
 }

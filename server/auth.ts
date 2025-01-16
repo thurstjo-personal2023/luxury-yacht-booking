@@ -40,10 +40,10 @@ nZtFnBk3VTG4vJ5p1RqD+Uk=
 -----END PRIVATE KEY-----`;
 
   admin.initializeApp({
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'demo-project',
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'etoile-yachts',
     credential: admin.credential.cert({
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'demo-project',
-      clientEmail: 'firebase-adminsdk-demo@demo-project.iam.gserviceaccount.com',
+      projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'etoile-yachts',
+      clientEmail: 'firebase-adminsdk-demo@etoile-yachts.iam.gserviceaccount.com',
       privateKey: dummyPrivateKey,
     }),
   });
