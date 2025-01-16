@@ -1,3 +1,12 @@
+import { auth } from './firebase';
+import { 
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut as firebaseSignOut,
+  type User as FirebaseUser 
+} from 'firebase/auth';
 import { create } from 'zustand';
 
 export type UserRole = 'consumer' | 'producer' | 'partner';
@@ -19,43 +28,39 @@ const useAuthStore = create<AuthState>((set) => ({
   setUser: (user) => set({ user }),
 }));
 
-export async function signInWithEmail(email: string, password: string) {
-  // TODO: Implement actual authentication later
-  const mockUser: UserProfile = {
-    id: '1',
-    email,
-    role: 'consumer',
-    displayName: email.split('@')[0],
+function createUserProfile(firebaseUser: FirebaseUser, role?: UserRole): UserProfile {
+  return {
+    id: firebaseUser.uid,
+    email: firebaseUser.email!,
+    role: role || 'consumer',
+    displayName: firebaseUser.displayName || undefined,
   };
-  useAuthStore.getState().setUser(mockUser);
-  return mockUser;
+}
+
+export async function signInWithEmail(email: string, password: string) {
+  const userCredential = await signInWithEmailAndPassword(auth, email, password);
+  const profile = createUserProfile(userCredential.user);
+  useAuthStore.getState().setUser(profile);
+  return profile;
 }
 
 export async function signUpWithEmail(email: string, password: string, role: UserRole) {
-  // TODO: Implement actual registration later
-  const mockUser: UserProfile = {
-    id: '1',
-    email,
-    role,
-    displayName: email.split('@')[0],
-  };
-  useAuthStore.getState().setUser(mockUser);
-  return mockUser;
+  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  const profile = createUserProfile(userCredential.user, role);
+  useAuthStore.getState().setUser(profile);
+  return profile;
 }
 
 export async function signInWithGoogle() {
-  // TODO: Implement Google authentication later
-  const mockUser: UserProfile = {
-    id: '1',
-    email: 'google@example.com',
-    role: 'consumer',
-    displayName: 'Google User',
-  };
-  useAuthStore.getState().setUser(mockUser);
-  return mockUser;
+  const provider = new GoogleAuthProvider();
+  const userCredential = await signInWithPopup(auth, provider);
+  const profile = createUserProfile(userCredential.user);
+  useAuthStore.getState().setUser(profile);
+  return profile;
 }
 
 export async function signOut() {
+  await firebaseSignOut(auth);
   useAuthStore.getState().setUser(null);
 }
 
