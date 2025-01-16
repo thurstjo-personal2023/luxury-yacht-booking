@@ -3,7 +3,13 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -23,7 +29,7 @@ const registerSchema = z.object({
     .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
     .regex(/[0-9]/, "Password must contain at least one number")
     .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
-  role: z.enum(["consumer", "producer", "partner"], {
+  role: z.string({
     required_error: "Please select a role",
   }),
 });
@@ -40,6 +46,7 @@ export default function RegisterPage() {
     handleSubmit,
     formState: { errors },
     watch,
+    setValue,
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   });
@@ -71,7 +78,7 @@ export default function RegisterPage() {
         displayName: data.fullName,
       });
 
-      // Store additional user data in Firestore
+      // Store additional user data in Firebase
       const userData = {
         uid: userCredential.user.uid,
         fullName: data.fullName,
@@ -93,7 +100,7 @@ export default function RegisterPage() {
         description: "Welcome to Etoile Yachts. Redirecting to your dashboard...",
       });
 
-      setLocation(dashboardRoutes[data.role]);
+      setLocation(dashboardRoutes[data.role as keyof typeof dashboardRoutes]);
     } catch (error: any) {
       console.error("Registration error:", error);
 
@@ -215,44 +222,24 @@ export default function RegisterPage() {
                 </div>
               </TooltipProvider>
 
-              <div className="space-y-4">
-                <Label>Select Your Role</Label>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <RadioGroup
-                        onValueChange={(value) => {
-                          register("role").onChange({ target: { value } });
-                        }}
-                        className="flex flex-col space-y-2"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="consumer" id="consumer" />
-                          <Label htmlFor="consumer">Consumer</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="producer" id="producer" />
-                          <Label htmlFor="producer">Producer</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="partner" id="partner" />
-                          <Label htmlFor="partner">Partner</Label>
-                        </div>
-                      </RadioGroup>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Choose your role:</p>
-                      <ul className="list-disc list-inside">
-                        <li>Consumer: Book and enjoy yacht experiences</li>
-                        <li>Producer: List and manage yacht services</li>
-                        <li>Partner: Manage referrals and concierge services</li>
-                      </ul>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select onValueChange={(value) => setValue("role", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="consumer">Consumer</SelectItem>
+                    <SelectItem value="producer">Producer</SelectItem>
+                    <SelectItem value="partner">Partner</SelectItem>
+                  </SelectContent>
+                </Select>
                 {errors.role && (
                   <p className="text-sm text-destructive">{errors.role.message}</p>
                 )}
+                <p className="text-sm text-muted-foreground">
+                  Choose how you'll use Etoile Yachts
+                </p>
               </div>
 
               <Button
