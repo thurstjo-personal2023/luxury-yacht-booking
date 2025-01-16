@@ -1,0 +1,12 @@
+specVersion: "v1beta"
+serviceId: "my-ey-data-connect"
+location: "asia-south1"
+schema:
+  source: "./schema"
+  datasource:
+    postgresql:
+      database: "postgres"
+      cloudSql:
+        instanceId: "my-eycloud-sql"
+      # schemaValidation: "COMPATIBLE"
+connectorDirs: ["./connector"]
