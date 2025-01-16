@@ -9,14 +9,13 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
-import { EMULATOR_CONFIG } from '@/lib/emulators';
+import { EMULATOR_CONFIG, getEmulatorHost, getEmulatorUIUrl } from '@/lib/emulators';
 import { auth, db, functions, storage } from '@/lib/firebase';
 
 interface EmulatorStatus {
   name: string;
   port: number;
   connected: boolean;
-  url: string;
 }
 
 export function EmulatorStatusWidget() {
@@ -25,34 +24,27 @@ export function EmulatorStatusWidget() {
 
   const checkEmulatorConnections = async () => {
     setChecking(true);
-    const host = '0.0.0.0';
-
     try {
-      // Check Firebase services connection status
       const emulators: EmulatorStatus[] = [
         { 
           name: 'Auth', 
           port: EMULATOR_CONFIG.auth.port,
-          connected: Boolean(auth.emulatorConfig),
-          url: `http://${host}:${EMULATOR_CONFIG.auth.port}`
+          connected: Boolean(auth.emulatorConfig)
         },
         { 
           name: 'Firestore', 
           port: EMULATOR_CONFIG.firestore.port,
-          connected: Boolean((db as any)._delegate._settings.host?.includes(String(EMULATOR_CONFIG.firestore.port))),
-          url: `http://${host}:${EMULATOR_CONFIG.firestore.port}`
+          connected: Boolean((db as any)._delegate._settings?.host?.includes(String(EMULATOR_CONFIG.firestore.port)))
         },
         { 
           name: 'Functions', 
           port: EMULATOR_CONFIG.functions.port,
-          connected: Boolean((functions as any)._customUrlOrRegion?.includes(String(EMULATOR_CONFIG.functions.port))),
-          url: `http://${host}:${EMULATOR_CONFIG.functions.port}`
+          connected: Boolean((functions as any)._customUrlOrRegion?.includes(String(EMULATOR_CONFIG.functions.port)))
         },
         { 
           name: 'Storage', 
           port: EMULATOR_CONFIG.storage.port,
-          connected: Boolean((storage as any)._customUrlOrRegion?.includes(String(EMULATOR_CONFIG.storage.port))),
-          url: `http://${host}:${EMULATOR_CONFIG.storage.port}`
+          connected: Boolean((storage as any)._customUrlOrRegion?.includes(String(EMULATOR_CONFIG.storage.port)))
         }
       ];
 
@@ -70,6 +62,9 @@ export function EmulatorStatusWidget() {
     const interval = setInterval(checkEmulatorConnections, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const host = getEmulatorHost();
+  const uiUrl = getEmulatorUIUrl();
 
   return (
     <Card className="w-[300px] shadow-lg fixed bottom-4 right-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -107,12 +102,12 @@ export function EmulatorStatusWidget() {
         ))}
         <div className="mt-2 text-xs text-muted-foreground">
           UI: <a 
-            href={`http://0.0.0.0:${EMULATOR_CONFIG.ui.port}`} 
+            href={uiUrl}
             target="_blank" 
             rel="noopener noreferrer"
             className="hover:underline"
           >
-            http://0.0.0.0:{EMULATOR_CONFIG.ui.port}
+            {uiUrl}
           </a>
         </div>
       </CardContent>
