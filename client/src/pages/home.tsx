@@ -11,25 +11,25 @@ export default function Home() {
       {/* Fixed Header */}
       <header className="fixed top-0 left-0 right-0 bg-background/95 backdrop-blur-sm z-50 border-b border-border">
         <nav className="flex items-center justify-between h-16">
-          {/* Logo Container */}
           <div 
-            className="w-28 h-10 md:w-32 md:h-12 bg-contain bg-no-repeat cursor-pointer ml-0"
-            style={{ backgroundImage: 'url(/Etoile_Yachts_v1_2.png)' }}
+            className="w-28 h-10 md:w-32 md:h-12 bg-contain bg-no-repeat cursor-pointer ml-4"
             onClick={() => setLocation("/")}
             aria-label="Etoile Yachts Logo"
-          />
+          >
+            <h1 className="text-xl font-bold">Etoile Yachts</h1>
+          </div>
 
           {/* Auth Buttons */}
           <div className="flex items-center gap-2 mr-4">
             <Button
               variant="ghost"
-              onClick={() => setLocation("/auth")}
+              onClick={() => setLocation("/auth/login")}
               className="text-sm px-3 py-2"
             >
               Log In
             </Button>
             <Button
-              onClick={() => setLocation("/auth")}
+              onClick={() => setLocation("/auth/register")}
               className="text-sm px-3 py-2"
             >
               Sign Up
@@ -38,34 +38,34 @@ export default function Home() {
         </nav>
       </header>
 
-      {/* Main Content with top padding for fixed header */}
+      {/* Main Content */}
       <main className="pt-16">
         {/* Hero Section */}
         <section className="relative h-[60vh] min-h-[400px]">
           <div 
             className="absolute inset-0 bg-cover bg-center"
             style={{ 
-              backgroundImage: 'url(https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?auto=format&fit=crop&q=80)',
+              backgroundImage: 'url(/yacht-hero.jpg)',
               filter: 'brightness(0.6)'
             }}
           />
           <div className="relative h-full flex flex-col items-center justify-center text-white p-6">
-            <h1 className="text-3xl md:text-5xl font-bold text-center mb-4 animate-fade-in">
+            <h1 className="text-3xl md:text-5xl font-bold text-center mb-4">
               Welcome to Etoile Yachts
             </h1>
-            <p className="text-lg md:text-xl text-center mb-8 max-w-2xl animate-fade-in">
+            <p className="text-lg md:text-xl text-center mb-8 max-w-2xl">
               Experience luxury water sports, integrated packages, and hybrid adventures
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md animate-slide-up">
+            <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
               <Button
-                onClick={() => setLocation("/auth")}
+                onClick={() => setLocation("/auth/register")}
                 className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white px-8 py-6"
                 size="lg"
               >
                 Get Started
               </Button>
               <Button
-                onClick={() => setLocation("/featured")}
+                onClick={() => setLocation("/explore")}
                 variant="outline"
                 className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white border-white px-8 py-6"
                 size="lg"
