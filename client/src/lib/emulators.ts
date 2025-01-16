@@ -21,11 +21,14 @@ interface FirebaseServices {
   storage: any;
 }
 
-function getEmulatorHost() {
+export function getEmulatorHost() {
   const host = window.location.hostname;
-  // Check if we're running in a Replit environment
-  const isReplit = host.includes('.repl.co');
-  return isReplit ? host : 'localhost';
+  return host.includes('.repl.co') ? host : 'localhost';
+}
+
+export function getEmulatorUIUrl() {
+  const host = getEmulatorHost();
+  return `http://${host}:${EMULATOR_CONFIG.ui.port}`;
 }
 
 export async function connectToEmulators(services: FirebaseServices) {
@@ -37,40 +40,26 @@ export async function connectToEmulators(services: FirebaseServices) {
   try {
     const host = getEmulatorHost();
     console.log('Connecting to Firebase emulators on host:', host);
+    console.log(`Firebase Emulator UI available at: ${getEmulatorUIUrl()}`);
 
     const { auth, db, functions, storage } = services;
 
     // Connect to Auth emulator
-    connectAuthEmulator(
-      auth, 
-      `http://${host}:${EMULATOR_CONFIG.auth.port}`,
-      { disableWarnings: true }
-    );
+    connectAuthEmulator(auth, `http://${host}:${EMULATOR_CONFIG.auth.port}`, { disableWarnings: true });
 
     // Connect to Firestore emulator
-    connectFirestoreEmulator(
-      db, 
-      host, 
-      EMULATOR_CONFIG.firestore.port
-    );
+    connectFirestoreEmulator(db, host, EMULATOR_CONFIG.firestore.port);
 
     // Connect to Functions emulator
-    connectFunctionsEmulator(
-      functions, 
-      host, 
-      EMULATOR_CONFIG.functions.port
-    );
+    connectFunctionsEmulator(functions, host, EMULATOR_CONFIG.functions.port);
 
     // Connect to Storage emulator
-    connectStorageEmulator(
-      storage, 
-      host, 
-      EMULATOR_CONFIG.storage.port
-    );
+    connectStorageEmulator(storage, host, EMULATOR_CONFIG.storage.port);
 
     console.log('Firebase emulators connected successfully:', {
       host,
-      ports: EMULATOR_CONFIG
+      ports: EMULATOR_CONFIG,
+      ui: getEmulatorUIUrl()
     });
 
     // Test connections
