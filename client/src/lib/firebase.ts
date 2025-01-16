@@ -1,9 +1,8 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getFunctions } from "firebase/functions";
-import { getStorage } from "firebase/storage";
-import { connectToEmulators } from './emulators';
+import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { getStorage, connectStorageEmulator } from "firebase/storage";
 
 // Validate required environment variables
 const requiredEnvVars = [
@@ -28,56 +27,43 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-let app: ReturnType<typeof initializeApp> | null = null;
-let auth: ReturnType<typeof getAuth> | null = null;
-let db: ReturnType<typeof getFirestore> | null = null;
-let functions: ReturnType<typeof getFunctions> | null = null;
-let storage: ReturnType<typeof getStorage> | null = null;
-
-async function initializeFirebase() {
-  try {
-    if (!app) {
-      // Initialize Firebase
-      app = initializeApp(firebaseConfig);
-
-      // Initialize services
-      auth = getAuth(app);
-      db = getFirestore(app);
-      functions = getFunctions(app);
-      storage = getStorage(app);
-
-      // Connect to emulators in development
-      if (import.meta.env.DEV) {
-        await connectToEmulators({ 
-          app, 
-          auth: auth!, 
-          db: db!, 
-          functions: functions!, 
-          storage: storage! 
-        });
-        console.log('Firebase emulator suite initialized successfully');
-      }
-    }
-
-    return {
-      app: app!,
-      auth: auth!,
-      db: db!,
-      functions: functions!,
-      storage: storage!
-    };
-  } catch (error) {
-    console.error('Failed to initialize Firebase:', error);
-    throw error;
-  }
+function getEmulatorHost() {
+  const host = window.location.hostname;
+  return host.includes('.repl.co') ? host : 'localhost';
 }
 
-// Initialize services and export them
-const firebaseInstance = await initializeFirebase();
-export const {
-  app: firebaseApp,
-  auth: firebaseAuth,
-  db: firebaseDb,
-  functions: firebaseFunctions,
-  storage: firebaseStorage
-} = firebaseInstance;
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+// Initialize Firebase services
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const functions = getFunctions(app);
+export const storage = getStorage(app);
+
+// Connect to emulators in development
+if (import.meta.env.DEV) {
+  const host = getEmulatorHost();
+
+  // Connect Auth Emulator
+  connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
+
+  // Connect Firestore Emulator
+  connectFirestoreEmulator(db, host, 8080);
+
+  // Connect Functions Emulator
+  connectFunctionsEmulator(functions, host, 5001);
+
+  // Connect Storage Emulator
+  connectStorageEmulator(storage, host, 9199);
+
+  console.log('Firebase emulators connected:', {
+    host,
+    ports: {
+      auth: 9099,
+      firestore: 8080,
+      functions: 5001,
+      storage: 9199
+    }
+  });
+}
