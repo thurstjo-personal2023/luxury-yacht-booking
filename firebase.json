@@ -37,6 +37,20 @@
     "ui": {
       "enabled": true,
       "port": 4000
-    }
+    },
+    "dataconnect": {
+      "dataDir": "dataconnect/.dataconnect/pgliteData",
+      "port": 9090
+    },
+    "functions": {
+      "port": 5001
+    },
+    "tasks": {
+      "port": 8085
+    },
+    "singleProjectMode": true
+  },
+  "dataconnect": {
+    "source": "dataconnect"
   }
 }
