@@ -37,12 +37,16 @@ export const storage = getStorage(app);
 // Connect to emulators in development
 if (import.meta.env.DEV) {
   try {
-    // Use 0.0.0.0 instead of localhost for better compatibility in Replit
-    connectAuthEmulator(auth, "http://0.0.0.0:9099");
-    connectFirestoreEmulator(db, "0.0.0.0", 8080);
-    connectFunctionsEmulator(functions, "0.0.0.0", 5001);
-    connectStorageEmulator(storage, "0.0.0.0", 9199);
-    console.log("Connected to Firebase emulators successfully");
+    // Use window.location.hostname to get the current host
+    const host = window.location.hostname;
+
+    // Connect to Firebase emulators using the current host
+    connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
+    connectFirestoreEmulator(db, host, 8080);
+    connectFunctionsEmulator(functions, host, 5001);
+    connectStorageEmulator(storage, host, 9199);
+
+    console.log("Connected to Firebase emulators successfully on host:", host);
   } catch (error) {
     console.error("Error connecting to Firebase emulators:", error);
   }

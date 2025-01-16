@@ -40,7 +40,7 @@ nZtFnBk3VTG4vJ5p1RqD+Uk=
 -----END PRIVATE KEY-----`;
 
   admin.initializeApp({
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'demo-project',
     credential: admin.credential.cert({
       projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'demo-project',
       clientEmail: 'firebase-adminsdk-demo@demo-project.iam.gserviceaccount.com',
@@ -50,7 +50,8 @@ nZtFnBk3VTG4vJ5p1RqD+Uk=
 
   // Connect to auth emulator in development
   if (process.env.NODE_ENV !== 'production') {
-    process.env['FIREBASE_AUTH_EMULATOR_HOST'] = '0.0.0.0:9099';
+    const host = process.env.REPL_SLUG ? `${process.env.REPL_SLUG}.repl.co` : '0.0.0.0';
+    process.env['FIREBASE_AUTH_EMULATOR_HOST'] = `${host}:9099`;
     console.log('Firebase Admin initialized in emulator mode');
   }
 }

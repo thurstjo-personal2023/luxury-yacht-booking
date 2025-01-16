@@ -66,20 +66,26 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormData) => {
     try {
       setIsLoading(true);
+      console.log('Starting registration process...'); // Debug log
 
       // Create user with Firebase Auth
+      console.log('Creating Firebase Auth user...'); // Debug log
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         data.email,
         data.password
       );
 
+      console.log('Firebase Auth user created:', userCredential.user.uid); // Debug log
+
       // Update profile with full name
+      console.log('Updating user profile...'); // Debug log
       await updateProfile(userCredential.user, {
         displayName: data.fullName,
       });
 
       // Create user document in Firestore
+      console.log('Creating Firestore document...'); // Debug log
       const userDoc = {
         uid: userCredential.user.uid,
         fullName: data.fullName,
@@ -91,6 +97,7 @@ export default function RegisterPage() {
       };
 
       await setDoc(doc(db, "users", userCredential.user.uid), userDoc);
+      console.log('Firestore document created successfully'); // Debug log
 
       // Redirect based on role
       const dashboardRoutes = {
@@ -111,18 +118,29 @@ export default function RegisterPage() {
       // Handle Firebase specific errors
       let errorMessage = "Something went wrong. Please try again.";
 
-      switch (error.code) {
-        case 'auth/email-already-in-use':
-          errorMessage = "This email is already registered. Please log in or reset your password.";
-          break;
-        case 'auth/network-request-failed':
-          errorMessage = "Network error. Please check your connection and try again.";
-          break;
-        case 'auth/invalid-email':
-          errorMessage = "Invalid email address.";
-          break;
-        default:
-          errorMessage = error.message;
+      if (error.code === 'auth/network-request-failed') {
+        errorMessage = `Network error: Please check your connection and try again. Host: ${window.location.hostname}`;
+        console.error('Network error details:', {
+          host: window.location.hostname,
+          error: error.message,
+          code: error.code
+        });
+      } else {
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            errorMessage = "This email is already registered. Please log in or reset your password.";
+            break;
+          case 'auth/invalid-email':
+            errorMessage = "Invalid email address.";
+            break;
+          default:
+            console.error('Unexpected error:', {
+              code: error.code,
+              message: error.message,
+              details: error
+            });
+            errorMessage = error.message;
+        }
       }
 
       toast({
@@ -279,6 +297,17 @@ export default function RegisterPage() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Debug information for development */}
+        {import.meta.env.DEV && (
+          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+            <p className="text-sm text-yellow-800">
+              Running in emulator mode. Do not use with production credentials.
+              <br />
+              Current host: {window.location.hostname}
+            </p>
+          </div>
+        )}
       </main>
     </div>
   );
