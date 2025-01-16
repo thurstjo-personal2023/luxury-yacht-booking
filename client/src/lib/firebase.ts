@@ -39,14 +39,24 @@ if (import.meta.env.DEV) {
   try {
     // Use window.location.hostname to get the current host
     const host = window.location.hostname;
+    const isReplitDev = host.includes('.replit.dev');
+
+    // For Replit dev URLs, we need to use HTTPS and the full hostname
+    const authUrl = isReplitDev 
+      ? `https://${host}`  // Replit dev URL
+      : `http://${host}`;  // Local development
 
     // Connect to Firebase emulators using the current host
-    connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
+    connectAuthEmulator(auth, `${authUrl}:9099`, { disableWarnings: true });
     connectFirestoreEmulator(db, host, 8080);
     connectFunctionsEmulator(functions, host, 5001);
     connectStorageEmulator(storage, host, 9199);
 
-    console.log("Connected to Firebase emulators successfully on host:", host);
+    console.log("Connected to Firebase emulators successfully:", {
+      host,
+      authUrl,
+      isReplitDev
+    });
   } catch (error) {
     console.error("Error connecting to Firebase emulators:", error);
   }

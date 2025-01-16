@@ -52,7 +52,7 @@ nZtFnBk3VTG4vJ5p1RqD+Uk=
   if (process.env.NODE_ENV !== 'production') {
     const host = process.env.REPL_SLUG ? `${process.env.REPL_SLUG}.repl.co` : '0.0.0.0';
     process.env['FIREBASE_AUTH_EMULATOR_HOST'] = `${host}:9099`;
-    console.log('Firebase Admin initialized in emulator mode');
+    console.log('Firebase Admin initialized in emulator mode with host:', host);
   }
 }
 
