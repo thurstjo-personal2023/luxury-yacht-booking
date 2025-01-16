@@ -18,6 +18,7 @@ if (!admin.apps.length) {
 
   // Connect to auth emulator in development
   if (process.env.NODE_ENV !== 'production') {
+    // Use 127.0.0.1 for local development
     const host = '127.0.0.1';
     const port = 9099;
 

@@ -36,12 +36,12 @@ export const db = getFirestore(app);
 export const functions = getFunctions(app);
 export const storage = getStorage(app);
 
-// Connect to emulators in development
+// Connect to local emulators in development
 if (import.meta.env.DEV) {
-  const host = '127.0.0.1';
+  const host = 'localhost';
 
   // Connect Auth Emulator
-  connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
+  connectAuthEmulator(auth, `http://${host}:9099`);
 
   // Connect Firestore Emulator
   connectFirestoreEmulator(db, host, 8080);
