@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/card';
 import { CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { EMULATOR_CONFIG } from '@/lib/emulators';
+import { auth, db, functions, storage } from '@/lib/firebase';
 
 interface EmulatorStatus {
   name: string;
@@ -24,65 +25,38 @@ export function EmulatorStatusWidget() {
 
   const checkEmulatorConnections = async () => {
     setChecking(true);
-    const host = 'localhost';
+    const host = '0.0.0.0';
 
     try {
+      // Check Firebase services connection status
       const emulators: EmulatorStatus[] = [
         { 
           name: 'Auth', 
           port: EMULATOR_CONFIG.auth.port,
-          connected: false,
+          connected: Boolean(auth.emulatorConfig),
           url: `http://${host}:${EMULATOR_CONFIG.auth.port}`
         },
         { 
           name: 'Firestore', 
           port: EMULATOR_CONFIG.firestore.port,
-          connected: false,
+          connected: Boolean((db as any)._delegate._settings.host?.includes(String(EMULATOR_CONFIG.firestore.port))),
           url: `http://${host}:${EMULATOR_CONFIG.firestore.port}`
         },
         { 
           name: 'Functions', 
           port: EMULATOR_CONFIG.functions.port,
-          connected: false,
+          connected: Boolean((functions as any)._customUrlOrRegion?.includes(String(EMULATOR_CONFIG.functions.port))),
           url: `http://${host}:${EMULATOR_CONFIG.functions.port}`
         },
         { 
           name: 'Storage', 
           port: EMULATOR_CONFIG.storage.port,
-          connected: false,
+          connected: Boolean((storage as any)._customUrlOrRegion?.includes(String(EMULATOR_CONFIG.storage.port))),
           url: `http://${host}:${EMULATOR_CONFIG.storage.port}`
         }
       ];
 
-      // Check each emulator connection
-      const statusChecks = await Promise.all(
-        emulators.map(async (emulator) => {
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000);
-
-            const response = await fetch(emulator.url, { 
-              method: 'HEAD',
-              signal: controller.signal
-            }).catch(() => null);
-
-            clearTimeout(timeoutId);
-
-            return {
-              ...emulator,
-              connected: response !== null
-            };
-          } catch (error) {
-            console.log(`Error checking ${emulator.name} emulator:`, error);
-            return {
-              ...emulator,
-              connected: false
-            };
-          }
-        })
-      );
-
-      setStatuses(statusChecks);
+      setStatuses(emulators);
     } catch (error) {
       console.error('Error checking emulator connections:', error);
     } finally {
@@ -92,7 +66,7 @@ export function EmulatorStatusWidget() {
 
   useEffect(() => {
     checkEmulatorConnections();
-    // Set up periodic checks every 30 seconds
+    // Check connection status every 30 seconds
     const interval = setInterval(checkEmulatorConnections, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -133,12 +107,12 @@ export function EmulatorStatusWidget() {
         ))}
         <div className="mt-2 text-xs text-muted-foreground">
           UI: <a 
-            href={`http://localhost:${EMULATOR_CONFIG.ui.port}`} 
+            href={`http://0.0.0.0:${EMULATOR_CONFIG.ui.port}`} 
             target="_blank" 
             rel="noopener noreferrer"
             className="hover:underline"
           >
-            http://localhost:{EMULATOR_CONFIG.ui.port}
+            http://0.0.0.0:{EMULATOR_CONFIG.ui.port}
           </a>
         </div>
       </CardContent>
