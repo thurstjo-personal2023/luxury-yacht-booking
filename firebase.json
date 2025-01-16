@@ -25,7 +25,7 @@
   },
   "emulators": {
     "auth": {
-      "port": 9099,
+      "port": 3003,
       "host": "0.0.0.0"
     },
     "firestore": {
@@ -47,6 +47,7 @@
     },
     "singleProjectMode": true,
     "hub": {
+      "port": 4400,
       "host": "0.0.0.0"
     }
   }

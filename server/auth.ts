@@ -39,11 +39,13 @@ ZZF5/Kt6NgRglZ5GYPWx7DW4G/p5jMtPqX5zqT6QNi8Y5U0MSvsV8M7Y5I5/KPtL
 nZtFnBk3VTG4vJ5p1RqD+Uk=
 -----END PRIVATE KEY-----`;
 
+  const projectId = process.env.VITE_FIREBASE_PROJECT_ID || 'etoile-yachts';
+
   admin.initializeApp({
-    projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'etoile-yachts',
+    projectId,
     credential: admin.credential.cert({
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'etoile-yachts',
-      clientEmail: 'firebase-adminsdk-demo@etoile-yachts.iam.gserviceaccount.com',
+      projectId,
+      clientEmail: `firebase-adminsdk-demo@${projectId}.iam.gserviceaccount.com`,
       privateKey: dummyPrivateKey,
     }),
   });
@@ -51,10 +53,10 @@ nZtFnBk3VTG4vJ5p1RqD+Uk=
   // Connect to auth emulator in development
   if (process.env.NODE_ENV !== 'production') {
     const host = process.env.REPL_SLUG ? `${process.env.REPL_SLUG}.repl.co` : '0.0.0.0';
-    // Use port 3003 for auth emulator in Replit environment
-    const port = process.env.REPL_SLUG ? '3003' : '9099';
+    const port = '3003';
     process.env['FIREBASE_AUTH_EMULATOR_HOST'] = `${host}:${port}`;
     console.log('Firebase Admin initialized in emulator mode:', {
+      projectId,
       host,
       port,
       emulatorHost: process.env['FIREBASE_AUTH_EMULATOR_HOST']

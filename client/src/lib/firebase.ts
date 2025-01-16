@@ -37,20 +37,27 @@ export const storage = getStorage(app);
 // Connect to emulators in development
 if (import.meta.env.DEV) {
   try {
-    const currentHost = window.location.hostname;
+    const host = window.location.hostname;
+    console.log('Connecting to Firebase emulators on host:', host);
 
-    // Always use the mapped ports for Replit environment
-    connectAuthEmulator(auth, `https://${currentHost}:3003`);
-    connectFirestoreEmulator(db, currentHost, 8080);
-    connectFunctionsEmulator(functions, currentHost, 5000);
-    connectStorageEmulator(storage, currentHost, 9199);
+    // Connect to Auth emulator on port 3003
+    connectAuthEmulator(auth, `http://${host}:3003`, { disableWarnings: true });
 
-    console.log('Firebase emulators connected with:', {
-      host: currentHost,
+    // Connect to Firestore emulator on port 8080
+    connectFirestoreEmulator(db, host, 8080);
+
+    // Connect to Functions emulator on port 5001
+    connectFunctionsEmulator(functions, host, 5001);
+
+    // Connect to Storage emulator on port 9199
+    connectStorageEmulator(storage, host, 9199);
+
+    console.log('Firebase emulators connected successfully:', {
+      host,
       ports: {
         auth: 3003,
         firestore: 8080,
-        functions: 5000,
+        functions: 5001,
         storage: 9199
       }
     });
