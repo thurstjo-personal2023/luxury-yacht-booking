@@ -1,10 +1,37 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import session from "express-session";
+import createMemoryStore from "memorystore";
+import { configureAuth } from "./auth";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Configure session middleware
+const MemoryStore = createMemoryStore(session);
+const sessionSettings: session.SessionOptions = {
+  secret: process.env.REPL_ID || "luxury-yacht-booking-secret",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {},
+  store: new MemoryStore({
+    checkPeriod: 86400000, // prune expired entries every 24h
+  }),
+};
+
+if (app.get("env") === "production") {
+  app.set("trust proxy", 1);
+  sessionSettings.cookie = {
+    secure: true,
+  };
+}
+
+app.use(session(sessionSettings));
+
+// Configure authentication after session middleware
+configureAuth(app);
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -42,9 +69,8 @@ app.use((req, res, next) => {
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
+    console.error('Server Error:', err);
     res.status(status).json({ message });
-    throw err;
   });
 
   if (app.get("env") === "development") {
