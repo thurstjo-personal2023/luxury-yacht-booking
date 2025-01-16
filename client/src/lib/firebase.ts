@@ -32,6 +32,11 @@ function getEmulatorHost() {
   return host.includes('.repl.co') ? host : 'localhost';
 }
 
+function getEmulatorUIUrl() {
+  const host = getEmulatorHost();
+  return `https://${host}:4000`;
+}
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
@@ -66,4 +71,7 @@ if (import.meta.env.DEV) {
       storage: 9199
     }
   });
+
+  console.log('\n🔥 Firebase Emulator UI is available at:', getEmulatorUIUrl());
+  console.log('Note: You may need to accept the self-signed certificate warning in your browser.');
 }
