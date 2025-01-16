@@ -27,16 +27,6 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-function getEmulatorHost() {
-  const host = window.location.hostname;
-  return host.includes('.repl.co') ? host : 'localhost';
-}
-
-function getEmulatorUIUrl() {
-  const host = getEmulatorHost();
-  return `https://${host}:4000`;
-}
-
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
@@ -48,7 +38,7 @@ export const storage = getStorage(app);
 
 // Connect to emulators in development
 if (import.meta.env.DEV) {
-  const host = getEmulatorHost();
+  const host = '127.0.0.1';
 
   // Connect Auth Emulator
   connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
@@ -62,16 +52,13 @@ if (import.meta.env.DEV) {
   // Connect Storage Emulator
   connectStorageEmulator(storage, host, 9199);
 
-  console.log('Firebase emulators connected:', {
-    host,
-    ports: {
-      auth: 9099,
-      firestore: 8080,
-      functions: 5001,
-      storage: 9199
-    }
-  });
-
-  console.log('\n🔥 Firebase Emulator UI is available at:', getEmulatorUIUrl());
-  console.log('Note: You may need to accept the self-signed certificate warning in your browser.');
+  console.log('\n🔥 Firebase Emulator Configuration:');
+  console.log('--------------------------------');
+  console.log('Connected to local Firebase emulators:');
+  console.log('Auth:', `http://${host}:9099`);
+  console.log('Firestore:', `http://${host}:8080`);
+  console.log('Functions:', `http://${host}:5001`);
+  console.log('Storage:', `http://${host}:9199`);
+  console.log('Emulator UI:', `http://${host}:4000`);
+  console.log('--------------------------------\n');
 }
