@@ -234,38 +234,59 @@ export default function YachtListing() {
             Search Results ({filteredYachts?.length ?? 0} yachts found)
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredYachts?.map((yacht) => (
-              <div key={yacht.id} className="group relative">
-                <div className="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200">
-                  <img
-                    src={yacht.imageUrl}
-                    alt={yacht.name}
-                    className="h-full w-full object-cover object-center group-hover:opacity-75"
-                  />
-                </div>
-                <div className="mt-4 space-y-2">
-                  <div className="flex justify-between">
-                    <h3 className="text-lg font-medium">{yacht.name}</h3>
-                    <p className="text-lg font-semibold">
-                      AED {yacht.price.toLocaleString()}
-                    </p>
+          {filteredYachts?.length === 0 ? (
+            <div className="text-center py-12 bg-muted/20 rounded-lg">
+              <p className="text-lg text-muted-foreground mb-4">
+                No experiences match your criteria. Please adjust your filters and try again.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSearchTerm("");
+                  setSelectedDate(undefined);
+                  setSelectedActivities([]);
+                  setPriceRange([5000, 100000]);
+                  setLocation("all");
+                  setDuration("all");
+                }}
+              >
+                Reset Filters
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredYachts?.map((yacht) => (
+                <div key={yacht.id} className="group relative">
+                  <div className="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-lg bg-gray-200">
+                    <img
+                      src={yacht.imageUrl}
+                      alt={yacht.name}
+                      className="h-full w-full object-cover object-center group-hover:opacity-75"
+                    />
                   </div>
-                  <p className="text-sm text-muted-foreground">{yacht.description}</p>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">
-                      Capacity: {yacht.capacity} guests
-                    </span>
-                    <Button
-                      onClick={() => {/* TODO: Implement view details */}}
-                    >
-                      View Details
-                    </Button>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex justify-between">
+                      <h3 className="text-lg font-medium">{yacht.name}</h3>
+                      <p className="text-lg font-semibold">
+                        AED {yacht.price.toLocaleString()}
+                      </p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{yacht.description}</p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">
+                        Capacity: {yacht.capacity} guests
+                      </span>
+                      <Button
+                        onClick={() => {/* TODO: Implement view details */}}
+                      >
+                        View Details
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

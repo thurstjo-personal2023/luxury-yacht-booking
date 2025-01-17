@@ -16,6 +16,7 @@ vi.mock('@/lib/firebase', () => ({
   },
 }));
 
+// Test data setup
 const mockYachts = [
   {
     id: "1",
@@ -99,6 +100,47 @@ describe('YachtListing Component - Search and Filter Functionality', () => {
     });
   });
 
+  it('should show "no results" message when no yachts match filters', async () => {
+    const user = userEvent.setup();
+    renderYachtListing();
+
+    // Apply filters that won't match any yachts
+    // 1. Set location to Dubai Marina
+    const locationSelect = screen.getByRole('combobox', { name: /location/i });
+    await user.click(locationSelect);
+    await user.click(screen.getByRole('option', { name: /dubai marina/i }));
+
+    // 2. Set an extremely low price range that no yacht matches
+    const priceSlider = screen.getByRole('slider');
+    fireEvent.change(priceSlider, { target: { value: 1000 } }); // Set price below minimum
+
+    // 3. Select a specific activity type
+    const corporateCheckbox = screen.getByRole('checkbox', { name: /corporate/i });
+    await user.click(corporateCheckbox);
+
+    // 4. Set duration
+    const durationSelect = screen.getByRole('combobox', { name: /duration/i });
+    await user.click(durationSelect);
+    await user.click(screen.getByRole('option', { name: /half day/i }));
+
+    // Verify no results message
+    await waitFor(() => {
+      expect(screen.getByText(/no experiences match your criteria/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /reset filters/i })).toBeInTheDocument();
+    });
+
+    // Test reset functionality
+    const resetButton = screen.getByRole('button', { name: /reset filters/i });
+    await user.click(resetButton);
+
+    // Verify all yachts are shown after reset
+    await waitFor(() => {
+      mockYachts.forEach(yacht => {
+        expect(screen.getByText(yacht.name)).toBeInTheDocument();
+      });
+    });
+  });
+
   it('should filter yachts based on search criteria', async () => {
     const user = userEvent.setup();
     renderYachtListing();
@@ -143,11 +185,6 @@ describe('YachtListing Component - Search and Filter Functionality', () => {
     expect(resultCard).toHaveTextContent('Luxurious megayacht');
     expect(resultCard).toHaveTextContent('Capacity: 12 guests');
     expect(screen.getByRole('button', { name: /view details/i })).toBeInTheDocument();
-  });
-
-  // Add more test cases for other scenarios
-  it('should show "no results" message when no yachts match filters', async () => {
-    // TODO: Implement this test
   });
 
   it('should reset filters when reset button is clicked', async () => {
