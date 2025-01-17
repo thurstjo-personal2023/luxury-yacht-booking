@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { EmulatorStatusWidget } from "@/components/ui/emulator-status";
 import Home from "@/pages/home";
 import RegisterPage from "@/pages/auth/register";
+import AuthPage from "@/pages/auth";
 import Dashboard from "@/pages/dashboard";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/lib/auth";
@@ -24,7 +25,7 @@ function PrivateRoute({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    setLocation("/auth/login");
+    setLocation("/auth");
     return null;
   }
 
@@ -35,6 +36,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/auth" component={AuthPage} />
       <Route path="/auth/register" component={RegisterPage} />
       <Route path="/dashboard">
         {() => (
