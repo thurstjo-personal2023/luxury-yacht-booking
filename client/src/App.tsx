@@ -8,19 +8,27 @@ import RegisterPage from "@/pages/auth/register";
 import Dashboard from "@/pages/dashboard";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/lib/auth";
-import React, { useEffect } from 'react';
+import { Loader2 } from "lucide-react";
+import { type ReactNode } from "react";
 
-function PrivateRoute({ component: Component, ...rest }: { component: React.ComponentType<any> }) {
-  const { user } = useAuth();
+function PrivateRoute({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
 
-  useEffect(() => {
-    if (!user) {
-      setLocation("/auth/login");
-    }
-  }, [user, setLocation]);
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-border" />
+      </div>
+    );
+  }
 
-  return user ? <Component {...rest} /> : null;
+  if (!user) {
+    setLocation("/auth/login");
+    return null;
+  }
+
+  return <>{children}</>;
 }
 
 function Router() {
@@ -29,7 +37,11 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/auth/register" component={RegisterPage} />
       <Route path="/dashboard">
-        {(params) => <PrivateRoute component={Dashboard} />}
+        {() => (
+          <PrivateRoute>
+            <Dashboard />
+          </PrivateRoute>
+        )}
       </Route>
       <Route component={NotFound} />
     </Switch>
