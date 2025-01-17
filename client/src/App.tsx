@@ -7,6 +7,7 @@ import Home from "@/pages/home";
 import RegisterPage from "@/pages/auth/register";
 import AuthPage from "@/pages/auth";
 import Dashboard from "@/pages/dashboard";
+import YachtListing from "@/pages/yacht-listing";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/lib/auth";
 import { Loader2 } from "lucide-react";
@@ -38,6 +39,13 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/auth/register" component={RegisterPage} />
+      <Route path="/yacht-listing">
+        {() => (
+          <PrivateRoute>
+            <YachtListing />
+          </PrivateRoute>
+        )}
+      </Route>
       <Route path="/dashboard">
         {() => (
           <PrivateRoute>
