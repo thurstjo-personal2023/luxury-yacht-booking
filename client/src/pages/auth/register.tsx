@@ -99,19 +99,19 @@ export default function RegisterPage() {
       await setDoc(doc(db, "users", userCredential.user.uid), userDoc);
       console.log('Firestore document created successfully'); // Debug log
 
-      // Redirect based on role
-      const dashboardRoutes = {
-        consumer: "/dashboard/consumer",
-        producer: "/dashboard/producer",
-        partner: "/dashboard/partner",
-      };
-
       toast({
         title: "Registration successful!",
         description: "Welcome to Etoile Yachts. Redirecting to your dashboard...",
       });
 
-      setLocation(dashboardRoutes[data.role as keyof typeof dashboardRoutes]);
+      // Redirect based on role
+      if (data.role === 'consumer') {
+        setLocation("/dashboard");
+      } else {
+        // For other roles, we can add their specific dashboard routes later
+        setLocation("/");
+      }
+
     } catch (error: any) {
       console.error("Registration error:", error);
 
