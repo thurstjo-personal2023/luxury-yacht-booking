@@ -5,7 +5,8 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
-  type User as FirebaseUser 
+  type User as FirebaseUser,
+  onAuthStateChanged 
 } from 'firebase/auth';
 import { create } from 'zustand';
 
@@ -20,12 +21,16 @@ export interface UserProfile {
 
 interface AuthState {
   user: UserProfile | null;
+  isLoading: boolean;
   setUser: (user: UserProfile | null) => void;
+  setLoading: (loading: boolean) => void;
 }
 
 const useAuthStore = create<AuthState>((set) => ({
   user: null,
+  isLoading: true,
   setUser: (user) => set({ user }),
+  setLoading: (isLoading) => set({ isLoading }),
 }));
 
 function createUserProfile(firebaseUser: FirebaseUser, role?: UserRole): UserProfile {
@@ -63,6 +68,17 @@ export async function signOut() {
   await firebaseSignOut(auth);
   useAuthStore.getState().setUser(null);
 }
+
+// Initialize auth state listener
+onAuthStateChanged(auth, (firebaseUser) => {
+  useAuthStore.getState().setLoading(false);
+  if (firebaseUser) {
+    const profile = createUserProfile(firebaseUser);
+    useAuthStore.getState().setUser(profile);
+  } else {
+    useAuthStore.getState().setUser(null);
+  }
+});
 
 export function useAuth() {
   return useAuthStore();

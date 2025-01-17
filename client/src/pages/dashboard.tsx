@@ -42,7 +42,7 @@ export default function Dashboard() {
         // Fetch bookings
         const bookingsQuery = query(
           collection(db, "bookings"),
-          where("userId", "==", user.uid)
+          where("userId", "==", user.id)
         );
         const bookingsSnapshot = await getDocs(bookingsQuery);
         const bookingsData = bookingsSnapshot.docs.map(doc => ({
