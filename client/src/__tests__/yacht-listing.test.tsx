@@ -38,6 +38,39 @@ const mockYachts = [
     capacity: 8,
     activities: ["water-sports"],
     duration: "half-day"
+  },
+  {
+    id: "3",
+    name: "Royal Voyager",
+    description: "Perfect for fishing trips",
+    price: 35000,
+    imageUrl: "https://example.com/yacht3.jpg",
+    location: "Abu Dhabi",
+    capacity: 6,
+    activities: ["fishing"],
+    duration: "full-day"
+  },
+  {
+    id: "4",
+    name: "Desert Pearl",
+    description: "Corporate events and parties",
+    price: 75000,
+    imageUrl: "https://example.com/yacht4.jpg",
+    location: "Dubai Marina",
+    capacity: 20,
+    activities: ["corporate", "party"],
+    duration: "multi-day"
+  },
+  {
+    id: "5",
+    name: "Marina Star",
+    description: "Family-friendly yacht with water sports",
+    price: 15000,
+    imageUrl: "https://example.com/yacht5.jpg",
+    location: "Palm Jumeirah",
+    capacity: 10,
+    activities: ["yacht-cruise", "water-sports"],
+    duration: "half-day"
   }
 ];
 
@@ -110,5 +143,18 @@ describe('YachtListing Component - Search and Filter Functionality', () => {
     expect(resultCard).toHaveTextContent('Luxurious megayacht');
     expect(resultCard).toHaveTextContent('Capacity: 12 guests');
     expect(screen.getByRole('button', { name: /view details/i })).toBeInTheDocument();
+  });
+
+  // Add more test cases for other scenarios
+  it('should show "no results" message when no yachts match filters', async () => {
+    // TODO: Implement this test
+  });
+
+  it('should reset filters when reset button is clicked', async () => {
+    // TODO: Implement this test
+  });
+
+  it('should maintain filter state when navigating back to the page', async () => {
+    // TODO: Implement this test
   });
 });
