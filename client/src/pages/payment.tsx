@@ -104,7 +104,9 @@ export default function PaymentPage() {
   // Parse and validate amount from URL
   const parseAmount = () => {
     console.log("[Payment Page] Parsing URL parameters:", location);
-    const searchParams = new URLSearchParams(location.split('?')[1]);
+    // Get the full search string including the ? character
+    const searchString = window.location.search;
+    const searchParams = new URLSearchParams(searchString);
     const amountParam = searchParams.get('amount');
     console.log("[Payment Page] Amount parameter from URL:", amountParam);
 
