@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 // Use the environment variable directly
 const stripePromise = loadStripe("pk_test_51QiY7MHld5Z9DroAkruR5iLpe8ypSOMArYmbikoaGZuIg7dikehIKnVhED5PNwQx8qhb6Tp1KdSURMSZH8XlPQmM00ymFCgZwQ");
@@ -99,16 +99,66 @@ function PaymentForm() {
 
 export default function PaymentPage() {
   const [location] = useLocation();
+  const [clientSecret, setClientSecret] = useState<string>();
+  const [error, setError] = useState<string>();
   const searchParams = new URLSearchParams(location.split('?')[1]);
   const amount = parseInt(searchParams.get('amount') || '0');
 
-  // Convert amount to cents for Stripe
-  const amountInCents = amount * 100;
+  useEffect(() => {
+    async function createPaymentIntent() {
+      try {
+        const response = await fetch('/api/create-payment-intent', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ amount }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create payment intent');
+        }
+
+        const data = await response.json();
+        setClientSecret(data.clientSecret);
+      } catch (err) {
+        console.error('Error:', err);
+        setError('Failed to initialize payment. Please try again.');
+      }
+    }
+
+    if (amount > 0) {
+      createPaymentIntent();
+    }
+  }, [amount]);
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <Card className="max-w-2xl mx-auto border-destructive">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-5 w-5" />
+                <p>{error}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  if (!clientSecret) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const options = {
-    mode: "payment" as const,
-    amount: amountInCents, // Amount in cents
-    currency: 'aed',
+    clientSecret,
     appearance: {
       theme: 'stripe' as const,
     },
