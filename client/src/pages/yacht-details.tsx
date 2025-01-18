@@ -372,11 +372,11 @@ const SAMPLE_YACHT_DETAILS: Record<string, YachtDetails> = {
     activities: ["yacht-cruise", "party", "corporate"],
     duration: "full-day",
     gallery: [
-      "https://images.unsplash.com/photo-1469796466635-455ede028aca",
-      "https://images.unsplash.com/photo-1605281317010-fe5ffe798166",
-      "https://images.unsplash.com/photo-1586302836983-b965139d7abc",
-      "https://images.unsplash.com/photo-1605281316961-437f8eb42745",
-      "https://images.unsplash.com/photo-1605281316446-8dd68628a11d"
+      "https://images.unsplash.com/photo-1469796466635-455ede028aca", // Main listing image
+      "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13", // Interior lounge
+      "https://images.unsplash.com/photo-1566073771259-6a8506099945", // Deck dining
+      "https://images.unsplash.com/photo-1554254464-7046778097bf", // Aerial view
+      "https://images.unsplash.com/photo-1582401858117-c92d5be9bdf2" // Night view
     ],
     addOns: [
       {
@@ -425,10 +425,11 @@ const SAMPLE_YACHT_DETAILS: Record<string, YachtDetails> = {
     activities: ["yacht-cruise", "water-sports"],
     duration: "half-day",
     gallery: [
-      "https://images.unsplash.com/photo-1507652313519-d4e9174996dd",
-      "https://images.unsplash.com/photo-1542272201-b1ca555f8505",
-      "https://images.unsplash.com/photo-1566438480900-0609be27a4be",
-      "https://images.unsplash.com/photo-1613553474179-e1eda3ea5734"
+      "https://images.unsplash.com/photo-1507652313519-d4e9174996dd", // Main listing image
+      "https://images.unsplash.com/photo-1599170613969-01b60ada6327", // Cabin interior
+      "https://images.unsplash.com/photo-1584158608392-31bae2e0fd0f", // Deck lounge
+      "https://images.unsplash.com/photo-1605281316446-8dd68628a11d", // Water activities
+      "https://images.unsplash.com/photo-1563296291-14f26f10c20f" // Sunset view
     ],
     addOns: [
       {
@@ -477,11 +478,11 @@ const SAMPLE_YACHT_DETAILS: Record<string, YachtDetails> = {
     activities: ["yacht-cruise", "fishing", "corporate"],
     duration: "multi-day",
     gallery: [
-      "https://images.unsplash.com/photo-1549439602-43ebca2327af",
-      "https://images.unsplash.com/photo-1571689936114-b16146c9570a",
-      "https://images.unsplash.com/photo-1571689935894-a5b09e5a6d12",
-      "https://images.unsplash.com/photo-1571689994302-a227d3747442",
-      "https://images.unsplash.com/photo-1571689982774-7b375a0b6958"
+      "https://images.unsplash.com/photo-1549439602-43ebca2327af", // Main listing image
+      "https://images.unsplash.com/photo-1586302836983-b965139d7abc", // Conference room
+      "https://images.unsplash.com/photo-1570101945621-945409a6370f", // Master suite
+      "https://images.unsplash.com/photo-1613553507747-5f8aa69d5706", // Fishing deck
+      "https://images.unsplash.com/photo-1575517111478-7f6afd0973db" // Evening deck view
     ],
     addOns: [
       {
