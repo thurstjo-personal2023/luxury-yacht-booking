@@ -49,7 +49,12 @@ export default function YachtDetails({ id }: { id: string }) {
   const { data: yacht, isLoading } = useQuery({
     queryKey: ['/api/yachts', id],
     queryFn: async () => {
-      return SAMPLE_YACHT_DETAILS;
+      // Return the specific yacht details based on ID
+      const yachtData = SAMPLE_YACHT_DETAILS[id];
+      if (!yachtData) {
+        throw new Error('Yacht not found');
+      }
+      return yachtData;
     }
   });
 
@@ -358,63 +363,162 @@ function LoadingSkeleton() {
 }
 
 // Sample data for development
-const SAMPLE_YACHT_DETAILS: YachtDetails = {
-  id: "1",
-  name: "Ocean Paradise",
-  description: "Experience luxury at its finest aboard our flagship yacht. Features include a helipad, infinity pool, and state-of-the-art entertainment systems.",
-  price: 50000,
-  location: "Dubai Marina",
-  capacity: 12,
-  activities: ["yacht-cruise", "party", "corporate"],
-  duration: "full-day",
-  gallery: [
-    "https://images.unsplash.com/photo-1544140708-514b7837e6b5?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80", // Luxury yacht front view
-    "https://images.unsplash.com/photo-1569263916174-97a5a552b0c9?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80", // Yacht interior
-    "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80", // Deck view
-    "https://images.unsplash.com/photo-1569261995036-701b8f3c4cf8?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80", // Yacht amenities
-    "https://images.unsplash.com/photo-1569262835711-5c127354f5fb?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"  // Sunset view
-  ],
-  addOns: [
-    {
-      id: "addon1",
-      name: "Private Chef Service",
-      description: "Enjoy gourmet meals prepared by our expert chef",
-      price: 5000
-    },
-    {
-      id: "addon2",
-      name: "Water Sports Package",
-      description: "Access to jet skis, paddleboards, and snorkeling gear",
-      price: 3000
-    },
-    {
-      id: "addon3",
-      name: "Professional Photography",
-      description: "2-hour photoshoot with our professional photographer",
-      price: 2500
-    }
-  ],
-  reviews: [
-    {
-      id: "review1",
-      userName: "Ahmed K.",
-      rating: 5,
-      comment: "An unforgettable experience! The yacht was immaculate and the service was outstanding.",
-      date: "2024-01-10"
-    },
-    {
-      id: "review2",
-      userName: "Sarah M.",
-      rating: 4,
-      comment: "Beautiful yacht and great crew. The water sports package was worth every penny.",
-      date: "2024-01-05"
-    },
-    {
-      id: "review3",
-      userName: "James L.",
-      rating: 5,
-      comment: "Perfect for our corporate event. The facilities exceeded our expectations.",
-      date: "2023-12-28"
-    }
-  ]
+const SAMPLE_YACHT_DETAILS: Record<string, YachtDetails> = {
+  "1": {
+    id: "1",
+    name: "Ocean Paradise",
+    description: "Experience luxury at its finest aboard our flagship yacht. Features include a helipad, infinity pool, and state-of-the-art entertainment systems.",
+    price: 50000,
+    location: "Dubai Marina",
+    capacity: 12,
+    activities: ["yacht-cruise", "party", "corporate"],
+    duration: "full-day",
+    gallery: [
+      "https://images.unsplash.com/photo-1544140708-514b7837e6b5?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1569263916174-97a5a552b0c9?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1569261995036-701b8f3c4cf8?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1569262835711-5c127354f5fb?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
+    ],
+    addOns: [
+      {
+        id: "addon1-1",
+        name: "Private Chef Service",
+        description: "Enjoy gourmet meals prepared by our expert Michelin-starred chef",
+        price: 5000
+      },
+      {
+        id: "addon1-2",
+        name: "Premium Bar Package",
+        description: "Top-shelf spirits, fine wines, and craft cocktails with professional bartender",
+        price: 3500
+      },
+      {
+        id: "addon1-3",
+        name: "Helicopter Transfer",
+        description: "Luxury helicopter transfer to and from the yacht",
+        price: 8000
+      }
+    ],
+    reviews: [
+      {
+        id: "review1-1",
+        userName: "Ahmed K.",
+        rating: 5,
+        comment: "An unforgettable experience! The yacht was immaculate and the service was outstanding.",
+        date: "2024-01-10"
+      },
+      {
+        id: "review1-2",
+        userName: "Sarah M.",
+        rating: 4,
+        comment: "Beautiful yacht and great crew. The helicopter transfer was worth every penny.",
+        date: "2024-01-05"
+      }
+    ]
+  },
+  "2": {
+    id: "2",
+    name: "Azure Dreams",
+    description: "Modern yacht perfect for intimate gatherings and romantic excursions, featuring sleek design and cutting-edge technology.",
+    price: 35000,
+    location: "Palm Jumeirah",
+    capacity: 8,
+    activities: ["yacht-cruise", "water-sports"],
+    duration: "half-day",
+    gallery: [
+      "https://images.unsplash.com/photo-1562281302-809d10c4c831?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1562281303-a1e5c4817b79?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1562281301-39fb54f9a917?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1562281298-c807ef4a0291?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
+    ],
+    addOns: [
+      {
+        id: "addon2-1",
+        name: "Water Sports Package",
+        description: "Access to jet skis, paddleboards, and snorkeling gear with instructor",
+        price: 2500
+      },
+      {
+        id: "addon2-2",
+        name: "Sunset Photography",
+        description: "2-hour professional photography session during golden hour",
+        price: 1800
+      },
+      {
+        id: "addon2-3",
+        name: "Romantic Dinner Setup",
+        description: "Private candlelit dinner with personal butler service",
+        price: 2000
+      }
+    ],
+    reviews: [
+      {
+        id: "review2-1",
+        userName: "Michael R.",
+        rating: 5,
+        comment: "Perfect for our anniversary celebration. The romantic dinner setup was magical!",
+        date: "2024-01-15"
+      },
+      {
+        id: "review2-2",
+        userName: "Lisa P.",
+        rating: 5,
+        comment: "Incredible water sports experience. The instructors were very professional.",
+        date: "2024-01-08"
+      }
+    ]
+  },
+  "3": {
+    id: "3",
+    name: "Royal Voyager",
+    description: "Classic luxury yacht with timeless elegance, perfect for corporate events and family celebrations.",
+    price: 45000,
+    location: "Abu Dhabi",
+    capacity: 10,
+    activities: ["yacht-cruise", "fishing", "corporate"],
+    duration: "multi-day",
+    gallery: [
+      "https://images.unsplash.com/photo-1565538810643-b5bdb714032a?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1565538810632-a500abdaa8c4?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1565538810622-7d7c861a8e5c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1565538810612-33c1a2127c0c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
+    ],
+    addOns: [
+      {
+        id: "addon3-1",
+        name: "Deep Sea Fishing",
+        description: "Full fishing equipment and experienced guide for deep sea fishing",
+        price: 3000
+      },
+      {
+        id: "addon3-2",
+        name: "Business Conference Setup",
+        description: "Complete AV equipment setup with technical support",
+        price: 4000
+      },
+      {
+        id: "addon3-3",
+        name: "Wellness Package",
+        description: "On-board massage therapist and yoga instructor",
+        price: 2800
+      }
+    ],
+    reviews: [
+      {
+        id: "review3-1",
+        userName: "James L.",
+        rating: 5,
+        comment: "Perfect for our corporate event. The conference setup was professional.",
+        date: "2023-12-28"
+      },
+      {
+        id: "review3-2",
+        userName: "David W.",
+        rating: 4,
+        comment: "Great fishing experience! Caught some impressive fish with the guide.",
+        date: "2024-01-02"
+      }
+    ]
+  }
 };
