@@ -12,15 +12,29 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Loader2 } from "lucide-react";
 
-// Initialize Stripe
+// Initialize Stripe with detailed logging
 const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-console.log("[Payment Page] Initializing Stripe with publishable key:", !!STRIPE_KEY);
+console.log("[Payment Page] Stripe Configuration:", {
+  environment: import.meta.env.MODE,
+  keyExists: !!STRIPE_KEY,
+  keyPrefix: STRIPE_KEY?.substring(0, 7),
+  allEnvVars: Object.keys(import.meta.env)
+});
 
 if (!STRIPE_KEY) {
-  console.error("[Payment Page] Stripe publishable key is missing");
+  console.error("[Payment Page] Stripe publishable key is missing. Available env vars:", Object.keys(import.meta.env));
+  throw new Error("Stripe publishable key is missing");
 }
 
-const stripePromise = STRIPE_KEY ? loadStripe(STRIPE_KEY) : null;
+// Create Stripe instance with error handling
+let stripePromise;
+try {
+  stripePromise = loadStripe(STRIPE_KEY);
+  console.log("[Payment Page] Stripe instance created successfully");
+} catch (error) {
+  console.error("[Payment Page] Error creating Stripe instance:", error);
+  stripePromise = null;
+}
 
 function PaymentForm() {
   const stripe = useStripe();
