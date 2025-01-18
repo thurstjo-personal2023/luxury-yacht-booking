@@ -33,28 +33,6 @@ app.use(session(sessionSettings));
 // Configure authentication after session middleware
 configureAuth(app);
 
-// Expose environment variables to the client
-app.get('/api/config', (req, res) => {
-  console.log('Environment variables:', {
-    STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
-    NODE_ENV: process.env.NODE_ENV
-  });
-
-  const stripeKey = process.env.STRIPE_PUBLISHABLE_KEY;
-
-  if (!stripeKey) {
-    console.error('Stripe publishable key is not configured in environment');
-    return res.status(500).json({ 
-      error: 'Stripe configuration is missing'
-    });
-  }
-
-  console.log('Serving Stripe configuration with key:', stripeKey.substring(0, 8) + '...');
-  res.json({
-    stripePublishableKey: stripeKey
-  });
-});
-
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;

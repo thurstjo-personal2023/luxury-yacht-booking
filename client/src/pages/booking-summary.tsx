@@ -7,6 +7,7 @@ export default function BookingSummaryPage() {
   const { toast } = useToast();
 
   // In a real application, this would come from your booking state management
+  // For testing purposes, we'll use sample data
   const sampleBookingData = {
     packageDetails: {
       name: "Ocean Paradise",
@@ -40,8 +41,9 @@ export default function BookingSummaryPage() {
   };
 
   const handleProceedToPayment = () => {
-    const totalInCents = calculateTotal() * 100; // Convert to cents for Stripe
-    setLocation(`/payment?amount=${totalInCents}`);
+    const total = calculateTotal();
+    // Pass the total amount to the payment page via URL state
+    setLocation(`/payment?amount=${total}`);
   };
 
   return (

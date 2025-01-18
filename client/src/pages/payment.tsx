@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
   PaymentElement,
@@ -9,8 +10,17 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AlertCircle, Loader2 } from "lucide-react";
-import { stripePromise } from "@/lib/stripe";
+
+// Use the environment variable directly
+const stripePromise = loadStripe("pk_test_51QiY7MHld5Z9DroAkruR5iLpe8ypSOMArYmbikoaGZuIg7dikehIKnVhED5PNwQx8qhb6Tp1KdSURMSZH8XlPQmM00ymFCgZwQ");
 
 function PaymentForm() {
   const stripe = useStripe();
@@ -18,12 +28,12 @@ function PaymentForm() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<string>("card");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!stripe || !elements) {
-      console.error("Stripe.js hasn't loaded yet");
       return;
     }
 
@@ -38,15 +48,14 @@ function PaymentForm() {
       });
 
       if (error) {
-        console.error("Payment confirmation error:", error);
         toast({
           variant: "destructive",
           title: "Payment failed",
-          description: error.message || "An error occurred during payment",
+          description: error.message,
         });
       }
     } catch (err) {
-      console.error("Payment error:", err);
+      console.error("Payment failed:", err);
       toast({
         variant: "destructive",
         title: "Payment failed",
@@ -60,31 +69,29 @@ function PaymentForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
-        <PaymentElement />
-        <div className="text-sm text-muted-foreground">
-          <p>Test Mode Instructions:</p>
-          <ul className="list-disc pl-4 space-y-1">
-            <li>Use card number: 4242 4242 4242 4242</li>
-            <li>Any future date for expiry (MM/YY)</li>
-            <li>Any 3 digits for CVC</li>
-            <li>Any 5 digits for postal code</li>
-          </ul>
-        </div>
+        <label className="text-sm font-medium">Payment Method</label>
+        <Select
+          value={paymentMethod}
+          onValueChange={setPaymentMethod}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select payment method" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="card">Credit Card</SelectItem>
+            <SelectItem value="wallet">Digital Wallet</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
+
+      <PaymentElement />
 
       <Button
         type="submit"
         className="w-full"
         disabled={!stripe || isProcessing}
       >
-        {isProcessing ? (
-          <span className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Processing...
-          </span>
-        ) : (
-          "Complete Payment"
-        )}
+        {isProcessing ? "Processing..." : "Complete Payment"}
       </Button>
     </form>
   );
@@ -95,12 +102,11 @@ export default function PaymentPage() {
   const [clientSecret, setClientSecret] = useState<string>();
   const [error, setError] = useState<string>();
   const searchParams = new URLSearchParams(location.split('?')[1]);
-  const amount = parseFloat(searchParams.get('amount') || '0');
+  const amount = parseInt(searchParams.get('amount') || '0');
 
   useEffect(() => {
     async function createPaymentIntent() {
       try {
-        console.log("Creating payment intent for amount:", amount);
         const response = await fetch('/api/create-payment-intent', {
           method: 'POST',
           headers: {
@@ -110,25 +116,20 @@ export default function PaymentPage() {
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || errorData.details || 'Failed to create payment intent');
+          throw new Error('Failed to create payment intent');
         }
 
         const data = await response.json();
-        console.log("Payment intent created successfully");
         setClientSecret(data.clientSecret);
       } catch (err) {
         console.error('Error:', err);
-        setError(err instanceof Error ? err.message : 'Failed to initialize payment. Please try again.');
+        setError('Failed to initialize payment. Please try again.');
       }
     }
 
-    if (!amount || isNaN(amount) || amount <= 0) {
-      setError('Invalid payment amount. Please try again.');
-      return;
+    if (amount > 0) {
+      createPaymentIntent();
     }
-
-    createPaymentIntent();
   }, [amount]);
 
   if (error) {
@@ -156,6 +157,13 @@ export default function PaymentPage() {
     );
   }
 
+  const options = {
+    clientSecret,
+    appearance: {
+      theme: 'stripe' as const,
+    },
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
@@ -171,19 +179,9 @@ export default function PaymentPage() {
           </CardHeader>
           <CardContent>
             <div className="mb-6">
-              <p className="text-lg font-semibold">
-                Total Amount: AED {(amount / 100).toLocaleString()}
-              </p>
+              <p className="text-lg font-semibold">Total Amount: AED {amount.toLocaleString()}</p>
             </div>
-            <Elements stripe={stripePromise} options={{
-              clientSecret,
-              appearance: {
-                theme: 'stripe',
-                variables: {
-                  colorPrimary: '#000000',
-                },
-              },
-            }}>
+            <Elements stripe={stripePromise} options={options}>
               <PaymentForm />
             </Elements>
           </CardContent>
