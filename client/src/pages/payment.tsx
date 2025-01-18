@@ -19,16 +19,8 @@ import {
 } from "@/components/ui/select";
 import { AlertCircle } from "lucide-react";
 
-const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-
-if (!STRIPE_PUBLISHABLE_KEY) {
-  throw new Error(
-    "Missing Stripe publishable key. Make sure VITE_STRIPE_PUBLISHABLE_KEY is set in your environment variables."
-  );
-}
-
-// Initialize Stripe with the publishable key
-const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
+// Use the environment variable directly
+const stripePromise = loadStripe("pk_test_51QiY7MHld5Z9DroAkruR5iLpe8ypSOMArYmbikoaGZuIg7dikehIKnVhED5PNwQx8qhb6Tp1KdSURMSZH8XlPQmM00ymFCgZwQ");
 
 function PaymentForm() {
   const stripe = useStripe();
@@ -107,30 +99,12 @@ function PaymentForm() {
 
 export default function PaymentPage() {
   const [location] = useLocation();
-  // Get amount from URL query parameters
   const searchParams = new URLSearchParams(location.split('?')[1]);
   const amount = parseInt(searchParams.get('amount') || '0');
 
-  if (!STRIPE_PUBLISHABLE_KEY) {
-    return (
-      <div className="min-h-screen bg-background">
-        <main className="container mx-auto px-4 py-8">
-          <Card className="max-w-2xl mx-auto border-destructive">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 text-destructive">
-                <AlertCircle className="h-5 w-5" />
-                <p>Stripe API key is not configured. Please contact support.</p>
-              </div>
-            </CardContent>
-          </Card>
-        </main>
-      </div>
-    );
-  }
-
   const options = {
     mode: "payment" as const,
-    amount: amount, // Use the amount from URL
+    amount: amount,
     currency: 'aed',
     appearance: {
       theme: 'stripe' as const,
