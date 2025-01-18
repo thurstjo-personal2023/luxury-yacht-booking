@@ -1,15 +1,22 @@
 import { loadStripe } from "@stripe/stripe-js";
 
-// Get the publishable key directly from the environment
-// This ensures we're accessing it in the correct scope for Vite
-const publishableKey = (window as any).ENV?.VITE_STRIPE_PUBLISHABLE_KEY || import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-
-if (!publishableKey) {
-  console.error("Stripe publishable key is missing. Check environment variables and server configuration.");
-  throw new Error(
-    "Missing Stripe publishable key. Make sure VITE_STRIPE_PUBLISHABLE_KEY is set and exposed correctly."
-  );
+// Function to fetch the Stripe publishable key from the server
+async function getStripePublishableKey(): Promise<string> {
+  const response = await fetch('/api/config');
+  if (!response.ok) {
+    throw new Error('Failed to load Stripe configuration');
+  }
+  const config = await response.json();
+  return config.stripePublishableKey;
 }
 
-// Initialize Stripe instance
-export const stripePromise = loadStripe(publishableKey);
+// Initialize Stripe with async configuration
+export const stripePromise = getStripePublishableKey().then(key => {
+  if (!key) {
+    console.error("Stripe publishable key is missing. Check server configuration.");
+    throw new Error(
+      "Missing Stripe publishable key. Make sure VITE_STRIPE_PUBLISHABLE_KEY is set on the server."
+    );
+  }
+  return loadStripe(key);
+});
