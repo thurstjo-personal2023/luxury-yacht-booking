@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { ChevronLeft, Star } from "lucide-react";
+import { ChevronLeft, Star, Plus, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
 import { useState } from 'react';
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 
 interface YachtDetails {
   id: string;
@@ -34,15 +34,21 @@ interface YachtDetails {
   }[];
 }
 
+interface SelectedAddOn {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
 export default function YachtDetails({ id }: { id: string }) {
   const [, setLocation] = useLocation();
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
+  const [selectedAddOns, setSelectedAddOns] = useState<SelectedAddOn[]>([]);
 
   const { data: yacht, isLoading } = useQuery({
     queryKey: ['/api/yachts', id],
     queryFn: async () => {
-      // In production, fetch from Firestore
-      // For now, return sample data
       return SAMPLE_YACHT_DETAILS;
     }
   });
@@ -53,6 +59,46 @@ export default function YachtDetails({ id }: { id: string }) {
       [index]: true
     }));
   };
+
+  const handleAddOn = (addOn: { id: string; name: string; price: number }) => {
+    setSelectedAddOns(prev => {
+      const existing = prev.find(item => item.id === addOn.id);
+      if (existing) {
+        return prev.map(item =>
+          item.id === addOn.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [...prev, { ...addOn, quantity: 1 }];
+    });
+  };
+
+  const handleRemoveAddOn = (addOnId: string) => {
+    setSelectedAddOns(prev => {
+      const existing = prev.find(item => item.id === addOnId);
+      if (existing && existing.quantity > 1) {
+        return prev.map(item =>
+          item.id === addOnId
+            ? { ...item, quantity: item.quantity - 1 }
+            : item
+        );
+      }
+      return prev.filter(item => item.id !== addOnId);
+    });
+  };
+
+  const calculateTotal = () => {
+    const basePrice = yacht?.price || 0;
+    const addOnsTotal = selectedAddOns.reduce(
+      (sum, addon) => sum + (addon.price * addon.quantity),
+      0
+    );
+    return basePrice + addOnsTotal;
+  };
+
+  const averageRating = yacht?.reviews.reduce((acc, review) => acc + review.rating, 0) / (yacht?.reviews.length || 1);
+
 
   if (isLoading) {
     return <LoadingSkeleton />;
@@ -79,8 +125,6 @@ export default function YachtDetails({ id }: { id: string }) {
       </div>
     );
   }
-
-  const averageRating = yacht.reviews.reduce((acc, review) => acc + review.rating, 0) / yacht.reviews.length;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -147,7 +191,7 @@ export default function YachtDetails({ id }: { id: string }) {
               }`}
             >
               <img
-                src={imageErrors[index] 
+                src={imageErrors[index]
                   ? "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" // Fallback image
                   : image
                 }
@@ -179,7 +223,28 @@ export default function YachtDetails({ id }: { id: string }) {
                     <span className="font-medium">
                       AED {addon.price.toLocaleString()}
                     </span>
-                    <Button size="sm">Add</Button>
+                    <div className="flex items-center gap-2">
+                      {selectedAddOns.find(item => item.id === addon.id) ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRemoveAddOn(addon.id)}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <span className="mx-2">
+                            {selectedAddOns.find(item => item.id === addon.id)?.quantity || 0}
+                          </span>
+                        </>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        onClick={() => handleAddOn(addon)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -219,20 +284,37 @@ export default function YachtDetails({ id }: { id: string }) {
         </TabsContent>
       </Tabs>
 
-      {/* Book Now Section */}
+      {/* Booking Summary */}
       <Card className="mt-8">
         <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold">
-                AED {yacht.price.toLocaleString()}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Base price, excluding add-ons
-              </p>
+          <h2 className="text-xl font-semibold mb-4">Booking Summary</h2>
+          <ScrollArea className="h-[200px] w-full rounded-md border p-4">
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <span>Base Price</span>
+                <span>AED {yacht.price.toLocaleString()}</span>
+              </div>
+              {selectedAddOns.map((addon) => (
+                <div key={addon.id} className="flex justify-between items-center">
+                  <div>
+                    <span>{addon.name}</span>
+                    <span className="text-sm text-muted-foreground ml-2">
+                      (x{addon.quantity})
+                    </span>
+                  </div>
+                  <span>AED {(addon.price * addon.quantity).toLocaleString()}</span>
+                </div>
+              ))}
+              <Separator />
+              <div className="flex justify-between font-bold">
+                <span>Total</span>
+                <span>AED {calculateTotal().toLocaleString()}</span>
+              </div>
             </div>
-            <Button size="lg">Book Now</Button>
-          </div>
+          </ScrollArea>
+          <Button size="lg" className="w-full mt-4">
+            Proceed to Book
+          </Button>
         </CardContent>
       </Card>
     </div>
