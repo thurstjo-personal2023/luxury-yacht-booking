@@ -32,15 +32,7 @@ export default function BookingSummaryPage() {
   };
 
   const handleProceedToPayment = () => {
-    // In a real application, this would navigate to the payment page
-    toast({
-      title: "Proceeding to Payment",
-      description: "Redirecting to secure payment gateway...",
-    });
-    // For testing purposes, we'll just show a success message
-    setTimeout(() => {
-      setLocation("/payment");
-    }, 1500);
+    setLocation("/payment");
   };
 
   return (

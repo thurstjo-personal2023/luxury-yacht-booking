@@ -10,6 +10,8 @@ import Dashboard from "@/pages/dashboard";
 import YachtListing from "@/pages/yacht-listing";
 import YachtDetails from "@/pages/yacht-details";
 import BookingSummary from "@/pages/booking-summary";
+import Payment from "@/pages/payment";
+import PaymentConfirmation from "@/pages/payment-confirmation";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/lib/auth";
 import { Loader2 } from "lucide-react";
@@ -59,6 +61,20 @@ function Router() {
         {() => (
           <PrivateRoute>
             <BookingSummary />
+          </PrivateRoute>
+        )}
+      </Route>
+      <Route path="/payment">
+        {() => (
+          <PrivateRoute>
+            <Payment />
+          </PrivateRoute>
+        )}
+      </Route>
+      <Route path="/payment-confirmation">
+        {() => (
+          <PrivateRoute>
+            <PaymentConfirmation />
           </PrivateRoute>
         )}
       </Route>
