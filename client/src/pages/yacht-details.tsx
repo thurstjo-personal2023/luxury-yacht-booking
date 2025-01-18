@@ -273,11 +273,11 @@ const SAMPLE_YACHT_DETAILS: YachtDetails = {
   activities: ["yacht-cruise", "party", "corporate"],
   duration: "full-day",
   gallery: [
-    "https://images.unsplash.com/photo-1469796466635-455ede028aca",
-    "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a",
-    "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13",
-    "https://images.unsplash.com/photo-1583916087630-e4c27a54f465",
-    "https://images.unsplash.com/photo-1593351415075-3bac9f45c877"
+    "https://images.unsplash.com/photo-1469796466635-455ede028aca?auto=format&fit=crop&w=800",
+    "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?auto=format&fit=crop&w=800",
+    "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?auto=format&fit=crop&w=800",
+    "https://images.unsplash.com/photo-1583916087630-e4c27a54f465?auto=format&fit=crop&w=800",
+    "https://images.unsplash.com/photo-1593351415075-3bac9f45c877?auto=format&fit=crop&w=800"
   ],
   addOns: [
     {
