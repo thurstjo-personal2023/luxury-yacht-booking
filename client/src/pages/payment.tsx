@@ -14,6 +14,12 @@ import { AlertCircle, Loader2 } from "lucide-react";
 
 // Initialize Stripe
 const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+console.log("[Payment Page] Initializing Stripe with publishable key:", !!STRIPE_KEY);
+
+if (!STRIPE_KEY) {
+  console.error("[Payment Page] Stripe publishable key is missing");
+}
+
 const stripePromise = STRIPE_KEY ? loadStripe(STRIPE_KEY) : null;
 
 function PaymentForm() {
@@ -159,7 +165,6 @@ export default function PaymentPage() {
     createPaymentIntent();
   }, [amount]);
 
-  // Check if Stripe is properly configured
   if (!stripePromise) {
     return (
       <div className="min-h-screen bg-background">
