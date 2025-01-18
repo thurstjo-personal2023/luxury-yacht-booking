@@ -102,9 +102,12 @@ export default function PaymentPage() {
   const searchParams = new URLSearchParams(location.split('?')[1]);
   const amount = parseInt(searchParams.get('amount') || '0');
 
+  // Convert amount to cents for Stripe
+  const amountInCents = amount * 100;
+
   const options = {
     mode: "payment" as const,
-    amount: amount,
+    amount: amountInCents, // Amount in cents
     currency: 'aed',
     appearance: {
       theme: 'stripe' as const,
