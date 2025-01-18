@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { useState } from 'react';
 
 interface YachtDetails {
   id: string;
@@ -35,6 +36,7 @@ interface YachtDetails {
 
 export default function YachtDetails({ id }: { id: string }) {
   const [, setLocation] = useLocation();
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
 
   const { data: yacht, isLoading } = useQuery({
     queryKey: ['/api/yachts', id],
@@ -44,6 +46,13 @@ export default function YachtDetails({ id }: { id: string }) {
       return SAMPLE_YACHT_DETAILS;
     }
   });
+
+  const handleImageError = (index: number) => {
+    setImageErrors(prev => ({
+      ...prev,
+      [index]: true
+    }));
+  };
 
   if (isLoading) {
     return <LoadingSkeleton />;
@@ -138,9 +147,13 @@ export default function YachtDetails({ id }: { id: string }) {
               }`}
             >
               <img
-                src={image}
+                src={imageErrors[index] 
+                  ? "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" // Fallback image
+                  : image
+                }
                 alt={`${yacht.name} - Image ${index + 1}`}
                 className="absolute inset-0 h-full w-full object-cover"
+                onError={() => handleImageError(index)}
               />
             </div>
           ))}
@@ -273,11 +286,11 @@ const SAMPLE_YACHT_DETAILS: YachtDetails = {
   activities: ["yacht-cruise", "party", "corporate"],
   duration: "full-day",
   gallery: [
-    "https://images.unsplash.com/photo-1469796466635-455ede028aca?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-    "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-    "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-    "https://images.unsplash.com/photo-1583916087630-e4c27a54f465?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-    "https://images.unsplash.com/photo-1593351415075-3bac9f45c877?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
+    "https://images.unsplash.com/photo-1544140708-514b7837e6b5?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80", // Luxury yacht front view
+    "https://images.unsplash.com/photo-1569263916174-97a5a552b0c9?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80", // Yacht interior
+    "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80", // Deck view
+    "https://images.unsplash.com/photo-1569261995036-701b8f3c4cf8?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80", // Yacht amenities
+    "https://images.unsplash.com/photo-1569262835711-5c127354f5fb?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"  // Sunset view
   ],
   addOns: [
     {
