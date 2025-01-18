@@ -2,9 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
 
-// Initialize Stripe with the secret key
+// Initialize Stripe with the secret key and explicit test mode configuration
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16'
+  apiVersion: '2023-10-16',
+  typescript: true,
 });
 
 export function registerRoutes(app: Express): Server {
@@ -21,13 +22,18 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Convert to cents for Stripe
-      const amountInCents = Math.round(amount * 100);
+      const amountInCents = Math.round(amount);
       console.log("Creating payment intent for amount (in cents):", amountInCents);
 
-      // Create payment intent
+      // Create payment intent with test mode configurations
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amountInCents,
         currency: "aed",
+        payment_method_types: ['card'],
+        // Enable test mode specific configurations
+        metadata: {
+          environment: 'test',
+        },
       });
 
       console.log("Payment intent created successfully");

@@ -10,16 +10,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { AlertCircle, Loader2 } from "lucide-react";
 
-// Use the environment variable directly
+// Initialize Stripe with publishable key
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 function PaymentForm() {
@@ -28,7 +21,6 @@ function PaymentForm() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<string>("card");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +43,7 @@ function PaymentForm() {
         toast({
           variant: "destructive",
           title: "Payment failed",
-          description: error.message,
+          description: error.message || "An error occurred during payment",
         });
       }
     } catch (err) {
@@ -69,22 +61,17 @@ function PaymentForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
-        <label className="text-sm font-medium">Payment Method</label>
-        <Select
-          value={paymentMethod}
-          onValueChange={setPaymentMethod}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select payment method" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="card">Credit Card</SelectItem>
-            <SelectItem value="wallet">Digital Wallet</SelectItem>
-          </SelectContent>
-        </Select>
+        <PaymentElement />
+        <div className="text-sm text-muted-foreground">
+          <p>Test Mode Instructions:</p>
+          <ul className="list-disc pl-4 space-y-1">
+            <li>Use card number: 4242 4242 4242 4242</li>
+            <li>Any future date for expiry</li>
+            <li>Any 3 digits for CVC</li>
+            <li>Any 5 digits for postal code</li>
+          </ul>
+        </div>
       </div>
-
-      <PaymentElement />
 
       <Button
         type="submit"
