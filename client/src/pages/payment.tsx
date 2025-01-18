@@ -12,22 +12,9 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Loader2 } from "lucide-react";
 
-// Initialize Stripe with better error handling
-console.log("[Payment Page] Initializing Stripe with environment variables");
-const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-console.log("[Payment Page] Stripe key available:", !!stripeKey);
-
-let stripePromise;
-try {
-  if (!stripeKey) {
-    console.error("[Payment Page] Stripe publishable key is missing");
-  } else {
-    stripePromise = loadStripe(stripeKey);
-    console.log("[Payment Page] Stripe initialized successfully");
-  }
-} catch (error) {
-  console.error("[Payment Page] Error initializing Stripe:", error);
-}
+// Initialize Stripe
+const STRIPE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+const stripePromise = STRIPE_KEY ? loadStripe(STRIPE_KEY) : null;
 
 function PaymentForm() {
   const stripe = useStripe();
@@ -115,14 +102,6 @@ export default function PaymentPage() {
   const [clientSecret, setClientSecret] = useState<string>();
   const [error, setError] = useState<string>();
 
-  // Check if Stripe is properly initialized
-  useEffect(() => {
-    if (!stripePromise) {
-      setError("Payment system is not properly configured. Please try again later.");
-      return;
-    }
-  }, []);
-
   const parseAmount = () => {
     console.log("[Payment Page] Parsing URL parameters:", location);
     const searchString = window.location.search;
@@ -179,6 +158,24 @@ export default function PaymentPage() {
 
     createPaymentIntent();
   }, [amount]);
+
+  // Check if Stripe is properly configured
+  if (!stripePromise) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <Card className="max-w-2xl mx-auto border-destructive">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-5 w-5" />
+                <p>Payment system is not properly configured. Please try again later.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
 
   if (error) {
     return (
