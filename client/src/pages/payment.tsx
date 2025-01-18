@@ -25,8 +25,10 @@ function PaymentForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("[Payment Form] Starting payment submission");
 
     if (!stripe || !elements) {
+      console.error("[Payment Form] Stripe or Elements not initialized");
       return;
     }
 
@@ -34,6 +36,7 @@ function PaymentForm() {
     setErrorMessage(undefined);
 
     try {
+      console.log("[Payment Form] Confirming payment with Stripe");
       const { error } = await stripe.confirmPayment({
         elements,
         confirmParams: {
@@ -42,15 +45,18 @@ function PaymentForm() {
       });
 
       if (error) {
+        console.error("[Payment Form] Payment confirmation error:", error);
         setErrorMessage(error.message);
         toast({
           variant: "destructive",
           title: "Payment failed",
           description: error.message,
         });
+      } else {
+        console.log("[Payment Form] Payment confirmed successfully");
       }
     } catch (err) {
-      console.error("Payment error:", err);
+      console.error("[Payment Form] Unexpected payment error:", err);
       setErrorMessage("An unexpected error occurred. Please try again.");
       toast({
         variant: "destructive",
@@ -94,11 +100,29 @@ export default function PaymentPage() {
   const [location] = useLocation();
   const [clientSecret, setClientSecret] = useState<string>();
   const [error, setError] = useState<string>();
-  const searchParams = new URLSearchParams(location.split('?')[1]);
-  const amount = parseInt(searchParams.get('amount') || '0');
+
+  // Parse and validate amount from URL
+  const parseAmount = () => {
+    console.log("[Payment Page] Parsing URL parameters:", location);
+    const searchParams = new URLSearchParams(location.split('?')[1]);
+    const amountParam = searchParams.get('amount');
+    console.log("[Payment Page] Amount parameter from URL:", amountParam);
+
+    if (!amountParam) {
+      console.error("[Payment Page] No amount parameter found in URL");
+      return 0;
+    }
+
+    const parsedAmount = parseInt(amountParam, 10);
+    console.log("[Payment Page] Parsed amount:", parsedAmount);
+    return parsedAmount;
+  };
+
+  const amount = parseAmount();
 
   useEffect(() => {
     async function createPaymentIntent() {
+      console.log("[Payment Page] Creating payment intent with amount:", amount);
       try {
         const response = await fetch('/api/create-payment-intent', {
           method: 'POST',
@@ -108,24 +132,30 @@ export default function PaymentPage() {
           body: JSON.stringify({ amount }),
         });
 
+        console.log("[Payment Page] Payment intent response status:", response.status);
+
         if (!response.ok) {
           const data = await response.json();
+          console.error("[Payment Page] Payment intent creation failed:", data);
           throw new Error(data.error || 'Failed to create payment intent');
         }
 
         const data = await response.json();
+        console.log("[Payment Page] Payment intent created successfully");
         setClientSecret(data.clientSecret);
       } catch (err) {
-        console.error('Error:', err);
+        console.error("[Payment Page] Error creating payment intent:", err);
         setError(err instanceof Error ? err.message : 'Failed to initialize payment');
       }
     }
 
-    if (amount > 0) {
-      createPaymentIntent();
-    } else {
-      setError('Invalid payment amount');
+    if (!amount || isNaN(amount) || amount <= 0) {
+      console.error("[Payment Page] Invalid amount:", amount);
+      setError('Invalid payment amount. Please ensure the amount is a valid number greater than 0.');
+      return;
     }
+
+    createPaymentIntent();
   }, [amount]);
 
   if (error) {
