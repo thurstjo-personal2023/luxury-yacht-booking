@@ -20,7 +20,7 @@ import {
 import { AlertCircle, Loader2 } from "lucide-react";
 
 // Use the environment variable directly
-const stripePromise = loadStripe("pk_test_51QiY7MHld5Z9DroAkruR5iLpe8ypSOMArYmbikoaGZuIg7dikehIKnVhED5PNwQx8qhb6Tp1KdSURMSZH8XlPQmM00ymFCgZwQ");
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 function PaymentForm() {
   const stripe = useStripe();
@@ -102,7 +102,7 @@ export default function PaymentPage() {
   const [clientSecret, setClientSecret] = useState<string>();
   const [error, setError] = useState<string>();
   const searchParams = new URLSearchParams(location.split('?')[1]);
-  const amount = parseInt(searchParams.get('amount') || '0');
+  const amount = parseInt(searchParams.get('amount') || '0', 10);
 
   useEffect(() => {
     async function createPaymentIntent() {

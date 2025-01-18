@@ -42,8 +42,8 @@ export default function BookingSummaryPage() {
 
   const handleProceedToPayment = () => {
     const total = calculateTotal();
-    // Pass the total amount to the payment page via URL state
-    setLocation(`/payment?amount=${total}`);
+    // Ensure the amount is passed as a positive number
+    setLocation(`/payment?amount=${Math.abs(total)}`);
   };
 
   return (
