@@ -15,7 +15,7 @@ export const stripePromise = getStripePublishableKey().then(key => {
   if (!key) {
     console.error("Stripe publishable key is missing. Check server configuration.");
     throw new Error(
-      "Missing Stripe publishable key. Make sure VITE_STRIPE_PUBLISHABLE_KEY is set on the server."
+      "Missing Stripe publishable key. Make sure STRIPE_PUBLISHABLE_KEY is set on the server."
     );
   }
   return loadStripe(key);
