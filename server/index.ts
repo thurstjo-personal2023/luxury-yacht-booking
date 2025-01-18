@@ -9,38 +9,13 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Add CORS and security headers
-app.use((req, res, next) => {
-  // Allow requests from mobile browsers
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-
-  // Add security headers
-  res.header('X-Content-Type-Options', 'nosniff');
-  res.header('X-Frame-Options', 'DENY');
-  res.header('X-XSS-Protection', '1; mode=block');
-
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-    return;
-  }
-  next();
-});
-
 // Configure session middleware
 const MemoryStore = createMemoryStore(session);
 const sessionSettings: session.SessionOptions = {
   secret: process.env.REPL_ID || "luxury-yacht-booking-secret",
   resave: false,
   saveUninitialized: false,
-  cookie: {
-    secure: false, // Set to false to work in development
-    sameSite: 'lax',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  },
+  cookie: {},
   store: new MemoryStore({
     checkPeriod: 86400000, // prune expired entries every 24h
   }),
@@ -50,7 +25,6 @@ if (app.get("env") === "production") {
   app.set("trust proxy", 1);
   sessionSettings.cookie = {
     secure: true,
-    sameSite: 'none'
   };
 }
 
@@ -99,9 +73,6 @@ app.use((req, res, next) => {
     res.status(status).json({ message });
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
