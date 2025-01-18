@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLocation } from "wouter";
 
 interface YachtPackage {
   id: string;
@@ -59,11 +60,12 @@ const LOCATIONS = [
 ];
 
 export default function YachtListing() {
+  const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<[number, number]>([5000, 100000]);
-  const [location, setLocation] = useState("all");
+  const [location, setLocationState] = useState("all");
   const [duration, setDuration] = useState("all");
 
   const { data: yachts, isLoading } = useQuery({
@@ -91,6 +93,10 @@ export default function YachtListing() {
 
     return matchesSearch && matchesPrice && matchesLocation && matchesDuration && matchesActivities;
   });
+
+  const handleViewDetails = (yachtId: string) => {
+    setLocation(`/yacht/${yachtId}`);
+  };
 
   if (isLoading) {
     return <LoadingSkeleton />;
@@ -151,7 +157,7 @@ export default function YachtListing() {
             {/* Location Select */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Location</label>
-              <Select value={location} onValueChange={setLocation}>
+              <Select value={location} onValueChange={setLocationState}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
@@ -246,7 +252,7 @@ export default function YachtListing() {
                   setSelectedDate(undefined);
                   setSelectedActivities([]);
                   setPriceRange([5000, 100000]);
-                  setLocation("all");
+                  setLocationState("all");
                   setDuration("all");
                 }}
               >
@@ -277,7 +283,7 @@ export default function YachtListing() {
                         Capacity: {yacht.capacity} guests
                       </span>
                       <Button
-                        onClick={() => {/* TODO: Implement view details */}}
+                        onClick={() => handleViewDetails(yacht.id)}
                       >
                         View Details
                       </Button>
