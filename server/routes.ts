@@ -4,7 +4,7 @@ import Stripe from "stripe";
 
 // Initialize Stripe with the secret key and explicit test mode configuration
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16',
+  apiVersion: '2024-12-18.acacia',
   typescript: true,
 });
 
@@ -21,7 +21,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Invalid amount provided" });
       }
 
-      // Convert to cents for Stripe
+      // Amount is already in cents from the client
       const amountInCents = Math.round(amount);
       console.log("Creating payment intent for amount (in cents):", amountInCents);
 

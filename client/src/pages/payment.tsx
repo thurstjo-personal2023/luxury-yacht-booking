@@ -172,7 +172,7 @@ export default function PaymentPage() {
           </CardHeader>
           <CardContent>
             <div className="mb-6">
-              <p className="text-lg font-semibold">Total Amount: AED {amount.toLocaleString()}</p>
+              <p className="text-lg font-semibold">Total Amount: AED {(amount / 100).toLocaleString()}</p>
             </div>
             <Elements stripe={stripePromise} options={options}>
               <PaymentForm />
