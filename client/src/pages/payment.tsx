@@ -12,8 +12,22 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Loader2 } from "lucide-react";
 
-// Initialize Stripe
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+// Initialize Stripe with better error handling
+console.log("[Payment Page] Initializing Stripe with environment variables");
+const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+console.log("[Payment Page] Stripe key available:", !!stripeKey);
+
+let stripePromise;
+try {
+  if (!stripeKey) {
+    console.error("[Payment Page] Stripe publishable key is missing");
+  } else {
+    stripePromise = loadStripe(stripeKey);
+    console.log("[Payment Page] Stripe initialized successfully");
+  }
+} catch (error) {
+  console.error("[Payment Page] Error initializing Stripe:", error);
+}
 
 function PaymentForm() {
   const stripe = useStripe();
@@ -101,10 +115,16 @@ export default function PaymentPage() {
   const [clientSecret, setClientSecret] = useState<string>();
   const [error, setError] = useState<string>();
 
-  // Parse and validate amount from URL
+  // Check if Stripe is properly initialized
+  useEffect(() => {
+    if (!stripePromise) {
+      setError("Payment system is not properly configured. Please try again later.");
+      return;
+    }
+  }, []);
+
   const parseAmount = () => {
     console.log("[Payment Page] Parsing URL parameters:", location);
-    // Get the full search string including the ? character
     const searchString = window.location.search;
     const searchParams = new URLSearchParams(searchString);
     const amountParam = searchParams.get('amount');
@@ -204,8 +224,8 @@ export default function PaymentPage() {
                 Total Amount: AED {amount.toLocaleString()}
               </p>
             </div>
-            <Elements 
-              stripe={stripePromise} 
+            <Elements
+              stripe={stripePromise}
               options={{
                 clientSecret,
                 appearance: {
