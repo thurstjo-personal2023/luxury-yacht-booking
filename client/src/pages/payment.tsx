@@ -17,8 +17,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AlertCircle } from "lucide-react";
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+
+if (!STRIPE_PUBLISHABLE_KEY) {
+  throw new Error(
+    "Missing Stripe publishable key. Make sure VITE_STRIPE_PUBLISHABLE_KEY is set in your environment variables."
+  );
+}
+
+// Initialize Stripe with the publishable key
+const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
 function PaymentForm() {
   const stripe = useStripe();
@@ -38,7 +48,7 @@ function PaymentForm() {
     setIsProcessing(true);
 
     try {
-      const { error, paymentIntent } = await stripe.confirmPayment({
+      const { error } = await stripe.confirmPayment({
         elements,
         confirmParams: {
           return_url: `${window.location.origin}/payment-confirmation`,
@@ -51,12 +61,6 @@ function PaymentForm() {
           title: "Payment failed",
           description: error.message,
         });
-      } else if (paymentIntent && paymentIntent.status === "succeeded") {
-        toast({
-          title: "Payment successful",
-          description: "Your booking has been confirmed!",
-        });
-        setLocation("/payment-confirmation");
       }
     } catch (err) {
       console.error("Payment failed:", err);
@@ -102,11 +106,35 @@ function PaymentForm() {
 }
 
 export default function PaymentPage() {
+  const [location] = useLocation();
+  // Get amount from URL query parameters
+  const searchParams = new URLSearchParams(location.split('?')[1]);
+  const amount = parseInt(searchParams.get('amount') || '0');
+
+  if (!STRIPE_PUBLISHABLE_KEY) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto px-4 py-8">
+          <Card className="max-w-2xl mx-auto border-destructive">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-5 w-5" />
+                <p>Stripe API key is not configured. Please contact support.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
   const options = {
-    mode: 'payment',
-    amount: 1099,
-    currency: 'usd',
-    // Add more options as needed
+    mode: "payment" as const,
+    amount: amount, // Use the amount from URL
+    currency: 'aed',
+    appearance: {
+      theme: 'stripe' as const,
+    },
   };
 
   return (
@@ -123,6 +151,9 @@ export default function PaymentPage() {
             <CardTitle>Payment Details</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="mb-6">
+              <p className="text-lg font-semibold">Total Amount: AED {amount.toLocaleString()}</p>
+            </div>
             <Elements stripe={stripePromise} options={options}>
               <PaymentForm />
             </Elements>

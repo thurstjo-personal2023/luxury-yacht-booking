@@ -31,20 +31,29 @@ export default function BookingSummaryPage() {
     ]
   };
 
+  const calculateTotal = () => {
+    const basePrice = sampleBookingData.packageDetails.price;
+    const addOnsTotal = sampleBookingData.addOns.reduce(
+      (sum, addon) => sum + (addon.price * addon.quantity),
+      0
+    );
+    return basePrice + addOnsTotal;
+  };
+
   const handleProceedToPayment = () => {
-    setLocation("/payment");
+    const total = calculateTotal();
+    // Pass the total amount to the payment page via URL state
+    setLocation(`/payment?amount=${total}`);
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center">
           <h1 className="text-2xl font-bold">Booking Summary</h1>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <BookingSummary
           packageDetails={sampleBookingData.packageDetails}
