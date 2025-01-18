@@ -49,7 +49,6 @@ export default function YachtDetails({ id }: { id: string }) {
   const { data: yacht, isLoading } = useQuery({
     queryKey: ['/api/yachts', id],
     queryFn: async () => {
-      // Return the specific yacht details based on ID
       const yachtData = SAMPLE_YACHT_DETAILS[id];
       if (!yachtData) {
         throw new Error('Yacht not found');
@@ -362,7 +361,6 @@ function LoadingSkeleton() {
   );
 }
 
-// Sample data for development
 const SAMPLE_YACHT_DETAILS: Record<string, YachtDetails> = {
   "1": {
     id: "1",
@@ -374,11 +372,11 @@ const SAMPLE_YACHT_DETAILS: Record<string, YachtDetails> = {
     activities: ["yacht-cruise", "party", "corporate"],
     duration: "full-day",
     gallery: [
-      "https://images.unsplash.com/photo-1544140708-514b7837e6b5?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1569263916174-97a5a552b0c9?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1569261995036-701b8f3c4cf8?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1569262835711-5c127354f5fb?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
+      "https://images.unsplash.com/photo-1469796466635-455ede028aca",
+      "https://images.unsplash.com/photo-1605281317010-fe5ffe798166",
+      "https://images.unsplash.com/photo-1586302836983-b965139d7abc",
+      "https://images.unsplash.com/photo-1605281316961-437f8eb42745",
+      "https://images.unsplash.com/photo-1605281316446-8dd68628a11d"
     ],
     addOns: [
       {
@@ -427,10 +425,10 @@ const SAMPLE_YACHT_DETAILS: Record<string, YachtDetails> = {
     activities: ["yacht-cruise", "water-sports"],
     duration: "half-day",
     gallery: [
-      "https://images.unsplash.com/photo-1562281302-809d10c4c831?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1562281303-a1e5c4817b79?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1562281301-39fb54f9a917?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1562281298-c807ef4a0291?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
+      "https://images.unsplash.com/photo-1507652313519-d4e9174996dd",
+      "https://images.unsplash.com/photo-1542272201-b1ca555f8505",
+      "https://images.unsplash.com/photo-1566438480900-0609be27a4be",
+      "https://images.unsplash.com/photo-1613553474179-e1eda3ea5734"
     ],
     addOns: [
       {
@@ -479,10 +477,11 @@ const SAMPLE_YACHT_DETAILS: Record<string, YachtDetails> = {
     activities: ["yacht-cruise", "fishing", "corporate"],
     duration: "multi-day",
     gallery: [
-      "https://images.unsplash.com/photo-1565538810643-b5bdb714032a?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1565538810632-a500abdaa8c4?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1565538810622-7d7c861a8e5c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1565538810612-33c1a2127c0c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
+      "https://images.unsplash.com/photo-1549439602-43ebca2327af",
+      "https://images.unsplash.com/photo-1571689936114-b16146c9570a",
+      "https://images.unsplash.com/photo-1571689935894-a5b09e5a6d12",
+      "https://images.unsplash.com/photo-1571689994302-a227d3747442",
+      "https://images.unsplash.com/photo-1571689982774-7b375a0b6958"
     ],
     addOns: [
       {
