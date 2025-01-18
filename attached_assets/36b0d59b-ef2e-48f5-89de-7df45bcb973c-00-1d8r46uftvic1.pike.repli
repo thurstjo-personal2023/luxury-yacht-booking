@@ -16,6 +16,7 @@
 overrideMethod @ installHook.js:1
  Error checking emulator connections: 
 overrideMethod @ installHook.js:1
+v3:1 Uncaught (in promise) 
  Removing unpermitted intrinsics
 /auth/register:1 [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) 
  Removing unpermitted intrinsics
@@ -25,47 +26,43 @@ overrideMethod @ installHook.js:1
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: Ge
+ Current value: Gl
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: Geo
+ Current value: Gle
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: Geor
+ Current value: Glen
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: Georg
+ Current value: Glen 
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: George
+ Current value: Glen D
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: George 
+ Current value: Glen Di
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: George B
+ Current value: Glen Die
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: George Be
+ Current value: Glen Dies
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: George Bee
+ Current value: Glen Diese
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: George Beeb
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: George Beebe
+ Current value: Glen Diesen
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
@@ -73,71 +70,87 @@ overrideMethod @ installHook.js:1
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gb
+ Current value: gl
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbe
+ Current value: gle
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbee
+ Current value: glen
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbeeb
+ Current value: glend
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbeebe
+ Current value: glendi
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbeebe@
+ Current value: glendie
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbeebe@h
+ Current value: glendies
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbeebe@ho
+ Current value: glendiese
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbeebe@hot
+ Current value: glendiesen
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbeebe@hotm
+ Current value: glendiesen@
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbeebe@hotma
+ Current value: glendiesen@h
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbeebe@hotmai
+ Current value: glendiesen@ho
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbeebe@hotmail
+ Current value: glendiesen@hot
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbeebe@hotmail.
+ Current value: glendiesen@hotm
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbeebe@hotmail.c
+ Current value: glendiesen@hotma
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbeebe@hotmail.co
+ Current value: glendiesen@hotmai
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: gbeebe@hotmail.com
+ Current value: glendiesen@hotmail
+ Current shortcuts: Array(0)
+ Data received in content script: Array(0)
+ Event target tag: INPUT
+ Current value: glendiesen@hotmail.
+ Current shortcuts: Array(0)
+ Data received in content script: Array(0)
+ Event target tag: INPUT
+ Current value: glendiesen@hotmail.c
+ Current shortcuts: Array(0)
+ Data received in content script: Array(0)
+ Event target tag: INPUT
+ Current value: glendiesen@hotmail.co
+ Current shortcuts: Array(0)
+ Data received in content script: Array(0)
+ Event target tag: INPUT
+ Current value: glendiesen@hotmail.com
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
@@ -148,98 +161,46 @@ overrideMethod @ installHook.js:1
  Current value: +1
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: +12
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: +121
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: +1213
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: +12134
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: +121344
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: +1213444
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: +12134445
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: +121344455
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: +1213444555
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: R
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: Ra
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: Rap
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
  Error checking emulator connections: 
 overrideMethod @ installHook.js:1
  Event target tag: INPUT
- Current value: Rap0
+ Current value: +13
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
  Event target tag: INPUT
- Current value: Rap01
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
-contentScript.bundle.js:4785 Current value: Rap012
+contentScript.bundle.js:4785 Current value: +131
 contentScript.bundle.js:4785 Current shortcuts: Array(0)
 contentScript.bundle.js:4785 Data received in content script: Array(0)
 contentScript.bundle.js:4785 Event target tag: INPUT
-contentScript.bundle.js:4785 Current value: Rap0123
+contentScript.bundle.js:4785 Current value: +1315
 contentScript.bundle.js:4785 Current shortcuts: Array(0)
 contentScript.bundle.js:4785 Data received in content script: Array(0)
 contentScript.bundle.js:4785 Event target tag: INPUT
-contentScript.bundle.js:4785 Current value: Rap012
+contentScript.bundle.js:4785 Current value: +13154
 contentScript.bundle.js:4785 Current shortcuts: Array(0)
 contentScript.bundle.js:4785 Data received in content script: Array(0)
 contentScript.bundle.js:4785 Event target tag: INPUT
-contentScript.bundle.js:4785 Current value: Rap01
+contentScript.bundle.js:4785 Current value: +131544
 contentScript.bundle.js:4785 Current shortcuts: Array(0)
 contentScript.bundle.js:4785 Data received in content script: Array(0)
 contentScript.bundle.js:4785 Event target tag: INPUT
-contentScript.bundle.js:4785 Current value: Rap0
+contentScript.bundle.js:4785 Current value: +1315444
 contentScript.bundle.js:4785 Current shortcuts: Array(0)
 contentScript.bundle.js:4785 Data received in content script: Array(0)
 contentScript.bundle.js:4785 Event target tag: INPUT
-contentScript.bundle.js:4785 Current value: Rap
+contentScript.bundle.js:4785 Current value: +13154446
 contentScript.bundle.js:4785 Current shortcuts: Array(0)
 contentScript.bundle.js:4785 Data received in content script: Array(0)
 contentScript.bundle.js:4785 Event target tag: INPUT
-contentScript.bundle.js:4785 Current value: Ra
+contentScript.bundle.js:4785 Current value: +131544467
 contentScript.bundle.js:4785 Current shortcuts: Array(0)
 contentScript.bundle.js:4785 Data received in content script: Array(0)
 contentScript.bundle.js:4785 Event target tag: INPUT
-contentScript.bundle.js:4785 Current value: R
+contentScript.bundle.js:4785 Current value: +1315444678
 contentScript.bundle.js:4785 Current shortcuts: Array(0)
 contentScript.bundle.js:4785 Data received in content script: Array(0)
 contentScript.bundle.js:4785 Event target tag: INPUT
-contentScript.bundle.js:4785 Current value: 
+contentScript.bundle.js:4785 Current value: +13154446789
 contentScript.bundle.js:4785 Current shortcuts: Array(0)
 contentScript.bundle.js:4785 Data received in content script: Array(0)
 contentScript.bundle.js:4785 Event target tag: INPUT
@@ -284,7 +245,7 @@ contentScript.bundle.js:4785 Current shortcuts: Array(0)
 contentScript.bundle.js:4785 Data received in content script: Array(0)
 register.tsx:69 Starting registration process...
 register.tsx:72 Creating Firebase Auth user...
-register.tsx:79 Firebase Auth user created: MdTB6JHUSg81fc6esohtvrfWO9Ln
+register.tsx:79 Firebase Auth user created: KpuJQVfDXcGyNwsCuBiPFJz2v0fa
 register.tsx:82 Updating user profile...
 register.tsx:88 Creating Firestore document...
 register.tsx:100 Firestore document created successfully
@@ -300,70 +261,6 @@ overrideMethod @ hook.js:608
 hook.js:608 Error checking emulator connections: TypeError: Cannot read properties of undefined (reading '_settings')
     at checkEmulatorConnections (emulator-status.tsx:37:52)
 overrideMethod @ hook.js:608
-hook.js:608 Error checking emulator connections: TypeError: Cannot read properties of undefined (reading '_settings')
-    at checkEmulatorConnections (emulator-status.tsx:37:52)
-overrideMethod @ hook.js:608
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
-Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
 Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
 Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.
 Chrome is moving towards a new experience that allows users to choose to browse without third-party cookies.

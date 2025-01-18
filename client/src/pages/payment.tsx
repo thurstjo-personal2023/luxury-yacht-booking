@@ -102,7 +102,7 @@ export default function PaymentPage() {
   const [clientSecret, setClientSecret] = useState<string>();
   const [error, setError] = useState<string>();
   const searchParams = new URLSearchParams(location.split('?')[1]);
-  const amount = parseInt(searchParams.get('amount') || '0', 10);
+  const amount = parseFloat(searchParams.get('amount') || '0');
 
   useEffect(() => {
     async function createPaymentIntent() {
@@ -119,7 +119,7 @@ export default function PaymentPage() {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to create payment intent');
+          throw new Error(data.error || data.details || 'Failed to create payment intent');
         }
 
         console.log("Payment intent created successfully");
@@ -130,11 +130,12 @@ export default function PaymentPage() {
       }
     }
 
-    if (amount > 0) {
-      createPaymentIntent();
-    } else {
-      setError('Invalid payment amount');
+    if (!amount || isNaN(amount) || amount <= 0) {
+      setError('Invalid payment amount. Please try again.');
+      return;
     }
+
+    createPaymentIntent();
   }, [amount]);
 
   if (error) {

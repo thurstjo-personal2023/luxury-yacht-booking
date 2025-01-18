@@ -15,15 +15,18 @@ export function registerRoutes(app: Express): Server {
       const { amount } = req.body;
 
       // Validate amount
-      if (!amount || amount <= 0) {
+      if (!amount || isNaN(amount) || amount <= 0) {
         console.log("Invalid amount received:", amount);
-        return res.status(400).json({ error: "Invalid amount" });
+        return res.status(400).json({ error: "Invalid amount provided" });
       }
 
-      console.log("Creating payment intent for amount:", amount);
+      // Convert to cents for Stripe
+      const amountInCents = Math.round(amount * 100);
+      console.log("Creating payment intent for amount (in cents):", amountInCents);
+
       // Create payment intent
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 100), // Convert to cents
+        amount: amountInCents,
         currency: "aed",
       });
 
