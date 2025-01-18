@@ -9,6 +9,7 @@ import AuthPage from "@/pages/auth";
 import Dashboard from "@/pages/dashboard";
 import YachtListing from "@/pages/yacht-listing";
 import YachtDetails from "@/pages/yacht-details";
+import BookingSummary from "@/pages/booking-summary";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/lib/auth";
 import { Loader2 } from "lucide-react";
@@ -51,6 +52,13 @@ function Router() {
         {(params) => (
           <PrivateRoute>
             <YachtDetails id={params.id} />
+          </PrivateRoute>
+        )}
+      </Route>
+      <Route path="/booking-summary">
+        {() => (
+          <PrivateRoute>
+            <BookingSummary />
           </PrivateRoute>
         )}
       </Route>

@@ -130,6 +130,10 @@ export default function YachtDetails({ id }: { id: string }) {
     );
   }
 
+  const handleProceedToBook = () => {
+    setLocation("/booking-summary");
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <Button
@@ -316,7 +320,7 @@ export default function YachtDetails({ id }: { id: string }) {
               </div>
             </div>
           </ScrollArea>
-          <Button size="lg" className="w-full mt-4">
+          <Button size="lg" className="w-full mt-4" onClick={handleProceedToBook}>
             Proceed to Book
           </Button>
         </CardContent>
