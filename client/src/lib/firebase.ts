@@ -40,25 +40,29 @@ export const storage = getStorage(app);
 if (import.meta.env.DEV) {
   const host = 'localhost';
 
-  // Connect Auth Emulator
-  connectAuthEmulator(auth, `http://${host}:9099`);
+  try {
+    // Connect Auth Emulator
+    connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
 
-  // Connect Firestore Emulator
-  connectFirestoreEmulator(db, host, 8080);
+    // Connect Firestore Emulator
+    connectFirestoreEmulator(db, host, 8080);
 
-  // Connect Functions Emulator
-  connectFunctionsEmulator(functions, host, 5001);
+    // Connect Functions Emulator
+    connectFunctionsEmulator(functions, host, 5001);
 
-  // Connect Storage Emulator
-  connectStorageEmulator(storage, host, 9199);
+    // Connect Storage Emulator with error handling
+    connectStorageEmulator(storage, host, 9199);
 
-  console.log('\n🔥 Firebase Emulator Configuration:');
-  console.log('--------------------------------');
-  console.log('Connected to local Firebase emulators:');
-  console.log('Auth:', `http://${host}:9099`);
-  console.log('Firestore:', `http://${host}:8080`);
-  console.log('Functions:', `http://${host}:5001`);
-  console.log('Storage:', `http://${host}:9199`);
-  console.log('Emulator UI:', `http://${host}:4000`);
-  console.log('--------------------------------\n');
+    console.log('\n🔥 Firebase Emulator Configuration:');
+    console.log('--------------------------------');
+    console.log('Connected to local Firebase emulators:');
+    console.log('Auth:', `http://${host}:9099`);
+    console.log('Firestore:', `http://${host}:8080`);
+    console.log('Functions:', `http://${host}:5001`);
+    console.log('Storage:', `http://${host}:9199`);
+    console.log('Emulator UI:', `http://${host}:4000`);
+    console.log('--------------------------------\n');
+  } catch (error) {
+    console.error('Error connecting to Firebase emulators:', error);
+  }
 }

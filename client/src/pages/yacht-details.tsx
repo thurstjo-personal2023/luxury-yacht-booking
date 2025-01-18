@@ -35,7 +35,7 @@ interface YachtDetails {
 
 export default function YachtDetails({ id }: { id: string }) {
   const [, setLocation] = useLocation();
-  
+
   const { data: yacht, isLoading } = useQuery({
     queryKey: ['/api/yachts', id],
     queryFn: async () => {
@@ -273,11 +273,11 @@ const SAMPLE_YACHT_DETAILS: YachtDetails = {
   activities: ["yacht-cruise", "party", "corporate"],
   duration: "full-day",
   gallery: [
-    "https://images.unsplash.com/photo-1469796466635-455ede028aca?auto=format&fit=crop&w=800",
-    "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?auto=format&fit=crop&w=800",
-    "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?auto=format&fit=crop&w=800",
-    "https://images.unsplash.com/photo-1583916087630-e4c27a54f465?auto=format&fit=crop&w=800",
-    "https://images.unsplash.com/photo-1593351415075-3bac9f45c877?auto=format&fit=crop&w=800"
+    "https://images.unsplash.com/photo-1469796466635-455ede028aca?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1583916087630-e4c27a54f465?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80",
+    "https://images.unsplash.com/photo-1593351415075-3bac9f45c877?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
   ],
   addOns: [
     {
