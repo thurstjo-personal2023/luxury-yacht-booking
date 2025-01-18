@@ -2,9 +2,13 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
 
-// Initialize Stripe with the secret key and explicit test mode configuration
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-12-18.acacia',
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error("Missing required STRIPE_SECRET_KEY");
+}
+
+// Initialize Stripe with the secret key and test mode configuration
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2023-10-16',
   typescript: true,
 });
 
@@ -16,29 +20,32 @@ export function registerRoutes(app: Express): Server {
       const { amount } = req.body;
 
       // Validate amount
-      if (!amount || isNaN(amount) || amount <= 0) {
+      if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
         console.log("Invalid amount received:", amount);
-        return res.status(400).json({ error: "Invalid amount provided" });
+        return res.status(400).json({ 
+          error: "Invalid amount provided",
+          details: "Amount must be a positive number"
+        });
       }
 
-      // Amount is already in cents from the client
-      const amountInCents = Math.round(amount);
+      // Amount should already be in cents from the client
+      const amountInCents = Math.round(Number(amount));
       console.log("Creating payment intent for amount (in cents):", amountInCents);
 
-      // Create payment intent with test mode configurations
+      // Create payment intent with test mode specific configuration
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amountInCents,
         currency: "aed",
         payment_method_types: ['card'],
-        // Enable test mode specific configurations
         metadata: {
           environment: 'test',
         },
       });
 
-      console.log("Payment intent created successfully");
+      console.log("Payment intent created successfully:", paymentIntent.id);
       res.json({
-        clientSecret: paymentIntent.client_secret
+        clientSecret: paymentIntent.client_secret,
+        id: paymentIntent.id
       });
     } catch (err) {
       console.error("Error creating payment intent:", err);

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
   PaymentElement,
@@ -11,9 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Loader2 } from "lucide-react";
-
-// Initialize Stripe with publishable key
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+import { stripePromise } from "@/lib/stripe";
 
 function PaymentForm() {
   const stripe = useStripe();
@@ -26,6 +23,7 @@ function PaymentForm() {
     e.preventDefault();
 
     if (!stripe || !elements) {
+      console.error("Stripe.js hasn't loaded yet");
       return;
     }
 
@@ -40,6 +38,7 @@ function PaymentForm() {
       });
 
       if (error) {
+        console.error("Payment confirmation error:", error);
         toast({
           variant: "destructive",
           title: "Payment failed",
@@ -47,7 +46,7 @@ function PaymentForm() {
         });
       }
     } catch (err) {
-      console.error("Payment failed:", err);
+      console.error("Payment error:", err);
       toast({
         variant: "destructive",
         title: "Payment failed",
@@ -66,7 +65,7 @@ function PaymentForm() {
           <p>Test Mode Instructions:</p>
           <ul className="list-disc pl-4 space-y-1">
             <li>Use card number: 4242 4242 4242 4242</li>
-            <li>Any future date for expiry</li>
+            <li>Any future date for expiry (MM/YY)</li>
             <li>Any 3 digits for CVC</li>
             <li>Any 5 digits for postal code</li>
           </ul>
@@ -78,7 +77,14 @@ function PaymentForm() {
         className="w-full"
         disabled={!stripe || isProcessing}
       >
-        {isProcessing ? "Processing..." : "Complete Payment"}
+        {isProcessing ? (
+          <span className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Processing...
+          </span>
+        ) : (
+          "Complete Payment"
+        )}
       </Button>
     </form>
   );
@@ -103,12 +109,12 @@ export default function PaymentPage() {
           body: JSON.stringify({ amount }),
         });
 
-        const data = await response.json();
-
         if (!response.ok) {
-          throw new Error(data.error || data.details || 'Failed to create payment intent');
+          const errorData = await response.json();
+          throw new Error(errorData.error || errorData.details || 'Failed to create payment intent');
         }
 
+        const data = await response.json();
         console.log("Payment intent created successfully");
         setClientSecret(data.clientSecret);
       } catch (err) {
@@ -150,13 +156,6 @@ export default function PaymentPage() {
     );
   }
 
-  const options = {
-    clientSecret,
-    appearance: {
-      theme: 'stripe' as const,
-    },
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
@@ -172,9 +171,19 @@ export default function PaymentPage() {
           </CardHeader>
           <CardContent>
             <div className="mb-6">
-              <p className="text-lg font-semibold">Total Amount: AED {(amount / 100).toLocaleString()}</p>
+              <p className="text-lg font-semibold">
+                Total Amount: AED {(amount / 100).toLocaleString()}
+              </p>
             </div>
-            <Elements stripe={stripePromise} options={options}>
+            <Elements stripe={stripePromise} options={{
+              clientSecret,
+              appearance: {
+                theme: 'stripe',
+                variables: {
+                  colorPrimary: '#000000',
+                },
+              },
+            }}>
               <PaymentForm />
             </Elements>
           </CardContent>
