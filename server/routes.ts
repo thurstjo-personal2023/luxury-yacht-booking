@@ -11,25 +11,32 @@ export function registerRoutes(app: Express): Server {
   // Create payment intent endpoint
   app.post("/api/create-payment-intent", async (req, res) => {
     try {
+      console.log("Received payment intent request:", req.body);
       const { amount } = req.body;
 
       // Validate amount
       if (!amount || amount <= 0) {
+        console.log("Invalid amount received:", amount);
         return res.status(400).json({ error: "Invalid amount" });
       }
 
+      console.log("Creating payment intent for amount:", amount);
       // Create payment intent
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(amount * 100), // Convert to cents
         currency: "aed",
       });
 
+      console.log("Payment intent created successfully");
       res.json({
         clientSecret: paymentIntent.client_secret
       });
     } catch (err) {
       console.error("Error creating payment intent:", err);
-      res.status(500).json({ error: "Failed to create payment intent" });
+      res.status(500).json({ 
+        error: "Failed to create payment intent",
+        details: err instanceof Error ? err.message : 'Unknown error'
+      });
     }
   });
 

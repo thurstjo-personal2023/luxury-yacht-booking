@@ -107,6 +107,7 @@ export default function PaymentPage() {
   useEffect(() => {
     async function createPaymentIntent() {
       try {
+        console.log("Creating payment intent for amount:", amount);
         const response = await fetch('/api/create-payment-intent', {
           method: 'POST',
           headers: {
@@ -115,20 +116,24 @@ export default function PaymentPage() {
           body: JSON.stringify({ amount }),
         });
 
+        const data = await response.json();
+
         if (!response.ok) {
-          throw new Error('Failed to create payment intent');
+          throw new Error(data.error || 'Failed to create payment intent');
         }
 
-        const data = await response.json();
+        console.log("Payment intent created successfully");
         setClientSecret(data.clientSecret);
       } catch (err) {
         console.error('Error:', err);
-        setError('Failed to initialize payment. Please try again.');
+        setError(err instanceof Error ? err.message : 'Failed to initialize payment. Please try again.');
       }
     }
 
     if (amount > 0) {
       createPaymentIntent();
+    } else {
+      setError('Invalid payment amount');
     }
   }, [amount]);
 
