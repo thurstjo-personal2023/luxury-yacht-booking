@@ -14,34 +14,23 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 // Initialize Firebase Admin SDK
-let firebaseInitialized = false;
 try {
   if (!admin.apps.length) {
     admin.initializeApp();
-    firebaseInitialized = true;
     console.log("[Firebase Admin] Successfully initialized");
   }
 } catch (error) {
   console.error("[Firebase Admin] Initialization error:", error);
+  throw error;
 }
 
 export function registerRoutes(app: Express): Server {
   // Login endpoint
   app.post("/api/auth/login", async (req, res) => {
-    console.log("[Auth API] Login attempt received");
-
-    if (!firebaseInitialized) {
-      console.error("[Auth API] Firebase not initialized");
-      return res.status(503).json({ 
-        error: "Authentication service is not available" 
-      });
-    }
-
     try {
       const { email, password } = req.body;
 
       if (!email || !password) {
-        console.log("[Auth API] Missing email or password");
         return res.status(400).json({ 
           error: "Email and password are required" 
         });
@@ -49,6 +38,7 @@ export function registerRoutes(app: Express): Server {
 
       // Sign in with Firebase Auth REST API
       const signInUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.FIREBASE_API_KEY}`;
+
       const signInResponse = await fetch(signInUrl, {
         method: 'POST',
         headers: {
@@ -61,105 +51,64 @@ export function registerRoutes(app: Express): Server {
         }),
       });
 
-      const responseData = await signInResponse.json();
+      const data = await signInResponse.json();
 
       if (!signInResponse.ok) {
-        console.error("[Auth API] Firebase Auth error:", responseData);
-
-        // Handle specific Firebase error codes
-        if (responseData.error?.message === 'INVALID_LOGIN_CREDENTIALS') {
-          return res.status(401).json({ 
-            error: "Invalid email or password" 
-          });
-        }
-
-        throw new Error(responseData.error?.message || "Authentication failed");
+        console.error("[Auth API] Login failed:", data.error);
+        return res.status(401).json({ 
+          error: "Invalid email or password" 
+        });
       }
 
-      // Get additional user info using Firebase Admin SDK
-      const auth = getAuth();
-      const userRecord = await auth.getUser(responseData.localId);
-
-      // For now, we'll assume all users are consumers
-      const userData = {
-        uid: userRecord.uid,
-        email: userRecord.email,
-        role: 'consumer',
-        displayName: userRecord.displayName || email.split('@')[0],
-      };
-
-      console.log("[Auth API] Login successful for user:", userData.email);
+      // Get user details from Firebase Admin
+      const userRecord = await getAuth().getUser(data.localId);
 
       res.json({
         message: "Login successful",
-        user: userData
+        user: {
+          uid: userRecord.uid,
+          email: userRecord.email,
+          role: 'consumer',
+          displayName: userRecord.displayName || email.split('@')[0],
+        }
       });
+
     } catch (error) {
       console.error("[Auth API] Login error:", error);
-
-      res.status(401).json({ 
-        error: "Invalid email or password"
+      res.status(500).json({ 
+        error: "Authentication failed" 
       });
     }
   });
 
   // Create payment intent endpoint
   app.post("/api/create-payment-intent", async (req, res) => {
-    console.log("[Payment Intent API] Received request with body:", req.body);
-
     try {
       const { amount } = req.body;
-      console.log("[Payment Intent API] Processing amount:", amount);
 
-      // Validate amount
-      if (!amount) {
-        console.error("[Payment Intent API] No amount provided");
+      if (!amount || isNaN(amount) || amount <= 0) {
         return res.status(400).json({ 
-          error: "No amount provided" 
+          error: "Invalid amount" 
         });
       }
 
-      if (isNaN(amount)) {
-        console.error("[Payment Intent API] Invalid amount format:", amount);
-        return res.status(400).json({ 
-          error: "Amount must be a valid number" 
-        });
-      }
-
-      if (amount <= 0) {
-        console.error("[Payment Intent API] Amount must be greater than 0:", amount);
-        return res.status(400).json({ 
-          error: "Amount must be greater than 0" 
-        });
-      }
-
-      // Convert amount to cents for Stripe
       const amountInCents = Math.round(amount * 100);
-      console.log("[Payment Intent API] Amount in cents:", amountInCents);
 
-      // Create payment intent with proper configuration
-      console.log("[Payment Intent API] Creating payment intent");
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amountInCents,
         currency: "aed",
         automatic_payment_methods: {
           enabled: true,
-        },
-        metadata: {
-          integration_check: 'accept_a_payment'
         }
       });
 
-      console.log("[Payment Intent API] Payment intent created successfully:", paymentIntent.id);
-
-      // Return only the client secret
       res.json({
         clientSecret: paymentIntent.client_secret
       });
     } catch (err) {
-      console.error("[Payment Intent API] Error creating payment intent:", err);
+      console.error("[Payment API] Error:", err);
       res.status(500).json({ 
-        error: err instanceof Error ? err.message : "Failed to create payment intent"
+        error: err instanceof Error ? err.message : "Payment processing failed"
       });
     }
   });
