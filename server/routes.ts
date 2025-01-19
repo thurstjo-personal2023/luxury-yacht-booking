@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
-import * as admin from "firebase-admin";
+import admin from "firebase-admin";
 import { getAuth } from "firebase-admin/auth";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -16,12 +16,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 // Initialize Firebase Admin SDK
 let firebaseInitialized = false;
 try {
-  if (process.env.FIREBASE_API_KEY) {
+  if (!admin.apps.length) {
     admin.initializeApp();
     firebaseInitialized = true;
     console.log("[Firebase Admin] Successfully initialized");
-  } else {
-    console.warn("[Firebase Admin] FIREBASE_API_KEY not set, authentication will not work");
   }
 } catch (error) {
   console.error("[Firebase Admin] Initialization error:", error);
