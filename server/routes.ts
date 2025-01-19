@@ -14,25 +14,41 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 // Initialize Firebase Admin SDK
+let firebaseAdmin: admin.app.App | null = null;
 try {
   if (!admin.apps.length) {
-    admin.initializeApp();
+    firebaseAdmin = admin.initializeApp({
+      credential: admin.credential.applicationDefault()
+    });
     console.log("[Firebase Admin] Successfully initialized");
+  } else {
+    firebaseAdmin = admin.apps[0]!;
   }
 } catch (error) {
   console.error("[Firebase Admin] Initialization error:", error);
-  throw error;
 }
 
 export function registerRoutes(app: Express): Server {
   // Login endpoint
   app.post("/api/auth/login", async (req, res) => {
     try {
+      if (!firebaseAdmin) {
+        return res.status(503).json({
+          error: "Authentication service is temporarily unavailable"
+        });
+      }
+
       const { email, password } = req.body;
 
       if (!email || !password) {
         return res.status(400).json({ 
           error: "Email and password are required" 
+        });
+      }
+
+      if (!process.env.FIREBASE_API_KEY) {
+        return res.status(503).json({
+          error: "Authentication service is not properly configured"
         });
       }
 
@@ -42,26 +58,34 @@ export function registerRoutes(app: Express): Server {
       const signInResponse = await fetch(signInUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           email,
           password,
-          returnSecureToken: true,
-        }),
+          returnSecureToken: true
+        })
       });
 
       const data = await signInResponse.json();
 
       if (!signInResponse.ok) {
         console.error("[Auth API] Login failed:", data.error);
-        return res.status(401).json({ 
-          error: "Invalid email or password" 
+
+        // Provide more specific error messages based on Firebase error codes
+        if (data.error?.message === "INVALID_LOGIN_CREDENTIALS") {
+          return res.status(401).json({
+            error: "Invalid email or password"
+          });
+        }
+
+        return res.status(401).json({
+          error: "Authentication failed"
         });
       }
 
       // Get user details from Firebase Admin
-      const userRecord = await getAuth().getUser(data.localId);
+      const userRecord = await getAuth(firebaseAdmin).getUser(data.localId);
 
       res.json({
         message: "Login successful",
@@ -76,7 +100,7 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("[Auth API] Login error:", error);
       res.status(500).json({ 
-        error: "Authentication failed" 
+        error: "Authentication service error" 
       });
     }
   });
