@@ -28,6 +28,12 @@ try {
   console.error("[Firebase Admin] Initialization error:", error);
 }
 
+// Configure Firebase Auth to use emulator in development
+const FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
+if (process.env.NODE_ENV !== 'production') {
+  process.env.FIREBASE_AUTH_EMULATOR_HOST = FIREBASE_AUTH_EMULATOR_HOST;
+}
+
 export function registerRoutes(app: Express): Server {
   // Login endpoint
   app.post("/api/auth/login", async (req, res) => {
@@ -46,14 +52,13 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      if (!process.env.VITE_FIREBASE_API_KEY) {
-        return res.status(503).json({
-          error: "Authentication service is not properly configured"
-        });
-      }
+      // In development, use the emulator
+      const baseUrl = process.env.NODE_ENV !== 'production' 
+        ? `http://${FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts`
+        : 'https://identitytoolkit.googleapis.com/v1/accounts';
 
-      // Sign in with Firebase Auth REST API
-      const signInUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.VITE_FIREBASE_API_KEY}`;
+      const signInUrl = `${baseUrl}:signInWithPassword?key=${process.env.VITE_FIREBASE_API_KEY}`;
+      console.log("[Auth API] Using auth endpoint:", signInUrl);
 
       const signInResponse = await fetch(signInUrl, {
         method: 'POST',
@@ -68,6 +73,7 @@ export function registerRoutes(app: Express): Server {
       });
 
       const data = await signInResponse.json();
+      console.log("[Auth API] Sign in response:", data);
 
       if (!signInResponse.ok) {
         console.error("[Auth API] Login failed:", data.error);
@@ -85,7 +91,13 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Get user details from Firebase Admin
-      const userRecord = await getAuth(firebaseAdmin).getUser(data.localId);
+      const auth = getAuth(firebaseAdmin);
+      // Configure auth to use emulator in development
+      if (process.env.NODE_ENV !== 'production') {
+        auth.useEmulator(`http://${FIREBASE_AUTH_EMULATOR_HOST}`);
+      }
+
+      const userRecord = await auth.getUser(data.localId);
 
       res.json({
         message: "Login successful",
