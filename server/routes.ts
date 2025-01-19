@@ -1,37 +1,44 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import Stripe from "stripe";
 import admin from "firebase-admin";
 import { getAuth } from "firebase-admin/auth";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY must be set');
+// Configure Firebase Auth to use emulator in development
+const isDevelopment = process.env.NODE_ENV !== 'production';
+if (isDevelopment) {
+  process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
+  console.log("[Firebase Admin] Using Auth emulator:", process.env.FIREBASE_AUTH_EMULATOR_HOST);
 }
-
-// Initialize Stripe with the secret key
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2023-10-16'
-});
 
 // Initialize Firebase Admin SDK
 let firebaseAdmin: admin.app.App | null = null;
 try {
   if (!admin.apps.length) {
     firebaseAdmin = admin.initializeApp({
-      credential: admin.credential.applicationDefault()
+      // Use a placeholder project ID when in development
+      projectId: isDevelopment ? 'demo-project' : process.env.VITE_FIREBASE_PROJECT_ID,
+      credential: isDevelopment
+        ? admin.credential.cert({ // Use cert credential even in dev
+            projectId: 'demo-project',
+            clientEmail: 'fake@example.com',
+            privateKey: '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDX4SNvmZpWp1g0\n-----END PRIVATE KEY-----\n'
+          })
+        : admin.credential.cert({
+            projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+            privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+          }),
     });
-    console.log("[Firebase Admin] Successfully initialized");
+    console.log("[Firebase Admin] Successfully initialized with config:", {
+      isDevelopment,
+      projectId: isDevelopment ? 'demo-project' : process.env.VITE_FIREBASE_PROJECT_ID,
+      usingEmulator: !!process.env.FIREBASE_AUTH_EMULATOR_HOST,
+    });
   } else {
     firebaseAdmin = admin.apps[0]!;
   }
 } catch (error) {
   console.error("[Firebase Admin] Initialization error:", error);
-}
-
-// Configure Firebase Auth to use emulator in development
-const FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
-if (process.env.NODE_ENV !== 'production') {
-  process.env.FIREBASE_AUTH_EMULATOR_HOST = FIREBASE_AUTH_EMULATOR_HOST;
 }
 
 export function registerRoutes(app: Express): Server {
@@ -52,12 +59,9 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      // In development, use the emulator
-      const baseUrl = process.env.NODE_ENV !== 'production' 
-        ? `http://${FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts`
-        : 'https://identitytoolkit.googleapis.com/v1/accounts';
+      const signInUrl = `http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.VITE_FIREBASE_API_KEY}`;
 
-      const signInUrl = `${baseUrl}:signInWithPassword?key=${process.env.VITE_FIREBASE_API_KEY}`;
+      console.log("[Auth API] Attempting login with emulator:", isDevelopment);
       console.log("[Auth API] Using auth endpoint:", signInUrl);
 
       const signInResponse = await fetch(signInUrl, {
@@ -76,27 +80,22 @@ export function registerRoutes(app: Express): Server {
       console.log("[Auth API] Sign in response:", data);
 
       if (!signInResponse.ok) {
-        console.error("[Auth API] Login failed:", data.error);
-
-        // Provide more specific error messages based on Firebase error codes
-        if (data.error?.message === "INVALID_LOGIN_CREDENTIALS") {
+        if (isDevelopment) {
+          // In development, provide more detailed error information
           return res.status(401).json({
-            error: "Invalid email or password"
+            error: `Authentication failed: ${data.error?.message || 'Unknown error'}`,
+            details: data.error
           });
         }
 
+        // In production, keep error messages generic
         return res.status(401).json({
-          error: "Authentication failed"
+          error: "Invalid email or password"
         });
       }
 
       // Get user details from Firebase Admin
       const auth = getAuth(firebaseAdmin);
-      // Configure auth to use emulator in development
-      if (process.env.NODE_ENV !== 'production') {
-        auth.useEmulator(`http://${FIREBASE_AUTH_EMULATOR_HOST}`);
-      }
-
       const userRecord = await auth.getUser(data.localId);
 
       res.json({
@@ -111,8 +110,17 @@ export function registerRoutes(app: Express): Server {
 
     } catch (error) {
       console.error("[Auth API] Login error:", error);
+
+      if (isDevelopment) {
+        // In development, provide more error details
+        return res.status(500).json({
+          error: "Authentication failed",
+          details: error instanceof Error ? error.message : String(error)
+        });
+      }
+
       res.status(500).json({ 
-        error: "Authentication service error" 
+        error: "Authentication service error"
       });
     }
   });
