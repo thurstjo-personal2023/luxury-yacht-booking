@@ -47,7 +47,7 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      // Sign in with Firebase Auth using the Firebase Auth REST API
+      // Sign in with Firebase Auth REST API
       const signInUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.FIREBASE_API_KEY}`;
       const signInResponse = await fetch(signInUrl, {
         method: 'POST',
@@ -61,21 +61,26 @@ export function registerRoutes(app: Express): Server {
         }),
       });
 
+      const responseData = await signInResponse.json();
+
       if (!signInResponse.ok) {
-        const errorData = await signInResponse.json();
-        console.error("[Auth API] Firebase Auth error:", errorData);
-        throw new Error(errorData.error?.message || "Authentication failed");
+        console.error("[Auth API] Firebase Auth error:", responseData);
+
+        // Handle specific Firebase error codes
+        if (responseData.error?.message === 'INVALID_LOGIN_CREDENTIALS') {
+          return res.status(401).json({ 
+            error: "Invalid email or password" 
+          });
+        }
+
+        throw new Error(responseData.error?.message || "Authentication failed");
       }
 
-      const signInData = await signInResponse.json();
-      console.log("[Auth API] Sign in successful");
-
-      // Get additional user info using the Firebase Admin SDK
+      // Get additional user info using Firebase Admin SDK
       const auth = getAuth();
-      const userRecord = await auth.getUser(signInData.localId);
+      const userRecord = await auth.getUser(responseData.localId);
 
       // For now, we'll assume all users are consumers
-      // In the future, we can fetch the role from Firestore
       const userData = {
         uid: userRecord.uid,
         email: userRecord.email,
@@ -92,20 +97,8 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error("[Auth API] Login error:", error);
 
-      // Provide more specific error messages
-      let errorMessage = "Invalid email or password";
-      if (error instanceof Error) {
-        if (error.message.includes("EMAIL_NOT_FOUND")) {
-          errorMessage = "No account found with this email";
-        } else if (error.message.includes("INVALID_PASSWORD")) {
-          errorMessage = "Incorrect password";
-        } else if (error.message.includes("INVALID_EMAIL")) {
-          errorMessage = "Invalid email format";
-        }
-      }
-
       res.status(401).json({ 
-        error: errorMessage
+        error: "Invalid email or password"
       });
     }
   });
