@@ -15,20 +15,16 @@ let firebaseAdmin: admin.app.App | null = null;
 try {
   if (!admin.apps.length) {
     firebaseAdmin = admin.initializeApp({
-      // Use a placeholder project ID when in development
       projectId: isDevelopment ? 'demo-project' : process.env.VITE_FIREBASE_PROJECT_ID,
-      credential: isDevelopment
-        ? admin.credential.cert({ // Use cert credential even in dev
-            projectId: 'demo-project',
-            clientEmail: 'fake@example.com',
-            privateKey: '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDX4SNvmZpWp1g0\n-----END PRIVATE KEY-----\n'
-          })
+      credential: isDevelopment 
+        ? admin.credential.applicationDefault()  // Use application default in development
         : admin.credential.cert({
             projectId: process.env.VITE_FIREBASE_PROJECT_ID,
             clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
             privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
           }),
     });
+
     console.log("[Firebase Admin] Successfully initialized with config:", {
       isDevelopment,
       projectId: isDevelopment ? 'demo-project' : process.env.VITE_FIREBASE_PROJECT_ID,
@@ -39,6 +35,7 @@ try {
   }
 } catch (error) {
   console.error("[Firebase Admin] Initialization error:", error);
+  firebaseAdmin = null;
 }
 
 export function registerRoutes(app: Express): Server {
