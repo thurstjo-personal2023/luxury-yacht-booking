@@ -6,9 +6,7 @@ import { EmulatorStatusWidget } from "@/components/ui/emulator-status";
 import Home from "@/pages/home";
 import RegisterPage from "@/pages/auth/register";
 import AuthPage from "@/pages/auth";
-import ConsumerDashboard from "@/pages/dashboard/consumer";
-import ProducerDashboard from "@/pages/dashboard/producer";
-import PartnerDashboard from "@/pages/dashboard/partner";
+import Dashboard from "@/pages/dashboard";
 import YachtListing from "@/pages/yacht-listing";
 import YachtDetails from "@/pages/yacht-details";
 import BookingSummary from "@/pages/booking-summary";
@@ -40,49 +38,11 @@ function PrivateRoute({ children }: { children: ReactNode }) {
 }
 
 function Router() {
-  const { user } = useAuth();
-
   return (
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/auth/register" component={RegisterPage} />
-
-      {/* Role-specific dashboard routes */}
-      <Route path="/dashboard/consumer">
-        {() => (
-          <PrivateRoute>
-            {user?.role === 'consumer' ? (
-              <ConsumerDashboard />
-            ) : (
-              <NotFound />
-            )}
-          </PrivateRoute>
-        )}
-      </Route>
-      <Route path="/dashboard/producer">
-        {() => (
-          <PrivateRoute>
-            {user?.role === 'producer' ? (
-              <ProducerDashboard />
-            ) : (
-              <NotFound />
-            )}
-          </PrivateRoute>
-        )}
-      </Route>
-      <Route path="/dashboard/partner">
-        {() => (
-          <PrivateRoute>
-            {user?.role === 'partner' ? (
-              <PartnerDashboard />
-            ) : (
-              <NotFound />
-            )}
-          </PrivateRoute>
-        )}
-      </Route>
-
       <Route path="/yacht-listing">
         {() => (
           <PrivateRoute>
@@ -115,6 +75,13 @@ function Router() {
         {() => (
           <PrivateRoute>
             <PaymentConfirmation />
+          </PrivateRoute>
+        )}
+      </Route>
+      <Route path="/dashboard">
+        {() => (
+          <PrivateRoute>
+            <Dashboard />
           </PrivateRoute>
         )}
       </Route>

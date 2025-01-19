@@ -23,7 +23,7 @@ export default function Home() {
           <div className="flex items-center gap-2 mr-4">
             <Button
               variant="ghost"
-              onClick={() => setLocation("/auth")}
+              onClick={() => setLocation("/auth/login")}
               className="text-sm px-3 py-2"
             >
               Log In

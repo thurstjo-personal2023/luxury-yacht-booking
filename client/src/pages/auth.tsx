@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,22 +14,26 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { signInWithEmail, signUpWithEmail, signInWithGoogle, type UserRole } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/auth";
-import { Loader2, AlertCircle } from "lucide-react";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 const formSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z.string().email(),
+  password: z.string().min(6),
+  role: z.enum(['consumer', 'producer', 'partner']).optional(),
 });
 
-export default function AuthPage() {
-  const [isLoading, setIsLoading] = useState(false);
+export default function Auth() {
+  const [isLogin, setIsLogin] = useState(true);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { user, signIn, isLoading: authLoading } = useAuth();
-  const [error, setError] = useState<string>();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -39,66 +43,46 @@ export default function AuthPage() {
     },
   });
 
-  useEffect(() => {
-    if (user) {
-      // Redirect based on user role
-      const dashboardPath = `/dashboard/${user.role}`;
-      setLocation(dashboardPath);
-    }
-  }, [user, setLocation]);
-
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      setIsLoading(true);
-      setError(undefined);
-
-      await signIn(values.email, values.password);
-
-      // The useEffect hook will handle the redirection
-
+      if (isLogin) {
+        await signInWithEmail(values.email, values.password);
+      } else {
+        if (!values.role) {
+          throw new Error("Please select a role");
+        }
+        await signUpWithEmail(values.email, values.password, values.role as UserRole);
+      }
+      setLocation("/dashboard");
     } catch (error: any) {
-      console.error("Login error:", error);
-      setError(error.message || "Failed to sign in");
       toast({
         variant: "destructive",
         title: "Authentication Error",
-        description: error.message || "Failed to sign in",
+        description: error.message || "An error occurred during authentication",
       });
-    } finally {
-      setIsLoading(false);
     }
   }
 
-  function handleForgotPassword() {
-    setLocation("/auth/reset-password");
-  }
-
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+  async function handleGoogleSignIn() {
+    try {
+      await signInWithGoogle();
+      setLocation("/dashboard");
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Google Sign In Error",
+        description: error.message || "An error occurred during Google sign in",
+      });
+    }
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl">Sign in</CardTitle>
-          <CardDescription>
-            Enter your email below to access your account
-          </CardDescription>
+        <CardHeader>
+          <CardTitle>{isLogin ? "Sign In" : "Create Account"}</CardTitle>
         </CardHeader>
         <CardContent>
-          {error && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
@@ -108,19 +92,12 @@ export default function AuthPage() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="name@example.com"
-                        type="email"
-                        autoComplete="email"
-                        disabled={isLoading}
-                        {...field}
-                      />
+                      <Input placeholder="email@example.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="password"
@@ -128,54 +105,58 @@ export default function AuthPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
-                        autoComplete="current-password"
-                        disabled={isLoading}
-                        {...field}
-                      />
+                      <Input type="password" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
-              <div className="space-y-4">
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "Sign In"
+              {!isLogin && (
+                <FormField
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Type</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="consumer">Consumer</SelectItem>
+                          <SelectItem value="producer">Producer</SelectItem>
+                          <SelectItem value="partner">Partner</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
                   )}
+                />
+              )}
+              <div className="space-y-4">
+                <Button type="submit" className="w-full">
+                  {isLogin ? "Sign In" : "Create Account"}
                 </Button>
-
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   className="w-full"
-                  onClick={handleForgotPassword}
-                  disabled={isLoading}
+                  onClick={handleGoogleSignIn}
                 >
-                  Forgot password?
+                  Continue with Google
                 </Button>
               </div>
             </form>
           </Form>
-
-          <div className="mt-6 text-center text-sm">
-            Don't have an account?{" "}
-            <Button
-              variant="link"
-              className="p-0 h-auto font-normal"
-              onClick={() => setLocation("/auth/register")}
-            >
-              Sign up
-            </Button>
-          </div>
+          <Button
+            variant="link"
+            className="mt-4 w-full"
+            onClick={() => setIsLogin(!isLogin)}
+          >
+            {isLogin ? "Need an account? Sign up" : "Already have an account? Sign in"}
+          </Button>
         </CardContent>
       </Card>
     </div>
