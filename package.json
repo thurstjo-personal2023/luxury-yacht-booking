@@ -16,6 +16,7 @@
     "@firebase/firestore": "^4.7.5",
     "@firebase/storage": "^0.13.4",
     "@firebasegen/default-connector": "file:dataconnect-generated/js/default-connector",
+    "@google/generative-ai": "^0.21.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@radix-ui/react-accordion": "^1.2.1",

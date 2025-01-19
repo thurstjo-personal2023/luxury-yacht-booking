@@ -1,9 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
-import * as admin from "firebase-admin";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getFirestore } from "firebase-admin/firestore";
-import { getFunctions } from "firebase-admin/functions";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('STRIPE_SECRET_KEY must be set');
@@ -13,6 +12,10 @@ if (!process.env.STRIPE_SECRET_KEY) {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2023-10-16'
 });
+
+// Initialize Google AI
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
+const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
 export function registerRoutes(app: Express): Server {
   // Create payment intent endpoint
@@ -76,7 +79,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // AI Chat endpoint using Firebase GenKit
+  // AI Chat endpoint
   app.post("/api/ai/chat", async (req, res) => {
     try {
       const { message, userId, context } = req.body;
@@ -85,27 +88,31 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Missing required parameters" });
       }
 
-      // Get Firebase Functions instance
-      const functions = getFunctions();
+      // Generate response from AI
+      const prompt = `
+        You are a helpful AI assistant for a luxury yacht booking platform.
+        Context: ${context}
+        User message: ${message}
 
-      // Call the GenKit AI function
-      const aiResponse = await functions.httpsCallable('genAiChat')({
-        message,
-        context,
-        userId
-      });
+        Please provide a helpful, professional response regarding yacht bookings,
+        focusing on package details, availability, and booking modifications.
+        Keep responses concise and relevant to yacht rentals and luxury experiences.
+      `;
+
+      const result = await model.generateContent(prompt);
+      const response = result.response.text();
 
       // Store chat history in Firestore
       const db = getFirestore();
       await db.collection('chat_history').add({
         userId,
         message,
-        response: aiResponse.data.response,
+        response,
         context,
         timestamp: new Date(),
       });
 
-      res.json({ response: aiResponse.data.response });
+      res.json({ response });
     } catch (error) {
       console.error("AI Chat Error:", error);
       res.status(500).json({ 
