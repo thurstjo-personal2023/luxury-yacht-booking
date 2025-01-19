@@ -1,6 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
+import * as admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
+import { getFunctions } from "firebase-admin/functions";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('STRIPE_SECRET_KEY must be set');
@@ -69,6 +72,45 @@ export function registerRoutes(app: Express): Server {
       console.error("[Payment Intent API] Error creating payment intent:", err);
       res.status(500).json({ 
         error: err instanceof Error ? err.message : "Failed to create payment intent"
+      });
+    }
+  });
+
+  // AI Chat endpoint using Firebase GenKit
+  app.post("/api/ai/chat", async (req, res) => {
+    try {
+      const { message, userId, context } = req.body;
+
+      if (!message || !userId) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
+
+      // Get Firebase Functions instance
+      const functions = getFunctions();
+
+      // Call the GenKit AI function
+      const aiResponse = await functions.httpsCallable('genAiChat')({
+        message,
+        context,
+        userId
+      });
+
+      // Store chat history in Firestore
+      const db = getFirestore();
+      await db.collection('chat_history').add({
+        userId,
+        message,
+        response: aiResponse.data.response,
+        context,
+        timestamp: new Date(),
+      });
+
+      res.json({ response: aiResponse.data.response });
+    } catch (error) {
+      console.error("AI Chat Error:", error);
+      res.status(500).json({ 
+        error: "Failed to process chat request",
+        details: error instanceof Error ? error.message : "Unknown error"
       });
     }
   });
