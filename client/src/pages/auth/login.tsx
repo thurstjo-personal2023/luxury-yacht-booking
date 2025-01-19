@@ -37,32 +37,15 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-
-      const userData = await response.json();
+      const { signInWithEmail } = await import('@/lib/auth');
+      await signInWithEmail(data.email, data.password);
       
-      // Check user role and redirect accordingly
-      if (userData.role === "consumer") {
-        setLocation("/dashboard");
-      } else {
-        // For future implementation of other roles
-        setLocation("/dashboard");
-      }
-
       toast({
         title: "Welcome back!",
         description: "You have successfully logged in.",
       });
+      
+      setLocation("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to log in");
       toast({
