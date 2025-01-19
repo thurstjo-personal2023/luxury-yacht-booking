@@ -38,7 +38,7 @@ export const storage = getStorage(app);
 
 // Connect to local emulators in development
 if (import.meta.env.DEV) {
-  const host = 'localhost';
+  const host = '127.0.0.1';
 
   try {
     // Connect Auth Emulator
@@ -60,6 +60,9 @@ if (import.meta.env.DEV) {
     console.log('Firestore:', `http://${host}:8080`);
     console.log('Functions:', `http://${host}:5001`);
     console.log('Storage:', `http://${host}:9199`);
+    console.log('Data Connect:', `http://${host}:9399`);
+    console.log('Cloud Tasks:', `http://${host}:9499`);
+    console.log('Emulator Hub:', `http://${host}:4400`);
     console.log('Emulator UI:', `http://${host}:4000`);
     console.log('--------------------------------\n');
   } catch (error) {
