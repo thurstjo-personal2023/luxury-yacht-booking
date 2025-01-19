@@ -59,3 +59,6 @@ drizzle/
 # Temporary files
 .temp
 .tmp
+
+# Additional Environment Files
+client/.env
