@@ -1,8 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getFirestore } from "firebase-admin/firestore";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('STRIPE_SECRET_KEY must be set');
@@ -12,10 +10,6 @@ if (!process.env.STRIPE_SECRET_KEY) {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2023-10-16'
 });
-
-// Initialize Google AI
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
 export function registerRoutes(app: Express): Server {
   // Create payment intent endpoint
@@ -75,49 +69,6 @@ export function registerRoutes(app: Express): Server {
       console.error("[Payment Intent API] Error creating payment intent:", err);
       res.status(500).json({ 
         error: err instanceof Error ? err.message : "Failed to create payment intent"
-      });
-    }
-  });
-
-  // AI Chat endpoint
-  app.post("/api/ai/chat", async (req, res) => {
-    try {
-      const { message, userId, context } = req.body;
-
-      if (!message || !userId) {
-        return res.status(400).json({ error: "Missing required parameters" });
-      }
-
-      // Generate response from AI
-      const prompt = `
-        You are a helpful AI assistant for a luxury yacht booking platform.
-        Context: ${context}
-        User message: ${message}
-
-        Please provide a helpful, professional response regarding yacht bookings,
-        focusing on package details, availability, and booking modifications.
-        Keep responses concise and relevant to yacht rentals and luxury experiences.
-      `;
-
-      const result = await model.generateContent(prompt);
-      const response = result.response.text();
-
-      // Store chat history in Firestore
-      const db = getFirestore();
-      await db.collection('chat_history').add({
-        userId,
-        message,
-        response,
-        context,
-        timestamp: new Date(),
-      });
-
-      res.json({ response });
-    } catch (error) {
-      console.error("AI Chat Error:", error);
-      res.status(500).json({ 
-        error: "Failed to process chat request",
-        details: error instanceof Error ? error.message : "Unknown error"
       });
     }
   });
