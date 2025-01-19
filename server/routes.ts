@@ -46,14 +46,14 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
-      if (!process.env.FIREBASE_API_KEY) {
+      if (!process.env.VITE_FIREBASE_API_KEY) {
         return res.status(503).json({
           error: "Authentication service is not properly configured"
         });
       }
 
       // Sign in with Firebase Auth REST API
-      const signInUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.FIREBASE_API_KEY}`;
+      const signInUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.VITE_FIREBASE_API_KEY}`;
 
       const signInResponse = await fetch(signInUrl, {
         method: 'POST',
