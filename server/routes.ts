@@ -78,12 +78,14 @@ export function registerRoutes(app: Express): Server {
 
       if (!signInResponse.ok) {
         if (isDevelopment) {
+          // In development, provide more detailed error information
           return res.status(401).json({
             error: `Authentication failed: ${data.error?.message || 'Unknown error'}`,
             details: data.error
           });
         }
 
+        // In production, keep error messages generic
         return res.status(401).json({
           error: "Invalid email or password"
         });
@@ -107,6 +109,7 @@ export function registerRoutes(app: Express): Server {
       console.error("[Auth API] Login error:", error);
 
       if (isDevelopment) {
+        // In development, provide more error details
         return res.status(500).json({
           error: "Authentication failed",
           details: error instanceof Error ? error.message : String(error)
@@ -115,6 +118,38 @@ export function registerRoutes(app: Express): Server {
 
       res.status(500).json({ 
         error: "Authentication service error"
+      });
+    }
+  });
+
+  // Create payment intent endpoint
+  app.post("/api/create-payment-intent", async (req, res) => {
+    try {
+      const { amount } = req.body;
+
+      if (!amount || isNaN(amount) || amount <= 0) {
+        return res.status(400).json({ 
+          error: "Invalid amount" 
+        });
+      }
+
+      const amountInCents = Math.round(amount * 100);
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountInCents,
+        currency: "aed",
+        automatic_payment_methods: {
+          enabled: true,
+        }
+      });
+
+      res.json({
+        clientSecret: paymentIntent.client_secret
+      });
+    } catch (err) {
+      console.error("[Payment API] Error:", err);
+      res.status(500).json({ 
+        error: err instanceof Error ? err.message : "Payment processing failed"
       });
     }
   });
