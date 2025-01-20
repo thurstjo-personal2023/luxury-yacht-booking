@@ -2,6 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import admin from "firebase-admin";
 import { getAuth } from "firebase-admin/auth";
+import { db } from "@db";
+import { reviews } from "@db/schema";
+import { eq } from "drizzle-orm";
 
 // Configure Firebase Auth to use emulator in development
 const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -118,6 +121,75 @@ export function registerRoutes(app: Express): Server {
 
       res.status(500).json({ 
         error: "Authentication service error"
+      });
+    }
+  });
+
+  // Review submission endpoint
+  app.post("/api/reviews", async (req, res) => {
+    try {
+      const { bookingId, yachtId, rating, comment } = req.body;
+
+      if (!bookingId || !yachtId || !rating) {
+        return res.status(400).json({
+          error: "Missing required fields"
+        });
+      }
+
+      if (rating < 1 || rating > 5) {
+        return res.status(400).json({
+          error: "Rating must be between 1 and 5"
+        });
+      }
+
+      // Get the user ID from the session or token
+      const userId = 1; // TODO: Get actual user ID from session
+
+      // Insert the review into the database
+      const [newReview] = await db.insert(reviews).values({
+        userId,
+        yachtId: parseInt(yachtId),
+        bookingId: parseInt(bookingId),
+        rating,
+        comment: comment || null,
+      }).returning();
+
+      res.status(201).json({
+        message: "Review submitted successfully",
+        review: newReview
+      });
+
+    } catch (error) {
+      console.error("[Reviews API] Error submitting review:", error);
+
+      res.status(500).json({
+        error: "Failed to submit review",
+        details: isDevelopment ? String(error) : undefined
+      });
+    }
+  });
+
+  // Get user's review history endpoint
+  app.get("/api/reviews/user/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      const userReviews = await db.query.reviews.findMany({
+        where: eq(reviews.userId, parseInt(userId)),
+        with: {
+          yacht: true,
+          booking: true
+        }
+      });
+
+      res.json(userReviews);
+
+    } catch (error) {
+      console.error("[Reviews API] Error fetching user reviews:", error);
+
+      res.status(500).json({
+        error: "Failed to fetch reviews",
+        details: isDevelopment ? String(error) : undefined
       });
     }
   });
