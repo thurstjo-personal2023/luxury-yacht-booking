@@ -5,7 +5,6 @@ import { getAuth } from "firebase-admin/auth";
 import { db } from "@db";
 import { reviews } from "@db/schema";
 import { eq } from "drizzle-orm";
-import Stripe from "stripe";
 
 // Configure Firebase Auth to use emulator in development
 const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -13,15 +12,6 @@ if (isDevelopment) {
   process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
   console.log("[Firebase Admin] Using Auth emulator:", process.env.FIREBASE_AUTH_EMULATOR_HOST);
 }
-
-// Initialize Stripe
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error("STRIPE_SECRET_KEY must be set in environment variables");
-}
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2023-10-16', // Use the latest stable version
-});
 
 // Initialize Firebase Admin SDK
 let firebaseAdmin: admin.app.App | null = null;
@@ -91,14 +81,12 @@ export function registerRoutes(app: Express): Server {
 
       if (!signInResponse.ok) {
         if (isDevelopment) {
-          // In development, provide more detailed error information
           return res.status(401).json({
             error: `Authentication failed: ${data.error?.message || 'Unknown error'}`,
             details: data.error
           });
         }
 
-        // In production, keep error messages generic
         return res.status(401).json({
           error: "Invalid email or password"
         });
@@ -122,7 +110,6 @@ export function registerRoutes(app: Express): Server {
       console.error("[Auth API] Login error:", error);
 
       if (isDevelopment) {
-        // In development, provide more error details
         return res.status(500).json({
           error: "Authentication failed",
           details: error instanceof Error ? error.message : String(error)
@@ -200,42 +187,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({
         error: "Failed to fetch reviews",
         details: isDevelopment ? String(error) : undefined
-      });
-    }
-  });
-
-  // Create payment intent endpoint
-  app.post("/api/create-payment-intent", async (req, res) => {
-    try {
-      const { amount } = req.body;
-
-      if (!amount || isNaN(amount) || amount <= 0) {
-        return res.status(400).json({ 
-          error: "Invalid amount" 
-        });
-      }
-
-      const amountInCents = Math.round(amount * 100);
-
-      console.log("[Payment API] Creating payment intent:", { amount, amountInCents });
-
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amountInCents,
-        currency: "aed",
-        automatic_payment_methods: {
-          enabled: true,
-        }
-      });
-
-      console.log("[Payment API] Payment intent created:", paymentIntent.id);
-
-      res.json({
-        clientSecret: paymentIntent.client_secret
-      });
-    } catch (err) {
-      console.error("[Payment API] Error:", err);
-      res.status(500).json({ 
-        error: err instanceof Error ? err.message : "Payment processing failed"
       });
     }
   });
