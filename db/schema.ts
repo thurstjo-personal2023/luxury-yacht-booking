@@ -46,7 +46,6 @@ export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id),
   yachtId: integer("yacht_id").references(() => yachts.id),
-  bookingId: integer("booking_id").references(() => bookings.id),
   rating: integer("rating").notNull(),
   comment: text("comment"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -66,7 +65,7 @@ export const yachtRelations = relations(yachts, ({ one, many }) => ({
   reviews: many(reviews),
 }));
 
-export const bookingRelations = relations(bookings, ({ one, many }) => ({
+export const bookingRelations = relations(bookings, ({ one }) => ({
   user: one(users, {
     fields: [bookings.userId],
     references: [users.id],
@@ -75,7 +74,6 @@ export const bookingRelations = relations(bookings, ({ one, many }) => ({
     fields: [bookings.yachtId],
     references: [yachts.id],
   }),
-  reviews: many(reviews),
 }));
 
 export const reviewRelations = relations(reviews, ({ one }) => ({
@@ -86,10 +84,6 @@ export const reviewRelations = relations(reviews, ({ one }) => ({
   yacht: one(yachts, {
     fields: [reviews.yachtId],
     references: [yachts.id],
-  }),
-  booking: one(bookings, {
-    fields: [reviews.bookingId],
-    references: [bookings.id],
   }),
 }));
 

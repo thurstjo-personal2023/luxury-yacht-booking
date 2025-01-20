@@ -1,61 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import ReviewForm from "@/components/reviews/ReviewForm";
-import { useToast } from "@/hooks/use-toast";
 
 export default function PaymentConfirmation() {
   const [, setLocation] = useLocation();
-  const [showReviewDialog, setShowReviewDialog] = useState(false);
-  const { toast } = useToast();
-
-  // In a real application, we would get these from the booking context/state
-  const bookingId = "123456";
-  const yachtId = "1";
 
   useEffect(() => {
-    // Show review dialog after 2 seconds
-    const timer = setTimeout(() => {
-      setShowReviewDialog(true);
-    }, 2000);
-
-    return () => clearTimeout(timer);
+    // In a real application, you would:
+    // 1. Verify the payment status with your backend
+    // 2. Send confirmation email
+    // 3. Send push notification
+    // 4. Update booking status in the database
   }, []);
-
-  const handleReviewSubmit = async (data: { rating: number; comment?: string }) => {
-    try {
-      const response = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          bookingId,
-          yachtId,
-          ...data,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to submit review');
-      }
-
-      toast({
-        title: "Review submitted",
-        description: "Thank you for your feedback!",
-      });
-      setShowReviewDialog(false);
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to submit review. Please try again.",
-      });
-    }
-  };
 
   const handleViewBookings = () => {
     setLocation("/dashboard");
@@ -85,7 +43,7 @@ export default function PaymentConfirmation() {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Booking ID</span>
-                  <span>#{bookingId}</span>
+                  <span>#123456</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Package</span>
@@ -113,21 +71,6 @@ export default function PaymentConfirmation() {
           </CardContent>
         </Card>
       </main>
-
-      <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Share Your Experience</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <ReviewForm
-              bookingId={bookingId}
-              yachtId={yachtId}
-              onSubmit={handleReviewSubmit}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
