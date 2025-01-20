@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import admin from "firebase-admin";
 import { getAuth } from "firebase-admin/auth";
+import Stripe from 'stripe';
 
 // Configure Firebase Auth to use emulator in development
 const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -122,7 +123,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  import Stripe from 'stripe';
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
   // Create payment intent endpoint
