@@ -122,6 +122,8 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
   // Create payment intent endpoint
   app.post("/api/create-payment-intent", async (req, res) => {
     try {
@@ -148,8 +150,10 @@ export function registerRoutes(app: Express): Server {
       });
     } catch (err) {
       console.error("[Payment API] Error:", err);
+      const errorMessage = err instanceof Error ? err.message : "Payment processing failed";
       res.status(500).json({ 
-        error: err instanceof Error ? err.message : "Payment processing failed"
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? err : undefined
       });
     }
   });
