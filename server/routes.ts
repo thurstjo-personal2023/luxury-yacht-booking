@@ -5,6 +5,7 @@ import { getAuth } from "firebase-admin/auth";
 import { db } from "@db";
 import { reviews } from "@db/schema";
 import { eq } from "drizzle-orm";
+import Stripe from "stripe";
 
 // Configure Firebase Auth to use emulator in development
 const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -12,6 +13,15 @@ if (isDevelopment) {
   process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
   console.log("[Firebase Admin] Using Auth emulator:", process.env.FIREBASE_AUTH_EMULATOR_HOST);
 }
+
+// Initialize Stripe
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error("STRIPE_SECRET_KEY must be set in environment variables");
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2023-10-16', // Use the latest stable version
+});
 
 // Initialize Firebase Admin SDK
 let firebaseAdmin: admin.app.App | null = null;
@@ -207,6 +217,8 @@ export function registerRoutes(app: Express): Server {
 
       const amountInCents = Math.round(amount * 100);
 
+      console.log("[Payment API] Creating payment intent:", { amount, amountInCents });
+
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amountInCents,
         currency: "aed",
@@ -214,6 +226,8 @@ export function registerRoutes(app: Express): Server {
           enabled: true,
         }
       });
+
+      console.log("[Payment API] Payment intent created:", paymentIntent.id);
 
       res.json({
         clientSecret: paymentIntent.client_secret
