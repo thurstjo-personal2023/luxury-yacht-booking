@@ -43,10 +43,22 @@ function createUserProfile(firebaseUser: FirebaseUser, role?: UserRole): UserPro
 }
 
 export async function signInWithEmail(email: string, password: string) {
-  const userCredential = await signInWithEmailAndPassword(auth, email, password);
-  const profile = createUserProfile(userCredential.user);
-  useAuthStore.getState().setUser(profile);
-  return profile;
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const profile = createUserProfile(userCredential.user);
+    useAuthStore.getState().setUser(profile);
+    return profile;
+  } catch (error: any) {
+    // Map Firebase Auth emulator specific error messages to user-friendly messages
+    if (error.code === 'auth/wrong-password') {
+      throw new Error('Invalid password. Please try again.');
+    } else if (error.code === 'auth/user-not-found') {
+      throw new Error('No account found with this email.');
+    } else if (error.code === 'auth/invalid-credential') {
+      throw new Error('Invalid credentials. Please try again.');
+    }
+    throw error;
+  }
 }
 
 export async function signUpWithEmail(email: string, password: string, role: UserRole) {
