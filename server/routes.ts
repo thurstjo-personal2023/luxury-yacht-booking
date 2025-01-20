@@ -122,7 +122,8 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+  import Stripe from 'stripe';
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
   // Create payment intent endpoint
   app.post("/api/create-payment-intent", async (req, res) => {
