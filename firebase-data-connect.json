@@ -1,0 +1,72 @@
+{
+  "name": "etoile-yachts-data-connect",
+  "type": "firestore",
+  "collections": {
+    "yacht_experiences": {
+      "source": {
+        "type": "collection",
+        "name": "yacht_experiences"
+      }
+    },
+    "user_profiles_tourist": {
+      "source": {
+        "type": "collection",
+        "name": "user_profiles_tourist"
+      }
+    },
+    "articles_and_guides": {
+      "source": {
+        "type": "collection",
+        "name": "articles_and_guides"
+      }
+    },
+    "event_announcements": {
+      "source": {
+        "type": "collection",
+        "name": "event_announcements"
+      }
+    },
+    "experience_packages": {
+      "source": {
+        "type": "collection",
+        "name": "experience_packages"
+      }
+    },
+    "notifications": {
+      "source": {
+        "type": "collection",
+        "name": "notifications"
+      }
+    },
+    "products_add_ons": {
+      "source": {
+        "type": "collection",
+        "name": "products_add_ons"
+      }
+    },
+    "promotions_and_offers": {
+      "source": {
+        "type": "collection",
+        "name": "promotions_and_offers"
+      }
+    },
+    "reviews_and_feedback": {
+      "source": {
+        "type": "collection",
+        "name": "reviews_and_feedback"
+      }
+    },
+    "support_content": {
+      "source": {
+        "type": "collection",
+        "name": "support_content"
+      }
+    },
+    "user_profiles_service_provider": {
+      "source": {
+        "type": "collection",
+        "name": "user_profiles_service_provider"
+      }
+    }
+  }
+}

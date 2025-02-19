@@ -1,0 +1,142 @@
+{
+  "yachts": [
+    {
+      "yachtId": "1",
+      "name": "Luxury Serenity",
+      "description": "Experience pure luxury aboard our flagship yacht, perfect for unforgettable cruises.",
+      "price": 5000,
+      "capacity": 12,
+      "producerId": "1",
+      "imageUrl": "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a",
+      "location": "Miami, FL",
+      "activities": [
+        "yacht-cruise",
+        "water-sports"
+      ],
+      "duration": "full-day",
+      "availableFrom": "2025-02-19T06:47:10.296Z",
+      "availableTo": "2026-02-19T06:47:10.296Z"
+    },
+    {
+      "yachtId": "2",
+      "name": "Ocean Explorer",
+      "description": "Adventure awaits on this versatile vessel equipped for diving and fishing expeditions.",
+      "price": 3500,
+      "capacity": 8,
+      "producerId": "1",
+      "imageUrl": "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13",
+      "location": "San Francisco, CA",
+      "activities": [
+        "diving",
+        "fishing"
+      ],
+      "duration": "half-day",
+      "availableFrom": "2025-02-19T06:47:10.296Z",
+      "availableTo": "2026-02-19T06:47:10.296Z"
+    },
+    {
+      "yachtId": "3",
+      "name": "Royal Voyager",
+      "description": "Premium multi-day cruising experience with state-of-the-art amenities.",
+      "price": 8000,
+      "capacity": 16,
+      "producerId": "1",
+      "imageUrl": "https://images.unsplash.com/photo-1559385360-5b4b5f907fe7",
+      "location": "Los Angeles, CA",
+      "activities": [
+        "yacht-cruise",
+        "water-sports",
+        "diving"
+      ],
+      "duration": "multi-day",
+      "availableFrom": "2025-02-19T06:47:10.296Z",
+      "availableTo": "2026-02-19T06:47:10.296Z"
+    },
+    {
+      "yachtId": "4",
+      "name": "Sports Paradise",
+      "description": "Perfect for water sports enthusiasts with top-notch equipment.",
+      "price": 2500,
+      "capacity": 6,
+      "producerId": "1",
+      "imageUrl": "https://images.unsplash.com/photo-1569432964324-987c694b7b5a",
+      "location": "Miami, FL",
+      "activities": [
+        "water-sports",
+        "fishing"
+      ],
+      "duration": "half-day",
+      "availableFrom": "2025-02-19T06:47:10.296Z",
+      "availableTo": "2026-02-19T06:47:10.296Z"
+    },
+    {
+      "yachtId": "5",
+      "name": "Ocean Majesty",
+      "description": "Luxurious 80-foot yacht perfect for day cruises and water activities",
+      "price": 2500,
+      "capacity": 12,
+      "producerId": "1",
+      "imageUrl": "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a",
+      "location": "Miami, FL",
+      "activities": [
+        "yacht-cruise",
+        "water-sports"
+      ],
+      "duration": "full-day",
+      "availableFrom": "2025-02-19T00:00:00.000Z",
+      "availableTo": "2025-12-31T00:00:00.000Z"
+    },
+    {
+      "yachtId": "6",
+      "name": "Blue Paradise",
+      "description": "Modern 65-foot yacht specializing in fishing expeditions",
+      "price": 1800,
+      "capacity": 8,
+      "producerId": "1",
+      "imageUrl": "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13",
+      "location": "Miami, FL",
+      "activities": [
+        "yacht-cruise",
+        "fishing"
+      ],
+      "duration": "half-day",
+      "availableFrom": "2025-02-19T00:00:00.000Z",
+      "availableTo": "2025-12-31T00:00:00.000Z"
+    },
+    {
+      "yachtId": "7",
+      "name": "Coral Explorer",
+      "description": "Diving-focused yacht with state-of-the-art equipment",
+      "price": 2200,
+      "capacity": 10,
+      "producerId": "1",
+      "imageUrl": "https://images.unsplash.com/photo-1569263916175-c6528d43a25d",
+      "location": "Miami, FL",
+      "activities": [
+        "yacht-cruise",
+        "diving"
+      ],
+      "duration": "full-day",
+      "availableFrom": "2025-02-19T00:00:00.000Z",
+      "availableTo": "2025-12-31T00:00:00.000Z"
+    },
+    {
+      "yachtId": "8",
+      "name": "Royal Wave",
+      "description": "Premium multi-day cruising experience",
+      "price": 5000,
+      "capacity": 15,
+      "producerId": "1",
+      "imageUrl": "https://images.unsplash.com/photo-1575517111478-7f6afd0973db",
+      "location": "Miami, FL",
+      "activities": [
+        "yacht-cruise",
+        "water-sports",
+        "diving"
+      ],
+      "duration": "multi-day",
+      "availableFrom": "2025-02-19T00:00:00.000Z",
+      "availableTo": "2025-12-31T00:00:00.000Z"
+    }
+  ]
+}

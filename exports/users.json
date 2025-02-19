@@ -1,0 +1,37 @@
+{
+  "users": [
+    {
+      "userId": "1",
+      "email": "thurstjo@icloud.com",
+      "role": "consumer",
+      "name": "John Boyd",
+      "phone": "+971528001340",
+      "points": 0,
+      "emailVerified": false,
+      "createdAt": "2025-02-18T06:07:37.470Z",
+      "updatedAt": "2025-02-18T06:07:37.470Z"
+    },
+    {
+      "userId": "2",
+      "email": "ally.gee@hotmail.com",
+      "role": "producer",
+      "name": "Ally Gee",
+      "phone": "+447438117798",
+      "points": 0,
+      "emailVerified": false,
+      "createdAt": "2025-02-18T06:17:38.740Z",
+      "updatedAt": "2025-02-18T06:17:38.740Z"
+    },
+    {
+      "userId": "3",
+      "email": "linwoody@hotmail.com",
+      "role": "partner",
+      "name": "Linwood Boyd",
+      "phone": "+19178765432",
+      "points": 0,
+      "emailVerified": false,
+      "createdAt": "2025-02-18T06:18:38.433Z",
+      "updatedAt": "2025-02-18T06:18:38.433Z"
+    }
+  ]
+}

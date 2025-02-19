@@ -1,0 +1,48 @@
+{
+  "emulators": {
+    "auth": {
+      "host": "127.0.0.1",
+      "port": 9099
+    },
+    "functions": {
+      "host": "127.0.0.1",
+      "port": 5001
+    },
+    "firestore": {
+      "host": "127.0.0.1",
+      "port": 8080
+    },
+    "storage": {
+      "host": "127.0.0.1",
+      "port": 9199
+    },
+    "database": {
+      "host": "127.0.0.1",
+      "port": 9001
+    },
+    "pubsub": {
+      "host": "127.0.0.1",
+      "port": 8085
+    },
+    "eventarc": {
+      "host": "127.0.0.1",
+      "port": 9299
+    },
+    "extensions": {
+      "host": "127.0.0.1",
+      "port": 5001
+    },
+    "tasks": {
+      "host": "127.0.0.1",
+      "port": 9499
+    },
+    "dataconnect": {
+      "host": "127.0.0.1",
+      "port": 9399
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    }
+  }
+}

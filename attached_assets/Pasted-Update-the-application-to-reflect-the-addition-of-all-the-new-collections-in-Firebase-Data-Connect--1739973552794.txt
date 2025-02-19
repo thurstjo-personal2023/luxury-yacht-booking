@@ -1,0 +1,34 @@
+Update the application to reflect the addition of all the new collections in Firebase Data Connect. Generate realistic mock data and images consistent with the schema of each collection, and then populate these collections in Data Connect.
+
+Instructions
+Understand the Collections and Fields :
+Below is the list of collections and their corresponding JSON files. Each collection represents a specific type of data in the application. Use this information to understand the structure of the data and its purpose.
+articles_and_guides: Contains articles and guides for users.
+event_announcements: Stores announcements for events.
+experience_packages: Represents curated experience packages for tourists.
+notifications: Notifications sent to users.
+products_add-ons: Add-ons or additional products available for purchase.
+promotions_and_offers: Promotions and special offers for users.
+reviews_and_feedback: User reviews and feedback.
+support_content: Support-related content (e.g., FAQs, troubleshooting).
+user_profiles_service_provider: Profiles of service providers (e.g., yacht captains, partners).
+user_profiles_tourist: Profiles of tourists (end-users).
+yacht_profiles: Profiles of yachts available for booking.
+Generate Mock Data :
+For each collection, generate realistic mock data that aligns with the field types and relationships. Ensure the data reflects real-world scenarios. For example:
+Use realistic names, descriptions, and timestamps.
+Include valid email addresses, phone numbers, and URLs.
+For numeric fields, use reasonable ranges (e.g., prices, ratings).
+Additionally, generate placeholder images for fields that require them (e.g., profile pictures, product images). Use tools like Lorem Picsum or Unsplash Source to generate random but relevant images.
+Populate the Collections in Data Connect :
+Once the mock data and images are generated, update the collections in Firebase Data Connect. Use the Firebase Admin SDK or GraphQL API to insert the data into the respective collections.
+Update the Application :
+Modify the application to reflect the new collections and their data. This includes:
+Adding new UI components to display the data (e.g., lists, cards, detail views).
+Implementing queries to fetch data from the collections.
+Handling relationships between collections (e.g., linking yacht_profiles to experience_packages).
+Test the Changes :
+Test the application to ensure:
+All collections are populated with the generated data.
+The UI displays the data correctly.
+Images load properly and are consistent with the mock data.
