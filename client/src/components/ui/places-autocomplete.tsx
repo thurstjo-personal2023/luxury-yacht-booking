@@ -20,7 +20,7 @@ export function PlacesAutocomplete({
   className,
 }: PlacesAutocompleteProps) {
   const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: process.env.VITE_GOOGLE_MAPS_API_KEY || "",
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries,
   });
 
@@ -40,7 +40,7 @@ export function PlacesAutocomplete({
 
     autocompleteRef.current.addListener("place_changed", () => {
       const place = autocompleteRef.current?.getPlace();
-      
+
       if (place?.geometry?.location) {
         onPlaceSelect({
           address: place.formatted_address || "",
