@@ -36,11 +36,11 @@ export interface Booking {
   createdAt: Timestamp;
 }
 
-// Keep the UserRole enum as it's used in authentication
-export const UserRole = {
-  consumer: 'consumer',
-  producer: 'producer',
-  partner: 'partner'
-} as const;
+// Updated UserRole enum to use proper TypeScript enum syntax
+export enum UserRole {
+  CONSUMER = "consumer",
+  PRODUCER = "producer",
+  PARTNER = "partner"
+}
 
-export type UserRoleType = typeof UserRole[keyof typeof UserRole];
+export type UserRoleType = UserRole;
