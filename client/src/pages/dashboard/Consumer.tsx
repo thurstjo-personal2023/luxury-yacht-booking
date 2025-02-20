@@ -23,6 +23,20 @@ import { auth } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { DateRange } from "react-day-picker";
 import { Progress } from "@/components/ui/progress";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Check } from "lucide-react";
+import cn from 'classnames';
 
 const activityTypes = [
   { id: "yacht-cruise", label: "Yacht Cruise" },
@@ -37,12 +51,41 @@ const durations = [
   { value: "multi-day", label: "Multi Day" },
 ];
 
-const locations = [
-  "Miami, FL",
-  "San Francisco, CA",
-  "Los Angeles, CA",
-  "New York, NY",
-  "Seattle, WA",
+interface LocationOption {
+  value: string;
+  label: string;
+  coordinates: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+const locationOptions: LocationOption[] = [
+  {
+    value: "miami-fl",
+    label: "Miami, FL",
+    coordinates: { latitude: 25.7617, longitude: -80.1918 }
+  },
+  {
+    value: "san-francisco-ca",
+    label: "San Francisco, CA",
+    coordinates: { latitude: 37.7749, longitude: -122.4194 }
+  },
+  {
+    value: "los-angeles-ca",
+    label: "Los Angeles, CA",
+    coordinates: { latitude: 34.0522, longitude: -118.2437 }
+  },
+  {
+    value: "new-york-ny",
+    label: "New York, NY",
+    coordinates: { latitude: 40.7128, longitude: -74.0060 }
+  },
+  {
+    value: "seattle-wa",
+    label: "Seattle, WA",
+    coordinates: { latitude: 47.6062, longitude: -122.3321 }
+  }
 ];
 
 export default function ConsumerDashboard() {
@@ -54,8 +97,9 @@ export default function ConsumerDashboard() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
   const [duration, setDuration] = useState<string>("");
   const [isSearching, setIsSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<LocationOption | null>(null);
 
-  // Fetch user's profile
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.uid],
     queryFn: async () => {
@@ -70,7 +114,6 @@ export default function ConsumerDashboard() {
     enabled: !!user
   });
 
-  // Fetch user's bookings
   const { data: bookings, isLoading: bookingsLoading } = useQuery({
     queryKey: ["bookings", user?.uid],
     queryFn: async () => {
@@ -82,7 +125,6 @@ export default function ConsumerDashboard() {
     enabled: !!user
   });
 
-  // Fetch available yachts based on filters
   const { data: yachts, isLoading: yachtsLoading, refetch: refetchYachts } = useQuery({
     queryKey: ["yachts", { location, dateRange, activities: selectedActivities, priceRange, duration }],
     queryFn: async () => {
@@ -93,12 +135,10 @@ export default function ConsumerDashboard() {
     enabled: isSearching
   });
 
-  // Updated recommended yachts query to use the same endpoint as home page
   const { data: recommendedYachts, isLoading: recommendedYachtsLoading } = useQuery<Yacht[]>({
     queryKey: ["/api/yachts/featured"],
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
-
 
   const handleActivityToggle = (activityId: string) => {
     setSelectedActivities((current) =>
@@ -121,10 +161,16 @@ export default function ConsumerDashboard() {
     refetchYachts();
   };
 
+  const handleLocationSelect = (locationValue: string) => {
+    const location = locationOptions.find(loc => loc.value === locationValue);
+    setSelectedLocation(location || null);
+    setLocation(location?.label || "");
+    setOpen(false);
+  };
+
   return (
     <DashboardLayout>
       <div className="container mx-auto px-4 py-8">
-        {/* Personalized Greeting */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold">
             Welcome Back, {profile?.name || "Guest"}!
@@ -134,9 +180,7 @@ export default function ConsumerDashboard() {
           </p>
         </div>
 
-        {/* Quick Access Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Upcoming Bookings Card */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Upcoming Bookings</CardTitle>
@@ -149,7 +193,6 @@ export default function ConsumerDashboard() {
             </CardContent>
           </Card>
 
-          {/* Loyalty Status Card */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Loyalty Status</CardTitle>
@@ -163,7 +206,6 @@ export default function ConsumerDashboard() {
             </CardContent>
           </Card>
 
-          {/* Quick Stats Cards */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Total Trips</CardTitle>
@@ -187,7 +229,6 @@ export default function ConsumerDashboard() {
           </Card>
         </div>
 
-        {/* Main Content Tabs */}
         <Tabs defaultValue="recommended" className="space-y-6">
           <TabsList>
             <TabsTrigger value="recommended">Recommended</TabsTrigger>
@@ -198,7 +239,6 @@ export default function ConsumerDashboard() {
           <TabsContent value="recommended" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6 pt-0">
               {recommendedYachtsLoading ? (
-                // Loading skeletons
                 Array.from({ length: 3 }).map((_, i) => (
                   <Card key={i} className="w-full">
                     <CardContent className="p-4">
@@ -245,7 +285,6 @@ export default function ConsumerDashboard() {
           </TabsContent>
 
           <TabsContent value="search" className="space-y-6">
-            {/* Search Filters */}
             <Card>
               <CardHeader>
                 <CardTitle>Find Your Perfect Yacht Experience</CardTitle>
@@ -255,27 +294,47 @@ export default function ConsumerDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Location Filter */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Location</label>
-                    <Select
-                      value={location}
-                      onValueChange={setLocation}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select location" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {locations.map((loc) => (
-                          <SelectItem key={loc} value={loc}>
-                            {loc}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={open} onOpenChange={setOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={open}
+                          className="w-full justify-between"
+                        >
+                          {selectedLocation ? selectedLocation.label : "Select location..."}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput placeholder="Search location..." />
+                          <CommandEmpty>No location found.</CommandEmpty>
+                          <CommandGroup>
+                            {locationOptions.map((location) => (
+                              <CommandItem
+                                key={location.value}
+                                value={location.value}
+                                onSelect={handleLocationSelect}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selectedLocation?.value === location.value
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                                {location.label}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
-                  {/* Date Range Filter */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Date Range</label>
                     <CalendarDateRangePicker
@@ -284,7 +343,6 @@ export default function ConsumerDashboard() {
                     />
                   </div>
 
-                  {/* Duration Filter */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Duration</label>
                     <Select
@@ -304,7 +362,6 @@ export default function ConsumerDashboard() {
                     </Select>
                   </div>
 
-                  {/* Activity Types Filter */}
                   <div className="space-y-2 col-span-full md:col-span-2">
                     <label className="text-sm font-medium">Activity Types</label>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -326,7 +383,6 @@ export default function ConsumerDashboard() {
                     </div>
                   </div>
 
-                  {/* Price Range Filter */}
                   <div className="space-y-2 col-span-full">
                     <label className="text-sm font-medium">
                       Price Range: ${priceRange[0]} - ${priceRange[1]}
@@ -347,10 +403,8 @@ export default function ConsumerDashboard() {
               </CardContent>
             </Card>
 
-            {/* Search Results */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {yachtsLoading ? (
-                // Loading skeletons
                 Array.from({ length: 6 }).map((_, i) => (
                   <Card key={i} className="w-full">
                     <CardContent className="p-4">
