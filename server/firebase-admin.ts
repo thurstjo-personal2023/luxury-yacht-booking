@@ -48,6 +48,12 @@ if (process.env.NODE_ENV === "development") {
   // Data Connect emulator
   process.env.FIREBASE_DATACONNECT_EMULATOR_HOST = "127.0.0.1:9399";
 
+  // Pub/Sub emulator
+  process.env.PUBSUB_EMULATOR_HOST = "127.0.0.1:8085";
+
+  // Eventarc emulator
+  process.env.EVENTARC_EMULATOR_HOST = "127.0.0.1:9299";
+
   console.log("Connected to external Firebase Admin emulators");
 }
 
