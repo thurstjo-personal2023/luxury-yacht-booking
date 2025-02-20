@@ -42,7 +42,7 @@ const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: passwordSchema,
   phone: z.string().regex(phoneRegex, "Please enter a valid phone number"),
-  role: z.enum([UserRole.CONSUMER, UserRole.PRODUCER, UserRole.PARTNER], {
+  role: z.nativeEnum(UserRole, {
     required_error: "Please select your role",
   }),
 });
