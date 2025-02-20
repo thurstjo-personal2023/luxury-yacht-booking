@@ -93,43 +93,9 @@ export default function ConsumerDashboard() {
     enabled: isSearching
   });
 
-  // Updated recommended yachts query with better error handling and logging
-  const { data: recommendedYachts, isLoading: recommendedYachtsLoading } = useQuery({
-    queryKey: ["yachts", "recommended"],
-    queryFn: async () => {
-      try {
-        console.log("Starting to fetch recommended yachts...");
-        const q = query(
-          collectionRefs.yachtExperiences,
-          limit(3)
-        );
-
-        console.log("Executing Firestore query...");
-        const snapshot = await getDocs(q);
-
-        console.log("Query completed. Documents found:", snapshot.size);
-
-        if (snapshot.empty) {
-          console.log("No yacht experiences found in Firestore");
-          return [];
-        }
-
-        const yachts = snapshot.docs.map(doc => {
-          const data = doc.data();
-          console.log("Processing yacht document:", doc.id, data);
-          return {
-            id: doc.id,
-            ...data
-          } as Yacht;
-        });
-
-        console.log("Successfully processed yacht data:", yachts);
-        return yachts;
-      } catch (error) {
-        console.error("Error fetching recommended yachts:", error);
-        throw error;
-      }
-    },
+  // Updated recommended yachts query to use the same endpoint as home page
+  const { data: recommendedYachts, isLoading: recommendedYachtsLoading } = useQuery<Yacht[]>({
+    queryKey: ["/api/yachts/featured"],
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
