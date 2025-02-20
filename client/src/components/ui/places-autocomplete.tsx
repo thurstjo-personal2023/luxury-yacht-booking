@@ -2,6 +2,8 @@ import { useRef, useEffect, useState } from "react";
 import { Input } from "./input";
 import { useLoadScript } from "@react-google-maps/api";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "./alert";
+import { ReloadIcon } from "@radix-ui/react-icons";
 
 const libraries: ("places")[] = ["places"];
 
@@ -22,10 +24,16 @@ export function PlacesAutocomplete({
 }: PlacesAutocompleteProps) {
   const { toast } = useToast();
   const [inputValue, setInputValue] = useState("");
+  const [showError, setShowError] = useState(false);
 
   // Log the API key status (masked for security)
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  console.log("Google Maps API Key status:", apiKey ? "Present" : "Missing");
+  console.log("Google Maps API Key status:", {
+    exists: !!apiKey,
+    length: apiKey?.length || 0,
+    startsWithAIza: apiKey?.startsWith('AIza'),
+    format: apiKey ? 'Valid format' : 'Invalid format'
+  });
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: apiKey || "",
@@ -96,6 +104,7 @@ export function PlacesAutocomplete({
 
         console.log("Sending place data to parent:", placeData);
         onPlaceSelect(placeData);
+        setShowError(false);
       });
 
       return () => {
@@ -111,6 +120,7 @@ export function PlacesAutocomplete({
         errorStack: error instanceof Error ? error.stack : undefined
       });
 
+      setShowError(true);
       toast({
         title: "Error",
         description: "Failed to initialize location search. Please try again later.",
@@ -119,34 +129,71 @@ export function PlacesAutocomplete({
     }
   }, [isLoaded, onPlaceSelect, toast]);
 
-  if (loadError) {
+  // Early validation of API key
+  useEffect(() => {
+    if (!apiKey) {
+      console.error("Google Maps API key is missing");
+      setShowError(true);
+      toast({
+        title: "Configuration Error",
+        description: "Location search is currently unavailable. Please try again later or contact support.",
+        variant: "destructive",
+      });
+    } else if (!apiKey.startsWith('AIza')) {
+      console.error("Google Maps API key appears to be in invalid format");
+      setShowError(true);
+      toast({
+        title: "Configuration Error",
+        description: "Location search is currently unavailable. Please try again later or contact support.",
+        variant: "destructive",
+      });
+    }
+  }, [apiKey, toast]);
+
+  if (loadError || showError) {
     console.error("Google Maps loading error:", {
       error: loadError,
-      message: loadError.message,
-      stack: loadError.stack
+      message: loadError?.message,
+      stack: loadError?.stack
     });
 
     return (
-      <Input 
-        className={className} 
-        placeholder="Error loading location search" 
-        disabled 
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-      />
+      <div className="space-y-2">
+        <Input 
+          className={className}
+          placeholder="Location search unavailable"
+          disabled
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+        />
+        <Alert variant="destructive" className="my-2">
+          <AlertDescription className="flex items-center gap-2">
+            <ReloadIcon className="h-4 w-4 animate-spin" />
+            Location search is temporarily unavailable. Please try again later.
+          </AlertDescription>
+        </Alert>
+      </div>
     );
   }
 
   if (!isLoaded) {
     console.log("Waiting for Google Maps to load...");
     return (
-      <Input 
-        className={className} 
-        placeholder="Loading..." 
-        disabled 
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-      />
+      <div className="space-y-2">
+        <Input 
+          className={className}
+          placeholder="Loading location search..."
+          disabled
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+        />
+        <Alert>
+          <AlertDescription className="flex items-center gap-2">
+            <ReloadIcon className="h-4 w-4 animate-spin" />
+            Initializing location search...
+          </AlertDescription>
+        </Alert>
+      </div>
     );
   }
 
