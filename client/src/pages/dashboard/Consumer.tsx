@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/popover";
 import { Check } from "lucide-react";
 import cn from 'classnames';
+import { PlacesAutocomplete } from "@/components/ui/places-autocomplete";
 
 const activityTypes = [
   { id: "yacht-cruise", label: "Yacht Cruise" },
@@ -52,41 +53,13 @@ const durations = [
 ];
 
 interface LocationOption {
-  value: string;
-  label: string;
+  address: string;
   coordinates: {
     latitude: number;
     longitude: number;
   };
 }
 
-const locationOptions: LocationOption[] = [
-  {
-    value: "miami-fl",
-    label: "Miami, FL",
-    coordinates: { latitude: 25.7617, longitude: -80.1918 }
-  },
-  {
-    value: "san-francisco-ca",
-    label: "San Francisco, CA",
-    coordinates: { latitude: 37.7749, longitude: -122.4194 }
-  },
-  {
-    value: "los-angeles-ca",
-    label: "Los Angeles, CA",
-    coordinates: { latitude: 34.0522, longitude: -118.2437 }
-  },
-  {
-    value: "new-york-ny",
-    label: "New York, NY",
-    coordinates: { latitude: 40.7128, longitude: -74.0060 }
-  },
-  {
-    value: "seattle-wa",
-    label: "Seattle, WA",
-    coordinates: { latitude: 47.6062, longitude: -122.3321 }
-  }
-];
 
 export default function ConsumerDashboard() {
   const { toast } = useToast();
@@ -161,11 +134,15 @@ export default function ConsumerDashboard() {
     refetchYachts();
   };
 
-  const handleLocationSelect = (locationValue: string) => {
-    const location = locationOptions.find(loc => loc.value === locationValue);
-    setSelectedLocation(location || null);
-    setLocation(location?.label || "");
-    setOpen(false);
+  const handleLocationSelect = (place: { address: string; latitude: number; longitude: number }) => {
+    setSelectedLocation({
+      address: place.address,
+      coordinates: {
+        latitude: place.latitude,
+        longitude: place.longitude,
+      }
+    });
+    setLocation(place.address);
   };
 
   return (
@@ -296,43 +273,11 @@ export default function ConsumerDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Location</label>
-                    <Popover open={open} onOpenChange={setOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={open}
-                          className="w-full justify-between"
-                        >
-                          {selectedLocation ? selectedLocation.label : "Select location..."}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-0">
-                        <Command>
-                          <CommandInput placeholder="Search location..." />
-                          <CommandEmpty>No location found.</CommandEmpty>
-                          <CommandGroup>
-                            {locationOptions.map((location) => (
-                              <CommandItem
-                                key={location.value}
-                                value={location.value}
-                                onSelect={handleLocationSelect}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    selectedLocation?.value === location.value
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                                {location.label}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
+                    <PlacesAutocomplete
+                      onPlaceSelect={handleLocationSelect}
+                      placeholder="Search for a location..."
+                      className="w-full"
+                    />
                   </div>
 
                   <div className="space-y-2">
