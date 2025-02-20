@@ -35,14 +35,11 @@ export function PlacesAutocomplete({
     setError(null);
 
     try {
-      console.log("[PlacesAutocomplete] Calling getLocation function with address:", inputValue);
-      console.log("[PlacesAutocomplete] Functions instance:", functions);
-
+      console.log("Calling getLocation function with address:", inputValue);
       const result = await getLocation({ address: inputValue });
-      console.log("[PlacesAutocomplete] Raw function result:", result);
-
       const data = result.data as { lat: number; lng: number; error?: { message: string; details: string } };
-      console.log("[PlacesAutocomplete] Parsed location data:", data);
+
+      console.log("Location function response:", data);
 
       if (data.error) {
         throw new Error(data.error.message || 'Failed to fetch location data');
@@ -53,17 +50,11 @@ export function PlacesAutocomplete({
         latitude: data.lat,
         longitude: data.lng,
       });
-    } catch (err: any) {
-      console.error("[PlacesAutocomplete] Error details:", {
-        message: err.message,
-        code: err.code,
-        details: err.details,
-        stack: err.stack
-      });
-
+    } catch (err) {
+      console.error("Error fetching location:", err);
       setError("Failed to fetch location data. Please try again.");
       toast({
-        title: "Location Search Error",
+        title: "Error",
         description: "Failed to fetch location data. Please try again later.",
         variant: "destructive",
       });

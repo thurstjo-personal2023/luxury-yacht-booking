@@ -25,7 +25,7 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
+// Initialize Firebase and export the app instance
 export const app = initializeApp(firebaseConfig);
 
 // Initialize Firestore with settings for better offline support
@@ -48,29 +48,27 @@ if (import.meta.env.DEV) {
     console.log("Connecting to external Firebase emulators...");
 
     // Auth Emulator
-    connectAuthEmulator(auth, "http://127.0.0.1:9099");
+    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+    console.log("✓ Auth emulator connected at: http://127.0.0.1:9099");
 
     // Firestore Emulator
     connectFirestoreEmulator(db, "127.0.0.1", 8080);
+    console.log("✓ Firestore emulator connected at: http://127.0.0.1:8080");
 
     // Storage Emulator
     connectStorageEmulator(storage, "127.0.0.1", 9199);
+    console.log("✓ Storage emulator connected at: http://127.0.0.1:9199");
 
-    // Functions Emulator
+    // Functions Emulator - explicitly set to port 5001
     connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+    console.log("✓ Functions emulator connected at: http://127.0.0.1:5001");
 
     // Realtime Database Emulator
     connectDatabaseEmulator(rtdb, "127.0.0.1", 9001);
+    console.log("✓ Realtime Database emulator connected at: http://127.0.0.1:9001");
 
-    console.log("Connected to external Firebase emulators successfully");
+    console.log("All Firebase emulators connected successfully!");
 
-    // Note: The following emulators are running but don't require client-side connection:
-    // - Data Connect: 127.0.0.1:9399
-    // - Cloud Tasks: 127.0.0.1:9499
-    // - Pub/Sub: 127.0.0.1:8085
-    // - Eventarc: 127.0.0.1:9299
-    // - Hosting: 127.0.0.1:5002
-    // - Emulator Hub: 127.0.0.1:4400
   } catch (error) {
     console.error("Error connecting to emulators:", error);
   }
