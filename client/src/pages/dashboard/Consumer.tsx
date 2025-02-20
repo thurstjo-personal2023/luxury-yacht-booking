@@ -361,12 +361,24 @@ export default function ConsumerDashboard() {
                     </CardContent>
                   </Card>
                 ))
-              ) : yachts?.length === 0 ? (
+              ) : !yachts?.length && isSearching ? (
                 <div className="col-span-full text-center py-8">
-                  <p className="text-muted-foreground">
-                    No experiences match your criteria. Please adjust your filters and try
-                    again.
-                  </p>
+                  <div className="max-w-md mx-auto space-y-4">
+                    <p className="text-lg text-muted-foreground">
+                      No experiences match your criteria. Please adjust your filters and try again.
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsSearching(false);
+                        setPriceRange([0, 10000]);
+                        setSelectedActivities([]);
+                        setDuration("");
+                      }}
+                    >
+                      Reset Filters
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 yachts?.map((yacht) => (
