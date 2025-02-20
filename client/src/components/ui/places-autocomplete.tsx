@@ -3,8 +3,6 @@ import { Input } from "./input";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "./alert";
 import { ReloadIcon } from "@radix-ui/react-icons";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { app } from "@/lib/firebase";
 
 interface PlacesAutocompleteProps {
   onPlaceSelect: (place: {
@@ -25,8 +23,9 @@ export function PlacesAutocomplete({
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const functions = getFunctions(app);
-  const getLocation = httpsCallable(functions, 'getLocation');
+
+  // Cloud Function URL for the emulator
+  const cloudFunctionURL = "http://127.0.0.1:5001/etoile-yachts/us-central1/getLocation";
 
   const handleLocationSearch = async () => {
     if (!inputValue.trim()) return;
@@ -35,17 +34,30 @@ export function PlacesAutocomplete({
     setError(null);
 
     try {
-      console.log("[PlacesAutocomplete] Calling getLocation function with address:", inputValue);
-      console.log("[PlacesAutocomplete] Functions instance:", functions);
+      console.log("[PlacesAutocomplete] Sending request to:", cloudFunctionURL);
+      console.log("[PlacesAutocomplete] Request payload:", { address: inputValue });
 
-      const result = await getLocation({ address: inputValue });
-      console.log("[PlacesAutocomplete] Raw function result:", result);
+      const response = await fetch(cloudFunctionURL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ address: inputValue }),
+      });
 
-      const data = result.data as { lat: number; lng: number; error?: { message: string; details: string } };
-      console.log("[PlacesAutocomplete] Parsed location data:", data);
+      console.log("[PlacesAutocomplete] Response status:", response.status);
 
-      if (data.error) {
-        throw new Error(data.error.message || 'Failed to fetch location data');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error("[PlacesAutocomplete] Error response:", errorData);
+        throw new Error(errorData?.error?.message || "Failed to fetch location data");
+      }
+
+      const data = await response.json();
+      console.log("[PlacesAutocomplete] Success response:", data);
+
+      if (!data.lat || !data.lng) {
+        throw new Error("Invalid location data received");
       }
 
       onPlaceSelect({
@@ -56,9 +68,7 @@ export function PlacesAutocomplete({
     } catch (err: any) {
       console.error("[PlacesAutocomplete] Error details:", {
         message: err.message,
-        code: err.code,
-        details: err.details,
-        stack: err.stack
+        stack: err.stack,
       });
 
       setError("Failed to fetch location data. Please try again.");

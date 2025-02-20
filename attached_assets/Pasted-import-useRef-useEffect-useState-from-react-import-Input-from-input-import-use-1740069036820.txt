@@ -1,0 +1,81 @@
+import { useRef, useEffect, useState } from "react";
+import { Input } from "./input";
+import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "./alert";
+import { ReloadIcon } from "@radix-ui/react-icons";
+
+interface PlacesAutocompleteProps {
+  onPlaceSelect: (place: {
+    address: string;
+    latitude: number;
+    longitude: number;
+  }) => void;
+  placeholder?: string;
+  className?: string;
+  cloudFunctionURL: string; // Add this prop to pass the cloud function URL
+}
+
+export function PlacesAutocomplete({
+  onPlaceSelect,
+  placeholder = "Enter location...",
+  className,
+  cloudFunctionURL, // cloud function URL
+}: PlacesAutocompleteProps) {
+  const { toast } = useToast();
+  const [inputValue, setInputValue] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLocationSearch = async () => {
+    if (!inputValue.trim()) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(cloudFunctionURL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ address: inputValue }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fetch location data");
+      }
+
+      const data = await response.json();
+      onPlaceSelect({
+        address: inputValue,
+        latitude: data.lat,
+        longitude: data.lng,
+      });
+    } catch (err: any) {
+      console.error("[PlacesAutocomplete] Error details:", err);
+      setError("Failed to fetch location data. Please try again.");
+      toast({
+        title: "Location Search Error",
+        description: "Failed to fetch location data. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Debounce the search
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (inputValue.trim().length >= 3) {
+        handleLocationSearch();
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [inputValue]);
+
+  // ... rest of your component code ...
+}
+
