@@ -1,5 +1,5 @@
 import { db } from "./firebase";
-import { collection, getDocs, query, limit } from "firebase/firestore";
+import { collection, getDocs, query, limit, connectFirestoreEmulator } from "firebase/firestore";
 import type {
   YachtExperience,
   TouristProfile,
@@ -12,6 +12,12 @@ import type {
   SupportContent,
   ServiceProviderProfile
 } from "@shared/firestore-schema";
+
+// Connect to the external Firestore emulator
+if (process.env.NODE_ENV === "development") {
+  connectFirestoreEmulator(db, "127.0.0.1", 8080);
+  console.log("Connected to external Firestore emulator on port 8080");
+}
 
 const collections = {
   yacht_experiences: "yacht_experiences",
