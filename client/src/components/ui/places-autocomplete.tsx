@@ -1,6 +1,7 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Input } from "./input";
 import { useLoadScript } from "@react-google-maps/api";
+import { useToast } from "@/hooks/use-toast";
 
 const libraries: ("places")[] = ["places"];
 
@@ -19,9 +20,13 @@ export function PlacesAutocomplete({
   placeholder = "Enter location...",
   className,
 }: PlacesAutocompleteProps) {
+  const { toast } = useToast();
+  const [inputValue, setInputValue] = useState("");
+
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries,
+    version: "weekly"
   });
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -30,39 +35,72 @@ export function PlacesAutocomplete({
   useEffect(() => {
     if (!isLoaded || !inputRef.current) return;
 
-    autocompleteRef.current = new google.maps.places.Autocomplete(
-      inputRef.current,
-      {
-        types: ["geocode"],
-        fields: ["formatted_address", "geometry"],
-      }
-    );
+    try {
+      autocompleteRef.current = new google.maps.places.Autocomplete(
+        inputRef.current,
+        {
+          types: ["geocode"],
+          fields: ["formatted_address", "geometry", "name"],
+        }
+      );
 
-    autocompleteRef.current.addListener("place_changed", () => {
-      const place = autocompleteRef.current?.getPlace();
+      autocompleteRef.current.addListener("place_changed", () => {
+        const place = autocompleteRef.current?.getPlace();
 
-      if (place?.geometry?.location) {
+        if (!place?.geometry?.location) {
+          toast({
+            title: "Location Error",
+            description: "Please select a location from the dropdown list",
+            variant: "destructive",
+          });
+          return;
+        }
+
         onPlaceSelect({
-          address: place.formatted_address || "",
+          address: place.formatted_address || place.name || "",
           latitude: place.geometry.location.lat(),
           longitude: place.geometry.location.lng(),
         });
-      }
-    });
+      });
 
-    return () => {
-      if (google.maps.event) {
-        google.maps.event.clearInstanceListeners(autocompleteRef.current!);
-      }
-    };
-  }, [isLoaded, onPlaceSelect]);
+      return () => {
+        if (google.maps.event && autocompleteRef.current) {
+          google.maps.event.clearInstanceListeners(autocompleteRef.current);
+        }
+      };
+    } catch (error) {
+      console.error("Error initializing Google Places Autocomplete:", error);
+      toast({
+        title: "Error",
+        description: "Failed to initialize location search. Please try again later.",
+        variant: "destructive",
+      });
+    }
+  }, [isLoaded, onPlaceSelect, toast]);
 
   if (loadError) {
-    return <Input className={className} placeholder="Error loading Google Maps" disabled />;
+    console.error("Error loading Google Maps:", loadError);
+    return (
+      <Input 
+        className={className} 
+        placeholder="Error loading location search" 
+        disabled 
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+      />
+    );
   }
 
   if (!isLoaded) {
-    return <Input className={className} placeholder="Loading..." disabled />;
+    return (
+      <Input 
+        className={className} 
+        placeholder="Loading..." 
+        disabled 
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+      />
+    );
   }
 
   return (
@@ -71,6 +109,8 @@ export function PlacesAutocomplete({
       type="text"
       placeholder={placeholder}
       className={className}
+      value={inputValue}
+      onChange={(e) => setInputValue(e.target.value)}
     />
   );
 }
