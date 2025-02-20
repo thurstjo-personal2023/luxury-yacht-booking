@@ -39,6 +39,12 @@ import { Check } from "lucide-react";
 import cn from 'classnames';
 import { PlacesAutocomplete } from "@/components/ui/places-autocomplete";
 
+interface LocationOption {
+  address: string;
+  latitude: number;
+  longitude: number;
+}
+
 const activityTypes = [
   { id: "yacht-cruise", label: "Yacht Cruise" },
   { id: "water-sports", label: "Water Sports" },
@@ -52,14 +58,6 @@ const durations = [
   { value: "multi-day", label: "Multi Day" },
 ];
 
-interface LocationOption {
-  address: string;
-  coordinates: {
-    latitude: number;
-    longitude: number;
-  };
-}
-
 
 export default function ConsumerDashboard() {
   const { toast } = useToast();
@@ -70,7 +68,6 @@ export default function ConsumerDashboard() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
   const [duration, setDuration] = useState<string>("");
   const [isSearching, setIsSearching] = useState(false);
-  const [open, setOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<LocationOption | null>(null);
 
   const { data: profile } = useQuery({
@@ -135,12 +132,11 @@ export default function ConsumerDashboard() {
   };
 
   const handleLocationSelect = (place: { address: string; latitude: number; longitude: number }) => {
+    console.log("Selected location:", place);
     setSelectedLocation({
       address: place.address,
-      coordinates: {
-        latitude: place.latitude,
-        longitude: place.longitude,
-      }
+      latitude: place.latitude,
+      longitude: place.longitude
     });
     setLocation(place.address);
   };

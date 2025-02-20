@@ -1,11 +1,10 @@
 import { useRef, useEffect, useState } from "react";
 import { Input } from "./input";
-import { useLoadScript } from "@react-google-maps/api";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "./alert";
 import { ReloadIcon } from "@radix-ui/react-icons";
-
-const libraries: ("places")[] = ["places"];
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { app } from "@/lib/firebase";
 
 interface PlacesAutocompleteProps {
   onPlaceSelect: (place: {
@@ -24,173 +23,69 @@ export function PlacesAutocomplete({
 }: PlacesAutocompleteProps) {
   const { toast } = useToast();
   const [inputValue, setInputValue] = useState("");
-  const [showError, setShowError] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const functions = getFunctions(app);
+  const getLocation = httpsCallable(functions, 'getLocation');
 
-  // Log the API key status (masked for security)
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  console.log("Google Maps API Key status:", {
-    exists: !!apiKey,
-    length: apiKey?.length || 0,
-    startsWithAIza: apiKey?.startsWith('AIza'),
-    format: apiKey ? 'Valid format' : 'Invalid format'
-  });
+  const handleLocationSearch = async () => {
+    if (!inputValue.trim()) return;
 
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: apiKey || "",
-    libraries,
-    version: "weekly"
-  });
-
-  // Log loading status
-  useEffect(() => {
-    console.log("Google Maps script loading status:", {
-      isLoaded,
-      hasLoadError: !!loadError,
-      errorDetails: loadError ? loadError.message : null
-    });
-  }, [isLoaded, loadError]);
-
-  const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-
-  useEffect(() => {
-    if (!isLoaded || !inputRef.current) {
-      console.log("Skipping Autocomplete initialization:", {
-        isLoaded,
-        hasInputRef: !!inputRef.current
-      });
-      return;
-    }
+    setIsLoading(true);
+    setError(null);
 
     try {
-      console.log("Initializing Google Places Autocomplete...");
+      console.log("Calling getLocation function with address:", inputValue);
+      const result = await getLocation({ address: inputValue });
+      const data = result.data as { lat: number; lng: number; error?: { message: string; details: string } };
 
-      autocompleteRef.current = new google.maps.places.Autocomplete(
-        inputRef.current,
-        {
-          types: ["geocode"],
-          fields: ["formatted_address", "geometry", "name"],
-        }
-      );
+      console.log("Location function response:", data);
 
-      console.log("Autocomplete initialized successfully");
+      if (data.error) {
+        throw new Error(data.error.message || 'Failed to fetch location data');
+      }
 
-      autocompleteRef.current.addListener("place_changed", () => {
-        console.log("Place selection triggered");
-        const place = autocompleteRef.current?.getPlace();
-
-        console.log("Selected place details:", {
-          hasPlace: !!place,
-          hasGeometry: !!place?.geometry,
-          hasLocation: !!place?.geometry?.location,
-          address: place?.formatted_address || place?.name,
-        });
-
-        if (!place?.geometry?.location) {
-          console.error("Invalid place selection: Missing geometry or location");
-          toast({
-            title: "Location Error",
-            description: "Please select a location from the dropdown list",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const placeData = {
-          address: place.formatted_address || place.name || "",
-          latitude: place.geometry.location.lat(),
-          longitude: place.geometry.location.lng(),
-        };
-
-        console.log("Sending place data to parent:", placeData);
-        onPlaceSelect(placeData);
-        setShowError(false);
+      onPlaceSelect({
+        address: inputValue,
+        latitude: data.lat,
+        longitude: data.lng,
       });
-
-      return () => {
-        if (google.maps.event && autocompleteRef.current) {
-          console.log("Cleaning up event listeners");
-          google.maps.event.clearInstanceListeners(autocompleteRef.current);
-        }
-      };
-    } catch (error) {
-      console.error("Error initializing Google Places Autocomplete:", {
-        error,
-        errorMessage: error instanceof Error ? error.message : "Unknown error",
-        errorStack: error instanceof Error ? error.stack : undefined
-      });
-
-      setShowError(true);
+    } catch (err) {
+      console.error("Error fetching location:", err);
+      setError("Failed to fetch location data. Please try again.");
       toast({
         title: "Error",
-        description: "Failed to initialize location search. Please try again later.",
+        description: "Failed to fetch location data. Please try again later.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
-  }, [isLoaded, onPlaceSelect, toast]);
+  };
 
-  // Early validation of API key
+  // Debounce the search to avoid too many function calls
   useEffect(() => {
-    if (!apiKey) {
-      console.error("Google Maps API key is missing");
-      setShowError(true);
-      toast({
-        title: "Configuration Error",
-        description: "Location search is currently unavailable. Please try again later or contact support.",
-        variant: "destructive",
-      });
-    } else if (!apiKey.startsWith('AIza')) {
-      console.error("Google Maps API key appears to be in invalid format");
-      setShowError(true);
-      toast({
-        title: "Configuration Error",
-        description: "Location search is currently unavailable. Please try again later or contact support.",
-        variant: "destructive",
-      });
-    }
-  }, [apiKey, toast]);
+    const timeoutId = setTimeout(() => {
+      if (inputValue.trim().length >= 3) {
+        handleLocationSearch();
+      }
+    }, 500);
 
-  if (loadError || showError) {
-    console.error("Google Maps loading error:", {
-      error: loadError,
-      message: loadError?.message,
-      stack: loadError?.stack
-    });
+    return () => clearTimeout(timeoutId);
+  }, [inputValue]);
 
+  if (error) {
     return (
       <div className="space-y-2">
-        <Input 
-          className={className}
-          placeholder="Location search unavailable"
-          disabled
+        <Input
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-        />
-        <Alert variant="destructive" className="my-2">
-          <AlertDescription className="flex items-center gap-2">
-            <ReloadIcon className="h-4 w-4 animate-spin" />
-            Location search is temporarily unavailable. Please try again later.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  if (!isLoaded) {
-    console.log("Waiting for Google Maps to load...");
-    return (
-      <div className="space-y-2">
-        <Input 
+          placeholder={placeholder}
           className={className}
-          placeholder="Loading location search..."
-          disabled
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
         />
-        <Alert>
+        <Alert variant="destructive">
           <AlertDescription className="flex items-center gap-2">
-            <ReloadIcon className="h-4 w-4 animate-spin" />
-            Initializing location search...
+            {error}
           </AlertDescription>
         </Alert>
       </div>
@@ -198,13 +93,22 @@ export function PlacesAutocomplete({
   }
 
   return (
-    <Input
-      ref={inputRef}
-      type="text"
-      placeholder={placeholder}
-      className={className}
-      value={inputValue}
-      onChange={(e) => setInputValue(e.target.value)}
-    />
+    <div className="space-y-2">
+      <Input
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        placeholder={isLoading ? "Searching..." : placeholder}
+        className={className}
+        disabled={isLoading}
+      />
+      {isLoading && (
+        <Alert>
+          <AlertDescription className="flex items-center gap-2">
+            <ReloadIcon className="h-4 w-4 animate-spin" />
+            Searching for location...
+          </AlertDescription>
+        </Alert>
+      )}
+    </div>
   );
 }
