@@ -23,19 +23,40 @@ export function PlacesAutocomplete({
   const { toast } = useToast();
   const [inputValue, setInputValue] = useState("");
 
+  // Log the API key status (masked for security)
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  console.log("Google Maps API Key status:", apiKey ? "Present" : "Missing");
+
   const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
+    googleMapsApiKey: apiKey || "",
     libraries,
     version: "weekly"
   });
+
+  // Log loading status
+  useEffect(() => {
+    console.log("Google Maps script loading status:", {
+      isLoaded,
+      hasLoadError: !!loadError,
+      errorDetails: loadError ? loadError.message : null
+    });
+  }, [isLoaded, loadError]);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   useEffect(() => {
-    if (!isLoaded || !inputRef.current) return;
+    if (!isLoaded || !inputRef.current) {
+      console.log("Skipping Autocomplete initialization:", {
+        isLoaded,
+        hasInputRef: !!inputRef.current
+      });
+      return;
+    }
 
     try {
+      console.log("Initializing Google Places Autocomplete...");
+
       autocompleteRef.current = new google.maps.places.Autocomplete(
         inputRef.current,
         {
@@ -44,10 +65,21 @@ export function PlacesAutocomplete({
         }
       );
 
+      console.log("Autocomplete initialized successfully");
+
       autocompleteRef.current.addListener("place_changed", () => {
+        console.log("Place selection triggered");
         const place = autocompleteRef.current?.getPlace();
 
+        console.log("Selected place details:", {
+          hasPlace: !!place,
+          hasGeometry: !!place?.geometry,
+          hasLocation: !!place?.geometry?.location,
+          address: place?.formatted_address || place?.name,
+        });
+
         if (!place?.geometry?.location) {
+          console.error("Invalid place selection: Missing geometry or location");
           toast({
             title: "Location Error",
             description: "Please select a location from the dropdown list",
@@ -56,20 +88,29 @@ export function PlacesAutocomplete({
           return;
         }
 
-        onPlaceSelect({
+        const placeData = {
           address: place.formatted_address || place.name || "",
           latitude: place.geometry.location.lat(),
           longitude: place.geometry.location.lng(),
-        });
+        };
+
+        console.log("Sending place data to parent:", placeData);
+        onPlaceSelect(placeData);
       });
 
       return () => {
         if (google.maps.event && autocompleteRef.current) {
+          console.log("Cleaning up event listeners");
           google.maps.event.clearInstanceListeners(autocompleteRef.current);
         }
       };
     } catch (error) {
-      console.error("Error initializing Google Places Autocomplete:", error);
+      console.error("Error initializing Google Places Autocomplete:", {
+        error,
+        errorMessage: error instanceof Error ? error.message : "Unknown error",
+        errorStack: error instanceof Error ? error.stack : undefined
+      });
+
       toast({
         title: "Error",
         description: "Failed to initialize location search. Please try again later.",
@@ -79,7 +120,12 @@ export function PlacesAutocomplete({
   }, [isLoaded, onPlaceSelect, toast]);
 
   if (loadError) {
-    console.error("Error loading Google Maps:", loadError);
+    console.error("Google Maps loading error:", {
+      error: loadError,
+      message: loadError.message,
+      stack: loadError.stack
+    });
+
     return (
       <Input 
         className={className} 
@@ -92,6 +138,7 @@ export function PlacesAutocomplete({
   }
 
   if (!isLoaded) {
+    console.log("Waiting for Google Maps to load...");
     return (
       <Input 
         className={className} 
