@@ -46,13 +46,21 @@ function App() {
   const [user] = useAuthState(auth);
 
   useEffect(() => {
-    // Initialize connection manager
-    const cleanup = initializeConnectionManager();
+    const initializeApp = async () => {
+      try {
+        // Initialize connection manager
+        const cleanup = initializeConnectionManager();
 
-    // Initialize Firestore collections
-    initializeFirestore().catch(console.error);
+        // Initialize Firestore collections
+        await initializeFirestore();
 
-    return cleanup;
+        return cleanup;
+      } catch (error) {
+        console.error("Failed to initialize app:", error);
+      }
+    };
+
+    initializeApp();
   }, []);
 
   return (
