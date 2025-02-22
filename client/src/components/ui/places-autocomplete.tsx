@@ -3,6 +3,8 @@ import { Input } from "./input";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "./alert";
 import { ReloadIcon } from "@radix-ui/react-icons";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { app } from "@/lib/firebase";
 
 interface PlacesAutocompleteProps {
   onPlaceSelect: (place: {
@@ -23,9 +25,8 @@ export function PlacesAutocomplete({
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Cloud Function URL for the emulator
-  const cloudFunctionURL = "http://127.0.0.1:5001/etoile-yachts/us-central1/getLocation";
+  const functions = getFunctions(app);
+  const getLocation = httpsCallable(functions, 'getLocation');
 
   const handleLocationSearch = async () => {
     if (!inputValue.trim()) return;
@@ -34,27 +35,18 @@ export function PlacesAutocomplete({
     setError(null);
 
     try {
-      console.log("[PlacesAutocomplete] Sending request to:", cloudFunctionURL);
-      console.log("[PlacesAutocomplete] Request payload:", { address: inputValue });
+      console.log("[PlacesAutocomplete] Calling getLocation with:", { address: inputValue });
 
-      const response = await fetch(cloudFunctionURL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ address: inputValue }),
-      });
+      const result = await getLocation({ address: inputValue });
+      console.log("[PlacesAutocomplete] Raw function result:", result);
 
-      console.log("[PlacesAutocomplete] Response status:", response.status);
+      // The data property contains our actual response
+      const data = result.data as { lat?: number; lng?: number; error?: string };
+      console.log("[PlacesAutocomplete] Parsed data:", data);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error("[PlacesAutocomplete] Error response:", errorData);
-        throw new Error(errorData?.error?.message || "Failed to fetch location data");
+      if (data.error) {
+        throw new Error(data.error);
       }
-
-      const data = await response.json();
-      console.log("[PlacesAutocomplete] Success response:", data);
 
       if (!data.lat || !data.lng) {
         throw new Error("Invalid location data received");
@@ -65,16 +57,25 @@ export function PlacesAutocomplete({
         latitude: data.lat,
         longitude: data.lng,
       });
+
+      // Show success toast
+      toast({
+        title: "Location Found",
+        description: `Successfully found coordinates for ${inputValue}`,
+      });
+
     } catch (err: any) {
       console.error("[PlacesAutocomplete] Error details:", {
         message: err.message,
+        name: err.name,
+        code: err.code,
         stack: err.stack,
       });
 
       setError("Failed to fetch location data. Please try again.");
       toast({
         title: "Location Search Error",
-        description: "Failed to fetch location data. Please try again later.",
+        description: err.message || "Failed to fetch location data. Please try again later.",
         variant: "destructive",
       });
     } finally {
@@ -82,7 +83,7 @@ export function PlacesAutocomplete({
     }
   };
 
-  // Debounce the search to avoid too many function calls
+  // Debounce the search
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (inputValue.trim().length >= 3) {
@@ -92,24 +93,6 @@ export function PlacesAutocomplete({
 
     return () => clearTimeout(timeoutId);
   }, [inputValue]);
-
-  if (error) {
-    return (
-      <div className="space-y-2">
-        <Input
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          placeholder={placeholder}
-          className={className}
-        />
-        <Alert variant="destructive">
-          <AlertDescription className="flex items-center gap-2">
-            {error}
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-2">
@@ -126,6 +109,11 @@ export function PlacesAutocomplete({
             <ReloadIcon className="h-4 w-4 animate-spin" />
             Searching for location...
           </AlertDescription>
+        </Alert>
+      )}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
     </div>
