@@ -51,6 +51,7 @@ export function PlacesAutocomplete({
       if (!selectedRegion) return;
 
       setIsLoading(true);
+      setError(null);
       try {
         const experiencesRef = collection(db, "experience_packages");
         const q = query(
@@ -68,7 +69,12 @@ export function PlacesAutocomplete({
           }
         });
 
-        setPiers(Array.from(uniquePiers));
+        const piersArray = Array.from(uniquePiers);
+        setPiers(piersArray);
+
+        if (piersArray.length === 0) {
+          setError("No piers found in this region");
+        }
       } catch (err) {
         console.error("Error fetching piers:", err);
         setError("Failed to fetch available piers");
@@ -100,6 +106,7 @@ export function PlacesAutocomplete({
   const handleRegionChange = (region: string) => {
     setSelectedRegion(region);
     setSelectedPier("");
+    setError(null);
 
     const regionData = REGIONS.find(r => r.id === region);
     if (regionData) {
@@ -127,6 +134,14 @@ export function PlacesAutocomplete({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
+        {geoError && (
+          <Alert variant="default" className="mb-4">
+            <AlertDescription>
+              {geoError} Please select your region manually.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Select
           value={selectedRegion}
           onValueChange={handleRegionChange}
@@ -174,15 +189,9 @@ export function PlacesAutocomplete({
         </Alert>
       )}
 
-      {error && (
+      {error && !isLoading && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {geoError && (
-        <Alert variant="destructive">
-          <AlertDescription>{geoError}</AlertDescription>
         </Alert>
       )}
     </div>
