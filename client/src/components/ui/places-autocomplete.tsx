@@ -3,122 +3,186 @@ import { Input } from "./input";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "./alert";
 import { ReloadIcon } from "@radix-ui/react-icons";
+import { useGeolocation } from "@/hooks/use-geolocation";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
+import { getDocs, query, where, collection } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./select";
 
 interface PlacesAutocompleteProps {
   onPlaceSelect: (place: {
     address: string;
     latitude: number;
     longitude: number;
+    pier?: string;
   }) => void;
   placeholder?: string;
   className?: string;
 }
 
+const REGIONS = [
+  { id: "dubai", name: "Dubai", coords: { lat: 25.2048, lng: 55.2708 } },
+  { id: "abu-dhabi", name: "Abu Dhabi", coords: { lat: 24.4539, lng: 54.3773 } }
+];
+
 export function PlacesAutocomplete({
   onPlaceSelect,
-  placeholder = "Enter location...",
+  placeholder = "Select location...",
   className,
 }: PlacesAutocompleteProps) {
   const { toast } = useToast();
-  const [inputValue, setInputValue] = useState("");
+  const [selectedRegion, setSelectedRegion] = useState<string>("");
+  const [selectedPier, setSelectedPier] = useState<string>("");
+  const [piers, setPiers] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const functions = getFunctions(app);
-  const getLocation = httpsCallable(functions, 'getLocation');
+  const { location, error: geoError } = useGeolocation();
 
-  const handleLocationSearch = async () => {
-    if (!inputValue.trim()) return;
+  // Fetch piers for selected region
+  useEffect(() => {
+    async function fetchPiers() {
+      if (!selectedRegion) return;
 
-    setIsLoading(true);
-    setError(null);
+      setIsLoading(true);
+      try {
+        const experiencesRef = collection(db, "experience_packages");
+        const q = query(
+          experiencesRef,
+          where("location.region", "==", selectedRegion)
+        );
 
-    try {
-      console.log("[PlacesAutocomplete] Calling getLocation with:", { address: inputValue });
+        const snapshot = await getDocs(q);
+        const uniquePiers = new Set<string>();
 
-      // Call the Cloud Function with the address
-      const result = await getLocation({ address: inputValue });
-      console.log("[PlacesAutocomplete] Cloud Function response:", result);
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.location?.pier) {
+            uniquePiers.add(data.location.pier);
+          }
+        });
 
-      // Extract the location data from the nested response
-      const locationData = result.data as {
-        lat: number;
-        lng: number;
-        address: string;
-      };
-
-      console.log("[PlacesAutocomplete] Extracted location data:", locationData);
-
-      // Validate the response data
-      if (!locationData || !locationData.lat || !locationData.lng) {
-        throw new Error("Invalid location data received from server");
+        setPiers(Array.from(uniquePiers));
+      } catch (err) {
+        console.error("Error fetching piers:", err);
+        setError("Failed to fetch available piers");
+        toast({
+          title: "Error",
+          description: "Failed to fetch available piers",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
       }
+    }
 
-      // Call the onPlaceSelect callback with the formatted data
+    fetchPiers();
+  }, [selectedRegion]);
+
+  // Auto-select region based on geolocation
+  useEffect(() => {
+    if (location?.address) {
+      const address = location.address.toLowerCase();
+      if (address.includes("dubai")) {
+        setSelectedRegion("dubai");
+      } else if (address.includes("abu dhabi")) {
+        setSelectedRegion("abu-dhabi");
+      }
+    }
+  }, [location]);
+
+  const handleRegionChange = (region: string) => {
+    setSelectedRegion(region);
+    setSelectedPier("");
+
+    const regionData = REGIONS.find(r => r.id === region);
+    if (regionData) {
       onPlaceSelect({
-        address: locationData.address || inputValue,
-        latitude: locationData.lat,
-        longitude: locationData.lng,
+        address: regionData.name,
+        latitude: regionData.coords.lat,
+        longitude: regionData.coords.lng
       });
-
-      // Show success toast
-      toast({
-        title: "Location Found",
-        description: `Successfully found coordinates for ${locationData.address || inputValue}`,
-      });
-
-    } catch (err: any) {
-      console.error("[PlacesAutocomplete] Error details:", {
-        message: err.message,
-        name: err.name,
-        code: err.code,
-        stack: err.stack,
-      });
-
-      // Set error state and show error toast
-      setError("Failed to fetch location data. Please try again.");
-      toast({
-        title: "Location Search Error",
-        description: err.message || "Failed to fetch location data. Please try again later.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  // Debounce the search
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (inputValue.trim().length >= 3) {
-        handleLocationSearch();
-      }
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [inputValue]);
+  const handlePierChange = (pier: string) => {
+    setSelectedPier(pier);
+    const regionData = REGIONS.find(r => r.id === selectedRegion);
+    if (regionData) {
+      onPlaceSelect({
+        address: `${pier}, ${regionData.name}`,
+        latitude: regionData.coords.lat,
+        longitude: regionData.coords.lng,
+        pier
+      });
+    }
+  };
 
   return (
-    <div className="space-y-2">
-      <Input
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        placeholder={isLoading ? "Searching..." : placeholder}
-        className={className}
-        disabled={isLoading}
-      />
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Select
+          value={selectedRegion}
+          onValueChange={handleRegionChange}
+        >
+          <SelectTrigger className={className}>
+            <SelectValue placeholder="Select region" />
+          </SelectTrigger>
+          <SelectContent>
+            {REGIONS.map(region => (
+              <SelectItem key={region.id} value={region.id}>
+                {region.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {selectedRegion && (
+        <div className="space-y-2">
+          <Select
+            value={selectedPier}
+            onValueChange={handlePierChange}
+            disabled={isLoading || piers.length === 0}
+          >
+            <SelectTrigger className={className}>
+              <SelectValue placeholder="Select pier" />
+            </SelectTrigger>
+            <SelectContent>
+              {piers.map(pier => (
+                <SelectItem key={pier} value={pier}>
+                  {pier}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {isLoading && (
         <Alert>
           <AlertDescription className="flex items-center gap-2">
             <ReloadIcon className="h-4 w-4 animate-spin" />
-            Searching for location...
+            Loading available piers...
           </AlertDescription>
         </Alert>
       )}
+
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {geoError && (
+        <Alert variant="destructive">
+          <AlertDescription>{geoError}</AlertDescription>
         </Alert>
       )}
     </div>
