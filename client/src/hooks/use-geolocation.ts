@@ -22,9 +22,13 @@ export function useGeolocation() {
     error: null,
     isLoading: true
   });
+
   const { toast } = useToast();
   const functions = getFunctions();
-  const reverseGeocode = httpsCallable<{ latitude: number; longitude: number }, ReverseGeocodeResponse>(functions, 'reverseGeocode');
+  const reverseGeocode = httpsCallable<{ latitude: number; longitude: number }, ReverseGeocodeResponse>(
+    functions, 
+    'reverseGeocode'
+  );
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -36,48 +40,75 @@ export function useGeolocation() {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          console.log("Got coordinates:", { latitude, longitude });
+    const successHandler = async (position: GeolocationPosition) => {
+      try {
+        const { latitude, longitude } = position.coords;
+        console.log("Got coordinates:", { latitude, longitude });
 
-          // Call the reverse geocoding Cloud Function
-          const result = await reverseGeocode({ latitude, longitude });
+        // First update state with coordinates
+        setState(prev => ({
+          location: {
+            latitude,
+            longitude
+          },
+          error: null,
+          isLoading: true
+        }));
 
-          setState({
+        // Then try to get the address
+        const result = await reverseGeocode({ 
+          latitude: Number(latitude.toFixed(6)), 
+          longitude: Number(longitude.toFixed(6))
+        });
+
+        if (result.data.address) {
+          setState(prev => ({
             location: {
-              latitude,
-              longitude,
-              address: result.data.address || undefined
+              ...prev.location!,
+              address: result.data.address
             },
             error: null,
             isLoading: false
-          });
+          }));
 
-          // If we got a location in UAE, show a success message
-          if (result.data.address?.includes("United Arab Emirates")) {
+          if (result.data.address.includes("United Arab Emirates")) {
             toast({
               title: "Location Detected",
               description: "We've detected your location in the UAE",
             });
           }
-        } catch (error) {
-          console.error("Error getting location:", error);
+        } else {
           setState(prev => ({
             ...prev,
-            error: "Failed to get your location details",
             isLoading: false
           }));
         }
-      },
-      (error) => {
-        console.error("Geolocation error:", error);
-        setState({
-          location: null,
-          error: error.message,
+      } catch (error: any) {
+        console.error("Error getting location:", error);
+        setState(prev => ({
+          location: prev.location, // Keep the coordinates if we have them
+          error: "Unable to determine your exact location",
           isLoading: false
-        });
+        }));
+      }
+    };
+
+    const errorHandler = (error: GeolocationPositionError) => {
+      console.error("Geolocation error:", error);
+      setState({
+        location: null,
+        error: "Failed to detect your location. Please allow location access or select your region manually.",
+        isLoading: false
+      });
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      successHandler,
+      errorHandler,
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
       }
     );
   }, []);
