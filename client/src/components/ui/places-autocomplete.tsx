@@ -37,31 +37,35 @@ export function PlacesAutocomplete({
     try {
       console.log("[PlacesAutocomplete] Calling getLocation with:", { address: inputValue });
 
+      // Call the Cloud Function with the address
       const result = await getLocation({ address: inputValue });
-      console.log("[PlacesAutocomplete] Raw function result:", result);
+      console.log("[PlacesAutocomplete] Cloud Function response:", result);
 
-      // The data property contains our actual response
-      const data = result.data as { lat?: number; lng?: number; error?: string };
-      console.log("[PlacesAutocomplete] Parsed data:", data);
+      // Extract the location data from the nested response
+      const locationData = result.data as {
+        lat: number;
+        lng: number;
+        address: string;
+      };
 
-      if (data.error) {
-        throw new Error(data.error);
+      console.log("[PlacesAutocomplete] Extracted location data:", locationData);
+
+      // Validate the response data
+      if (!locationData || !locationData.lat || !locationData.lng) {
+        throw new Error("Invalid location data received from server");
       }
 
-      if (!data.lat || !data.lng) {
-        throw new Error("Invalid location data received");
-      }
-
+      // Call the onPlaceSelect callback with the formatted data
       onPlaceSelect({
-        address: inputValue,
-        latitude: data.lat,
-        longitude: data.lng,
+        address: locationData.address || inputValue,
+        latitude: locationData.lat,
+        longitude: locationData.lng,
       });
 
       // Show success toast
       toast({
         title: "Location Found",
-        description: `Successfully found coordinates for ${inputValue}`,
+        description: `Successfully found coordinates for ${locationData.address || inputValue}`,
       });
 
     } catch (err: any) {
@@ -72,6 +76,7 @@ export function PlacesAutocomplete({
         stack: err.stack,
       });
 
+      // Set error state and show error toast
       setError("Failed to fetch location data. Please try again.");
       toast({
         title: "Location Search Error",
