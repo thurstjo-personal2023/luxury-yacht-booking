@@ -21,7 +21,7 @@ interface PlacesAutocompleteProps {
     address: string;
     latitude: number;
     longitude: number;
-    pier?: string;
+    port_marina?: string;
   }) => void;
   placeholder?: string;
   className?: string;
@@ -32,6 +32,24 @@ const REGIONS = [
   { id: "abu-dhabi", name: "Abu Dhabi", coords: { lat: 24.4539, lng: 54.3773 } }
 ];
 
+const MARINA_OPTIONS = {
+  'dubai': [
+    "Dubai Marina Yacht Club",
+    "Dubai Creek Marina",
+    "Port Rashid Marina",
+    "Bulgari Yacht Club & Marina",
+    "Dubai Harbour Marina"
+  ],
+  'abu-dhabi': [
+    "Yas Marina",
+    "Emirates Palace Marina",
+    "Saadiyat Island Marina",
+    "Al Bateen Marina",
+    "Eastern Mangroves Marina",
+    "Ghantoot Marina"
+  ]
+};
+
 export function PlacesAutocomplete({
   onPlaceSelect,
   placeholder = "Select location...",
@@ -39,56 +57,37 @@ export function PlacesAutocomplete({
 }: PlacesAutocompleteProps) {
   const { toast } = useToast();
   const [selectedRegion, setSelectedRegion] = useState<string>("");
-  const [selectedPier, setSelectedPier] = useState<string>("");
-  const [piers, setPiers] = useState<string[]>([]);
+  const [selectedMarina, setSelectedMarina] = useState<string>("");
+  const [marinas, setMarinas] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { location, error: geoError } = useGeolocation();
 
-  // Fetch piers for selected region
+  // Fetch marinas for selected region
   useEffect(() => {
-    async function fetchPiers() {
-      if (!selectedRegion) return;
+    if (!selectedRegion) return;
 
-      setIsLoading(true);
-      setError(null);
-      try {
-        const experiencesRef = collection(db, "experience_packages");
-        const q = query(
-          experiencesRef,
-          where("location.region", "==", selectedRegion)
-        );
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Get marinas from predefined options
+      const regionMarinas = MARINA_OPTIONS[selectedRegion as keyof typeof MARINA_OPTIONS] || [];
+      setMarinas(regionMarinas);
 
-        const snapshot = await getDocs(q);
-        const uniquePiers = new Set<string>();
-
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          if (data.location?.pier) {
-            uniquePiers.add(data.location.pier);
-          }
-        });
-
-        const piersArray = Array.from(uniquePiers);
-        setPiers(piersArray);
-
-        if (piersArray.length === 0) {
-          setError("No piers found in this region");
-        }
-      } catch (err) {
-        console.error("Error fetching piers:", err);
-        setError("Failed to fetch available piers");
-        toast({
-          title: "Error",
-          description: "Failed to fetch available piers",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
+      if (regionMarinas.length === 0) {
+        setError("No marinas found in this region");
       }
+    } catch (err) {
+      console.error("Error setting marina options:", err);
+      setError("Failed to load marina options");
+      toast({
+        title: "Error",
+        description: "Failed to load marina options",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
-
-    fetchPiers();
   }, [selectedRegion]);
 
   // Auto-select region based on geolocation
@@ -105,7 +104,7 @@ export function PlacesAutocomplete({
 
   const handleRegionChange = (region: string) => {
     setSelectedRegion(region);
-    setSelectedPier("");
+    setSelectedMarina("");
     setError(null);
 
     const regionData = REGIONS.find(r => r.id === region);
@@ -118,15 +117,15 @@ export function PlacesAutocomplete({
     }
   };
 
-  const handlePierChange = (pier: string) => {
-    setSelectedPier(pier);
+  const handleMarinaChange = (marina: string) => {
+    setSelectedMarina(marina);
     const regionData = REGIONS.find(r => r.id === selectedRegion);
     if (regionData) {
       onPlaceSelect({
-        address: `${pier}, ${regionData.name}`,
+        address: `${marina}, ${regionData.name}, UAE`,
         latitude: regionData.coords.lat,
         longitude: regionData.coords.lng,
-        pier
+        port_marina: marina
       });
     }
   };
@@ -162,17 +161,17 @@ export function PlacesAutocomplete({
       {selectedRegion && (
         <div className="space-y-2">
           <Select
-            value={selectedPier}
-            onValueChange={handlePierChange}
-            disabled={isLoading || piers.length === 0}
+            value={selectedMarina}
+            onValueChange={handleMarinaChange}
+            disabled={isLoading || marinas.length === 0}
           >
             <SelectTrigger className={className}>
-              <SelectValue placeholder="Select pier" />
+              <SelectValue placeholder="Select Port/Marina" />
             </SelectTrigger>
             <SelectContent>
-              {piers.map(pier => (
-                <SelectItem key={pier} value={pier}>
-                  {pier}
+              {marinas.map(marina => (
+                <SelectItem key={marina} value={marina}>
+                  {marina}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -184,7 +183,7 @@ export function PlacesAutocomplete({
         <Alert>
           <AlertDescription className="flex items-center gap-2">
             <ReloadIcon className="h-4 w-4 animate-spin" />
-            Loading available piers...
+            Loading available ports/marinas...
           </AlertDescription>
         </Alert>
       )}
