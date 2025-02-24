@@ -17,12 +17,14 @@ import { getStorage, connectStorageEmulator } from "firebase/storage";
 import { getDatabase, connectDatabaseEmulator } from "firebase/database";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
+// Firebase configuration with real values
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.appspot.com`,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 // Initialize Firebase and export the app instance
@@ -42,35 +44,33 @@ export const storage = getStorage(app);
 export const functions = getFunctions(app);
 export const rtdb = getDatabase(app);
 
-// Connect to external Firebase emulators in development
-if (import.meta.env.DEV) {
-  try {
-    console.log("Connecting to external Firebase emulators...");
+// Always connect to emulators
+try {
+  console.log("Connecting to Firebase emulators...");
 
-    // Auth Emulator
-    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-    console.log("✓ Auth emulator connected at: http://127.0.0.1:9099");
+  // Auth Emulator
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  console.log("✓ Auth emulator connected at: http://127.0.0.1:9099");
 
-    // Firestore Emulator
-    connectFirestoreEmulator(db, "127.0.0.1", 8080);
-    console.log("✓ Firestore emulator connected at: http://127.0.0.1:8080");
+  // Firestore Emulator
+  connectFirestoreEmulator(db, "127.0.0.1", 8080);
+  console.log("✓ Firestore emulator connected at: http://127.0.0.1:8080");
 
-    // Storage Emulator
-    connectStorageEmulator(storage, "127.0.0.1", 9199);
-    console.log("✓ Storage emulator connected at: http://127.0.0.1:9199");
+  // Storage Emulator
+  connectStorageEmulator(storage, "127.0.0.1", 9199);
+  console.log("✓ Storage emulator connected at: http://127.0.0.1:9199");
 
-    // Functions Emulator
-    connectFunctionsEmulator(functions, "127.0.0.1", 5001);
-    console.log("✓ Functions emulator connected at: http://127.0.0.1:5001");
+  // Functions Emulator
+  connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+  console.log("✓ Functions emulator connected at: http://127.0.0.1:5001");
 
-    // Realtime Database Emulator
-    connectDatabaseEmulator(rtdb, "127.0.0.1", 9001);
-    console.log("✓ Realtime Database emulator connected at: http://127.0.0.1:9001");
+  // Realtime Database Emulator
+  connectDatabaseEmulator(rtdb, "127.0.0.1", 9001);
+  console.log("✓ Realtime Database emulator connected at: http://127.0.0.1:9001");
 
-    console.log("All Firebase emulators connected successfully!");
-  } catch (error) {
-    console.error("Error connecting to emulators:", error);
-  }
+  console.log("All Firebase emulators connected successfully!");
+} catch (error) {
+  console.error("Error connecting to emulators:", error);
 }
 
 // Auth helpers with improved error handling and retry logic
