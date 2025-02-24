@@ -4,6 +4,8 @@ export interface Location {
   latitude: number;
   longitude: number;
   address: string;
+  region: "dubai" | "abu-dhabi";
+  port_marina: string;
 }
 
 export interface Media {
@@ -11,18 +13,46 @@ export interface Media {
   url: string;
 }
 
-export interface YachtExperience {
-  yachtId: string;
+export interface CustomizationOption {
   name: string;
-  description: string;
-  capacity: number;
   price: number;
-  imageUrl: string;
+}
+
+export interface YachtExperience {
+  package_id: string;
+  title: string;
+  description: string;
+  category: string;
   location: Location;
+  duration: number;
+  capacity: number;
+  pricing: number;
+  pricing_model: "Fixed" | "Variable";
+  customization_options: CustomizationOption[];
+  media: Media[];
+  availability_status: boolean;
+  tags: string[];
+  created_date: Timestamp;
+  last_updated_date: Timestamp;
+  published_status: boolean;
+}
+
+export interface YachtProfile {
+  yacht_id: string;
+  name: string;
+  model: string;
+  year: number;
+  length: number;
+  beam: number;
+  description: string;
   features: string[];
-  available: boolean;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  media: Media[];
+  max_guests: number;
+  crew_size: number;
+  location: Location;
+  availability_status: boolean;
+  created_date: Timestamp;
+  last_updated_date: Timestamp;
 }
 
 export interface Notification {
@@ -33,11 +63,6 @@ export interface Notification {
   recipientId: string;
   sentDate: Timestamp;
   readStatus: boolean;
-}
-
-export interface CustomizationOption {
-  name: string;
-  price: number;
 }
 
 export interface ProductAddOn {

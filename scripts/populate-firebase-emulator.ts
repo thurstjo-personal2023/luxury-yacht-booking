@@ -1,132 +1,156 @@
 import { adminDb } from "../server/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
-import type {
-  YachtExperience,
-  TouristProfile,
-  Article,
-  Event,
-  Notification,
-  ProductAddOn,
-  Promotion,
-  Review,
-  SupportContent,
-  ServiceProviderProfile
-} from "@shared/firestore-schema";
 
 const sampleData = {
-  yacht_experiences: [
+  yacht_profiles: [
     {
-      package_id: "EXP_DXB_001",
-      title: "Dubai Marina Yacht Club Experience",
-      description: "Experience the stunning Dubai skyline aboard our luxury yacht, cruising through the iconic Dubai Marina.",
-      category: "Luxury",
-      location: {
-        latitude: 25.0819,
-        longitude: 55.1367,
-        address: "Dubai Marina, Dubai, UAE",
-        region: "dubai",
-        port_marina: "Dubai Marina Yacht Club"
-      },
-      duration: 4,
+      yacht_id: "YAC_YAS_001",
+      name: "Pearl of Yas",
+      description: "A stunning 35-meter luxury yacht perfectly suited for the F1 atmosphere of Yas Marina",
       capacity: 12,
-      pricing: 2500.00,
-      pricing_model: "Fixed",
-      customization_options: [
-        { name: "Gourmet Dining", price: 750 },
-        { name: "Professional Photography", price: 500 }
-      ],
+      length: 35.0,
+      features: ["Sundeck", "Premium Bar", "Entertainment System", "WiFi", "Climate Control"],
+      certifications: ["Maritime Safety Certified", "UAE Coast Guard Approved"],
       media: [
-        { type: "image", url: "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?w=800" }
+        { type: "image", url: "https://images.unsplash.com/photo-1621277224630-4c70c1a24c15?w=800" }
       ],
-      availability_status: true,
-      tags: ["luxury", "sunset", "marina"],
+      pricing: 3500.00,
+      owner_id: "OWN_YAS_001",
+      tags: ["luxury", "f1", "entertainment"],
       created_date: Timestamp.fromDate(new Date()),
-      last_updated_date: Timestamp.fromDate(new Date()),
-      published_status: true
+      last_updated_date: Timestamp.fromDate(new Date())
     },
     {
-      package_id: "EXP_DXB_002",
-      title: "Dubai Creek Luxury Experience",
-      description: "Discover Dubai's maritime heritage from the historic Dubai Creek.",
-      category: "Cultural",
-      location: {
-        latitude: 25.2526,
-        longitude: 55.2800,
-        address: "Dubai Creek, Dubai, UAE",
-        region: "dubai",
-        port_marina: "Dubai Creek Marina"
-      },
-      duration: 5,
+      yacht_id: "YAC_YAS_002",
+      name: "Yas Elegance",
+      description: "An exquisite 40-meter yacht featuring gourmet dining facilities and panoramic views",
       capacity: 15,
-      pricing: 3000.00,
-      pricing_model: "Fixed",
-      customization_options: [
-        { name: "Heritage Guide", price: 600 },
-        { name: "Traditional Dinner", price: 800 }
-      ],
+      length: 40.0,
+      features: ["Gourmet Kitchen", "Dining Salon", "Master Suite", "Wine Cellar", "Observation Deck"],
+      certifications: ["5-Star Luxury Rating", "UAE Maritime Authority Certified"],
       media: [
-        { type: "image", url: "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?w=800" }
+        { type: "image", url: "https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=800" }
       ],
-      availability_status: true,
-      tags: ["heritage", "culture", "history"],
+      pricing: 4200.00,
+      owner_id: "OWN_YAS_002",
+      tags: ["luxury", "dining", "gourmet"],
       created_date: Timestamp.fromDate(new Date()),
-      last_updated_date: Timestamp.fromDate(new Date()),
-      published_status: true
+      last_updated_date: Timestamp.fromDate(new Date())
     },
     {
-      package_id: "EXP_AUH_001",
-      title: "Yas Marina Luxury Experience",
-      description: "Enjoy the Formula 1 atmosphere with a luxury yacht experience at Yas Marina.",
+      yacht_id: "YAC_YAS_003",
+      name: "Yas Adventurer",
+      description: "A versatile 45-meter yacht equipped for water sports and adventure activities",
+      capacity: 20,
+      length: 45.0,
+      features: ["Water Sports Equipment", "Diving Gear", "Speed Boats", "Sun Deck", "Beach Club"],
+      certifications: ["Water Sports Safety Certified", "Adventure Tourism Licensed"],
+      media: [
+        { type: "image", url: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800" }
+      ],
+      pricing: 5500.00,
+      owner_id: "OWN_YAS_003",
+      tags: ["adventure", "water sports", "active"],
+      created_date: Timestamp.fromDate(new Date()),
+      last_updated_date: Timestamp.fromDate(new Date())
+    }
+  ],
+  experience_packages: [
+    {
+      package_id: "EXP_YAS_001",
+      title: "Yas Marina F1 Sunset Experience",
+      description: "Experience the thrill of Formula 1 atmosphere with a luxury sunset cruise along Yas Marina Circuit. Perfect for motorsport enthusiasts and luxury seekers alike.",
       category: "Premium",
       location: {
         latitude: 24.4672,
         longitude: 54.6031,
-        address: "Yas Island, Abu Dhabi, UAE",
-        region: "abu-dhabi",
+        address: "Yas Marina, Abu Dhabi, UAE",
         port_marina: "Yas Marina"
       },
-      duration: 6,
-      capacity: 20,
-      pricing: 4000.00,
+      duration: 4,
+      capacity: 12,
+      pricing: 3500.00,
       pricing_model: "Fixed",
       customization_options: [
-        { name: "F1 Circuit View Dinner", price: 1000 },
-        { name: "Water Sports Package", price: 800 }
+        { name: "F1-themed Gourmet Dining", price: 850 },
+        { name: "Professional Photography", price: 500 },
+        { name: "Circuit Tour Guide", price: 300 }
       ],
       media: [
-        { type: "image", url: "https://images.unsplash.com/photo-1577032229840-33197764440d?w=800" }
+        { type: "image", url: "https://images.unsplash.com/photo-1621277224630-4c70c1a24c15?w=800" },
+        { type: "video", url: "https://example.com/videos/yas-f1-experience.mp4" }
       ],
       availability_status: true,
-      tags: ["luxury", "sports", "entertainment"],
+      reviews: [
+        { review_id: "REV_YAS_001", rating: 5, review_text: "Amazing F1 atmosphere and luxury service!" }
+      ],
+      tags: ["f1", "luxury", "sunset", "yacht"],
       created_date: Timestamp.fromDate(new Date()),
       last_updated_date: Timestamp.fromDate(new Date()),
       published_status: true
     },
     {
-      package_id: "EXP_AUH_002",
-      title: "Saadiyat Island Marina Experience",
-      description: "Experience luxury yachting from the pristine Saadiyat Island Marina.",
+      package_id: "EXP_YAS_002",
+      title: "Yas Marina Luxury Dinner Cruise",
+      description: "Indulge in an exquisite dining experience aboard our luxury yacht at Yas Marina. Featuring a 5-star chef and breathtaking views of the Abu Dhabi skyline.",
       category: "Ultra-Luxury",
       location: {
-        latitude: 24.5439,
-        longitude: 54.4275,
-        address: "Saadiyat Island, Abu Dhabi, UAE",
-        region: "abu-dhabi",
-        port_marina: "Saadiyat Island Marina"
+        latitude: 24.4672,
+        longitude: 54.6031,
+        address: "Yas Marina, Abu Dhabi, UAE",
+        port_marina: "Yas Marina"
       },
-      duration: 4,
-      capacity: 10,
-      pricing: 5000.00,
+      duration: 3,
+      capacity: 15,
+      pricing: 4200.00,
       pricing_model: "Fixed",
       customization_options: [
-        { name: "Private Beach Access", price: 1200 },
-        { name: "Luxury Spa Treatment", price: 1500 }
+        { name: "Private Chef Experience", price: 1200 },
+        { name: "Wine Pairing", price: 600 },
+        { name: "Live Music", price: 800 }
       ],
       media: [
-        { type: "image", url: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800" }
+        { type: "image", url: "https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=800" },
+        { type: "video", url: "https://example.com/videos/yas-dinner-cruise.mp4" }
       ],
       availability_status: true,
-      tags: ["ultra-luxury", "beach", "exclusive"],
+      reviews: [
+        { review_id: "REV_YAS_002", rating: 5, review_text: "The dining experience was absolutely spectacular!" }
+      ],
+      tags: ["dining", "luxury", "gourmet", "exclusive"],
+      created_date: Timestamp.fromDate(new Date()),
+      last_updated_date: Timestamp.fromDate(new Date()),
+      published_status: true
+    },
+    {
+      package_id: "EXP_YAS_003",
+      title: "Yas Marina Adventure Package",
+      description: "Combine luxury yachting with thrilling water sports at Yas Marina. Perfect for adventure seekers looking for an adrenaline-packed day on the water.",
+      category: "Adventure",
+      location: {
+        latitude: 24.4672,
+        longitude: 54.6031,
+        address: "Yas Marina, Abu Dhabi, UAE",
+        port_marina: "Yas Marina"
+      },
+      duration: 6,
+      capacity: 20,
+      pricing: 5500.00,
+      pricing_model: "Fixed",
+      customization_options: [
+        { name: "Jet Ski Package", price: 800 },
+        { name: "Parasailing Experience", price: 400 },
+        { name: "Diving Experience", price: 600 }
+      ],
+      media: [
+        { type: "image", url: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800" },
+        { type: "video", url: "https://example.com/videos/yas-adventure.mp4" }
+      ],
+      availability_status: true,
+      reviews: [
+        { review_id: "REV_YAS_003", rating: 5, review_text: "Perfect mix of luxury and adventure!" }
+      ],
+      tags: ["adventure", "watersports", "luxury", "active"],
       created_date: Timestamp.fromDate(new Date()),
       last_updated_date: Timestamp.fromDate(new Date()),
       published_status: true
@@ -136,28 +160,25 @@ const sampleData = {
 
 async function populateEmulator() {
   try {
-    console.log("Starting to populate Firebase emulator with sample data...");
+    console.log("Starting to populate Firebase Data Connect emulator with sample data...");
 
-    // Get reference to experience packages collection
-    const experiencesCollection = adminDb.collection('experience_packages');
-
-    // Clear existing data
-    const existingDocs = await experiencesCollection.get();
-    const batch = adminDb.batch();
-    existingDocs.docs.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
-    await batch.commit();
-
-    // Add new experience packages
-    for (const experience of sampleData.yacht_experiences) {
-      await experiencesCollection.doc(experience.package_id).set(experience);
-      console.log(`Created experience package document ${experience.package_id}`);
+    // Populate yacht profiles
+    const yachtProfilesCollection = adminDb.collection('yacht_profiles');
+    for (const yacht of sampleData.yacht_profiles) {
+      await yachtProfilesCollection.doc(yacht.yacht_id).set(yacht);
+      console.log(`Created yacht profile document ${yacht.yacht_id}`);
     }
 
-    console.log("Successfully populated Firebase emulator with sample data");
+    // Populate experience packages
+    const experiencePackagesCollection = adminDb.collection('experience_packages');
+    for (const exp of sampleData.experience_packages) {
+      await experiencePackagesCollection.doc(exp.package_id).set(exp);
+      console.log(`Created experience package document ${exp.package_id}`);
+    }
+
+    console.log("Successfully populated Firebase Data Connect emulator with sample data");
   } catch (error) {
-    console.error("Error populating Firebase emulator:", error);
+    console.error("Error populating Firebase Data Connect emulator:", error);
     process.exit(1);
   }
 }
