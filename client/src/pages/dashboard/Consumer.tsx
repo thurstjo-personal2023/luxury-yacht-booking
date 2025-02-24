@@ -87,12 +87,12 @@ export default function ConsumerDashboard() {
     queryFn: async () => {
       try {
         console.log("=== Recommended Yachts Query Start ===");
-        console.log("Firestore DB instance:", db);
 
         const experiencesRef = collection(db, "experience_packages");
-        console.log("Collection reference:", experiencesRef);
+        const q = query(experiencesRef, where("featured", "==", true), limit(6));
+        console.log("Query:", q);
 
-        const snapshot = await getDocs(experiencesRef);
+        const snapshot = await getDocs(q);
         console.log("Raw snapshot:", {
           empty: snapshot.empty,
           size: snapshot.size,
@@ -100,37 +100,17 @@ export default function ConsumerDashboard() {
         });
 
         if (snapshot.empty) {
-          console.log("No documents found in experience_packages collection");
+          console.log("No featured experience packages found");
           return [];
         }
 
-        const allPackages = snapshot.docs.map(doc => {
-          const data = doc.data();
-          console.log(`Document ${doc.id} data:`, data);
-          return {
-            id: doc.id,
-            ...data
-          };
-        }) as YachtExperience[];
+        const recommendedPackages = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as YachtExperience[];
 
-        console.log("All packages after mapping:", allPackages);
-
-        const recommended = allPackages
-          .filter(pkg => {
-            const hasHighRating = pkg.reviews?.some(review => review.rating >= 4.5);
-            const isRecommended = pkg.featured || hasHighRating;
-            console.log(`Package ${pkg.id} recommendation check:`, {
-              featured: pkg.featured,
-              hasHighRating,
-              isRecommended
-            });
-            return isRecommended;
-          })
-          .slice(0, 6);
-
-        console.log("Final recommended packages:", recommended);
-        console.log("=== Recommended Yachts Query End ===");
-        return recommended;
+        console.log("Recommended packages:", recommendedPackages);
+        return recommendedPackages;
       } catch (error) {
         console.error("Error in recommended yachts query:", error);
         throw error;

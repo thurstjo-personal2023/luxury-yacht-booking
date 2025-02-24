@@ -19,6 +19,22 @@ async function testQueries() {
       });
     }
 
+    // Test recommended experience packages query (similar to Consumer.tsx)
+    console.log("\nTesting recommended experience packages query:");
+    const recommendedSnapshot = await adminDb.collection("experience_packages")
+      .where("featured", "==", true)
+      .get();
+
+    if (recommendedSnapshot.empty) {
+      console.log("No featured experience packages found!");
+    } else {
+      console.log(`Found ${recommendedSnapshot.size} featured experience packages:`);
+      recommendedSnapshot.docs.forEach(doc => {
+        console.log(`\nDocument ID: ${doc.id}`);
+        console.log("Data:", JSON.stringify(doc.data(), null, 2));
+      });
+    }
+
     // Test all other collections
     const collections = [
       'articles_and_guides',

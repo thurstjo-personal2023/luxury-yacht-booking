@@ -45,6 +45,11 @@ export function useGeolocation() {
         const { latitude, longitude } = position.coords;
         console.log("Got coordinates:", { latitude, longitude });
 
+        // Validate coordinates
+        if (isNaN(latitude) || isNaN(longitude) || !isFinite(latitude) || !isFinite(longitude)) {
+          throw new Error("Invalid coordinates received from geolocation");
+        }
+
         // First update state with coordinates
         setState(prev => ({
           location: {
@@ -55,23 +60,32 @@ export function useGeolocation() {
           isLoading: true
         }));
 
+        // Format coordinates to 6 decimal places and ensure they're numbers
+        const formattedLat = parseFloat(latitude.toFixed(6));
+        const formattedLng = parseFloat(longitude.toFixed(6));
+
+        console.log("Calling reverseGeocode with coordinates:", { formattedLat, formattedLng });
+
         // Then try to get the address
         const result = await reverseGeocode({ 
-          latitude: Number(latitude.toFixed(6)), 
-          longitude: Number(longitude.toFixed(6))
+          latitude: formattedLat,
+          longitude: formattedLng
         });
 
-        if (result.data.address) {
+        console.log("Reverse geocode result:", result);
+
+        const address = result.data.address;
+        if (address) {
           setState(prev => ({
             location: {
               ...prev.location!,
-              address: result.data.address
+              address
             },
             error: null,
             isLoading: false
           }));
 
-          if (result.data.address.includes("United Arab Emirates")) {
+          if (address.includes("United Arab Emirates")) {
             toast({
               title: "Location Detected",
               description: "We've detected your location in the UAE",
@@ -87,7 +101,7 @@ export function useGeolocation() {
         console.error("Error getting location:", error);
         setState(prev => ({
           location: prev.location, // Keep the coordinates if we have them
-          error: "Unable to determine your exact location",
+          error: error.message || "Unable to determine your exact location",
           isLoading: false
         }));
       }
@@ -107,7 +121,7 @@ export function useGeolocation() {
       errorHandler,
       {
         enableHighAccuracy: true,
-        timeout: 5000,
+        timeout: 10000, // Increased timeout to 10 seconds
         maximumAge: 0
       }
     );
