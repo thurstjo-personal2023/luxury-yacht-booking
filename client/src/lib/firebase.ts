@@ -16,6 +16,7 @@ import {
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 import { getDatabase, connectDatabaseEmulator } from "firebase/database";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { getDataConnect, connectDataConnectEmulator } from "firebase/dataconnect";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -41,6 +42,7 @@ export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
 export const rtdb = getDatabase(app);
+export const dataConnect = getDataConnect(app);
 
 // Connect to external Firebase emulators in development
 if (import.meta.env.DEV) {
@@ -59,13 +61,17 @@ if (import.meta.env.DEV) {
     connectStorageEmulator(storage, "127.0.0.1", 9199);
     console.log("✓ Storage emulator connected at: http://127.0.0.1:9199");
 
-    // Functions Emulator - explicitly set to port 5001
+    // Functions Emulator
     connectFunctionsEmulator(functions, "127.0.0.1", 5001);
     console.log("✓ Functions emulator connected at: http://127.0.0.1:5001");
 
     // Realtime Database Emulator
     connectDatabaseEmulator(rtdb, "127.0.0.1", 9001);
     console.log("✓ Realtime Database emulator connected at: http://127.0.0.1:9001");
+
+    // Data Connect Emulator
+    connectDataConnectEmulator(dataConnect, "127.0.0.1", 9399);
+    console.log("✓ Data Connect emulator connected at: http://127.0.0.1:9399");
 
     console.log("All Firebase emulators connected successfully!");
 
