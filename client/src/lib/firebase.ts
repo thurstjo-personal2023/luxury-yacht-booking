@@ -68,7 +68,6 @@ if (import.meta.env.DEV) {
     console.log("✓ Realtime Database emulator connected at: http://127.0.0.1:9001");
 
     console.log("All Firebase emulators connected successfully!");
-
   } catch (error) {
     console.error("Error connecting to emulators:", error);
   }
