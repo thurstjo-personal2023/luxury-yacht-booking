@@ -24,8 +24,8 @@ export function SearchAndBook() {
   useEffect(() => {
     const fetchPackages = async () => {
       try {
-        console.log("Fetching all experience packages...");
-        const querySnapshot = await getDocs(collection(db, "experience_packages"));
+        console.log("Fetching all yacht experiences...");
+        const querySnapshot = await getDocs(collection(db, "yacht_experiences"));
         const allPackages = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         console.log("Fetched packages:", allPackages);
         setPackages(allPackages);
@@ -33,7 +33,7 @@ export function SearchAndBook() {
         console.error("Error fetching packages:", error);
         toast({
           title: "Error",
-          description: "Failed to load experience packages",
+          description: "Failed to load yacht experiences",
           variant: "destructive",
         });
       }

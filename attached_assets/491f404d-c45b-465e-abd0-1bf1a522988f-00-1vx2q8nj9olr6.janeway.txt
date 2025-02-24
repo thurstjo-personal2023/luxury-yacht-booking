@@ -1,0 +1,157 @@
+ Removing unpermitted intrinsics
+ [vite] connecting...
+ Connecting to external Firebase emulators...
+ ✓ Auth emulator connected at: http://127.0.0.1:9099
+ ✓ Firestore emulator connected at: http://127.0.0.1:8080
+ ✓ Storage emulator connected at: http://127.0.0.1:9199
+ ✓ Functions emulator connected at: http://127.0.0.1:5001
+ ✓ Realtime Database emulator connected at: http://127.0.0.1:9001
+ All Firebase emulators connected successfully!
+ Connected to external Firestore emulator on port 8080
+ Initializing Firestore collections in emulator...
+ [vite] connected.
+ Collection yacht_experiences verified in emulator
+ Collection user_profiles_tourist verified in emulator
+ Collection articles_and_guides verified in emulator
+ Collection event_announcements verified in emulator
+ Collection notifications verified in emulator
+ Collection products_add_ons verified in emulator
+ Collection promotions_and_offers verified in emulator
+ Collection reviews_and_feedback verified in emulator
+ Collection support_content verified in emulator
+ Collection user_profiles_service_provider verified in emulator
+ All Firestore collections initialized successfully in emulator
+ Removing unpermitted intrinsics
+/login:1 [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) 
+ Event target tag: INPUT
+ Current value: t
+ Current shortcuts: Array(0)
+ Event target tag: INPUT
+ Current value: th
+ Current shortcuts: Array(0)
+ Data received in content script: Array(0)
+ Data received in content script: Array(0)
+ Event target tag: INPUT
+ Current value: thu
+ Current shortcuts: Array(0)
+ Data received in content script: Array(0)
+ Event target tag: INPUT
+ Current value: thur
+ Current shortcuts: Array(0)
+ Data received in content script: Array(0)
+ Event target tag: INPUT
+ Current value: thurs
+ Current shortcuts: Array(0)
+ Data received in content script: Array(0)
+ Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurst
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstj
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@i
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@ic
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@icl
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@iclo
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@iclou
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@icloud
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@icloud.
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@icloud.c
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@icloud.co
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@icloud.com
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: R
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: Ra
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: Rap
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: Rap0
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: Rap0!
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: Rap0!2
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: Rap0!23
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: Rap0!23r
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: Rap0!23ra
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: Rap0!23rap
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+hook.js:608 Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["profile","t1iUkXrCPbNKbYuHo4iSOUt4VRuL"]
+overrideMethod @ hook.js:608
+use-geolocation.ts:46 Got coordinates: Object
+use-geolocation.ts:46 Got coordinates: Object
+127.0.0.1:5001/etoile-yachts/us-central1/reverseGeocode:1 
+            
+            
+           Failed to load resource: the server responded with a status of 400 (Bad Request)
+hook.js:608 Error getting location: FirebaseError: invalid-argument
+overrideMethod @ hook.js:608
+127.0.0.1:5001/etoile-yachts/us-central1/reverseGeocode:1 
+            
+            
+           Failed to load resource: the server responded with a status of 400 (Bad Request)
+hook.js:608 Error getting location: FirebaseError: invalid-argument
+overrideMethod @ hook.js:608
