@@ -1,5 +1,5 @@
 import { adminDb } from "../server/firebase-admin";
-import { collection, getDocs } from "firebase-admin/firestore";
+import { collection, getDocs, query, where, limit } from "firebase-admin/firestore";
 
 async function testQueries() {
   try {
@@ -17,6 +17,34 @@ async function testQueries() {
         console.log(`\nDocument ID: ${doc.id}`);
         console.log("Data:", JSON.stringify(doc.data(), null, 2));
       });
+    }
+
+    // Test all other collections
+    const collections = [
+      'articles_and_guides',
+      'event_announcements',
+      'notifications',
+      'products_add_ons',
+      'promotions_and_offers',
+      'reviews_and_feedback',
+      'support_content',
+      'user_profiles_service_provider',
+      'user_profiles_tourist',
+      'yacht_profiles'
+    ];
+
+    for (const collectionName of collections) {
+      console.log(`\nTesting ${collectionName} collection:`);
+      const snapshot = await adminDb.collection(collectionName).get();
+
+      if (snapshot.empty) {
+        console.log(`No documents found in ${collectionName} collection!`);
+      } else {
+        console.log(`Found ${snapshot.size} documents in ${collectionName} collection`);
+        snapshot.docs.forEach(doc => {
+          console.log(`Document ID: ${doc.id}`);
+        });
+      }
     }
 
   } catch (error) {
