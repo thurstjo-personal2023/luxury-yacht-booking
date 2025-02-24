@@ -1,4 +1,4 @@
-import { initializeApp, cert, type ServiceAccount } from "firebase-admin/app";
+import { initializeApp, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
@@ -18,7 +18,7 @@ const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT ? JSON.parse(process
 
 // Initialize Firebase Admin
 const app = initializeApp({
-  credential: cert(serviceAccount),
+  credential: cert(serviceAccount as any),
   projectId: "etoile-yachts",
   storageBucket: "etoile-yachts.appspot.com",
 });
@@ -34,27 +34,16 @@ if (process.env.NODE_ENV === "development") {
   process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 
   // Firestore emulator
-  process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
+  const FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
+  adminDb.settings({
+    host: FIRESTORE_EMULATOR_HOST,
+    ssl: false,
+  });
 
   // Storage emulator
   process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
 
-  // Functions emulator
-  process.env.FUNCTIONS_EMULATOR_HOST = "127.0.0.1:5001";
-
-  // Database emulator
-  process.env.FIREBASE_DATABASE_EMULATOR_HOST = "127.0.0.1:9001";
-
-  // Data Connect emulator
-  process.env.FIREBASE_DATACONNECT_EMULATOR_HOST = "127.0.0.1:9399";
-
-  // Pub/Sub emulator
-  process.env.PUBSUB_EMULATOR_HOST = "127.0.0.1:8085";
-
-  // Eventarc emulator
-  process.env.EVENTARC_EMULATOR_HOST = "127.0.0.1:9299";
-
-  console.log("Connected to external Firebase Admin emulators");
+  console.log("Connected to Firebase Admin emulators");
 }
 
 // Export the initialized services
