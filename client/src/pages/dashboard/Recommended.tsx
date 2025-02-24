@@ -4,9 +4,10 @@ import { collection, getDocs, query, where, orderBy, limit } from "firebase/fire
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { YachtExperience } from "@shared/firestore-schema";
 
 export function Recommended() {
-  const [recommendedPackages, setRecommendedPackages] = useState<any[]>([]);
+  const [recommendedPackages, setRecommendedPackages] = useState<YachtExperience[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -15,29 +16,27 @@ export function Recommended() {
       try {
         console.log("Fetching recommended packages...");
 
-        // Get all packages
-        const snapshot = await getDocs(collection(db, "yacht_experiences"));
+        // Get all packages from the correct collection name
+        const snapshot = await getDocs(collection(db, "experience_packages"));
 
         if (snapshot.empty) {
-          console.log("No yacht experiences found");
+          console.log("No experience packages found");
           setRecommendedPackages([]);
           return;
         }
 
         const allPackages = snapshot.docs.map(doc => ({
+          ...doc.data(),
           id: doc.id,
-          ...doc.data()
-        }));
+        })) as YachtExperience[];
 
         console.log("All fetched packages:", allPackages);
 
         // Filter for featured or highly rated packages
         const recommended = allPackages
           .filter(pkg => {
-            // Check for high ratings or featured flag
-            const isHighlyRated = pkg.reviews?.some((review: any) => review.rating >= 4.5);
-            const isFeatured = pkg.featured === true;
-            return isHighlyRated || isFeatured;
+            const hasHighRating = pkg.reviews?.some(review => review.rating >= 4.5);
+            return pkg.featured || hasHighRating;
           })
           .slice(0, 6); // Limit to 6 recommendations
 
