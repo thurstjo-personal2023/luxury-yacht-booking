@@ -1,0 +1,33 @@
+[
+  {
+    "package_id": "EXP123",
+    "title": "Luxury Sunset Yacht Cruise",
+    "description": "Experience a breathtaking sunset aboard a private luxury yacht...",
+    "category": "Adventure",
+    "location": {
+      "latitude": 25.2048,
+      "longitude": 55.2708,
+      "address": "Dubai Marina, UAE"
+    },
+    "duration": 3,
+    "capacity": 10,
+    "pricing": 1500.00,
+    "pricing_model": "Fixed",
+    "customization_options": [
+      { "name": "Private Chef", "price": 500 },
+      { "name": "Spa Service", "price": 300 }
+    ],
+    "media": [
+      { "type": "image", "url": "https://etoileyachts.com/media/yacht1.jpg" },
+      { "type": "video", "url": "https://etoileyachts.com/media/yacht1.mp4" }
+    ],
+    "availability_status": true,
+    "reviews": [
+      { "review_id": "REV456", "rating": 5, "review_text": "Amazing experience!" }
+    ],
+    "tags": ["luxury", "adventure", "sunset"],
+    "created_date": "2025-01-01T10:00:00Z",
+    "last_updated_date": "2025-01-05T10:00:00Z",
+    "published_status": true
+  }
+]

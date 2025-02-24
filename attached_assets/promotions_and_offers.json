@@ -1,0 +1,16 @@
+[
+  {
+    "promotion_id": "PROMO123",
+    "title": "Winter Special: 20% Off",
+    "description": "Get 20% off on all sunset yacht cruises this winter...",
+    "start_date": "2025-01-01T10:00:00Z",
+    "end_date": "2025-02-01T10:00:00Z",
+    "applicable_packages": ["EXP123", "EXP456"],
+    "discount_type": "Percentage",
+    "discount_value": 20,
+    "terms_and_conditions": "Offer valid only for online bookings...",
+    "tags": ["winter", "discount"],
+    "created_date": "2025-01-01T10:00:00Z",
+    "last_updated_date": "2025-01-05T10:00:00Z"
+  }
+]

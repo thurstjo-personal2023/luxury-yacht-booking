@@ -1,0 +1,16 @@
+[
+  {
+    "article_id": "ART123",
+    "title": "Top 5 Luxury Yachting Destinations",
+    "author": "Jane Smith",
+    "publish_date": "2025-01-01T10:00:00Z",
+    "content": "<p>Explore the most breathtaking yachting destinations...</p>",
+    "media": [
+      { "type": "image", "url": "https://etoileyachts.com/media/destination.jpg" }
+    ],
+    "tags": ["luxury", "destinations"],
+    "related_experiences": ["EXP123", "EXP456"],
+    "created_date": "2025-01-01T10:00:00Z",
+    "last_updated_date": "2025-01-05T10:00:00Z"
+  }
+]

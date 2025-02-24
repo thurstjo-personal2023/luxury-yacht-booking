@@ -1,0 +1,10 @@
+[
+  {
+    "support_id": "SUP123",
+    "question": "How do I book a luxury yacht?",
+    "answer": "<p>You can book a luxury yacht by browsing our packages and selecting your preferred option...</p>",
+    "related_topics": ["booking", "yacht"],
+    "created_date": "2025-01-01T10:00:00Z",
+    "last_updated_date": "2025-01-05T10:00:00Z"
+  }
+]

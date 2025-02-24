@@ -1,0 +1,19 @@
+[
+  {
+    "yacht_id": "YAC123",
+    "name": "Majestic Pearl",
+    "description": "A 30-meter luxury yacht with state-of-the-art amenities...",
+    "capacity": 12,
+    "length": 30.5,
+    "features": ["Jacuzzi", "Sundeck", "Dining Area"],
+    "certifications": ["ISO 9001", "Safety Certified"],
+    "media": [
+      { "type": "image", "url": "https://etoileyachts.com/media/yacht.jpg" }
+    ],
+    "pricing": 2500.00,
+    "owner_id": "OWN123",
+    "tags": ["luxury", "private", "jacuzzi"],
+    "created_date": "2025-01-01T10:00:00Z",
+    "last_updated_date": "2025-01-05T10:00:00Z"
+  }
+]

@@ -1,0 +1,11 @@
+[
+  {
+    "notification_id": "NOTIF123",
+    "title": "Booking Confirmed",
+    "message": "Your sunset yacht cruise has been confirmed for January 10, 2025...",
+    "type": "Booking Confirmation",
+    "recipient_id": "USR123",
+    "sent_date": "2025-01-01T10:00:00Z",
+    "read_status": false
+  }
+]

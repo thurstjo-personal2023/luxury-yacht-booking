@@ -1,0 +1,17 @@
+[
+  {
+    "product_id": "ADD123",
+    "name": "Private Chef Service",
+    "description": "Enjoy a gourmet dining experience prepared by a professional chef...",
+    "category": "Dining",
+    "pricing": 500.00,
+    "media": [
+      { "type": "image", "url": "https://etoileyachts.com/media/chef.jpg" }
+    ],
+    "availability": true,
+    "tags": ["dining", "luxury"],
+    "partner_id": "PART456",
+    "created_date": "2025-01-01T10:00:00Z",
+    "last_updated_date": "2025-01-05T10:00:00Z"
+  }
+]

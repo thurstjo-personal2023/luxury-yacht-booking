@@ -1,0 +1,20 @@
+[
+  {
+    "event_id": "EVT123",
+    "title": "Luxury Yacht Show 2025",
+    "description": "Join us for an exclusive showcase of our newest luxury yachts...",
+    "date_and_time": "2025-03-10T18:00:00Z",
+    "location": {
+      "latitude": 25.2048,
+      "longitude": 55.2708,
+      "address": "Dubai Marina, UAE"
+    },
+    "registration_link": "https://etoileyachts.com/events/yacht-show-2025",
+    "media": [
+      { "type": "image", "url": "https://etoileyachts.com/media/event.jpg" }
+    ],
+    "tags": ["event", "luxury"],
+    "created_date": "2025-01-01T10:00:00Z",
+    "last_updated_date": "2025-01-05T10:00:00Z"
+  }
+]
