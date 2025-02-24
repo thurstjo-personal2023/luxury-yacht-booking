@@ -1,0 +1,15 @@
+[
+  {
+    "user_id": "USR123",
+    "name": "John Doe",
+    "email": "john.doe@example.com",
+    "phone_number": "+971500000000",
+    "profile_photo": "https://etoileyachts.com/media/profile.jpg",
+    "loyalty_tier": "Gold",
+    "preferences": ["adventure", "dining"],
+    "wishlist": ["EXP123", "EXP456"],
+    "booking_history": ["BKG123", "BKG456"],
+    "reviews_provided": ["REV123", "REV456"],
+    "created_date": "2025-01-01T10:00:00Z"
+  }
+]

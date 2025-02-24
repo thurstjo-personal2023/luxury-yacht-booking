@@ -1,0 +1,13 @@
+[
+  {
+    "review_id": "REV123",
+    "reviewer_id": "USR123",
+    "related_content_id": "EXP123",
+    "rating": 5,
+    "review_text": "Absolutely loved the experience! The yacht was stunning.",
+    "photos": [
+      "https://etoileyachts.com/media/review1.jpg"
+    ],
+    "created_date": "2025-01-05T10:00:00Z"
+  }
+]
