@@ -19,8 +19,8 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log('Getting experiences with filters:', filters);
 
-      // First get all experiences
-      const experiencesRef = adminDb.collection('yacht_experiences');
+      // Query the experience_packages collection
+      const experiencesRef = adminDb.collection('experience_packages');
       const snapshot = await experiencesRef.get();
 
       if (snapshot.empty) {
@@ -80,8 +80,8 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log('Getting featured experiences');
 
-      // Get all experiences and filter by high ratings or featured flag
-      const snapshot = await adminDb.collection('yacht_experiences').get();
+      // Get all experiences from experience_packages collection
+      const snapshot = await adminDb.collection('experience_packages').get();
 
       if (snapshot.empty) {
         console.log('No experiences found');
@@ -93,11 +93,16 @@ export class FirestoreStorage implements IStorage {
         id: doc.id,
       })) as YachtExperience[];
 
-      // Filter for featured experiences (either flagged as featured or highly rated)
-      const featuredExperiences = allExperiences.filter(exp => {
-        const isHighlyRated = exp.reviews?.some(review => review.rating >= 4.5);
-        return exp.featured || isHighlyRated;
-      }).slice(0, 6); // Limit to 6 featured experiences
+      // Get featured experiences based on reviews or featured flag
+      const featuredExperiences = allExperiences
+        .filter(exp => {
+          // Check if experience has high rating reviews
+          const hasHighRating = exp.reviews?.some(review => review.rating >= 4.5);
+          // Check if experience is marked as featured
+          const isFeatured = exp.featured === true;
+          return hasHighRating || isFeatured;
+        })
+        .slice(0, 6); // Limit to 6 featured experiences
 
       console.log(`Found ${featuredExperiences.length} featured experiences`);
       return featuredExperiences;
