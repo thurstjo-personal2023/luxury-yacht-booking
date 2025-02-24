@@ -16,34 +16,22 @@ import { Slider } from "@/components/ui/slider";
 import { CalendarDateRangePicker } from "@/components/ui/date-range-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import type { Booking, Yacht } from "@shared/schema";
-import { collectionRefs } from "@/lib/firestore-init";
-import { getDocs, query, where, limit } from "firebase/firestore";
-import { auth } from "@/lib/firebase";
+import type { YachtExperience } from "@shared/firestore-schema";
+import { getDocs, query, where, limit, collection } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { DateRange } from "react-day-picker";
 import { Progress } from "@/components/ui/progress";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Check } from "lucide-react";
-import cn from 'classnames';
 import { PlacesAutocomplete } from "@/components/ui/places-autocomplete";
+
 
 interface LocationOption {
   address: string;
   latitude: number;
   longitude: number;
 }
+
+// Existing activity types and durations arrays remain unchanged...
 
 const activityTypes = [
   { id: "yacht-cruise", label: "Yacht Cruise" },
@@ -57,7 +45,6 @@ const durations = [
   { value: "full-day", label: "Full Day" },
   { value: "multi-day", label: "Multi Day" },
 ];
-
 
 export default function ConsumerDashboard() {
   const { toast } = useToast();
@@ -95,19 +82,62 @@ export default function ConsumerDashboard() {
     enabled: !!user
   });
 
-  const { data: yachts, isLoading: yachtsLoading, refetch: refetchYachts } = useQuery({
-    queryKey: ["yachts", { location, dateRange, activities: selectedActivities, priceRange, duration }],
+  const { data: recommendedYachts, isLoading: recommendedYachtsLoading } = useQuery<YachtExperience[]>({
+    queryKey: ["yachts", "recommended"],
     queryFn: async () => {
-      const q = query(collectionRefs.yachtExperiences);
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Yacht[];
-    },
-    enabled: isSearching
+      console.log("Fetching recommended yachts...");
+      const experiencesRef = collection(db, "experience_packages");
+      const snapshot = await getDocs(experiencesRef);
+      console.log("Snapshot:", snapshot.size, "documents");
+
+      if (snapshot.empty) {
+        console.log("No documents found");
+        return [];
+      }
+
+      const allPackages = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as YachtExperience[];
+
+      console.log("All packages:", allPackages);
+
+      const recommended = allPackages
+        .filter(pkg => {
+          const hasHighRating = pkg.reviews?.some(review => review.rating >= 4.5);
+          const isRecommended = pkg.featured || hasHighRating;
+          console.log(`Package ${pkg.id}:`, { featured: pkg.featured, hasHighRating, isRecommended });
+          return isRecommended;
+        })
+        .slice(0, 6);
+
+      console.log("Recommended packages:", recommended);
+      return recommended;
+    }
   });
 
-  const { data: recommendedYachts, isLoading: recommendedYachtsLoading } = useQuery<Yacht[]>({
-    queryKey: ["/api/yachts/featured"],
-    staleTime: 1000 * 60 * 5, // 5 minutes
+  const { data: yachts, isLoading: yachtsLoading, refetch: refetchYachts } = useQuery<YachtExperience[]>({
+    queryKey: ["yachts", { location, dateRange, activities: selectedActivities, priceRange, duration }],
+    queryFn: async () => {
+      console.log("Fetching all yachts with filters...");
+      const experiencesRef = collection(db, "experience_packages");
+      const snapshot = await getDocs(experiencesRef);
+      console.log("Snapshot:", snapshot.size, "documents");
+
+      if (snapshot.empty) {
+        console.log("No documents found");
+        return [];
+      }
+
+      const allPackages = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as YachtExperience[];
+
+      console.log("All packages before filtering:", allPackages);
+      return allPackages;
+    },
+    enabled: isSearching
   });
 
   const handleActivityToggle = (activityId: string) => {
