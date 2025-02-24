@@ -44,15 +44,15 @@ export const storage = getStorage(app);
 export const functions = getFunctions(app);
 export const rtdb = getDatabase(app);
 
-// Always connect to emulators
-try {
-  console.log("Connecting to Firebase emulators...");
+// Always connect to emulators in development
+console.log("Connecting to Firebase emulators...");
 
+try {
   // Auth Emulator
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
   console.log("✓ Auth emulator connected at: http://127.0.0.1:9099");
 
-  // Firestore Emulator
+  // Firestore Emulator - Force connection regardless of environment
   connectFirestoreEmulator(db, "127.0.0.1", 8080);
   console.log("✓ Firestore emulator connected at: http://127.0.0.1:8080");
 
