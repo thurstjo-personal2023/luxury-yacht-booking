@@ -15,29 +15,31 @@ export function Recommended() {
       try {
         console.log("Fetching recommended packages...");
 
-        // Get all packages first
-        const querySnapshot = await getDocs(
-          query(
-            collection(db, "experience_packages"),
-            where("availability_status", "==", true),
-            orderBy("rating", "desc"),
-            limit(6)
-          )
-        );
+        // Get all packages
+        const snapshot = await getDocs(collection(db, "yacht_experiences"));
 
-        const allPackages = querySnapshot.docs.map(doc => ({
+        if (snapshot.empty) {
+          console.log("No yacht experiences found");
+          setRecommendedPackages([]);
+          return;
+        }
+
+        const allPackages = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
 
         console.log("All fetched packages:", allPackages);
 
-        // Filter for highly rated or featured packages
-        const recommended = allPackages.filter(pkg => {
-          const isHighlyRated = pkg.reviews?.some((review: any) => review.rating >= 4.5);
-          const isFeatured = pkg.featured === true;
-          return isHighlyRated || isFeatured;
-        });
+        // Filter for featured or highly rated packages
+        const recommended = allPackages
+          .filter(pkg => {
+            // Check for high ratings or featured flag
+            const isHighlyRated = pkg.reviews?.some((review: any) => review.rating >= 4.5);
+            const isFeatured = pkg.featured === true;
+            return isHighlyRated || isFeatured;
+          })
+          .slice(0, 6); // Limit to 6 recommendations
 
         console.log("Filtered recommended packages:", recommended);
         setRecommendedPackages(recommended);
