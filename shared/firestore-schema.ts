@@ -19,6 +19,7 @@ export interface CustomizationOption {
 }
 
 export interface YachtExperience {
+  id?: string; // Added optional id field for frontend use
   package_id: string;
   title: string;
   description: string;
@@ -31,8 +32,8 @@ export interface YachtExperience {
   customization_options: CustomizationOption[];
   media: Media[];
   availability_status: boolean;
-  featured: boolean; // Added featured flag
-  reviews?: { rating: number }[]; // Added reviews
+  featured: boolean;
+  reviews?: { rating: number }[];
   tags: string[];
   created_date: Timestamp;
   last_updated_date: Timestamp;

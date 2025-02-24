@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,7 +16,6 @@ export function Recommended() {
       try {
         console.log("Fetching recommended packages...");
 
-        // Get all packages from the correct collection name
         const snapshot = await getDocs(collection(db, "experience_packages"));
 
         if (snapshot.empty) {
@@ -25,20 +24,20 @@ export function Recommended() {
           return;
         }
 
+        // Updated type assertion with proper document ID handling
         const allPackages = snapshot.docs.map(doc => ({
-          ...doc.data(),
           id: doc.id,
+          ...doc.data()
         })) as YachtExperience[];
 
         console.log("All fetched packages:", allPackages);
 
-        // Filter for featured or highly rated packages
         const recommended = allPackages
           .filter(pkg => {
             const hasHighRating = pkg.reviews?.some(review => review.rating >= 4.5);
             return pkg.featured || hasHighRating;
           })
-          .slice(0, 6); // Limit to 6 recommendations
+          .slice(0, 6);
 
         console.log("Filtered recommended packages:", recommended);
         setRecommendedPackages(recommended);
