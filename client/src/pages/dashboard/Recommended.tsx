@@ -14,9 +14,16 @@ export function Recommended() {
   useEffect(() => {
     const fetchRecommendedPackages = async () => {
       try {
-        console.log("Fetching recommended packages...");
+        console.log("Starting to fetch recommended packages...");
+        console.log("Firestore instance:", db); // Log the Firestore instance
 
-        const snapshot = await getDocs(collection(db, "experience_packages"));
+        const experiencesRef = collection(db, "experience_packages");
+        console.log("Collection reference:", experiencesRef);
+
+        const snapshot = await getDocs(experiencesRef);
+        console.log("Query snapshot:", snapshot);
+        console.log("Is snapshot empty?", snapshot.empty);
+        console.log("Number of documents:", snapshot.size);
 
         if (snapshot.empty) {
           console.log("No experience packages found");
@@ -24,7 +31,6 @@ export function Recommended() {
           return;
         }
 
-        // Updated type assertion with proper document ID handling
         const allPackages = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
@@ -35,11 +41,16 @@ export function Recommended() {
         const recommended = allPackages
           .filter(pkg => {
             const hasHighRating = pkg.reviews?.some(review => review.rating >= 4.5);
-            return pkg.featured || hasHighRating;
+            const isRecommended = pkg.featured || hasHighRating;
+            console.log(`Package ${pkg.id} recommended:`, isRecommended, {
+              featured: pkg.featured,
+              hasHighRating
+            });
+            return isRecommended;
           })
           .slice(0, 6);
 
-        console.log("Filtered recommended packages:", recommended);
+        console.log("Final recommended packages:", recommended);
         setRecommendedPackages(recommended);
       } catch (error) {
         console.error("Error fetching recommended packages:", error);
