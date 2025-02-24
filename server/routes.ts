@@ -11,10 +11,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const filters: any = {};
 
-      // Only add filters if they are provided
-      if (type) filters.type = type as string;
-      if (region) filters.region = region as string;
-      if (port_marina) filters.port_marina = port_marina as string;
+      // Only add filters if they are provided with non-empty values
+      if (type && type !== '') filters.type = type as string;
+      if (region && region !== '') filters.region = region as string;
+      if (port_marina && port_marina !== '') filters.port_marina = port_marina as string;
 
       const experiences = await storage.getAllExperiencePackages(
         Object.keys(filters).length > 0 ? filters : undefined
