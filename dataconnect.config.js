@@ -8,7 +8,13 @@ module.exports = {
   collections: {
     yacht_experiences: {
       source: 'yacht_experiences',
-      schema: './shared/firestore-schema.ts'
+      schema: './shared/firestore-schema.ts',
+      interface: 'YachtExperience'
+    },
+    yacht_profiles: {
+      source: 'yacht_profiles',
+      schema: './shared/firestore-schema.ts',
+      interface: 'YachtProfile'
     },
     user_profiles_tourist: {
       source: 'user_profiles_tourist',
@@ -20,10 +26,6 @@ module.exports = {
     },
     event_announcements: {
       source: 'event_announcements',
-      schema: './shared/firestore-schema.ts'
-    },
-    experience_packages: {
-      source: 'experience_packages',
       schema: './shared/firestore-schema.ts'
     },
     notifications: {
