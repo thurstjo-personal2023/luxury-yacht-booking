@@ -21,16 +21,17 @@ export function SearchAndBook() {
   });
   const { toast } = useToast();
 
-  // Fetch all experience packages initially
   useEffect(() => {
     const fetchPackages = async () => {
       try {
         console.log("Fetching all yacht experiences...");
         const querySnapshot = await getDocs(collection(db, "experience_packages"));
+        // Updated type assertion with proper document ID handling
         const allPackages = querySnapshot.docs.map(doc => ({
-          ...doc.data(),
           id: doc.id,
+          ...doc.data()
         })) as YachtExperience[];
+
         console.log("Fetched packages:", allPackages);
         setPackages(allPackages);
       } catch (error) {
@@ -46,22 +47,18 @@ export function SearchAndBook() {
     fetchPackages();
   }, [toast]);
 
-  // Apply filters progressively
   const filteredPackages = packages.filter((pkg) => {
     console.log("Filtering package:", pkg, "with filters:", filters);
 
-    // Category filter (Yacht Cruise)
     const matchesCategory = !filters.category || 
       (filters.category === "yacht-cruise" && 
        pkg.tags?.some(tag => 
          ["yacht", "cruise", "luxury"].includes(tag.toLowerCase())
        ));
 
-    // Region filter
     const matchesRegion = !filters.region || 
       pkg.location?.address.toLowerCase().includes(filters.region.toLowerCase());
 
-    // Marina filter
     const matchesMarina = !filters.marina || 
       pkg.location?.port_marina === filters.marina;
 
@@ -70,7 +67,6 @@ export function SearchAndBook() {
     return matches;
   });
 
-  // Handle filter changes
   const handleFilterChange = (field: keyof typeof filters, value: string) => {
     console.log(`Updating ${field} filter to:`, value);
     setFilters(prev => ({
