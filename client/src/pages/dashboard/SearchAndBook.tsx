@@ -10,9 +10,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import type { YachtExperience } from "@shared/firestore-schema";
 
 export function SearchAndBook() {
-  const [packages, setPackages] = useState<any[]>([]);
+  const [packages, setPackages] = useState<YachtExperience[]>([]);
   const [filters, setFilters] = useState({
     category: "",
     region: "",
@@ -25,8 +26,11 @@ export function SearchAndBook() {
     const fetchPackages = async () => {
       try {
         console.log("Fetching all yacht experiences...");
-        const querySnapshot = await getDocs(collection(db, "yacht_experiences"));
-        const allPackages = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const querySnapshot = await getDocs(collection(db, "experience_packages"));
+        const allPackages = querySnapshot.docs.map(doc => ({
+          ...doc.data(),
+          id: doc.id,
+        })) as YachtExperience[];
         console.log("Fetched packages:", allPackages);
         setPackages(allPackages);
       } catch (error) {
@@ -49,7 +53,7 @@ export function SearchAndBook() {
     // Category filter (Yacht Cruise)
     const matchesCategory = !filters.category || 
       (filters.category === "yacht-cruise" && 
-       pkg.tags?.some((tag: string) => 
+       pkg.tags?.some(tag => 
          ["yacht", "cruise", "luxury"].includes(tag.toLowerCase())
        ));
 
@@ -134,7 +138,7 @@ export function SearchAndBook() {
                 <p className="text-sm">Price: ${pkg.pricing}</p>
                 {pkg.tags && (
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {pkg.tags.map((tag: string) => (
+                    {pkg.tags.map((tag) => (
                       <span
                         key={tag}
                         className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs"
