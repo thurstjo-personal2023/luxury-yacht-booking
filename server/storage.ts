@@ -19,7 +19,7 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log('Getting experiences with filters:', filters);
 
-      // Query the yacht_experiences collection
+      // First get all experiences
       const experiencesRef = adminDb.collection('yacht_experiences');
       const snapshot = await experiencesRef.get();
 
@@ -28,32 +28,39 @@ export class FirestoreStorage implements IStorage {
         return [];
       }
 
+      // Map all experiences first
       let results = snapshot.docs.map(doc => ({
         ...doc.data(),
         id: doc.id,
       })) as YachtExperience[];
 
-      console.log(`Found ${results.length} experiences before filtering`);
+      console.log(`Found ${results.length} total experiences`);
 
-      // Apply filters if they exist
+      // Apply filters progressively if they exist
       if (filters) {
+        // Filter by type (yacht cruise)
         if (filters.type === 'yacht-cruise') {
+          console.log('Filtering by yacht cruise...');
           results = results.filter(exp => 
             exp.tags && exp.tags.some(tag => 
               ['yacht', 'cruise', 'luxury'].includes(tag.toLowerCase())
             )
           );
-          console.log(`After yacht-cruise filter: ${results.length} experiences`);
+          console.log(`After yacht filter: ${results.length} experiences`);
         }
 
+        // Filter by region
         if (filters.region) {
+          console.log(`Filtering by region: ${filters.region}`);
           results = results.filter(exp => 
             exp.location.address.toLowerCase().includes(filters.region.toLowerCase())
           );
           console.log(`After region filter: ${results.length} experiences`);
         }
 
+        // Filter by port/marina
         if (filters.port_marina) {
+          console.log(`Filtering by marina: ${filters.port_marina}`);
           results = results.filter(exp => 
             exp.location.port_marina === filters.port_marina
           );
@@ -73,23 +80,27 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log('Getting featured experiences');
 
-      const snapshot = await adminDb.collection('yacht_experiences')
-        .where('featured', '==', true)
-        .limit(6)
-        .get();
+      // Get all experiences and filter by high ratings or featured flag
+      const snapshot = await adminDb.collection('yacht_experiences').get();
 
       if (snapshot.empty) {
-        console.log('No featured experiences found');
+        console.log('No experiences found');
         return [];
       }
 
-      const results = snapshot.docs.map(doc => ({
+      const allExperiences = snapshot.docs.map(doc => ({
         ...doc.data(),
         id: doc.id,
       })) as YachtExperience[];
 
-      console.log(`Found ${results.length} featured experiences`);
-      return results;
+      // Filter for featured experiences (either flagged as featured or highly rated)
+      const featuredExperiences = allExperiences.filter(exp => {
+        const isHighlyRated = exp.reviews?.some(review => review.rating >= 4.5);
+        return exp.featured || isHighlyRated;
+      }).slice(0, 6); // Limit to 6 featured experiences
+
+      console.log(`Found ${featuredExperiences.length} featured experiences`);
+      return featuredExperiences;
     } catch (error) {
       console.error('Error fetching featured experiences:', error);
       return [];

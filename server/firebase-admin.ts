@@ -43,6 +43,12 @@ if (process.env.NODE_ENV === "development") {
   // Storage emulator
   process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
 
+  // Functions emulator
+  process.env.FUNCTIONS_EMULATOR_HOST = "127.0.0.1:5001";
+
+  // Database emulator
+  process.env.FIREBASE_DATABASE_EMULATOR_HOST = "127.0.0.1:9001";
+
   console.log("Connected to Firebase Admin emulators");
 }
 
