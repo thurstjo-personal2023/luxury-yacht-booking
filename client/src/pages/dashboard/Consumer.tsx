@@ -85,57 +85,103 @@ export default function ConsumerDashboard() {
   const { data: recommendedYachts, isLoading: recommendedYachtsLoading } = useQuery<YachtExperience[]>({
     queryKey: ["yachts", "recommended"],
     queryFn: async () => {
-      console.log("Fetching recommended yachts...");
-      const experiencesRef = collection(db, "experience_packages");
-      const snapshot = await getDocs(experiencesRef);
-      console.log("Snapshot:", snapshot.size, "documents");
+      try {
+        console.log("=== Recommended Yachts Query Start ===");
+        console.log("Firestore DB instance:", db);
 
-      if (snapshot.empty) {
-        console.log("No documents found");
-        return [];
+        const experiencesRef = collection(db, "experience_packages");
+        console.log("Collection reference:", experiencesRef);
+
+        const snapshot = await getDocs(experiencesRef);
+        console.log("Raw snapshot:", {
+          empty: snapshot.empty,
+          size: snapshot.size,
+          docs: snapshot.docs.map(doc => doc.id)
+        });
+
+        if (snapshot.empty) {
+          console.log("No documents found in experience_packages collection");
+          return [];
+        }
+
+        const allPackages = snapshot.docs.map(doc => {
+          const data = doc.data();
+          console.log(`Document ${doc.id} data:`, data);
+          return {
+            id: doc.id,
+            ...data
+          };
+        }) as YachtExperience[];
+
+        console.log("All packages after mapping:", allPackages);
+
+        const recommended = allPackages
+          .filter(pkg => {
+            const hasHighRating = pkg.reviews?.some(review => review.rating >= 4.5);
+            const isRecommended = pkg.featured || hasHighRating;
+            console.log(`Package ${pkg.id} recommendation check:`, {
+              featured: pkg.featured,
+              hasHighRating,
+              isRecommended
+            });
+            return isRecommended;
+          })
+          .slice(0, 6);
+
+        console.log("Final recommended packages:", recommended);
+        console.log("=== Recommended Yachts Query End ===");
+        return recommended;
+      } catch (error) {
+        console.error("Error in recommended yachts query:", error);
+        throw error;
       }
-
-      const allPackages = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as YachtExperience[];
-
-      console.log("All packages:", allPackages);
-
-      const recommended = allPackages
-        .filter(pkg => {
-          const hasHighRating = pkg.reviews?.some(review => review.rating >= 4.5);
-          const isRecommended = pkg.featured || hasHighRating;
-          console.log(`Package ${pkg.id}:`, { featured: pkg.featured, hasHighRating, isRecommended });
-          return isRecommended;
-        })
-        .slice(0, 6);
-
-      console.log("Recommended packages:", recommended);
-      return recommended;
     }
   });
 
   const { data: yachts, isLoading: yachtsLoading, refetch: refetchYachts } = useQuery<YachtExperience[]>({
     queryKey: ["yachts", { location, dateRange, activities: selectedActivities, priceRange, duration }],
     queryFn: async () => {
-      console.log("Fetching all yachts with filters...");
-      const experiencesRef = collection(db, "experience_packages");
-      const snapshot = await getDocs(experiencesRef);
-      console.log("Snapshot:", snapshot.size, "documents");
+      try {
+        console.log("=== Search Yachts Query Start ===");
+        console.log("Search parameters:", {
+          location,
+          dateRange,
+          activities: selectedActivities,
+          priceRange,
+          duration
+        });
 
-      if (snapshot.empty) {
-        console.log("No documents found");
-        return [];
+        const experiencesRef = collection(db, "experience_packages");
+        console.log("Collection reference:", experiencesRef);
+
+        const snapshot = await getDocs(experiencesRef);
+        console.log("Raw snapshot:", {
+          empty: snapshot.empty,
+          size: snapshot.size,
+          docs: snapshot.docs.map(doc => doc.id)
+        });
+
+        if (snapshot.empty) {
+          console.log("No documents found in experience_packages collection");
+          return [];
+        }
+
+        const allPackages = snapshot.docs.map(doc => {
+          const data = doc.data();
+          console.log(`Document ${doc.id} data:`, data);
+          return {
+            id: doc.id,
+            ...data
+          };
+        }) as YachtExperience[];
+
+        console.log("All packages before filtering:", allPackages);
+        console.log("=== Search Yachts Query End ===");
+        return allPackages;
+      } catch (error) {
+        console.error("Error in search yachts query:", error);
+        throw error;
       }
-
-      const allPackages = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as YachtExperience[];
-
-      console.log("All packages before filtering:", allPackages);
-      return allPackages;
     },
     enabled: isSearching
   });

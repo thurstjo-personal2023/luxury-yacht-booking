@@ -1,7 +1,7 @@
  Removing unpermitted intrinsics
  [vite] connecting...
  [vite] connected.
- Connecting to external Firebase emulators...
+ Connecting to Firebase emulators...
  ✓ Auth emulator connected at: http://127.0.0.1:9099
  ✓ Firestore emulator connected at: http://127.0.0.1:8080
  ✓ Storage emulator connected at: http://127.0.0.1:9199
@@ -42,84 +42,84 @@
  Current value: thurs
  Current shortcuts: Array(0)
  Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: thurst
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: thurstj
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: thurstjo
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: thurstjo@
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: thurstjo@i
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: thurstjo@ic
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: thurstjo@icl
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: thurstjo@iclo
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: thurstjo@iclou
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: thurstjo@icloud
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: thurstjo@icloud.
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: thurstjo@icloud.c
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: thurstjo@icloud.co
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: thurstjo@icloud.com
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: R
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: Ra
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: Rap
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: Rap0
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: Rap0!
- Current shortcuts: Array(0)
- Data received in content script: Array(0)
- Event target tag: INPUT
- Current value: Rap0!2
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurst
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstj
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@i
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@ic
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@icl
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@iclo
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@iclou
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@icloud
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@icloud.
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@icloud.c
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@icloud.co
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: thurstjo@icloud.com
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: R
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: Ra
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: Rap
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: Rap0
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: Rap0!
+contentScript.bundle.js:4785 Current shortcuts: Array(0)
+contentScript.bundle.js:4785 Data received in content script: Array(0)
+contentScript.bundle.js:4785 Event target tag: INPUT
+contentScript.bundle.js:4785 Current value: Rap0!2
 contentScript.bundle.js:4785 Current shortcuts: Array(0)
 contentScript.bundle.js:4785 Data received in content script: Array(0)
 contentScript.bundle.js:4785 Event target tag: INPUT
@@ -138,5 +138,6 @@ contentScript.bundle.js:4785 Event target tag: INPUT
 contentScript.bundle.js:4785 Current value: Rap0!23rap
 contentScript.bundle.js:4785 Current shortcuts: Array(0)
 contentScript.bundle.js:4785 Data received in content script: Array(0)
-hook.js:608 Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["profile","t1iUkXrCPbNKbYuHo4iSOUt4VRuL"]
-overrideMethod @ hook.js:608
+Consumer.tsx:88 Fetching recommended yachts...
+Consumer.tsx:91 Snapshot: 0 documents
+Consumer.tsx:94 No documents found
