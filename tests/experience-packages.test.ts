@@ -1,25 +1,19 @@
-import { initializeApp, cert } from "firebase-admin/app";
-import { 
-  getFirestore, 
-  collection, 
-  getDocs, 
-  query, 
-  where, 
-  addDoc, 
-  deleteDoc, 
-  Timestamp 
-} from "firebase-admin/firestore";
+import { initializeApp } from "firebase/app";
+import { getFirestore, connectFirestoreEmulator, collection, getDocs, query, where, addDoc, deleteDoc, Timestamp } from "firebase/firestore";
 import { beforeEach, afterEach, describe, test, expect } from '@jest/globals';
 import type { YachtExperience } from "../shared/firestore-schema";
 
-// Initialize Firebase Admin with emulator config
-const app = initializeApp({
+const firebaseConfig = {
   projectId: "etoile-yachts",
-  // Using Data Connect emulator
-  databaseURL: "http://127.0.0.1:9399"
-}, 'test-admin');
+  // We don't need other config options when using emulators
+};
 
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+// Connect to Firestore emulator
+connectFirestoreEmulator(db, "127.0.0.1", 8080);
 
 interface Review {
   rating: number;
@@ -83,10 +77,10 @@ const mockExperiences: YachtExperience[] = [
 describe('Experience Packages Queries', () => {
   beforeEach(async () => {
     // Clear and populate test data
-    const experiencesRef = collection(db, 'yacht_experiences');
+    const experiencesRef = collection(db, 'experience_packages');
 
     // Clear existing data
-    const snapshot = await getDocs(collection(db, 'yacht_experiences'));
+    const snapshot = await getDocs(collection(db, 'experience_packages'));
     for (const doc of snapshot.docs) {
       await deleteDoc(doc.ref);
     }
@@ -95,19 +89,19 @@ describe('Experience Packages Queries', () => {
     for (const exp of mockExperiences) {
       await addDoc(experiencesRef, exp);
     }
-    console.log('Test data initialized in Data Connect');
+    console.log('Test data initialized');
   });
 
   afterEach(async () => {
     // Clean up test data
-    const snapshot = await getDocs(collection(db, 'yacht_experiences'));
+    const snapshot = await getDocs(collection(db, 'experience_packages'));
     for (const doc of snapshot.docs) {
       await deleteDoc(doc.ref);
     }
   });
 
   test('fetchAllPackages returns all experiences', async () => {
-    const snapshot = await getDocs(collection(db, 'yacht_experiences'));
+    const snapshot = await getDocs(collection(db, 'experience_packages'));
     const experiences = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     expect(experiences.length).toBe(mockExperiences.length);
@@ -120,7 +114,7 @@ describe('Experience Packages Queries', () => {
   test('filterByCategory returns only yacht experiences', async () => {
     const filtered = await getDocs(
       query(
-        collection(db, 'yacht_experiences'),
+        collection(db, 'experience_packages'),
         where('tags', 'array-contains', 'yacht')
       )
     );
@@ -134,7 +128,7 @@ describe('Experience Packages Queries', () => {
 
   test('filterByRegion returns experiences from specified region', async () => {
     const region = 'Dubai';
-    const snapshot = await getDocs(collection(db, 'yacht_experiences'));
+    const snapshot = await getDocs(collection(db, 'experience_packages'));
     const experiences = snapshot.docs
       .map(doc => doc.data())
       .filter(exp => exp.location.address.includes(region));
@@ -146,7 +140,7 @@ describe('Experience Packages Queries', () => {
   });
 
   test('fetchRecommended returns featured or highly rated experiences', async () => {
-    const snapshot = await getDocs(collection(db, 'yacht_experiences'));
+    const snapshot = await getDocs(collection(db, 'experience_packages'));
     const experiences = snapshot.docs
       .map(doc => doc.data())
       .filter(exp => exp.featured || exp.reviews?.some((r: Review) => r.rating >= 4.5));
@@ -160,12 +154,12 @@ describe('Experience Packages Queries', () => {
 
   test('handles empty results gracefully', async () => {
     // Clear all data
-    const snapshot = await getDocs(collection(db, 'yacht_experiences'));
+    const snapshot = await getDocs(collection(db, 'experience_packages'));
     for (const doc of snapshot.docs) {
       await deleteDoc(doc.ref);
     }
 
-    const emptySnapshot = await getDocs(collection(db, 'yacht_experiences'));
+    const emptySnapshot = await getDocs(collection(db, 'experience_packages'));
     expect(emptySnapshot.empty).toBe(true);
   });
 });
