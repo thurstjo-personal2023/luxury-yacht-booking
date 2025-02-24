@@ -31,6 +31,8 @@ export interface YachtExperience {
   customization_options: CustomizationOption[];
   media: Media[];
   availability_status: boolean;
+  featured: boolean; // Added featured flag
+  reviews?: { rating: number }[]; // Added reviews
   tags: string[];
   created_date: Timestamp;
   last_updated_date: Timestamp;
