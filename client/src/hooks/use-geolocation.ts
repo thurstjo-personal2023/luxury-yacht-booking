@@ -50,6 +50,11 @@ export function useGeolocation() {
           throw new Error("Invalid coordinates received from geolocation");
         }
 
+        // Ensure coordinates are within valid ranges
+        if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+          throw new Error("Coordinates out of valid range");
+        }
+
         // First update state with coordinates
         setState(prev => ({
           location: {
@@ -61,8 +66,8 @@ export function useGeolocation() {
         }));
 
         // Format coordinates to 6 decimal places and ensure they're numbers
-        const formattedLat = parseFloat(latitude.toFixed(6));
-        const formattedLng = parseFloat(longitude.toFixed(6));
+        const formattedLat = Number(latitude.toFixed(6));
+        const formattedLng = Number(longitude.toFixed(6));
 
         console.log("Calling reverseGeocode with coordinates:", { formattedLat, formattedLng });
 
@@ -121,7 +126,7 @@ export function useGeolocation() {
       errorHandler,
       {
         enableHighAccuracy: true,
-        timeout: 10000, // Increased timeout to 10 seconds
+        timeout: 10000, // 10 second timeout
         maximumAge: 0
       }
     );
