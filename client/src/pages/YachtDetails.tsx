@@ -24,6 +24,7 @@ import type { YachtExperience } from "@shared/firestore-schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { VirtualTourViewer } from "@/components/VirtualTourViewer";
 
 // Add-on type
 interface AddOn {
@@ -330,6 +331,59 @@ export default function YachtDetails() {
     );
   }
 
+  // Sample virtual tour data for testing if none exists in the yacht data
+  const sampleVirtualTourScenes = [
+    {
+      id: "deck",
+      title: "Main Deck",
+      imageUrl: "https://raw.githubusercontent.com/fariskassim/notreal/main/360-1.jpg",
+      hotspots: [
+        {
+          id: "info-1",
+          pitch: -10,
+          yaw: 20,
+          text: "Spacious sundeck with lounge area",
+          type: "info"
+        },
+        {
+          id: "scene-to-cabin",
+          pitch: -20,
+          yaw: 180,
+          text: "Go to Cabin",
+          type: "scene",
+          sceneId: "cabin"
+        }
+      ]
+    },
+    {
+      id: "cabin",
+      title: "Luxury Cabin",
+      imageUrl: "https://raw.githubusercontent.com/fariskassim/notreal/main/360-2.jpg",
+      hotspots: [
+        {
+          id: "info-2",
+          pitch: 0,
+          yaw: 40,
+          text: "Queen-size bed with premium linens",
+          type: "info"
+        },
+        {
+          id: "scene-to-deck",
+          pitch: 0,
+          yaw: -120,
+          text: "Return to Main Deck",
+          type: "scene",
+          sceneId: "deck"
+        }
+      ]
+    }
+  ];
+
+  // Use yacht's virtual tour data if available, otherwise use sample data for testing
+  const virtualTourScenes = (yacht.virtual_tour?.enabled && yacht.virtual_tour.scenes?.length > 0) 
+    ? yacht.virtual_tour.scenes 
+    : sampleVirtualTourScenes;
+
   return (
     <DashboardLayout>
       <div className="container mx-auto p-4 md:p-8">
@@ -453,6 +507,7 @@ export default function YachtDetails() {
                 <TabsTrigger value="description">Description</TabsTrigger>
                 <TabsTrigger value="features">Features & Add-Ons</TabsTrigger>
                 <TabsTrigger value="location">Location</TabsTrigger>
+                <TabsTrigger value="virtual-tour">Virtual Tour</TabsTrigger>
               </TabsList>
 
               <TabsContent value="description" className="mt-4">
@@ -598,6 +653,42 @@ export default function YachtDetails() {
                   </div>
                 )}
               </TabsContent>
+
+              {/* Virtual Tour tab content */}
+              <TabsContent value="virtual-tour" className="mt-4">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">360° Virtual Tour</h3>
+                    <Badge variant="outline">
+                      {virtualTourScenes.length} scenes available
+                    </Badge>
+                  </div>
+
+                  <p className="text-muted-foreground mb-4">
+                    Explore this yacht in immersive 360° view. Navigate between different areas using hotspots or the control panel.
+                  </p>
+
+                  <div className="rounded-lg overflow-hidden border">
+                    <VirtualTourViewer 
+                      scenes={virtualTourScenes}
+                      initialSceneId={virtualTourScenes[0]?.id}
+                      height="500px"
+                      width="100%"
+                      className="rounded-lg"
+                    />
+                  </div>
+
+                  <div className="p-4 bg-muted/30 rounded-lg mt-4">
+                    <h4 className="font-medium mb-2">How to navigate:</h4>
+                    <ul className="space-y-1 text-sm text-muted-foreground">
+                      <li>• Click and drag to look around in 360 degrees</li>
+                      <li>• Use mouse wheel to zoom in and out</li>
+                      <li>• Click on hotspots (highlighted points) to view details or move to different areas</li>
+                      <li>• Use the navigation controls to switch between different scenes</li>
+                    </ul>
+                  </div>
+                </div>
+              </TabsContent>
             </Tabs>
 
             {/* Call to action for mobile */}
@@ -652,7 +743,7 @@ export default function YachtDetails() {
                     {yacht.availability_status ? "Book Now" : "Currently Unavailable"}
                   </Button>
                 </CardFooter>
-              </Card>
+              </Card>            
             </div>
           </div>
 
@@ -707,7 +798,7 @@ export default function YachtDetails() {
                 <CardFooter>
                   <Button 
                     className="w-full" 
-                    size="lg"
+                                        size="lg"
                     onClick={handleBooking}
                     disabled={!yacht.availability_status}
                   >
@@ -721,13 +812,11 @@ export default function YachtDetails() {
 
         {/* Similar Experiences */}
         {relatedYachts.length > 0 && (
-          <div className="mt-12">
-            <YachtCarousel 
-              yachts={relatedYachts}
-              title="Similar Experiences"
-              description="You might also be interested in these yacht experiences"
-            />
-          </div>
+          <YachtCarousel 
+            yachts={relatedYachts}
+            title="Similar Experiences"
+            description="You might also be interested in these yacht experiences"
+          />
         )}
       </div>
     </DashboardLayout>
