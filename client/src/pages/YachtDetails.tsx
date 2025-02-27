@@ -41,6 +41,14 @@ interface AddOn {
   tags: string[];
 }
 
+// Selected add-on interface for tracking
+interface SelectedAddOn {
+  uniqueId: string;
+  productId: string;
+  name: string;
+  price: number;
+}
+
 export default function YachtDetails() {
   const [, params] = useRoute("/yacht/:id");
   const yachtId = params?.id;
@@ -49,7 +57,7 @@ export default function YachtDetails() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [relatedYachts, setRelatedYachts] = useState<YachtExperience[]>([]);
   const [addOns, setAddOns] = useState<AddOn[]>([]);
-  const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
+  const [selectedAddOns, setSelectedAddOns] = useState<SelectedAddOn[]>([]);
   const [totalPrice, setTotalPrice] = useState<number>(0);
   const { toast } = useToast();
   const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
@@ -189,12 +197,9 @@ export default function YachtDetails() {
     let price = yacht.pricing || 0;
 
     // Add prices for selected add-ons
-    if (yacht.customization_options && selectedAddOns.length > 0) {
-      yacht.customization_options.forEach(option => {
-        if (selectedAddOns.includes(option.product_id)) {
-          price += option.price;
-        }
-      });
+    if (selectedAddOns.length > 0) {
+      const addOnTotal = selectedAddOns.reduce((sum, addon) => sum + addon.price, 0);
+      price += addOnTotal;
     }
 
     console.log("Updated total price:", price, "Selected add-ons:", selectedAddOns);
@@ -224,20 +229,21 @@ export default function YachtDetails() {
     // or open a booking modal with additional options
   };
 
-  const handleAddOnToggle = (productId: string) => {
-    console.log("Toggling add-on:", productId);
-    console.log("Current selected add-ons:", selectedAddOns);
+  const handleAddOnToggle = (uniqueId: string, productId: string, name: string, price: number) => {
+    console.log("Toggling add-on:", { uniqueId, productId, name, price });
 
     setSelectedAddOns(current => {
-      // Check if this add-on is already selected
-      if (current.includes(productId)) {
-        // Remove it from the selection
-        console.log("Removing add-on:", productId);
-        return current.filter(id => id !== productId);
+      // Check if this specific add-on is already selected by its unique ID
+      const isSelected = current.some(addon => addon.uniqueId === uniqueId);
+
+      if (isSelected) {
+        // Remove this specific add-on
+        console.log("Removing add-on:", uniqueId);
+        return current.filter(addon => addon.uniqueId !== uniqueId);
       } else {
-        // Add it to the selection
-        console.log("Adding add-on:", productId);
-        return [...current, productId];
+        // Add this specific add-on
+        console.log("Adding add-on:", uniqueId);
+        return [...current, { uniqueId, productId, name, price }];
       }
     });
   };
@@ -507,14 +513,17 @@ export default function YachtDetails() {
                     {yacht.customization_options.map((option, index) => {
                       // Find matching detailed add-on if available
                       const addOnDetails = addOns.find(addOn => addOn.product_id === option.product_id);
-                      const uniqueId = `addon-${option.product_id}-${index}`; // Create a unique ID for each option
+                      const uniqueId = `addon-${option.product_id}-${index}`; // Create a truly unique ID for each option
+
+                      // Check if this specific add-on is selected by its unique ID
+                      const isSelected = selectedAddOns.some(addon => addon.uniqueId === uniqueId);
 
                       return (
                         <div key={uniqueId} className="flex items-start p-3 border rounded-lg">
                           <Checkbox 
                             id={uniqueId}
-                            checked={selectedAddOns.includes(option.product_id)}
-                            onCheckedChange={() => handleAddOnToggle(option.product_id)}
+                            checked={isSelected}
+                            onCheckedChange={() => handleAddOnToggle(uniqueId, option.product_id, option.name, option.price)}
                             className="mt-1 mr-3"
                           />
                           <div className="flex-1">
@@ -607,15 +616,12 @@ export default function YachtDetails() {
                     {selectedAddOns.length > 0 && (
                       <div className="pt-2 space-y-2 border-t">
                         <p className="text-sm font-medium">Selected Add-Ons:</p>
-                        {selectedAddOns.map(addonId => {
-                          const option = yacht.customization_options?.find(o => o.product_id === addonId);
-                          return option ? (
-                            <div key={addonId} className="flex justify-between text-sm">
-                              <span>{option.name}</span>
-                              <span>+${option.price}</span>
-                            </div>
-                          ) : null;
-                        })}
+                        {selectedAddOns.map(addon => (
+                          <div key={addon.uniqueId} className="flex justify-between text-sm">
+                            <span>{addon.name}</span>
+                            <span>+${addon.price}</span>
+                          </div>
+                        ))}
                       </div>
                     )}
 
@@ -670,15 +676,12 @@ export default function YachtDetails() {
                     {selectedAddOns.length > 0 && (
                       <div className="pt-2 space-y-2 border-t">
                         <p className="text-sm font-medium">Selected Add-Ons:</p>
-                        {selectedAddOns.map(addonId => {
-                          const option = yacht.customization_options?.find(o => o.product_id === addonId);
-                          return option ? (
-                            <div key={addonId} className="flex justify-between text-sm">
-                              <span>{option.name}</span>
-                              <span>+${option.price}</span>
-                            </div>
-                          ) : null;
-                        })}
+                        {selectedAddOns.map(addon => (
+                          <div key={addon.uniqueId} className="flex justify-between text-sm">
+                            <span>{addon.name}</span>
+                            <span>+${addon.price}</span>
+                          </div>
+                        ))}
                       </div>
                     )}
 
