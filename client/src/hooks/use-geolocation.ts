@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { getFunctions, httpsCallable } from "firebase/functions";
 import { useToast } from "./use-toast";
+import { reverseGeocode } from "@/functions/reverseGeocode";
 
 interface GeolocationState {
   location: {
@@ -12,10 +12,6 @@ interface GeolocationState {
   isLoading: boolean;
 }
 
-interface ReverseGeocodeResponse {
-  address: string | null;
-}
-
 export function useGeolocation() {
   const [state, setState] = useState<GeolocationState>({
     location: null,
@@ -24,11 +20,6 @@ export function useGeolocation() {
   });
 
   const { toast } = useToast();
-  const functions = getFunctions();
-  const reverseGeocode = httpsCallable<{ latitude: number; longitude: number }, ReverseGeocodeResponse>(
-    functions, 
-    'reverseGeocode'
-  );
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -65,21 +56,12 @@ export function useGeolocation() {
           isLoading: true
         }));
 
-        // Format coordinates to 6 decimal places and ensure they're numbers
-        const formattedLat = Number(latitude.toFixed(6));
-        const formattedLng = Number(longitude.toFixed(6));
-
-        console.log("Calling reverseGeocode with coordinates:", { formattedLat, formattedLng });
-
-        // Then try to get the address
-        const result = await reverseGeocode({ 
-          latitude: formattedLat,
-          longitude: formattedLng
-        });
+        // Then try to get the address using our improved function
+        const result = await reverseGeocode(latitude, longitude);
 
         console.log("Reverse geocode result:", result);
 
-        const address = result.data.address;
+        const address = result.address;
         if (address) {
           setState(prev => ({
             location: {

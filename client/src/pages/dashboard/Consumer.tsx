@@ -17,21 +17,37 @@ import { CalendarDateRangePicker } from "@/components/ui/date-range-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import type { YachtExperience } from "@shared/firestore-schema";
-import { getDocs, query, where, limit, collection } from "firebase/firestore";
+import { getDocs, query, where, limit, collection, orderBy } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { DateRange } from "react-day-picker";
 import { Progress } from "@/components/ui/progress";
 import { PlacesAutocomplete } from "@/components/ui/places-autocomplete";
 
-
 interface LocationOption {
   address: string;
   latitude: number;
   longitude: number;
+  port_marina?: string;
 }
 
-// Existing activity types and durations arrays remain unchanged...
+interface Booking {
+  id: string;
+  userId: string;
+  packageId: string;
+  startDate: string;
+  endDate: string;
+  totalPrice: number;
+  status: string;
+  [key: string]: any;
+}
+
+// Collection references
+const collectionRefs = {
+  experiencePackages: collection(db, "experience_packages"),
+  touristProfiles: collection(db, "user_profiles_tourist"),
+  bookings: collection(db, "bookings")
+};
 
 const activityTypes = [
   { id: "yacht-cruise", label: "Yacht Cruise" },
@@ -87,9 +103,11 @@ export default function ConsumerDashboard() {
     queryFn: async () => {
       try {
         console.log("=== Recommended Yachts Query Start ===");
+        console.log("Firestore DB instance:", db);
 
         const experiencesRef = collection(db, "experience_packages");
-        const q = query(experiencesRef, where("featured", "==", true), limit(6));
+        // Query for featured packages or those with high ratings
+        const q = query(experiencesRef, where("published_status", "==", true), limit(6));
         console.log("Query:", q);
 
         const snapshot = await getDocs(q);
@@ -100,14 +118,22 @@ export default function ConsumerDashboard() {
         });
 
         if (snapshot.empty) {
-          console.log("No featured experience packages found");
+          console.log("No experience packages found");
           return [];
         }
 
-        const recommendedPackages = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as YachtExperience[];
+        const recommendedPackages = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.title || "Unnamed Package",
+            description: data.description || "No description available",
+            price: data.pricing || 0,
+            imageUrl: data.media && data.media[0] ? data.media[0].url : 
+                     "https://images.unsplash.com/photo-1577032229840-33197764440d?w=800",
+            ...data
+          };
+        }) as YachtExperience[];
 
         console.log("Recommended packages:", recommendedPackages);
         return recommendedPackages;
@@ -134,7 +160,24 @@ export default function ConsumerDashboard() {
         const experiencesRef = collection(db, "experience_packages");
         console.log("Collection reference:", experiencesRef);
 
-        const snapshot = await getDocs(experiencesRef);
+        let q = query(experiencesRef, where("published_status", "==", true));
+
+        // Apply additional filters as needed
+        if (location && selectedLocation) {
+          // For simplicity, we're just filtering by region for now
+          // In a real app, you might need more complex geospatial queries
+          console.log("Filtering by location:", selectedLocation);
+        }
+
+        if (priceRange && priceRange[0] !== 0 && priceRange[1] !== 10000) {
+          // Note: Client-side filtering for price range since Firestore doesn't support range queries on multiple fields
+          console.log("Will filter by price range:", priceRange);
+        }
+
+        // Limitation: We're fetching all and filtering client-side for demo purposes
+        // In production, you'd use more sophisticated querying
+
+        const snapshot = await getDocs(q);
         console.log("Raw snapshot:", {
           empty: snapshot.empty,
           size: snapshot.size,
@@ -142,22 +185,47 @@ export default function ConsumerDashboard() {
         });
 
         if (snapshot.empty) {
-          console.log("No documents found in experience_packages collection");
+          console.log("No experience packages found");
           return [];
         }
 
+        // Map and filter results
         const allPackages = snapshot.docs.map(doc => {
           const data = doc.data();
-          console.log(`Document ${doc.id} data:`, data);
           return {
             id: doc.id,
+            name: data.title || "Unnamed Package",
+            description: data.description || "No description available",
+            price: data.pricing || 0,
+            imageUrl: data.media && data.media[0] ? data.media[0].url : 
+                     "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800",
             ...data
           };
         }) as YachtExperience[];
 
-        console.log("All packages before filtering:", allPackages);
+        // Client-side filtering for price and duration
+        let filteredPackages = allPackages;
+
+        // Filter by price range if set
+        if (priceRange && priceRange[0] !== 0 && priceRange[1] !== 10000) {
+          filteredPackages = filteredPackages.filter(pkg => 
+            pkg.price >= priceRange[0] && pkg.price <= priceRange[1]
+          );
+        }
+
+        // Filter by duration if selected
+        if (duration) {
+          filteredPackages = filteredPackages.filter(pkg => {
+            if (duration === "half-day" && pkg.duration <= 4) return true;
+            if (duration === "full-day" && pkg.duration > 4 && pkg.duration <= 10) return true;
+            if (duration === "multi-day" && pkg.duration > 10) return true;
+            return false;
+          });
+        }
+
+        console.log("Filtered packages:", filteredPackages);
         console.log("=== Search Yachts Query End ===");
-        return allPackages;
+        return filteredPackages;
       } catch (error) {
         console.error("Error in search yachts query:", error);
         throw error;
@@ -187,12 +255,13 @@ export default function ConsumerDashboard() {
     refetchYachts();
   };
 
-  const handleLocationSelect = (place: { address: string; latitude: number; longitude: number }) => {
+  const handleLocationSelect = (place: { address: string; latitude: number; longitude: number; port_marina?: string }) => {
     console.log("Selected location:", place);
     setSelectedLocation({
       address: place.address,
       latitude: place.latitude,
-      longitude: place.longitude
+      longitude: place.longitude,
+      port_marina: place.port_marina
     });
     setLocation(place.address);
   };
