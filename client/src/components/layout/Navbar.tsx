@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu } from "lucide-react";
@@ -8,14 +8,18 @@ import { useToast } from "@/hooks/use-toast";
 
 export function Navbar() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const handleLogout = async () => {
     try {
       await auth.signOut();
+      // Add toast notification
       toast({
         title: "Logged out successfully",
         duration: 2000,
       });
+      // Redirect to login page after successful logout
+      setLocation("/login");
     } catch (error) {
       console.error("Logout error:", error);
       toast({
