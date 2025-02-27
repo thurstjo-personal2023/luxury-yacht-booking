@@ -6,12 +6,16 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+// Define a module declaration for react-pannellum
+declare module 'react-pannellum';
+
 interface Hotspot {
   id: string;
   pitch: number;
   yaw: number;
   text: string;
-  type: "info";
+  type: "info" | "scene";
+  sceneId?: string;
 }
 
 interface Scene {
@@ -105,7 +109,15 @@ export function VirtualTourViewer({
   // Handle hotspot clicks
   const handleHotspotClick = (evt: any, hotSpotDiv: any, hotSpot: any) => {
     console.log("Hotspot clicked:", hotSpot);
-    // We could implement scene transitions or info displays here
+
+    // Check if it's a scene navigation hotspot
+    if (hotSpot.type === "scene" && hotSpot.sceneId) {
+      const sceneIndex = scenes.findIndex(scene => scene.id === hotSpot.sceneId);
+      if (sceneIndex !== -1) {
+        setCurrentSceneIndex(sceneIndex);
+        setIsLoading(true);
+      }
+    }
   };
 
   return (
@@ -130,12 +142,10 @@ export function VirtualTourViewer({
           image={currentScene.imageUrl}
           pitch={0}
           yaw={0}
-          hfov={110}
-          autoLoad
+          // Remove duplicate hfov and autoLoad props that are already in config
           onLoad={() => setIsLoading(false)}
-          onError={(err) => console.error("Pannellum error:", err)}
+          onError={(err: any) => console.error("Pannellum error:", err)}
           {...config}
-          hotspotDebug={false}
           onScenechange={handleHotspotClick}
         />
       ) : (
@@ -156,13 +166,13 @@ export function VirtualTourViewer({
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            
+
             {scenes.length > 1 && (
               <Badge variant="outline" className="px-2 py-1">
                 {currentSceneIndex + 1} / {scenes.length}
               </Badge>
             )}
-            
+
             <Button 
               variant="outline" 
               size="icon" 
@@ -171,7 +181,7 @@ export function VirtualTourViewer({
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-            
+
             <Button 
               variant="outline" 
               size="icon" 
