@@ -68,9 +68,32 @@ const addPannellumStyles = () => {
       bottom: 0 !important;
     }
     
+    /* Fix for the canvas element inside Pannellum */
+    .pnlm-render-container {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    
+    /* Ensure the panorama itself (canvas) is properly sized */
+    .pnlm-render-container canvas {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+    }
+    
     /* Ensure all Pannellum controls and UI elements have proper z-index */
     .pnlm-ui {
       z-index: 10 !important;
+    }
+    
+    /* Make sure hotspots are visible */
+    .pnlm-hotspot {
+      z-index: 11 !important;
+    }
+    
+    /* Make sure controls are visible and properly positioned */
+    .pnlm-controls-container {
+      z-index: 12 !important;
     }
   `;
   document.head.appendChild(style);
@@ -138,34 +161,50 @@ export function VirtualTourViewer({
     })) || [];
 
     try {
-      // Configure and initialize the viewer
-      const viewer = window.pannellum.viewer(panoramaRef.current, {
-        type: "equirectangular",
-        panorama: currentScene.imageUrl,
-        autoLoad: true,
-        showZoomCtrl: true,
-        showFullscreenCtrl: false,
-        hotSpots: formattedHotspots,
-        compass: true,
-        hfov: 120,
-        minHfov: 50,
-        maxHfov: 150,
-        hotSpotDebug: false,
-        ...(currentScene.initialViewParameters || {}),
+      // Ensure the parent container has proper styling before initialization
+      if (panoramaRef.current) {
+        panoramaRef.current.style.width = "100%";
+        panoramaRef.current.style.height = "100%";
+        panoramaRef.current.style.position = "relative";
+        panoramaRef.current.style.overflow = "hidden";
+      }
 
-        // Event handlers
-        onLoad: () => {
-          setIsLoading(false);
-        },
-
-        // Handle errors
-        onerror: (err: any) => {
-          console.error('Pannellum error:', err);
+      // Configure and initialize the viewer with a small delay to ensure the DOM is ready
+      setTimeout(() => {
+        try {
+          const viewer = window.pannellum.viewer(panoramaRef.current, {
+            type: "equirectangular",
+            panorama: currentScene.imageUrl,
+            autoLoad: true,
+            showZoomCtrl: true,
+            showFullscreenCtrl: false,
+            hotSpots: formattedHotspots,
+            compass: true,
+            hfov: 120,
+            minHfov: 50,
+            maxHfov: 150,
+            hotSpotDebug: false,
+            ...(currentScene.initialViewParameters || {}),
+  
+            // Event handlers
+            onLoad: () => {
+              console.log("Pannellum viewer loaded successfully");
+              setIsLoading(false);
+            },
+  
+            // Handle errors
+            onerror: (err: any) => {
+              console.error('Pannellum error:', err);
+              setIsLoading(false);
+            }
+          });
+  
+          viewerInstanceRef.current = viewer;
+        } catch (innerError) {
+          console.error("Error during Pannellum initialization:", innerError);
           setIsLoading(false);
         }
-      });
-
-      viewerInstanceRef.current = viewer;
+      }, 100); // Small delay to ensure DOM is ready
     } catch (error) {
       console.error("Error initializing Pannellum viewer:", error);
       setIsLoading(false);
@@ -239,8 +278,12 @@ export function VirtualTourViewer({
           style={{ 
             background: "#000",
             position: "relative",
-            overflow: "hidden"
+            overflow: "hidden",
+            // Added !important flag to ensure these styles take precedence
+            width: "100% !important",
+            height: isFullscreen ? "100vh !important" : `${height} !important`
           }}
+          data-test-id="panorama-container" // For debugging purposes
         />
       ) : (
         <div className="flex items-center justify-center h-full bg-muted">
