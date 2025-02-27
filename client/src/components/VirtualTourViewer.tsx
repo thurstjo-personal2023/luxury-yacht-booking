@@ -7,6 +7,9 @@ import { Badge } from "@/components/ui/badge";
 
 // Import Pannellum directly, not through react-pannellum
 import "pannellum";
+// We also need to import the CSS directly to ensure it's loaded
+import "pannellum/build/pannellum.css";
+
 // Use window.pannellum since the library attaches itself to the window object
 declare global {
   interface Window {
@@ -44,6 +47,35 @@ interface VirtualTourViewerProps {
   className?: string;
 }
 
+// Add global CSS to ensure Pannellum viewer displays correctly
+// We use useEffect to add these styles dynamically to avoid conflicts
+const addPannellumStyles = () => {
+  // Check if style already exists
+  const styleId = 'pannellum-viewer-fixes';
+  if (document.getElementById(styleId)) return;
+
+  const style = document.createElement('style');
+  style.id = styleId;
+  style.innerHTML = `
+    /* Fix for Pannellum viewer container */
+    .pnlm-container {
+      width: 100% !important;
+      height: 100% !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+    }
+    
+    /* Ensure all Pannellum controls and UI elements have proper z-index */
+    .pnlm-ui {
+      z-index: 10 !important;
+    }
+  `;
+  document.head.appendChild(style);
+};
+
 export function VirtualTourViewer({
   scenes,
   initialSceneId,
@@ -58,6 +90,11 @@ export function VirtualTourViewer({
   const panoramaRef = useRef<HTMLDivElement>(null);
   const viewerInstanceRef = useRef<any>(null); // Use ref instead of state for the viewer instance
 
+  // Add Pannellum CSS fixes on component mount
+  useEffect(() => {
+    addPannellumStyles();
+  }, []);
+  
   // Set initial scene if provided
   useEffect(() => {
     if (initialSceneId && scenes.length > 0) {
@@ -199,7 +236,11 @@ export function VirtualTourViewer({
         <div 
           ref={panoramaRef} 
           className="w-full h-full"
-          style={{ background: "#000" }}
+          style={{ 
+            background: "#000",
+            position: "relative",
+            overflow: "hidden"
+          }}
         />
       ) : (
         <div className="flex items-center justify-center h-full bg-muted">
