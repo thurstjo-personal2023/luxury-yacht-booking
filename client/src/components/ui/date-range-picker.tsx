@@ -18,6 +18,7 @@ interface CalendarDateRangePickerProps {
   date: DateRange | undefined;
   setDate?: (date: DateRange | undefined) => void;
   onDateRangeChange?: (date: DateRange | undefined) => void; // Add this prop as an alternative
+  onDateChange?: (date: Date) => boolean; // For disabling specific dates
 }
 
 export function CalendarDateRangePicker({
@@ -25,6 +26,7 @@ export function CalendarDateRangePicker({
   date,
   setDate,
   onDateRangeChange,
+  onDateChange,
 }: CalendarDateRangePickerProps) {
   // Handle date changes using either prop
   const handleDateChange = (newDate: DateRange | undefined) => {
@@ -68,7 +70,7 @@ export function CalendarDateRangePicker({
             onSelect={handleDateChange}
             numberOfMonths={2}
             disabled={(date) =>
-              date < new Date() || date > addDays(new Date(), 90)
+              onDateChange ? onDateChange(date) : date < new Date() || date > addDays(new Date(), 90)
             }
           />
         </PopoverContent>
