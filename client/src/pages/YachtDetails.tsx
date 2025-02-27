@@ -336,7 +336,7 @@ export default function YachtDetails() {
     {
       id: "deck",
       title: "Yacht Main Deck",
-      imageUrl: "https://raw.githubusercontent.com/fariskassim/notreal/main/360-1.jpg",
+      imageUrl: "https://pannellum.org/images/alma.jpg",
       hotspots: [
         {
           id: "info-1",
@@ -363,7 +363,7 @@ export default function YachtDetails() {
     {
       id: "cabin",
       title: "Luxury Cabin",
-      imageUrl: "https://raw.githubusercontent.com/fariskassim/notreal/main/360-2.jpg",
+      imageUrl: "https://pannellum.org/images/bma-1.jpg",
       hotspots: [
         {
           id: "info-2",
@@ -390,7 +390,7 @@ export default function YachtDetails() {
     {
       id: "lounge",
       title: "VIP Lounge Area",
-      imageUrl: "https://pannellum.org/images/alma.jpg",
+      imageUrl: "https://pannellum.org/images/cerro-toco-0.jpg",
       hotspots: [
         {
           id: "info-3",
@@ -819,9 +819,7 @@ export default function YachtDetails() {
                         <div className="text-xl font-bold text-primary">${totalPrice}/day</div>
                       </div>
                     )}
-
                     <Separator />
-
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Select Dates</label>
                       <CalendarDateRangePicker 

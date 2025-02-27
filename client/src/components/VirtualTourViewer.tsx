@@ -56,7 +56,7 @@ export function VirtualTourViewer({
   const [isLoading, setIsLoading] = useState(true);
   const viewerRef = useRef<HTMLDivElement>(null);
   const panoramaRef = useRef<HTMLDivElement>(null);
-  const [viewerInstance, setViewerInstance] = useState<any>(null);
+  const viewerInstanceRef = useRef<any>(null); // Use ref instead of state for the viewer instance
 
   // Set initial scene if provided
   useEffect(() => {
@@ -75,8 +75,9 @@ export function VirtualTourViewer({
     setIsLoading(true);
 
     // Clear previous panorama if it exists
-    if (viewerInstance) {
-      viewerInstance.destroy();
+    if (viewerInstanceRef.current) {
+      viewerInstanceRef.current.destroy();
+      viewerInstanceRef.current = null;
     }
 
     const currentScene = scenes[currentSceneIndex];
@@ -99,39 +100,45 @@ export function VirtualTourViewer({
       }
     })) || [];
 
-    // Configure and initialize the viewer
-    const viewer = window.pannellum.viewer(panoramaRef.current, {
-      type: "equirectangular",
-      panorama: currentScene.imageUrl,
-      autoLoad: true,
-      showZoomCtrl: true,
-      showFullscreenCtrl: false,
-      hotSpots: formattedHotspots,
-      compass: true,
-      hfov: 120,
-      minHfov: 50,
-      maxHfov: 150,
-      hotSpotDebug: false,
-      ...currentScene.initialViewParameters,
+    try {
+      // Configure and initialize the viewer
+      const viewer = window.pannellum.viewer(panoramaRef.current, {
+        type: "equirectangular",
+        panorama: currentScene.imageUrl,
+        autoLoad: true,
+        showZoomCtrl: true,
+        showFullscreenCtrl: false,
+        hotSpots: formattedHotspots,
+        compass: true,
+        hfov: 120,
+        minHfov: 50,
+        maxHfov: 150,
+        hotSpotDebug: false,
+        ...(currentScene.initialViewParameters || {}),
 
-      // Event handlers
-      onLoad: () => {
-        setIsLoading(false);
-      },
+        // Event handlers
+        onLoad: () => {
+          setIsLoading(false);
+        },
 
-      // Handle errors
-      onerror: (err: any) => {
-        console.error('Pannellum error:', err);
-        setIsLoading(false);
-      }
-    });
+        // Handle errors
+        onerror: (err: any) => {
+          console.error('Pannellum error:', err);
+          setIsLoading(false);
+        }
+      });
 
-    setViewerInstance(viewer);
+      viewerInstanceRef.current = viewer;
+    } catch (error) {
+      console.error("Error initializing Pannellum viewer:", error);
+      setIsLoading(false);
+    }
 
     // Cleanup on unmount
     return () => {
-      if (viewer) {
-        viewer.destroy();
+      if (viewerInstanceRef.current) {
+        viewerInstanceRef.current.destroy();
+        viewerInstanceRef.current = null;
       }
     };
   }, [currentSceneIndex, scenes]);
