@@ -343,14 +343,14 @@ export default function YachtDetails() {
           pitch: -10,
           yaw: 20,
           text: "Spacious sundeck with lounge area",
-          type: "info"
+          type: "info" as const
         },
         {
           id: "scene-to-cabin",
           pitch: -20,
           yaw: 180,
           text: "Go to Cabin",
-          type: "scene",
+          type: "scene" as const,
           sceneId: "cabin"
         }
       ]
@@ -365,14 +365,14 @@ export default function YachtDetails() {
           pitch: 0,
           yaw: 40,
           text: "Queen-size bed with premium linens",
-          type: "info"
+          type: "info" as const
         },
         {
           id: "scene-to-deck",
           pitch: 0,
           yaw: -120,
           text: "Return to Main Deck",
-          type: "scene",
+          type: "scene" as const,
           sceneId: "deck"
         }
       ]
@@ -798,7 +798,7 @@ export default function YachtDetails() {
                 <CardFooter>
                   <Button 
                     className="w-full" 
-                                        size="lg"
+                    size="lg"
                     onClick={handleBooking}
                     disabled={!yacht.availability_status}
                   >
