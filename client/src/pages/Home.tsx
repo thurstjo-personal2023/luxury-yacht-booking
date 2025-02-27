@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
 import type { Yacht } from "@shared/schema";
+import { YachtCarousel } from "@/components/YachtCarousel";
 
 export default function Home() {
   const [user] = useAuthState(auth);
@@ -131,42 +132,13 @@ export default function Home() {
           </Card>
         </div>
 
-        {/* Featured Yachts Section */}
-        <section className="mt-16">
-          {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <Card key={i} className="w-full">
-                  <CardContent className="p-4">
-                    <div className="h-48 bg-muted animate-pulse rounded-lg mb-4" />
-                    <div className="h-6 bg-muted animate-pulse rounded mb-2" />
-                    <div className="h-4 bg-muted animate-pulse rounded w-2/3" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {featuredYachts?.map((yacht) => (
-                <Link key={yacht.id} href={`/yacht/${yacht.id}`}>
-                  <Card className="w-full hover:shadow-lg transition-shadow">
-                    <CardContent className="p-4">
-                      <img
-                        src={yacht.imageUrl}
-                        alt={yacht.name}
-                        className="w-full h-48 object-cover rounded-lg mb-4"
-                      />
-                      <h3 className="font-semibold mb-2">{yacht.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        From ${yacht.price}/day
-                      </p>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
+        {/* Featured Yachts Section - Now using YachtCarousel */}
+        <YachtCarousel 
+          yachts={featuredYachts} 
+          isLoading={isLoading} 
+          title="Featured Luxury Yachts"
+          description="Discover our most exclusive and sought-after yacht experiences"
+        />
       </div>
     </div>
   );
