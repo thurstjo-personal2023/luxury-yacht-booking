@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useRoute } from "wouter";
-import { doc, getDoc } from "firebase/firestore";
+import { useRoute, Link } from "wouter";
+import { doc, getDoc, collection, query, where, getDocs, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -19,9 +19,27 @@ import { useToast } from "@/hooks/use-toast";
 import { DateRange } from "react-day-picker";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Anchor, Users, Clock, Map, CalendarRange, Star, Check, ExternalLink } from "lucide-react";
-import { Link } from "wouter";
+import { ArrowLeft, Anchor, Users, Clock, Map, CalendarRange, Star, Check, ExternalLink, Play, X } from "lucide-react";
 import type { YachtExperience } from "@shared/firestore-schema";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+
+// Add-on type
+interface AddOn {
+  id: string;
+  product_id: string;
+  name: string;
+  description: string;
+  category: string;
+  pricing: number;
+  media?: {
+    type: string;
+    url: string;
+  }[];
+  availability: boolean;
+  tags: string[];
+}
 
 export default function YachtDetails() {
   const [, params] = useRoute("/yacht/:id");
@@ -30,7 +48,11 @@ export default function YachtDetails() {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [relatedYachts, setRelatedYachts] = useState<YachtExperience[]>([]);
+  const [addOns, setAddOns] = useState<AddOn[]>([]);
+  const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
+  const [totalPrice, setTotalPrice] = useState<number>(0);
   const { toast } = useToast();
+  const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchYachtDetails() {
@@ -42,15 +64,99 @@ export default function YachtDetails() {
         const yachtDoc = await getDoc(yachtRef);
 
         if (yachtDoc.exists()) {
-          setYacht({ id: yachtDoc.id, ...yachtDoc.data() } as YachtExperience);
+          const yachtData = { id: yachtDoc.id, ...yachtDoc.data() } as YachtExperience;
+          setYacht(yachtData);
+
+          // Set initial total price
+          setTotalPrice(yachtData.pricing || 0);
+
+          // Fetch add-ons if any customization options are present
+          if (yachtData.customization_options && yachtData.customization_options.length > 0) {
+            const productIds = yachtData.customization_options.map(option => option.product_id);
+
+            try {
+              const addOnsRef = collection(db, "products_add_ons");
+              const q = query(addOnsRef, where("product_id", "in", productIds));
+              const addOnsSnapshot = await getDocs(q);
+
+              if (!addOnsSnapshot.empty) {
+                const addOnsData = addOnsSnapshot.docs.map(doc => ({
+                  id: doc.id,
+                  ...doc.data()
+                })) as AddOn[];
+                setAddOns(addOnsData);
+              }
+            } catch (error) {
+              console.error("Error fetching add-ons:", error);
+            }
+          }
 
           // Fetch related yachts
-          // TODO: Implement a more sophisticated recommendation algorithm
-          // For now, just fetch packages with the same category or region
-          const data = yachtDoc.data();
-          if (data) {
-            // We'll implement this in a future iteration
-            setRelatedYachts([]);
+          try {
+            const experiencesRef = collection(db, "experience_packages");
+            let relatedQuery;
+
+            // First try to find yachts in the same category
+            if (yachtData.category) {
+              relatedQuery = query(
+                experiencesRef, 
+                where("category", "==", yachtData.category),
+                where("id", "!=", yachtId),
+                limit(3)
+              );
+            } else if (yachtData.location && yachtData.location.address) {
+              // If no category, try to find yachts in the same region
+              const regionTerms = ["Dubai", "Abu Dhabi"];
+              let region = "";
+
+              for (const term of regionTerms) {
+                if (yachtData.location.address.includes(term)) {
+                  region = term;
+                  break;
+                }
+              }
+
+              if (region) {
+                relatedQuery = query(
+                  experiencesRef,
+                  where("location.address", "array-contains", region),
+                  where("id", "!=", yachtId),
+                  limit(3)
+                );
+              }
+            }
+
+            if (relatedQuery) {
+              const relatedSnapshot = await getDocs(relatedQuery);
+              if (!relatedSnapshot.empty) {
+                const relatedData = relatedSnapshot.docs.map(doc => ({
+                  id: doc.id,
+                  ...doc.data()
+                })) as YachtExperience[];
+                setRelatedYachts(relatedData);
+              }
+            }
+
+            // If no related yachts found by category or location, get random ones
+            if (!relatedYachts.length) {
+              const randomQuery = query(
+                experiencesRef,
+                where("published_status", "==", true),
+                where("id", "!=", yachtId),
+                limit(3)
+              );
+
+              const randomSnapshot = await getDocs(randomQuery);
+              if (!randomSnapshot.empty) {
+                const randomData = randomSnapshot.docs.map(doc => ({
+                  id: doc.id,
+                  ...doc.data()
+                })) as YachtExperience[];
+                setRelatedYachts(randomData);
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching related yachts:", error);
           }
         } else {
           toast({
@@ -74,6 +180,24 @@ export default function YachtDetails() {
     fetchYachtDetails();
   }, [yachtId, toast]);
 
+  // Calculate total price based on base price and selected add-ons
+  useEffect(() => {
+    if (!yacht) return;
+
+    let price = yacht.pricing || 0;
+
+    // Add prices for selected add-ons
+    if (yacht.customization_options && selectedAddOns.length > 0) {
+      yacht.customization_options.forEach(option => {
+        if (selectedAddOns.includes(option.product_id)) {
+          price += option.price;
+        }
+      });
+    }
+
+    setTotalPrice(price);
+  }, [yacht, selectedAddOns]);
+
   const handleBooking = () => {
     if (!dateRange?.from || !dateRange?.to) {
       toast({
@@ -84,13 +208,25 @@ export default function YachtDetails() {
       return;
     }
 
+    // Calculate number of days
+    const days = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
+    const grandTotal = totalPrice * days;
+
     toast({
       title: "Booking initiated",
-      description: "Your booking request has been received. Redirecting to checkout...",
+      description: `Your booking total is $${grandTotal} for ${days} days. Redirecting to checkout...`,
     });
 
     // In a real app, you would redirect to a checkout page
     // or open a booking modal with additional options
+  };
+
+  const handleAddOnToggle = (productId: string) => {
+    setSelectedAddOns(current => 
+      current.includes(productId)
+        ? current.filter(id => id !== productId)
+        : [...current, productId]
+    );
   };
 
   // Helper function to ensure tags are in array format
@@ -107,6 +243,34 @@ export default function YachtDetails() {
     }
 
     return [];
+  };
+
+  // Helper function to determine if a date should be disabled in the calendar
+  const isDateDisabled = (date: Date) => {
+    // If availability_status is false, disable all dates
+    if (yacht && !yacht.availability_status) {
+      return true;
+    }
+
+    // Ensure dates in the past are disabled
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (date < today) {
+      return true;
+    }
+
+    // If we had a more sophisticated availability system, we would check against
+    // specific booked dates here. For now, just prevent dates > 90 days out
+    const ninetyDaysFromNow = new Date();
+    ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+    if (date > ninetyDaysFromNow) {
+      return true;
+    }
+
+    // Custom blocked dates could be added here from yacht.blocked_dates
+
+    // Date is available
+    return false;
   };
 
   if (loading) {
@@ -158,19 +322,48 @@ export default function YachtDetails() {
           </Button>
         </Link>
 
-        {/* Image Gallery */}
+        {/* Image & Video Gallery */}
         <div className="mb-8">
           <Carousel className="w-full">
             <CarouselContent>
               {yacht.media && yacht.media.length > 0 ? (
                 yacht.media.map((item, index) => (
                   <CarouselItem key={index} className="basis-full">
-                    <div className="relative h-[400px] w-full overflow-hidden rounded-lg">
-                      <img 
-                        src={item.url} 
-                        alt={`${yacht.title} - Photo ${index + 1}`}
-                        className="h-full w-full object-cover"
-                      />
+                    <div className="relative h-[400px] w-full overflow-hidden rounded-lg group">
+                      {item.type === "video" ? (
+                        <>
+                          <img 
+                            src={yacht.media?.find(m => m.type === "image")?.url || item.url} 
+                            alt={`${yacht.title} - Video thumbnail`}
+                            className="h-full w-full object-cover brightness-75"
+                          />
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button 
+                                className="absolute inset-0 m-auto h-16 w-16 rounded-full bg-black/30 backdrop-blur-sm hover:bg-black/50 transition-all group-hover:scale-110"
+                                variant="ghost"
+                              >
+                                <Play className="h-8 w-8 text-white" fill="white" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-3xl p-0 bg-black">
+                              <div className="relative pt-[56.25%]">
+                                <iframe
+                                  src={item.url}
+                                  className="absolute top-0 left-0 w-full h-full"
+                                  allowFullScreen
+                                ></iframe>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </>
+                      ) : (
+                        <img 
+                          src={item.url} 
+                          alt={`${yacht.title} - Photo ${index + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+                      )}
                     </div>
                   </CarouselItem>
                 ))
@@ -196,7 +389,7 @@ export default function YachtDetails() {
                 <Star className="h-5 w-5 text-yellow-500 mr-1" fill="currentColor" />
                 <span className="font-medium">
                   {yacht.reviews && yacht.reviews.length > 0
-                    ? (yacht.reviews.reduce((sum, review) => sum + review.rating, 0) / yacht.reviews.length).toFixed(1)
+                    ? (yacht.reviews.reduce((review: any) => review.rating, 0) / yacht.reviews.length).toFixed(1)
                     : "New"}
                 </span>
               </div>
@@ -239,44 +432,147 @@ export default function YachtDetails() {
             <Tabs defaultValue="description" className="mb-8">
               <TabsList>
                 <TabsTrigger value="description">Description</TabsTrigger>
-                <TabsTrigger value="features">Features</TabsTrigger>
-                <TabsTrigger value="customization">Customization</TabsTrigger>
+                <TabsTrigger value="features">Features & Add-Ons</TabsTrigger>
+                <TabsTrigger value="location">Location</TabsTrigger>
               </TabsList>
+
               <TabsContent value="description" className="mt-4">
                 <div className="prose max-w-none">
-                  <p className="text-muted-foreground">{yacht.description}</p>
+                  <p className="text-muted-foreground whitespace-pre-line">{yacht.description}</p>
                 </div>
               </TabsContent>
+
               <TabsContent value="features" className="mt-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <h3 className="text-lg font-semibold mb-2">✅ Included Features</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-6">
                   {yacht.category && (
                     <div className="flex items-center">
                       <Check className="h-4 w-4 mr-2 text-primary" />
                       <span>{yacht.category}</span>
                     </div>
                   )}
-                  {/* You would typically map through a features array here */}
-                  {/* For now, let's display the tags as features */}
+
+                  {/* Display yacht type as a feature */}
+                  {yacht.yacht_type && (
+                    <div className="flex items-center">
+                      <Check className="h-4 w-4 mr-2 text-primary" />
+                      <span>{yacht.yacht_type} Yacht</span>
+                    </div>
+                  )}
+
+                  {/* Display tags as features */}
                   {getTagsArray().map((tag, index) => (
                     <div key={index} className="flex items-center">
                       <Check className="h-4 w-4 mr-2 text-primary" />
                       <span>{tag}</span>
                     </div>
                   ))}
+
+                  {/* Display standard amenities */}
+                  <div className="flex items-center">
+                    <Check className="h-4 w-4 mr-2 text-primary" />
+                    <span>Professional Captain & Crew</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Check className="h-4 w-4 mr-2 text-primary" />
+                    <span>Fuel & Basic Refreshments</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Check className="h-4 w-4 mr-2 text-primary" />
+                    <span>Safety Equipment</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Check className="h-4 w-4 mr-2 text-primary" />
+                    <span>Towels & Basic Amenities</span>
+                  </div>
                 </div>
-              </TabsContent>
-              <TabsContent value="customization" className="mt-4">
+
+                {/* Optional Add-Ons */}
+                <h3 className="text-lg font-semibold mb-2">✅ Optional Add-Ons</h3>
                 {yacht.customization_options && yacht.customization_options.length > 0 ? (
-                  <div className="space-y-2">
-                    {yacht.customization_options.map((option, index) => (
-                      <div key={index} className="flex justify-between items-center p-2 bg-muted/30 rounded">
-                        <span>{option.name}</span>
-                        <span className="font-semibold">${option.price}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    {yacht.customization_options.map((option, index) => {
+                      // Find matching detailed add-on if available
+                      const addOnDetails = addOns.find(addOn => addOn.product_id === option.product_id);
+
+                      return (
+                        <div key={index} className="flex items-start p-3 border rounded-lg">
+                          <Checkbox 
+                            id={`addon-${option.product_id}`}
+                            checked={selectedAddOns.includes(option.product_id)}
+                            onCheckedChange={() => handleAddOnToggle(option.product_id)}
+                            className="mt-1 mr-3"
+                          />
+                          <div className="flex-1">
+                            <label 
+                              htmlFor={`addon-${option.product_id}`}
+                              className="font-medium cursor-pointer"
+                            >
+                              {option.name}
+                              <span className="ml-2 font-bold text-primary">+${option.price}</span>
+                            </label>
+                            {addOnDetails && (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {addOnDetails.description || "Enhance your experience with this premium add-on."}
+                              </p>
+                            )}
+                          </div>
+                          {addOnDetails?.media && addOnDetails.media.length > 0 && (
+                            <div className="w-16 h-16 rounded overflow-hidden ml-2 flex-shrink-0">
+                              <img 
+                                src={addOnDetails.media[0].url} 
+                                alt={option.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-muted-foreground">No customization options available for this package.</p>
+                )}
+              </TabsContent>
+
+              <TabsContent value="location" className="mt-4">
+                {yacht.location && (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-muted/30 rounded-lg">
+                      <h3 className="font-semibold mb-2">Departure Location</h3>
+                      <p className="text-muted-foreground mb-2">{yacht.location.address}</p>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        {yacht.location.port_marina && <span className="font-medium">Port/Marina: </span>}
+                        {yacht.location.port_marina || ""}
+                      </p>
+
+                      {yacht.location.latitude && yacht.location.longitude && (
+                        <a 
+                          href={`https://www.google.com/maps/search/?api=1&query=${yacht.location.latitude},${yacht.location.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center text-primary hover:underline"
+                        >
+                          View on Google Maps
+                          <ExternalLink className="ml-1 h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Google Maps Preview */}
+                    {yacht.location.latitude && yacht.location.longitude && (
+                      <div className="rounded-lg overflow-hidden h-[300px] bg-muted">
+                        <img 
+                          src={`https://maps.googleapis.com/maps/api/staticmap?center=${yacht.location.latitude},${yacht.location.longitude}&zoom=14&size=800x300&markers=color:red%7C${yacht.location.latitude},${yacht.location.longitude}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`}
+                          alt="Map location"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = "https://placehold.co/800x300/e6e6e6/929292?text=Location+Map+Preview";
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
                 )}
               </TabsContent>
             </Tabs>
@@ -290,15 +586,38 @@ export default function YachtDetails() {
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Price</span>
-                      <div className="text-2xl font-bold">${yacht.pricing}</div>
+                      <span className="text-muted-foreground">Base Price</span>
+                      <div className="text-2xl font-bold">${yacht.pricing}/day</div>
                     </div>
 
-                    <div className="space-y-2">
+                    {selectedAddOns.length > 0 && (
+                      <div className="pt-2 space-y-2 border-t">
+                        <p className="text-sm font-medium">Selected Add-Ons:</p>
+                        {selectedAddOns.map(addonId => {
+                          const option = yacht.customization_options?.find(o => o.product_id === addonId);
+                          return option ? (
+                            <div key={addonId} className="flex justify-between text-sm">
+                              <span>{option.name}</span>
+                              <span>+${option.price}</span>
+                            </div>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
+
+                    {selectedAddOns.length > 0 && (
+                      <div className="flex justify-between items-center pt-2 border-t">
+                        <span className="font-medium">Total Price</span>
+                        <div className="text-xl font-bold text-primary">${totalPrice}/day</div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2 pt-4">
                       <label className="text-sm font-medium">Select Dates</label>
                       <CalendarDateRangePicker 
                         date={dateRange}
                         onDateRangeChange={setDateRange} 
+                        onDateChange={isDateDisabled}
                       />
                     </div>
                   </div>
@@ -315,33 +634,6 @@ export default function YachtDetails() {
                 </CardFooter>
               </Card>
             </div>
-
-            {/* Location */}
-            <div className="mb-8">
-              <h2 className="text-xl font-bold mb-4">Location</h2>
-              {yacht.location && (
-                <div className="rounded-lg overflow-hidden h-[300px] bg-muted">
-                  {/* In a real implementation, you would display a map here using Google Maps or similar */}
-                  <div className="h-full w-full flex items-center justify-center">
-                    <div className="text-center p-4">
-                      <p className="font-medium mb-2">{yacht.location.port_marina}</p>
-                      <p className="text-muted-foreground mb-4">{yacht.location.address}</p>
-                      <a 
-                        href={`https://www.google.com/maps/search/?api=1&query=${yacht.location.latitude},${yacht.location.longitude}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center text-primary hover:underline"
-                      >
-                        View on Google Maps
-                        <ExternalLink className="ml-1 h-3 w-3" />
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Reviews section could be added here */}
           </div>
 
           {/* Booking Widget - Desktop */}
@@ -354,14 +646,34 @@ export default function YachtDetails() {
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Price</span>
+                      <span className="text-muted-foreground">Base Price</span>
                       <div>
                         <span className="text-2xl font-bold">${yacht.pricing}</span>
-                        {yacht.pricing_model === "Variable" && 
-                          <span className="text-muted-foreground text-sm ml-1">starting from</span>
-                        }
+                        <span className="text-muted-foreground text-sm ml-1">/day</span>
                       </div>
                     </div>
+
+                    {selectedAddOns.length > 0 && (
+                      <div className="pt-2 space-y-2 border-t">
+                        <p className="text-sm font-medium">Selected Add-Ons:</p>
+                        {selectedAddOns.map(addonId => {
+                          const option = yacht.customization_options?.find(o => o.product_id === addonId);
+                          return option ? (
+                            <div key={addonId} className="flex justify-between text-sm">
+                              <span>{option.name}</span>
+                              <span>+${option.price}</span>
+                            </div>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
+
+                    {selectedAddOns.length > 0 && (
+                      <div className="flex justify-between items-center pt-2 border-t">
+                        <span className="font-medium">Total Price</span>
+                        <div className="text-xl font-bold text-primary">${totalPrice}/day</div>
+                      </div>
+                    )}
 
                     <Separator />
 
@@ -370,6 +682,7 @@ export default function YachtDetails() {
                       <CalendarDateRangePicker 
                         date={dateRange}
                         onDateRangeChange={setDateRange} 
+                        onDateChange={isDateDisabled}
                       />
                     </div>
                   </div>
