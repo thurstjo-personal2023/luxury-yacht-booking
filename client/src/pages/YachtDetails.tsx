@@ -73,6 +73,7 @@ export default function YachtDetails() {
           // Fetch add-ons if any customization options are present
           if (yachtData.customization_options && yachtData.customization_options.length > 0) {
             const productIds = yachtData.customization_options.map(option => option.product_id);
+            console.log("Product IDs to fetch:", productIds);
 
             try {
               const addOnsRef = collection(db, "products_add_ons");
@@ -84,6 +85,7 @@ export default function YachtDetails() {
                   id: doc.id,
                   ...doc.data()
                 })) as AddOn[];
+                console.log("Fetched add-ons:", addOnsData);
                 setAddOns(addOnsData);
               }
             } catch (error) {
@@ -195,6 +197,7 @@ export default function YachtDetails() {
       });
     }
 
+    console.log("Updated total price:", price, "Selected add-ons:", selectedAddOns);
     setTotalPrice(price);
   }, [yacht, selectedAddOns]);
 
@@ -223,11 +226,20 @@ export default function YachtDetails() {
 
   const handleAddOnToggle = (productId: string) => {
     console.log("Toggling add-on:", productId);
-    setSelectedAddOns(current => 
-      current.includes(productId)
-        ? current.filter(id => id !== productId)
-        : [...current, productId]
-    );
+    console.log("Current selected add-ons:", selectedAddOns);
+
+    setSelectedAddOns(current => {
+      // Check if this add-on is already selected
+      if (current.includes(productId)) {
+        // Remove it from the selection
+        console.log("Removing add-on:", productId);
+        return current.filter(id => id !== productId);
+      } else {
+        // Add it to the selection
+        console.log("Adding add-on:", productId);
+        return [...current, productId];
+      }
+    });
   };
 
   // Helper function to ensure tags are in array format
@@ -495,18 +507,19 @@ export default function YachtDetails() {
                     {yacht.customization_options.map((option, index) => {
                       // Find matching detailed add-on if available
                       const addOnDetails = addOns.find(addOn => addOn.product_id === option.product_id);
+                      const uniqueId = `addon-${option.product_id}-${index}`; // Create a unique ID for each option
 
                       return (
-                        <div key={index} className="flex items-start p-3 border rounded-lg">
+                        <div key={uniqueId} className="flex items-start p-3 border rounded-lg">
                           <Checkbox 
-                            id={`addon-${option.product_id}`}
+                            id={uniqueId}
                             checked={selectedAddOns.includes(option.product_id)}
                             onCheckedChange={() => handleAddOnToggle(option.product_id)}
                             className="mt-1 mr-3"
                           />
                           <div className="flex-1">
                             <label 
-                              htmlFor={`addon-${option.product_id}`}
+                              htmlFor={uniqueId}
                               className="font-medium cursor-pointer"
                             >
                               {option.name}
