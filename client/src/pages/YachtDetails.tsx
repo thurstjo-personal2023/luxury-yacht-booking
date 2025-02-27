@@ -222,6 +222,7 @@ export default function YachtDetails() {
   };
 
   const handleAddOnToggle = (productId: string) => {
+    console.log("Toggling add-on:", productId);
     setSelectedAddOns(current => 
       current.includes(productId)
         ? current.filter(id => id !== productId)
@@ -389,7 +390,7 @@ export default function YachtDetails() {
                 <Star className="h-5 w-5 text-yellow-500 mr-1" fill="currentColor" />
                 <span className="font-medium">
                   {yacht.reviews && yacht.reviews.length > 0
-                    ? (yacht.reviews.reduce((review: any) => review.rating, 0) / yacht.reviews.length).toFixed(1)
+                    ? (yacht.reviews.reduce((sum, review) => sum + review.rating, 0) / yacht.reviews.length).toFixed(1)
                     : "New"}
                 </span>
               </div>

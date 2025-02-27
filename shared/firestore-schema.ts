@@ -16,6 +16,7 @@ export interface Media {
 export interface CustomizationOption {
   name: string;
   price: number;
+  product_id: string;  // Added product_id property
 }
 
 export interface YachtExperience {
@@ -38,6 +39,7 @@ export interface YachtExperience {
   created_date: Timestamp;
   last_updated_date: Timestamp;
   published_status: boolean;
+  yacht_type?: string; // Added optional yacht_type field
 }
 
 export interface YachtProfile {
