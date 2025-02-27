@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { Pannellum } from "react-pannellum";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Maximize, Minimize, Info } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-// Define a module declaration for react-pannellum
-declare module 'react-pannellum';
+// Import Pannellum directly, not through react-pannellum
+import * as Pannellum from "pannellum";
 
 interface Hotspot {
   id: string;
@@ -22,7 +21,13 @@ interface Scene {
   id: string;
   title: string;
   imageUrl: string;
+  thumbnailUrl?: string;
   hotspots?: Hotspot[];
+  initialViewParameters?: {
+    pitch?: number;
+    yaw?: number;
+    hfov?: number;
+  };
 }
 
 interface VirtualTourViewerProps {
@@ -44,6 +49,8 @@ export function VirtualTourViewer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const viewerRef = useRef<HTMLDivElement>(null);
+  const panoramaRef = useRef<HTMLDivElement>(null);
+  const [viewerInstance, setViewerInstance] = useState<any>(null);
 
   // Set initial scene if provided
   useEffect(() => {
@@ -55,21 +62,73 @@ export function VirtualTourViewer({
     }
   }, [initialSceneId, scenes]);
 
-  const currentScene = scenes[currentSceneIndex];
+  // Initialize Pannellum viewer
+  useEffect(() => {
+    if (!panoramaRef.current || scenes.length === 0) return;
 
-  const config = {
-    autoLoad: true,
-    showZoomCtrl: true,
-    showFullscreenCtrl: false, // We'll handle fullscreen ourselves
-    showControls: true,
-    hotSpots: currentScene?.hotspots || [],
-    hotSpotDebug: false,
-    compass: true,
-    mouseZoom: true,
-    hfov: 120,
-    minHfov: 50,
-    maxHfov: 150,
-  };
+    setIsLoading(true);
+
+    // Clear previous panorama if it exists
+    if (viewerInstance) {
+      viewerInstance.destroy();
+    }
+
+    const currentScene = scenes[currentSceneIndex];
+
+    // Format hotspots for Pannellum
+    const formattedHotspots = currentScene.hotspots?.map(hotspot => ({
+      id: hotspot.id,
+      pitch: hotspot.pitch,
+      yaw: hotspot.yaw,
+      text: hotspot.text,
+      type: hotspot.type,
+      sceneId: hotspot.sceneId,
+      clickHandlerFunc: (evt: any) => {
+        if (hotspot.type === "scene" && hotspot.sceneId) {
+          const nextSceneIndex = scenes.findIndex(scene => scene.id === hotspot.sceneId);
+          if (nextSceneIndex !== -1) {
+            setCurrentSceneIndex(nextSceneIndex);
+          }
+        }
+      }
+    })) || [];
+
+    // Configure and initialize the viewer
+    const viewer = Pannellum.viewer(panoramaRef.current, {
+      type: "equirectangular",
+      panorama: currentScene.imageUrl,
+      autoLoad: true,
+      showZoomCtrl: true,
+      showFullscreenCtrl: false,
+      hotSpots: formattedHotspots,
+      compass: true,
+      hfov: 120,
+      minHfov: 50,
+      maxHfov: 150,
+      hotSpotDebug: false,
+      ...currentScene.initialViewParameters,
+
+      // Event handlers
+      onLoad: () => {
+        setIsLoading(false);
+      },
+
+      // Handle errors
+      onerror: (err: any) => {
+        console.error('Pannellum error:', err);
+        setIsLoading(false);
+      }
+    });
+
+    setViewerInstance(viewer);
+
+    // Cleanup on unmount
+    return () => {
+      if (viewer) {
+        viewer.destroy();
+      }
+    };
+  }, [currentSceneIndex, scenes]);
 
   const handleSceneChange = (direction: "prev" | "next") => {
     if (direction === "prev") {
@@ -106,19 +165,7 @@ export function VirtualTourViewer({
     };
   }, []);
 
-  // Handle hotspot clicks
-  const handleHotspotClick = (evt: any, hotSpotDiv: any, hotSpot: any) => {
-    console.log("Hotspot clicked:", hotSpot);
-
-    // Check if it's a scene navigation hotspot
-    if (hotSpot.type === "scene" && hotSpot.sceneId) {
-      const sceneIndex = scenes.findIndex(scene => scene.id === hotSpot.sceneId);
-      if (sceneIndex !== -1) {
-        setCurrentSceneIndex(sceneIndex);
-        setIsLoading(true);
-      }
-    }
-  };
+  const currentScene = scenes[currentSceneIndex];
 
   return (
     <div 
@@ -136,17 +183,10 @@ export function VirtualTourViewer({
       )}
 
       {scenes.length > 0 ? (
-        <Pannellum
-          width="100%"
-          height="100%"
-          image={currentScene.imageUrl}
-          pitch={0}
-          yaw={0}
-          // Remove duplicate hfov and autoLoad props that are already in config
-          onLoad={() => setIsLoading(false)}
-          onError={(err: any) => console.error("Pannellum error:", err)}
-          {...config}
-          onScenechange={handleHotspotClick}
+        <div 
+          ref={panoramaRef} 
+          className="w-full h-full"
+          style={{ background: "#000" }}
         />
       ) : (
         <div className="flex items-center justify-center h-full bg-muted">
