@@ -93,6 +93,22 @@ export default function YachtDetails() {
     // or open a booking modal with additional options
   };
 
+  // Helper function to ensure tags are in array format
+  const getTagsArray = () => {
+    if (!yacht) return [];
+
+    if (Array.isArray(yacht.tags)) {
+      return yacht.tags;
+    } else if (typeof yacht.tags === 'string') {
+      return yacht.tags.split(',').map(tag => tag.trim());
+    } else if (yacht.tags) {
+      // If it's some other non-null value, try to convert to string and split
+      return String(yacht.tags).split(',').map(tag => tag.trim());
+    }
+
+    return [];
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -187,7 +203,7 @@ export default function YachtDetails() {
             </div>
 
             <div className="flex flex-wrap gap-2 mb-4">
-              {yacht.tags && yacht.tags.map((tag, index) => (
+              {getTagsArray().map((tag, index) => (
                 <Badge key={index} variant="secondary">{tag}</Badge>
               ))}
             </div>
@@ -241,7 +257,7 @@ export default function YachtDetails() {
                   )}
                   {/* You would typically map through a features array here */}
                   {/* For now, let's display the tags as features */}
-                  {yacht.tags && yacht.tags.map((tag, index) => (
+                  {getTagsArray().map((tag, index) => (
                     <div key={index} className="flex items-center">
                       <Check className="h-4 w-4 mr-2 text-primary" />
                       <span>{tag}</span>
