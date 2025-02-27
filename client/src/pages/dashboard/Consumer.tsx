@@ -23,6 +23,7 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { DateRange } from "react-day-picker";
 import { Progress } from "@/components/ui/progress";
 import { PlacesAutocomplete } from "@/components/ui/places-autocomplete";
+import { YachtCarousel } from "@/components/YachtCarousel";
 
 interface LocationOption {
   address: string;
@@ -335,51 +336,12 @@ export default function ConsumerDashboard() {
           </TabsList>
 
           <TabsContent value="recommended" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6 pt-0">
-              {recommendedYachtsLoading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <Card key={i} className="w-full">
-                    <CardContent className="p-4">
-                      <div className="h-48 bg-muted animate-pulse rounded-lg mb-4" />
-                      <div className="space-y-2">
-                        <div className="h-4 bg-muted animate-pulse rounded w-2/3" />
-                        <div className="h-4 bg-muted animate-pulse rounded w-1/2" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              ) : !recommendedYachts?.length ? (
-                <div className="col-span-full text-center py-8">
-                  <p className="text-muted-foreground">
-                    No recommended experiences available at this time.
-                  </p>
-                </div>
-              ) : (
-                recommendedYachts.map((yacht) => (
-                  <Card key={yacht.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                    <CardContent className="p-0">
-                      <img
-                        src={yacht.imageUrl}
-                        alt={yacht.name}
-                        className="w-full h-48 object-cover"
-                      />
-                      <div className="p-4">
-                        <h3 className="font-semibold mb-2">{yacht.name}</h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          {yacht.description}
-                        </p>
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">
-                            ${yacht.price}/day
-                          </span>
-                          <Button variant="outline">View Details</Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
+            <YachtCarousel 
+              yachts={recommendedYachts} 
+              isLoading={recommendedYachtsLoading}
+              title="Recommended for You"
+              description="Personalized yacht experiences based on your preferences" 
+            />
           </TabsContent>
 
           <TabsContent value="search" className="space-y-6">
