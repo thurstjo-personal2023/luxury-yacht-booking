@@ -16,14 +16,22 @@ import {
 interface CalendarDateRangePickerProps {
   className?: string;
   date: DateRange | undefined;
-  setDate: (date: DateRange | undefined) => void;
+  setDate?: (date: DateRange | undefined) => void;
+  onDateRangeChange?: (date: DateRange | undefined) => void; // Add this prop as an alternative
 }
 
 export function CalendarDateRangePicker({
   className,
   date,
   setDate,
+  onDateRangeChange,
 }: CalendarDateRangePickerProps) {
+  // Handle date changes using either prop
+  const handleDateChange = (newDate: DateRange | undefined) => {
+    if (setDate) setDate(newDate);
+    if (onDateRangeChange) onDateRangeChange(newDate);
+  };
+
   return (
     <div className={cn("grid gap-2", className)}>
       <Popover>
@@ -57,7 +65,7 @@ export function CalendarDateRangePicker({
             mode="range"
             defaultMonth={date?.from}
             selected={date}
-            onSelect={setDate}
+            onSelect={handleDateChange}
             numberOfMonths={2}
             disabled={(date) =>
               date < new Date() || date > addDays(new Date(), 90)
