@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useNavigate } from "wouter";
 import { cn } from "@/lib/utils";
 import {
   Home,
@@ -15,7 +15,7 @@ import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 
 export function Sidebar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
 
   const menuItems = [
     { icon: Home, label: "Home", href: "/" },
@@ -26,6 +26,17 @@ export function Sidebar() {
     { icon: Award, label: "Loyalty", href: "/loyalty" },
     { icon: Settings, label: "Settings", href: "/settings" },
   ];
+
+  // Handle logout with redirection
+  const handleLogout = async () => {
+    try {
+      await auth.signOut();
+      // Redirect to login page after successful logout
+      setLocation("/login");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -54,7 +65,7 @@ export function Sidebar() {
             <Button
               variant="ghost"
               className="w-full justify-start gap-2"
-              onClick={() => auth.signOut()}
+              onClick={handleLogout}
             >
               <LogOut className="h-4 w-4" />
               Logout
