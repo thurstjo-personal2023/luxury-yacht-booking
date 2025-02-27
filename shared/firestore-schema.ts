@@ -19,6 +19,30 @@ export interface CustomizationOption {
   product_id: string;  // Added product_id property
 }
 
+// Define VirtualTourHotspot interface
+export interface VirtualTourHotspot {
+  id: string;
+  pitch: number;
+  yaw: number;
+  text: string;
+  type: "info" | "scene"; // info for information, scene for navigation to another scene
+  sceneId?: string; // Optional, only used if type is "scene"
+}
+
+// Define VirtualTourScene interface
+export interface VirtualTourScene {
+  id: string;
+  title: string;
+  imageUrl: string;
+  thumbnailUrl?: string;
+  hotspots?: VirtualTourHotspot[];
+  initialViewParameters?: {
+    pitch?: number;
+    yaw?: number;
+    hfov?: number;
+  };
+}
+
 export interface YachtExperience {
   id?: string; // Added optional id field for frontend use
   package_id: string;
@@ -40,6 +64,10 @@ export interface YachtExperience {
   last_updated_date: Timestamp;
   published_status: boolean;
   yacht_type?: string; // Added optional yacht_type field
+  virtual_tour?: {
+    enabled: boolean;
+    scenes: VirtualTourScene[];
+  }; // Added virtual tour data
 }
 
 export interface YachtProfile {
