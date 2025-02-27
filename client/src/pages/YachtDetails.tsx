@@ -335,25 +335,30 @@ export default function YachtDetails() {
   const sampleVirtualTourScenes = [
     {
       id: "deck",
-      title: "Main Deck",
+      title: "Yacht Main Deck",
       imageUrl: "https://raw.githubusercontent.com/fariskassim/notreal/main/360-1.jpg",
       hotspots: [
         {
           id: "info-1",
-          pitch: -10,
-          yaw: 20,
-          text: "Spacious sundeck with lounge area",
+          pitch: -12,
+          yaw: 34,
+          text: "Spacious sun deck with premium lounge furniture",
           type: "info" as const
         },
         {
           id: "scene-to-cabin",
-          pitch: -20,
-          yaw: 180,
-          text: "Go to Cabin",
+          pitch: -28,
+          yaw: 174,
+          text: "Enter Cabin",
           type: "scene" as const,
           sceneId: "cabin"
         }
-      ]
+      ],
+      initialViewParameters: {
+        pitch: -3,
+        yaw: 117,
+        hfov: 110
+      }
     },
     {
       id: "cabin",
@@ -362,7 +367,7 @@ export default function YachtDetails() {
       hotspots: [
         {
           id: "info-2",
-          pitch: 0,
+          pitch: -9,
           yaw: 40,
           text: "Queen-size bed with premium linens",
           type: "info" as const
@@ -375,7 +380,39 @@ export default function YachtDetails() {
           type: "scene" as const,
           sceneId: "deck"
         }
-      ]
+      ],
+      initialViewParameters: {
+        pitch: 0,
+        yaw: 5,
+        hfov: 110
+      }
+    },
+    {
+      id: "lounge",
+      title: "VIP Lounge Area",
+      imageUrl: "https://pannellum.org/images/alma.jpg",
+      hotspots: [
+        {
+          id: "info-3",
+          pitch: 5,
+          yaw: 60,
+          text: "Exclusive VIP seating with panoramic views",
+          type: "info" as const
+        },
+        {
+          id: "scene-to-deck",
+          pitch: -5,
+          yaw: -60,
+          text: "Back to Main Deck",
+          type: "scene" as const,
+          sceneId: "deck"
+        }
+      ],
+      initialViewParameters: {
+        pitch: 0,
+        yaw: 0,
+        hfov: 100
+      }
     }
   ];
 
