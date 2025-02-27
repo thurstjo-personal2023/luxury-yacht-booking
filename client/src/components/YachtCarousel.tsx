@@ -38,6 +38,21 @@ interface YachtCarouselProps {
 
 // Helper function to normalize yacht data from different sources
 function normalizeYacht(yacht: any): NormalizedYacht {
+  // Ensure activities is always an array
+  let activities: string[] = [];
+
+  if (yacht.activities && Array.isArray(yacht.activities)) {
+    activities = yacht.activities;
+  } else if (yacht.tags && Array.isArray(yacht.tags)) {
+    activities = yacht.tags;
+  } else if (typeof yacht.activities === 'string') {
+    // Handle case where activities might be a comma-separated string
+    activities = yacht.activities.split(',').map((item: string) => item.trim());
+  } else if (typeof yacht.tags === 'string') {
+    // Handle case where tags might be a comma-separated string
+    activities = yacht.tags.split(',').map((item: string) => item.trim());
+  }
+
   return {
     id: yacht.id || yacht.yacht_id || "",
     name: yacht.name || yacht.title || "Unnamed Package",
@@ -49,7 +64,7 @@ function normalizeYacht(yacht: any): NormalizedYacht {
     location: yacht.location?.address || 
               (typeof yacht.location === "string" ? yacht.location : "Location unavailable"),
     capacity: yacht.capacity || yacht.max_guests || 0,
-    activities: yacht.activities || yacht.tags || []
+    activities: activities
   };
 }
 
@@ -174,7 +189,7 @@ export function YachtCarousel({
                       <h4 className="font-semibold">{yacht.name}</h4>
                       <p className="text-sm text-muted-foreground">{yacht.description}</p>
                       <div className="flex flex-wrap gap-1 mt-2">
-                        {yacht.activities?.map((activity) => (
+                        {Array.isArray(yacht.activities) && yacht.activities.length > 0 && yacht.activities.map((activity) => (
                           <span 
                             key={activity} 
                             className="text-xs bg-muted px-2 py-1 rounded-full"
