@@ -6,7 +6,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 // Import Pannellum directly, not through react-pannellum
-import * as Pannellum from "pannellum";
+import "pannellum";
+// Use window.pannellum since the library attaches itself to the window object
+declare global {
+  interface Window {
+    pannellum: any;
+  }
+}
 
 interface Hotspot {
   id: string;
@@ -94,7 +100,7 @@ export function VirtualTourViewer({
     })) || [];
 
     // Configure and initialize the viewer
-    const viewer = Pannellum.viewer(panoramaRef.current, {
+    const viewer = window.pannellum.viewer(panoramaRef.current, {
       type: "equirectangular",
       panorama: currentScene.imageUrl,
       autoLoad: true,
