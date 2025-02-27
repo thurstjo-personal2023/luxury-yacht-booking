@@ -19,6 +19,7 @@ const Register = lazy(() => import("@/pages/auth/Register"));
 const ConsumerDashboard = lazy(() => import("@/pages/dashboard/Consumer"));
 const ProducerDashboard = lazy(() => import("@/pages/dashboard/Producer"));
 const PartnerDashboard = lazy(() => import("@/pages/dashboard/Partner"));
+const YachtDetails = lazy(() => import("@/pages/YachtDetails"));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -65,6 +66,7 @@ function App() {
               <Route path="/" component={Home} />
               <Route path="/login" component={Login} />
               <Route path="/register" component={Register} />
+              <Route path="/yacht/:id" component={YachtDetails} />
 
               {/* Protected Routes */}
               <Route path="/dashboard/consumer">
