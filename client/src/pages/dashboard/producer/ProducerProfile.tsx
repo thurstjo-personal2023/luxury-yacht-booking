@@ -40,7 +40,7 @@ import {
   UserRound 
 } from "lucide-react";
 import { auth, db, storage } from "@/lib/firebase";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { ServiceProviderProfile } from "@shared/firestore-schema";
 
@@ -111,9 +111,11 @@ export default function ProducerProfile() {
           return;
         }
 
+        // First try to get data from the service provider collection
         const profileDocRef = doc(db, "user_profiles_service_provider", user.uid);
         const profileDoc = await getDoc(profileDocRef);
         
+        // If producer profile exists, use that data
         if (profileDoc.exists()) {
           const data = profileDoc.data() as ServiceProviderProfile;
           setProfileData(data);
@@ -141,6 +143,56 @@ export default function ProducerProfile() {
           // Set image preview
           if (data.profilePhoto) {
             setImagePreview(data.profilePhoto);
+          }
+        } else {
+          // If producer profile doesn't exist, look for data in users collection
+          const userDocRef = doc(db, "users", user.uid);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            
+            // Pre-fill the form with available user data
+            form.reset({
+              businessName: userData.name || "",
+              email: userData.email || user.email || "",
+              phone: userData.phone || "",
+              address: "",
+              profilePhoto: userData.profilePhoto || "",
+              yearsOfExperience: undefined,
+              professionalDescription: "",
+              servicesOffered: [],
+              certifications: [],
+              industryAffiliations: [],
+              communicationPreferences: {
+                email: true,
+                sms: true,
+                push: true,
+              },
+              profileVisibility: 'public',
+            });
+            
+            // Create a partial profile data object
+            setProfileData({
+              providerId: user.uid,
+              businessName: userData.name || "",
+              contactInformation: {
+                email: userData.email || user.email || "",
+                phone: userData.phone || "",
+                address: "",
+              },
+              profilePhoto: userData.profilePhoto || "",
+              servicesOffered: [],
+              certifications: [],
+              ratings: 0,
+              tags: [],
+              createdDate: new Date() as any,
+              lastUpdatedDate: new Date() as any,
+            } as ServiceProviderProfile);
+            
+            if (userData.profilePhoto) {
+              setImagePreview(userData.profilePhoto);
+            }
           }
         }
       } catch (error) {
@@ -260,9 +312,63 @@ export default function ProducerProfile() {
         lastUpdatedDate: new Date() as any,
       };
       
-      // Update the document in Firestore
+      // Check if profile document exists
       const profileDocRef = doc(db, "user_profiles_service_provider", auth.currentUser.uid);
-      await updateDoc(profileDocRef, updatedProfile);
+      const profileSnapshot = await getDoc(profileDocRef);
+      
+      if (profileSnapshot.exists()) {
+        // Update existing document
+        await updateDoc(profileDocRef, updatedProfile);
+      } else {
+        // Create new profile document with complete required fields
+        const newProfile: ServiceProviderProfile = {
+          providerId: auth.currentUser.uid,
+          businessName: values.businessName,
+          contactInformation: {
+            email: values.email,
+            phone: values.phone,
+            address: values.address,
+          },
+          profilePhoto: profilePhotoUrl || "",
+          servicesOffered: values.servicesOffered || [],
+          certifications: values.certifications || [],
+          yearsOfExperience: values.yearsOfExperience,
+          professionalDescription: values.professionalDescription,
+          industryAffiliations: values.industryAffiliations || [],
+          communicationPreferences: values.communicationPreferences,
+          profileVisibility: values.profileVisibility,
+          ratings: 0,
+          tags: [],
+          accountStatus: 'active',
+          verificationStatus: 'pending',
+          createdDate: new Date() as any,
+          lastUpdatedDate: new Date() as any,
+        };
+        
+        // Set the new document
+        await setDoc(profileDocRef, newProfile);
+        
+        // Also update the users collection with basic info
+        const userDocRef = doc(db, "users", auth.currentUser.uid);
+        await updateDoc(userDocRef, {
+          name: values.businessName,
+          email: values.email,
+          phone: values.phone,
+          profilePhoto: profilePhotoUrl || "",
+          lastUpdatedDate: new Date().toISOString()
+        }).catch(() => {
+          // If update fails (document might not exist), try to create it
+          setDoc(userDocRef, {
+            name: values.businessName,
+            email: values.email,
+            phone: values.phone,
+            profilePhoto: profilePhotoUrl || "",
+            role: "producer",
+            createdAt: new Date().toISOString(),
+            lastUpdatedDate: new Date().toISOString()
+          });
+        });
+      }
       
       toast({
         title: "Profile Updated",
