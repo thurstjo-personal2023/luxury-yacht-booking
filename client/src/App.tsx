@@ -25,6 +25,13 @@ const PaymentPage = lazy(() => import("@/pages/PaymentPage"));
 const SearchAndBook = lazy(() => import("@/pages/explore/SearchAndBook"));
 const GuestDashboard = lazy(() => import("@/pages/explore/GuestDashboard"));
 
+// Producer Dashboard Pages
+const ProducerProfile = lazy(() => import("@/pages/dashboard/producer/ProducerProfile"));
+const AssetManagement = lazy(() => import("@/pages/dashboard/producer/AssetManagement"));
+const YachtForm = lazy(() => import("@/pages/dashboard/producer/YachtForm"));
+const ComplianceDocuments = lazy(() => import("@/pages/dashboard/producer/ComplianceDocuments"));
+const ReviewsManagement = lazy(() => import("@/pages/dashboard/producer/ReviewsManagement"));
+
 // Loading component
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center h-screen">
@@ -93,6 +100,26 @@ function App() {
               </Route>
               <Route path="/dashboard/partner">
                 <PrivateRoute component={PartnerDashboard} />
+              </Route>
+              
+              {/* Producer Dashboard Routes */}
+              <Route path="/dashboard/producer/profile">
+                <PrivateRoute component={ProducerProfile} />
+              </Route>
+              <Route path="/dashboard/producer/assets">
+                <PrivateRoute component={AssetManagement} />
+              </Route>
+              <Route path="/dashboard/producer/assets/new-yacht">
+                <PrivateRoute component={YachtForm} />
+              </Route>
+              <Route path="/dashboard/producer/assets/edit-yacht/:id">
+                <PrivateRoute component={YachtForm} />
+              </Route>
+              <Route path="/dashboard/producer/compliance">
+                <PrivateRoute component={ComplianceDocuments} />
+              </Route>
+              <Route path="/dashboard/producer/reviews">
+                <PrivateRoute component={ReviewsManagement} />
               </Route>
 
               {/* Fallback to 404 */}
