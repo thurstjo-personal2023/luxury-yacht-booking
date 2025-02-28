@@ -288,16 +288,16 @@ export default function YachtDetails() {
   };
 
   // Helper function to ensure tags are in array format
-  const getTagsArray = () => {
+  const getTagsArray = (): string[] => {
     if (!yacht) return [];
 
     if (Array.isArray(yacht.tags)) {
-      return yacht.tags;
+      return yacht.tags as string[];
     } else if (typeof yacht.tags === 'string') {
-      return yacht.tags.split(',').map(tag => tag.trim());
+      return (yacht.tags as string).split(',').map((tag: string) => tag.trim());
     } else if (yacht.tags) {
       // If it's some other non-null value, try to convert to string and split
-      return String(yacht.tags).split(',').map(tag => tag.trim());
+      return String(yacht.tags).split(',').map((tag: string) => tag.trim());
     }
 
     return [];
@@ -974,11 +974,18 @@ export default function YachtDetails() {
                     )}
                     <Separator />
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Select Dates</label>
-                      <CalendarDateRangePicker 
-                        date={dateRange}
-                        onDateRangeChange={setDateRange} 
-                        onDateChange={isDateDisabled}
+                      <label className="text-sm font-medium mb-1 block">Schedule Your Experience</label>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Select a date and available time slot for your booking.
+                      </p>
+                      <DateTimePicker
+                        date={selectedDate}
+                        setDate={setSelectedDate}
+                        duration={yacht.duration || 4}
+                        timeSlot={selectedTimeSlot}
+                        setTimeSlot={setSelectedTimeSlot}
+                        availableTimeSlots={availableTimeSlots}
+                        onDateSelect={getAvailableTimeSlots}
                       />
                     </div>
                   </div>

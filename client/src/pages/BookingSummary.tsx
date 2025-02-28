@@ -26,6 +26,13 @@ interface BookingSummaryProps {
     from: Date;
     to: Date;
   };
+  timeSlot?: {
+    id: string;
+    startTime: string;
+    endTime: string;
+    label: string;
+    available: boolean;
+  };
   totalPrice?: number;
   days?: number;
 }
@@ -77,22 +84,8 @@ export default function BookingSummary() {
             availability_status: true,
             featured: true,
             tags: ["luxury", "yacht", "dubai"],
-            created_date: { 
-              toDate: () => new Date(),
-              toMillis: () => Date.now(),
-              isEqual: () => false,
-              toJSON: () => ({ seconds: Date.now() / 1000, nanoseconds: 0 }),
-              seconds: Date.now() / 1000,
-              nanoseconds: 0
-            },
-            last_updated_date: { 
-              toDate: () => new Date(),
-              toMillis: () => Date.now(),
-              isEqual: () => false,
-              toJSON: () => ({ seconds: Date.now() / 1000, nanoseconds: 0 }),
-              seconds: Date.now() / 1000,
-              nanoseconds: 0
-            },
+            created_date: new Date() as any,
+            last_updated_date: new Date() as any,
             published_status: true
           },
           selectedAddOns: [
@@ -111,10 +104,17 @@ export default function BookingSummary() {
           ],
           dateRange: {
             from: new Date(Date.now() + 86400000), // Tomorrow
-            to: new Date(Date.now() + 86400000 * 3) // 3 days from tomorrow
+            to: new Date(Date.now() + 86400000) // Same day booking for single time slot
+          },
+          timeSlot: {
+            id: "morning",
+            startTime: "09:00",
+            endTime: "13:00",
+            label: "Morning (9:00 AM - 1:00 PM)",
+            available: true
           },
           totalPrice: 7000,
-          days: 3
+          days: 1
         });
       }
     } catch (error) {
@@ -171,7 +171,7 @@ export default function BookingSummary() {
     );
   }
 
-  const { yacht, selectedAddOns = [], dateRange, totalPrice = 0, days = 0 } = bookingData;
+  const { yacht, selectedAddOns = [], dateRange, timeSlot, totalPrice = 0, days = 0 } = bookingData;
   const grandTotal = days * totalPrice;
 
   return (
@@ -206,13 +206,13 @@ export default function BookingSummary() {
                   <div className="flex items-center">
                     <CalendarRange className="h-5 w-5 mr-2 text-primary" />
                     <div>
-                      <p className="font-medium">Booking Dates</p>
+                      <p className="font-medium">Booking Date</p>
                       {dateRange ? (
                         <p className="text-sm text-muted-foreground">
-                          {formatDate(dateRange.from)} - {formatDate(dateRange.to)}
+                          {formatDate(dateRange.from)}
                         </p>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Dates not selected</p>
+                        <p className="text-sm text-muted-foreground">Date not selected</p>
                       )}
                     </div>
                   </div>
@@ -220,9 +220,19 @@ export default function BookingSummary() {
                   <div className="flex items-center">
                     <Clock className="h-5 w-5 mr-2 text-primary" />
                     <div>
-                      <p className="font-medium">Duration</p>
+                      <p className="font-medium">Time Slot</p>
                       <p className="text-sm text-muted-foreground">
-                        {days} day{days !== 1 ? 's' : ''} ({yacht.duration} hours per day)
+                        {timeSlot ? timeSlot.label : "No time slot selected"}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <Clock className="h-5 w-5 mr-2 text-primary" />
+                    <div>
+                      <p className="font-medium">Experience Duration</p>
+                      <p className="text-sm text-muted-foreground">
+                        {yacht.duration} hours
                       </p>
                     </div>
                   </div>
