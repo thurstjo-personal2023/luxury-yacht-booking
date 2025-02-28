@@ -128,13 +128,24 @@ export default function BookingSummary() {
   }, [toast]);
 
   const handleProceedToPayment = () => {
-    toast({
-      title: "Proceeding to payment",
-      description: "Redirecting to payment gateway...",
-    });
-    
-    // Redirect to the payment page which will handle the Stripe payment process
-    setLocation("/payment");
+    if (bookingData) {
+      // Store the current booking data in session storage for the payment page
+      sessionStorage.setItem('bookingSummaryData', JSON.stringify(bookingData));
+      
+      toast({
+        title: "Proceeding to payment",
+        description: "Redirecting to payment gateway...",
+      });
+      
+      // Redirect to the payment page which will handle the Stripe payment process
+      setLocation("/payment");
+    } else {
+      toast({
+        title: "Error",
+        description: "Booking information is missing. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const formatDate = (date: Date) => {
