@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { 
   BarChart, 
+  Calendar, 
   Calendar as CalendarIcon, 
   CheckCircle, 
   Clock, 

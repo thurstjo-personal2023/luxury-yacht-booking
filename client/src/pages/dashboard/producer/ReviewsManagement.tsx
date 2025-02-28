@@ -714,7 +714,7 @@ export default function ReviewsManagement() {
                   </div>
                   
                   {responseStatus === 'draft' && (
-                    <Alert variant="outline" className="bg-muted/50">
+                    <Alert className="bg-muted/50">
                       <AlertCircle className="h-4 w-4" />
                       <AlertTitle>Draft Mode</AlertTitle>
                       <AlertDescription>
