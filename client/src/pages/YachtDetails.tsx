@@ -14,7 +14,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { YachtCarousel } from "@/components/YachtCarousel";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDateRangePicker } from "@/components/ui/date-range-picker";
+import { DateTimePicker, TimeSlot } from "@/components/ui/date-time-picker";
 import { useToast } from "@/hooks/use-toast";
 import { DateRange } from "react-day-picker";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,7 +55,9 @@ export default function YachtDetails() {
   const yachtId = params?.id;
   const [yacht, setYacht] = useState<YachtExperience | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | undefined>();
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
   const [relatedYachts, setRelatedYachts] = useState<YachtExperience[]>([]);
   const [addOns, setAddOns] = useState<AddOn[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<SelectedAddOn[]>([]);
@@ -208,29 +210,46 @@ export default function YachtDetails() {
   }, [yacht, selectedAddOns]);
 
   const handleBooking = () => {
-    if (!dateRange?.from || !dateRange?.to) {
+    if (!selectedDate) {
       toast({
         title: "Date selection required",
-        description: "Please select start and end dates for your booking.",
+        description: "Please select a date for your booking.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!selectedTimeSlot) {
+      toast({
+        title: "Time slot required",
+        description: "Please select a time slot for your booking.",
         variant: "destructive"
       });
       return;
     }
 
-    // Calculate number of days
-    const days = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
+    // For our simplified booking model, we'll consider it a single-day booking
+    // In a more complex system, we would support multi-day bookings
+    const days = 1;
     const grandTotal = totalPrice * days;
 
     toast({
       title: "Booking initiated",
-      description: `Your booking total is $${grandTotal} for ${days} days. Redirecting to checkout...`,
+      description: `Your booking for ${selectedTimeSlot.label} on ${selectedDate.toLocaleDateString()} is being processed. Redirecting to checkout...`,
     });
+
+    // Create a date range object for compatibility with the existing booking summary page
+    const dateRange = {
+      from: selectedDate,
+      to: selectedDate,  // For single-day bookings, from and to are the same
+    };
 
     // Save booking data to sessionStorage so the BookingSummary page can access it
     const bookingData = {
       yacht,
       selectedAddOns,
       dateRange,
+      timeSlot: selectedTimeSlot,
       totalPrice,
       days
     };
@@ -284,33 +303,141 @@ export default function YachtDetails() {
     return [];
   };
 
-  // Helper function to determine if a date should be disabled in the calendar
-  const isDateDisabled = (date: Date) => {
-    // If availability_status is false, disable all dates
-    if (yacht && !yacht.availability_status) {
-      return true;
+  // Function to check available time slots for a given date
+  const getAvailableTimeSlots = async (date: Date): Promise<TimeSlot[]> => {
+    if (!yacht) return [];
+    
+    // In a real app, this would query a backend API to get available time slots based on bookings
+    // For our demo, we'll generate time slots based on the yacht's duration
+    
+    // Format the date for logging
+    const formattedDate = date.toLocaleDateString();
+    console.log(`Checking available time slots for ${formattedDate}`);
+    
+    // If yacht is not available at all, return empty array
+    if (!yacht.availability_status) {
+      return [];
     }
-
-    // Ensure dates in the past are disabled
+    
+    // If date is in the past, no slots available
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (date < today) {
-      return true;
+      return [];
     }
-
-    // If we had a more sophisticated availability system, we would check against
-    // specific booked dates here. For now, just prevent dates > 90 days out
+    
+    // If date is more than 90 days in the future, no slots available
     const ninetyDaysFromNow = new Date();
     ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
     if (date > ninetyDaysFromNow) {
-      return true;
+      return [];
     }
-
-    // Custom blocked dates could be added here from yacht.blocked_dates
-
-    // Date is available
-    return false;
+    
+    // Standard time slots
+    const timeSlots: TimeSlot[] = [];
+    const duration = yacht.duration || 4; // default to 4 hours if no duration specified
+    
+    // Generate standard time slots based on duration
+    if (duration <= 4) {
+      // For short experiences (up to 4 hours), offer multiple slots per day
+      timeSlots.push(
+        {
+          id: "morning",
+          startTime: "09:00",
+          endTime: `${9 + duration}:00`,
+          label: `Morning (9:00 AM - ${9 + duration}:00 PM)`,
+          available: true
+        },
+        {
+          id: "afternoon",
+          startTime: "13:00",
+          endTime: `${13 + duration}:00`,
+          label: `Afternoon (1:00 PM - ${(13 + duration) % 12 || 12}:00 ${13 + duration >= 12 ? 'PM' : 'AM'})`,
+          available: true
+        }
+      );
+      
+      // Add evening slot if it would end by 9 PM
+      if (17 + duration <= 21) {
+        timeSlots.push({
+          id: "evening",
+          startTime: "17:00",
+          endTime: `${17 + duration}:00`,
+          label: `Evening (5:00 PM - ${(17 + duration) % 12 || 12}:00 ${17 + duration >= 12 ? 'PM' : 'AM'})`,
+          available: true
+        });
+      }
+    } else if (duration <= 8) {
+      // For medium-length experiences (5-8 hours), offer two slots per day
+      timeSlots.push(
+        {
+          id: "morning-extended",
+          startTime: "09:00",
+          endTime: `${9 + duration}:00`,
+          label: `Morning to ${(9 + duration) >= 12 ? 'Afternoon' : 'Evening'} (9:00 AM - ${(9 + duration) % 12 || 12}:00 ${9 + duration >= 12 ? 'PM' : 'AM'})`,
+          available: true
+        }
+      );
+      
+      // Add afternoon slot only if it would end by 10 PM
+      if (13 + duration <= 22) {
+        timeSlots.push({
+          id: "afternoon-extended",
+          startTime: "13:00",
+          endTime: `${13 + duration}:00`,
+          label: `Afternoon to Evening (1:00 PM - ${(13 + duration) % 12 || 12}:00 ${13 + duration >= 12 ? 'PM' : 'AM'})`,
+          available: true
+        });
+      }
+    } else {
+      // For full-day or multi-day experiences, offer a single "full day" slot
+      timeSlots.push({
+        id: "full-day",
+        startTime: "09:00",
+        endTime: "17:00",
+        label: "Full Day (9:00 AM - 5:00 PM)",
+        available: true
+      });
+    }
+    
+    // In a real app, we would check against existing bookings here
+    // and mark time slots as unavailable accordingly
+    
+    // For demo purposes, let's randomly make some slots unavailable
+    // This simulates some slots being already booked
+    const simulateRandomAvailability = (slot: TimeSlot) => {
+      // Ensure slots for today and tomorrow are always available for demo purposes
+      const isToday = date.getDate() === today.getDate() && 
+                      date.getMonth() === today.getMonth() && 
+                      date.getFullYear() === today.getFullYear();
+      
+      const isTomorrow = date.getDate() === new Date(today.getTime() + 86400000).getDate() && 
+                         date.getMonth() === today.getMonth() && 
+                         date.getFullYear() === today.getFullYear();
+      
+      if (isToday || isTomorrow) {
+        return { ...slot, available: true };
+      }
+      
+      // For other dates, randomly make some slots unavailable
+      return { 
+        ...slot, 
+        available: Math.random() > 0.3 // 70% chance of being available
+      };
+    };
+    
+    return timeSlots.map(simulateRandomAvailability);
   };
+  
+  // Generate initial time slots when yacht data is loaded
+  useEffect(() => {
+    if (yacht) {
+      const today = new Date();
+      getAvailableTimeSlots(today).then(slots => {
+        setAvailableTimeSlots(slots);
+      });
+    }
+  }, [yacht]);
 
   if (loading) {
     return (
@@ -780,11 +907,18 @@ export default function YachtDetails() {
                     )}
 
                     <div className="space-y-2 pt-4">
-                      <label className="text-sm font-medium">Select Dates</label>
-                      <CalendarDateRangePicker 
-                        date={dateRange}
-                        onDateRangeChange={setDateRange} 
-                        onDateChange={isDateDisabled}
+                      <label className="text-sm font-medium mb-1 block">Schedule Your Experience</label>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Select a date and available time slot for your booking.
+                      </p>
+                      <DateTimePicker
+                        date={selectedDate}
+                        setDate={setSelectedDate}
+                        duration={yacht.duration || 4}
+                        timeSlot={selectedTimeSlot}
+                        setTimeSlot={setSelectedTimeSlot}
+                        availableTimeSlots={availableTimeSlots}
+                        onDateSelect={getAvailableTimeSlots}
                       />
                     </div>
                   </div>
