@@ -11,7 +11,7 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
-    // User profiles
+    // User profiles - original collection
     match /users/{userId} {
       allow create: if request.auth.uid == userId
         && request.resource.data.keys().hasAll(['name', 'email', 'role', 'phone'])
@@ -21,8 +21,83 @@ service cloud.firestore {
       allow update: if isSignedIn() && isOwner(userId);
       allow delete: if false; // Prevent user deletion through client
     }
+    
+    // Service provider profiles
+    match /user_profiles_service_provider/{userId} {
+      allow read;
+      allow create, update: if isSignedIn() && isOwner(userId);
+      allow delete: if false;
+    }
+    
+    // Tourist profiles
+    match /user_profiles_tourist/{userId} {
+      allow read;
+      allow create, update: if isSignedIn() && isOwner(userId);
+      allow delete: if false;
+    }
+    
+    // Experience packages
+    match /experience_packages/{document} {
+      allow read;
+      allow write: if request.time < timestamp.date(2024, 12, 31);
+    }
+    
+    // Yacht Experiences (consolidated collection)
+    match /yacht_experiences/{document} {
+      allow read;
+      allow write: if request.time < timestamp.date(2024, 12, 31);
+    }
+    
+    // Product Add-ons (original format)
+    match /products_add_ons/{document} {
+      allow read;
+      allow write: if request.time < timestamp.date(2024, 12, 31);
+    }
+    
+    // Product Add-ons with dash
+    match /products_add-ons/{document} {
+      allow read;
+      allow write: if request.time < timestamp.date(2024, 12, 31);
+    }
+    
+    // Product Add-ons (consolidated collection)
+    match /product_add_ons/{document} {
+      allow read;
+      allow write: if request.time < timestamp.date(2024, 12, 31);
+    }
+    
+    // Other collections
+    match /articles_and_guides/{document} {
+      allow read;
+      allow write: if request.time < timestamp.date(2024, 12, 31);
+    }
+    
+    match /event_announcements/{document} {
+      allow read;
+      allow write: if request.time < timestamp.date(2024, 12, 31);
+    }
+    
+    match /notifications/{document} {
+      allow read;
+      allow write: if request.time < timestamp.date(2024, 12, 31);
+    }
+    
+    match /promotions_and_offers/{document} {
+      allow read;
+      allow write: if request.time < timestamp.date(2024, 12, 31);
+    }
+    
+    match /reviews_and_feedback/{document} {
+      allow read;
+      allow write: if request.time < timestamp.date(2024, 12, 31);
+    }
+    
+    match /support_content/{document} {
+      allow read;
+      allow write: if request.time < timestamp.date(2024, 12, 31);
+    }
 
-    // Default deny
+    // Default deny for any other collection
     match /{document=**} {
       allow read, write: if false;
     }
