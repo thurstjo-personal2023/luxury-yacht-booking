@@ -19,12 +19,19 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log('Getting experiences with filters:', filters);
 
-      // Query the experience_packages collection
-      const experiencesRef = adminDb.collection('experience_packages');
-      const snapshot = await experiencesRef.get();
+      // Try the new consolidated collection first
+      let experiencesRef = adminDb.collection('yacht_experiences');
+      let snapshot = await experiencesRef.get();
+
+      // If no data in consolidated collection, fall back to the old collection
+      if (snapshot.empty) {
+        console.log('No experiences found in yacht_experiences collection, trying experience_packages');
+        experiencesRef = adminDb.collection('experience_packages');
+        snapshot = await experiencesRef.get();
+      }
 
       if (snapshot.empty) {
-        console.log('No experiences found in collection');
+        console.log('No experiences found in any collection');
         return [];
       }
 
@@ -80,11 +87,17 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log('Getting featured experiences');
 
-      // Get all experiences from experience_packages collection
-      const snapshot = await adminDb.collection('experience_packages').get();
+      // Try the new consolidated collection first
+      let snapshot = await adminDb.collection('yacht_experiences').get();
+
+      // If no data in consolidated collection, fall back to the old collection
+      if (snapshot.empty) {
+        console.log('No experiences found in yacht_experiences collection, trying experience_packages');
+        snapshot = await adminDb.collection('experience_packages').get();
+      }
 
       if (snapshot.empty) {
-        console.log('No experiences found');
+        console.log('No experiences found in any collection');
         return [];
       }
 
