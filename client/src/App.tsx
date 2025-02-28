@@ -20,6 +20,7 @@ const ConsumerDashboard = lazy(() => import("@/pages/dashboard/Consumer"));
 const ProducerDashboard = lazy(() => import("@/pages/dashboard/Producer"));
 const PartnerDashboard = lazy(() => import("@/pages/dashboard/Partner"));
 const YachtDetails = lazy(() => import("@/pages/YachtDetails"));
+const BookingSummary = lazy(() => import("@/pages/BookingSummary"));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -67,6 +68,11 @@ function App() {
               <Route path="/login" component={Login} />
               <Route path="/register" component={Register} />
               <Route path="/yacht/:id" component={YachtDetails} />
+              
+              {/* Booking Routes */}
+              <Route path="/booking-summary">
+                <PrivateRoute component={BookingSummary} />
+              </Route>
 
               {/* Protected Routes */}
               <Route path="/dashboard/consumer">
