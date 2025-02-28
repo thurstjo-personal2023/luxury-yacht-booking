@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Elements, 
   CardElement, 
@@ -53,7 +53,7 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'wallet'>('card');
 
   // Set up payment request for digital wallets (Apple Pay, Google Pay)
-  useState(() => {
+  useEffect(() => {
     if (stripe) {
       const pr = stripe.paymentRequest({
         country: 'US',

@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { registerStripeRoutes } from "./stripe";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Experience Packages with Filters
@@ -38,6 +39,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch featured experiences" });
     }
   });
+
+  // Register Stripe-related routes
+  registerStripeRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

@@ -133,13 +133,8 @@ export default function BookingSummary() {
       description: "Redirecting to payment gateway...",
     });
     
-    // In a real app, this would redirect to a payment page
-    setTimeout(() => {
-      toast({
-        title: "Payment simulation",
-        description: "This is a demo. In a real app, you would be redirected to a payment provider.",
-      });
-    }, 2000);
+    // Redirect to the payment page which will handle the Stripe payment process
+    setLocation("/payment");
   };
 
   const formatDate = (date: Date) => {
