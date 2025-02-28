@@ -1,4 +1,5 @@
 import { Timestamp } from "firebase/firestore";
+import { Booking } from "@shared/schema";
 
 export interface Location {
   latitude: number;
@@ -161,6 +162,29 @@ export interface ServiceProviderProfile {
   tags: string[];
   createdDate: Timestamp;
   lastUpdatedDate: Timestamp;
+  // Extended fields for Producer Dashboard
+  yearsOfExperience?: number;
+  industryAffiliations?: string[];
+  professionalDescription?: string;
+  communicationPreferences?: {
+    email: boolean;
+    sms: boolean;
+    push: boolean;
+  };
+  profileVisibility?: 'public' | 'verified_users' | 'private';
+  accountStatus?: 'active' | 'pending' | 'suspended';
+  verificationStatus?: 'verified' | 'pending' | 'unverified';
+  complianceDocuments?: ComplianceDocument[];
+  availabilityCalendar?: AvailabilitySchedule[];
+  earningsStats?: {
+    totalEarnings: number;
+    currentMonthEarnings: number;
+    pendingPayouts: number;
+    lastPayout?: {
+      amount: number;
+      date: Timestamp;
+    };
+  };
 }
 
 export interface TouristProfile {
@@ -201,4 +225,95 @@ export interface Event {
   tags: string[];
   createdDate: Timestamp;
   lastUpdatedDate: Timestamp;
+}
+
+// Producer Dashboard specific interfaces
+export interface ComplianceDocument {
+  documentId: string;
+  documentType: 'business_license' | 'safety_certification' | 'liability_insurance' | 'other';
+  documentTitle: string;
+  fileUrl: string;
+  mimeType: string;
+  issueDate: Timestamp;
+  expirationDate: Timestamp;
+  status: 'valid' | 'expired' | 'pending_review';
+  verificationDate?: Timestamp;
+  uploadDate: Timestamp;
+  notes?: string;
+}
+
+export interface AvailabilitySchedule {
+  scheduleId: string;
+  assetId: string; // Yacht or service ID
+  date: Timestamp;
+  timeSlots: TimeSlot[];
+  specialPricing?: {
+    type: 'discount' | 'surge';
+    percentage: number;
+    reason?: string;
+  };
+  isFullyBooked: boolean;
+  isDayOff: boolean;
+}
+
+export interface TimeSlot {
+  id: string;
+  startTime: string;
+  endTime: string;
+  available: boolean;
+  price?: number; // Override default price if needed
+}
+
+export interface ReviewResponse {
+  responseId: string;
+  reviewId: string;
+  responderId: string;
+  responseText: string;
+  responseDate: Timestamp;
+  isPublic: boolean;
+  status: 'published' | 'draft' | 'archived';
+}
+
+export interface ProducerBooking extends Booking {
+  customerDetails?: {
+    name: string;
+    contactInformation: {
+      email: string;
+      phone?: string;
+    };
+    specialRequests?: string;
+  };
+  serviceProviderNotes?: string;
+  checkinStatus?: 'pending' | 'checked_in' | 'no_show';
+  paymentStatus: 'pending' | 'partial' | 'complete' | 'refunded';
+  commissionAmount: number;
+  netEarnings: number;
+}
+
+export interface ProducerEarningsReport {
+  reportId: string;
+  producerId: string;
+  timePeriod: {
+    startDate: Timestamp;
+    endDate: Timestamp;
+  };
+  totalBookings: number;
+  grossRevenue: number;
+  totalCommissions: number;
+  netEarnings: number;
+  pendingPayouts: number;
+  completedPayouts: number;
+  bookingBreakdown: {
+    completed: number;
+    cancelled: number;
+    refunded: number;
+  };
+  detailedTransactions: {
+    transactionId: string;
+    bookingId: string;
+    amount: number;
+    type: 'booking' | 'refund' | 'adjustment' | 'payout';
+    date: Timestamp;
+    description: string;
+  }[];
 }
