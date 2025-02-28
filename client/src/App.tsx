@@ -21,6 +21,7 @@ const ProducerDashboard = lazy(() => import("@/pages/dashboard/Producer"));
 const PartnerDashboard = lazy(() => import("@/pages/dashboard/Partner"));
 const YachtDetails = lazy(() => import("@/pages/YachtDetails"));
 const BookingSummary = lazy(() => import("@/pages/BookingSummary"));
+const PaymentPage = lazy(() => import("@/pages/PaymentPage"));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -72,6 +73,9 @@ function App() {
               {/* Booking Routes */}
               <Route path="/booking-summary">
                 <PrivateRoute component={BookingSummary} />
+              </Route>
+              <Route path="/payment">
+                <PrivateRoute component={PaymentPage} />
               </Route>
 
               {/* Protected Routes */}
