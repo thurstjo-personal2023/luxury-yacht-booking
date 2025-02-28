@@ -22,6 +22,8 @@ const PartnerDashboard = lazy(() => import("@/pages/dashboard/Partner"));
 const YachtDetails = lazy(() => import("@/pages/YachtDetails"));
 const BookingSummary = lazy(() => import("@/pages/BookingSummary"));
 const PaymentPage = lazy(() => import("@/pages/PaymentPage"));
+const SearchAndBook = lazy(() => import("@/pages/explore/SearchAndBook"));
+const GuestDashboard = lazy(() => import("@/pages/explore/GuestDashboard"));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -69,6 +71,10 @@ function App() {
               <Route path="/login" component={Login} />
               <Route path="/register" component={Register} />
               <Route path="/yacht/:id" component={YachtDetails} />
+              
+              {/* Guest Experience Routes */}
+              <Route path="/explore" component={GuestDashboard} />
+              <Route path="/explore/search" component={SearchAndBook} />
               
               {/* Booking Routes */}
               <Route path="/booking-summary">
