@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { doc, getDoc, collection, query, where, getDocs, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
