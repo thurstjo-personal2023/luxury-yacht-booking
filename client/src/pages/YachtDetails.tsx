@@ -52,6 +52,7 @@ interface SelectedAddOn {
 
 export default function YachtDetails() {
   const [, params] = useRoute("/yacht/:id");
+  const [, setLocation] = useLocation();
   const yachtId = params?.id;
   const [yacht, setYacht] = useState<YachtExperience | null>(null);
   const [loading, setLoading] = useState(true);
@@ -256,8 +257,8 @@ export default function YachtDetails() {
     
     try {
       sessionStorage.setItem('bookingSummaryData', JSON.stringify(bookingData));
-      // Redirect to the booking summary page
-      window.location.href = '/booking-summary';
+      // Redirect to the booking summary page using wouter's setLocation
+      setLocation('/booking-summary');
     } catch (error) {
       console.error("Error saving booking data:", error);
       toast({
