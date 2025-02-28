@@ -226,8 +226,27 @@ export default function YachtDetails() {
       description: `Your booking total is $${grandTotal} for ${days} days. Redirecting to checkout...`,
     });
 
-    // In a real app, you would redirect to a checkout page
-    // or open a booking modal with additional options
+    // Save booking data to sessionStorage so the BookingSummary page can access it
+    const bookingData = {
+      yacht,
+      selectedAddOns,
+      dateRange,
+      totalPrice,
+      days
+    };
+    
+    try {
+      sessionStorage.setItem('bookingSummaryData', JSON.stringify(bookingData));
+      // Redirect to the booking summary page
+      window.location.href = '/booking-summary';
+    } catch (error) {
+      console.error("Error saving booking data:", error);
+      toast({
+        title: "Error processing booking",
+        description: "There was an error processing your booking. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleAddOnToggle = (uniqueId: string, productId: string, name: string, price: number) => {
