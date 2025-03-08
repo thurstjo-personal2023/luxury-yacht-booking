@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,6 +85,7 @@ export default function YachtForm() {
   const [, setLocation] = useLocation();
   const params = useParams();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("basic");
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -439,6 +441,10 @@ export default function YachtForm() {
           description: "Your yacht has been successfully created.",
         });
       }
+
+      // Invalidate queries to refresh data in the asset management page
+      queryClient.invalidateQueries({ queryKey: ['yachts'] });
+      queryClient.invalidateQueries({ queryKey: ['experiences'] });
       
       // Navigate back to asset management
       navigateBack();
