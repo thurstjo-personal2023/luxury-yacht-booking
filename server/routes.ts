@@ -41,15 +41,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get producer yachts
+  // Get producer yachts with pagination and ordering by availability status
   app.get("/api/yachts/producer", async (req, res) => {
     try {
+      // Parse pagination parameters from query string
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 10;
+      
       // In a real implementation, we would get the producer ID from auth
-      // For now, we'll just return all yachts since we're in development mode
-      const snapshot = await adminDb.collection('yacht_experiences').get();
+      // For now, we'll just query all yachts since we're in development mode
+      
+      // Create a reference to the collection
+      const yachtsRef = adminDb.collection('yacht_experiences');
+      
+      // Create a query with ordering by availability_status (descending - so true comes before false)
+      // and then by last_updated_date (newest first)
+      const yachtsQuery = yachtsRef.orderBy('availability_status', 'desc')
+                            .orderBy('last_updated_date', 'desc');
+      
+      // Get the total count first for pagination metadata
+      const totalYachts = await adminDb.collection('yacht_experiences').count().get();
+      const totalCount = totalYachts.data().count;
+      
+      // Apply pagination
+      const offset = (page - 1) * pageSize;
+      const paginatedQuery = yachtsQuery.offset(offset).limit(pageSize);
+      
+      // Execute the query
+      const snapshot = await paginatedQuery.get();
       
       if (snapshot.empty) {
-        return res.json([]);
+        return res.json({
+          yachts: [],
+          pagination: {
+            currentPage: page,
+            pageSize: pageSize,
+            totalCount: totalCount,
+            totalPages: Math.ceil(totalCount / pageSize)
+          }
+        });
       }
       
       const yachts = snapshot.docs.map(doc => ({
@@ -58,22 +88,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         package_id: doc.id // Ensure package_id is set, using doc.id as fallback
       }));
       
-      res.json(yachts);
+      // Return the yachts along with pagination metadata
+      res.json({
+        yachts: yachts,
+        pagination: {
+          currentPage: page,
+          pageSize: pageSize,
+          totalCount: totalCount,
+          totalPages: Math.ceil(totalCount / pageSize)
+        }
+      });
     } catch (error) {
       console.error("Error fetching producer yachts:", error);
       res.status(500).json({ error: "Failed to fetch yachts" });
     }
   });
   
-  // Get producer add-ons
+  // Get producer add-ons with pagination and ordering by availability
   app.get("/api/addons/producer", async (req, res) => {
     try {
+      // Parse pagination parameters from query string
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 10;
+      
       // In a real implementation, we would get the producer ID from auth
-      // For now, we'll just return all add-ons or an empty array
-      const snapshot = await adminDb.collection('products_add_ons').get();
+      // For now, we'll just query all add-ons since we're in development mode
+      
+      // Create a reference to the collection
+      const addonsRef = adminDb.collection('products_add_ons');
+      
+      // Create a query with ordering by availability (descending - so true comes before false)
+      // and then by lastUpdatedDate (newest first)
+      const addonsQuery = addonsRef.orderBy('availability', 'desc')
+                           .orderBy('lastUpdatedDate', 'desc');
+      
+      // Get the total count first for pagination metadata
+      const totalAddons = await adminDb.collection('products_add_ons').count().get();
+      const totalCount = totalAddons.data().count;
+      
+      // Apply pagination
+      const offset = (page - 1) * pageSize;
+      const paginatedQuery = addonsQuery.offset(offset).limit(pageSize);
+      
+      // Execute the query
+      const snapshot = await paginatedQuery.get();
       
       if (snapshot.empty) {
-        return res.json([]);
+        return res.json({
+          addons: [],
+          pagination: {
+            currentPage: page,
+            pageSize: pageSize,
+            totalCount: totalCount,
+            totalPages: Math.ceil(totalCount / pageSize)
+          }
+        });
       }
       
       const addons = snapshot.docs.map(doc => ({
@@ -81,7 +150,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         productId: doc.id // Ensure productId is set
       }));
       
-      res.json(addons);
+      // Return the add-ons along with pagination metadata
+      res.json({
+        addons: addons,
+        pagination: {
+          currentPage: page,
+          pageSize: pageSize,
+          totalCount: totalCount,
+          totalPages: Math.ceil(totalCount / pageSize)
+        }
+      });
     } catch (error) {
       console.error("Error fetching producer add-ons:", error);
       res.status(500).json({ error: "Failed to fetch add-ons" });
