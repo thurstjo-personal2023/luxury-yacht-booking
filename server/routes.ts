@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { registerStripeRoutes } from "./stripe";
+import { adminDb } from "./firebase-admin";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Experience Packages with Filters
@@ -37,6 +38,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching featured experiences:", error);
       res.status(500).json({ error: "Failed to fetch featured experiences" });
+    }
+  });
+
+  // Get producer yachts
+  app.get("/api/yachts/producer", async (req, res) => {
+    try {
+      // In a real implementation, we would get the producer ID from auth
+      // For now, we'll just return all yachts since we're in development mode
+      const snapshot = await adminDb.collection('yacht_experiences').get();
+      
+      if (snapshot.empty) {
+        return res.json([]);
+      }
+      
+      const yachts = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+        package_id: doc.id // Ensure package_id is set, using doc.id as fallback
+      }));
+      
+      res.json(yachts);
+    } catch (error) {
+      console.error("Error fetching producer yachts:", error);
+      res.status(500).json({ error: "Failed to fetch yachts" });
+    }
+  });
+  
+  // Get producer add-ons
+  app.get("/api/addons/producer", async (req, res) => {
+    try {
+      // In a real implementation, we would get the producer ID from auth
+      // For now, we'll just return all add-ons or an empty array
+      const snapshot = await adminDb.collection('products_add_ons').get();
+      
+      if (snapshot.empty) {
+        return res.json([]);
+      }
+      
+      const addons = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        productId: doc.id // Ensure productId is set
+      }));
+      
+      res.json(addons);
+    } catch (error) {
+      console.error("Error fetching producer add-ons:", error);
+      res.status(500).json({ error: "Failed to fetch add-ons" });
+    }
+  });
+  
+  // Get producer reviews
+  app.get("/api/reviews/producer", async (req, res) => {
+    try {
+      // In a real implementation, we would get the producer ID from auth and filter reviews
+      // For now, we'll just return an empty array
+      res.json([]);
+    } catch (error) {
+      console.error("Error fetching producer reviews:", error);
+      res.status(500).json({ error: "Failed to fetch reviews" });
+    }
+  });
+  
+  // Get producer bookings
+  app.get("/api/bookings/producer", async (req, res) => {
+    try {
+      // In a real implementation, we would get the producer ID from auth and filter bookings
+      // For now, we'll just return an empty array
+      res.json([]);
+    } catch (error) {
+      console.error("Error fetching producer bookings:", error);
+      res.status(500).json({ error: "Failed to fetch bookings" });
     }
   });
 
