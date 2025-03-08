@@ -69,10 +69,14 @@ export class FirestoreStorage implements IStorage {
       }
 
       // Map all experiences first
-      let results = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-      })) as YachtExperience[];
+      let results = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          package_id: doc.id, // Ensure package_id is set
+          id: doc.id, // Keep id for backwards compatibility
+        } as YachtExperience;
+      });
 
       console.log(`Found ${results.length} total experiences`);
 
@@ -93,7 +97,7 @@ export class FirestoreStorage implements IStorage {
         if (filters.region) {
           console.log(`Filtering by region: ${filters.region}`);
           results = results.filter(exp => 
-            exp.location.address.toLowerCase().includes(filters.region.toLowerCase())
+            exp.location.address.toLowerCase().includes((filters.region as string).toLowerCase())
           );
           console.log(`After region filter: ${results.length} experiences`);
         }
@@ -171,10 +175,14 @@ export class FirestoreStorage implements IStorage {
         return [];
       }
 
-      const allExperiences = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-      })) as YachtExperience[];
+      const allExperiences = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          package_id: doc.id, // Ensure package_id is set
+          id: doc.id, // Keep id for backwards compatibility
+        } as YachtExperience;
+      });
 
       // Get featured experiences based on reviews or featured flag
       const featuredExperiences = allExperiences
@@ -205,8 +213,8 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log('Getting add-ons with filters:', filters);
 
-      // Try to get from products_add-ons collection
-      let addOnsRef = adminDb.collection('products_add-ons');
+      // Try to get from products_add_ons collection (note the underscore)
+      let addOnsRef = adminDb.collection('products_add_ons');
       let snapshot = await addOnsRef.get();
 
       if (snapshot.empty) {
@@ -223,10 +231,14 @@ export class FirestoreStorage implements IStorage {
       }
 
       // Map all add-ons
-      let results = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-      })) as ProductAddOn[];
+      let results = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          productId: doc.id,
+          id: doc.id, // Keep id for backwards compatibility
+        } as ProductAddOn;
+      });
 
       console.log(`Found ${results.length} total add-ons`);
 
