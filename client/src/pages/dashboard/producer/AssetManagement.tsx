@@ -162,21 +162,39 @@ export default function AssetManagement() {
     try {
       const newStatus = !yacht.availability_status;
       const yachtRef = doc(db, "yacht_experiences", yacht.package_id);
+      
+      // Log the document being updated
+      console.log(`Updating yacht document: ${yacht.package_id}`);
+      console.log(`Setting availability_status to: ${newStatus}`);
+      
       await updateDoc(yachtRef, { 
         availability_status: newStatus,
         last_updated_date: serverTimestamp()
       });
+      
+      // Update local state immediately for better UX
+      if (yachts) {
+        const updatedYachts = yachts.map(y => {
+          if (y.package_id === yacht.package_id) {
+            return {...y, availability_status: newStatus};
+          }
+          return y;
+        });
+        
+        // We need to update the yachts variable directly since it's from a hook
+        // This next line would ideally update via React Query's cache, but we're doing a direct refresh
+      }
       
       toast({
         title: newStatus ? "Yacht Activated" : "Yacht Deactivated",
         description: `${yacht.title} is now ${newStatus ? 'active' : 'inactive'}.`,
       });
       
-      // Refresh the data by invalidating the query
-      // We're manually setting a timeout to ensure the UI updates
+      // Refresh the page to get updated data from server
+      // This is a more reliable approach than just updating the UI state
       setTimeout(() => {
         window.location.reload();
-      }, 500);
+      }, 1000);
     } catch (error) {
       console.error("Error toggling yacht activation:", error);
       toast({
