@@ -297,7 +297,34 @@ export default function AssetManagement() {
   };
   
   return (
-    <DashboardLayout>
+    <>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {itemToDelete && (
+                <>
+                  This will permanently delete <strong>{itemToDelete.name}</strong> and 
+                  cannot be undone. All associated data will also be deleted.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setItemToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => itemToDelete && handleDelete(itemToDelete.id, itemToDelete.type)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <DashboardLayout>
       <div className="container mx-auto px-4 py-6">
         <div className="mb-6">
           <Button 
@@ -506,7 +533,7 @@ export default function AssetManagement() {
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem 
                                   className="text-destructive focus:text-destructive"
-                                  onClick={() => handleDelete(yacht.package_id, 'yacht')}
+                                  onClick={() => openDeleteConfirm(yacht.package_id, 'yacht', yacht.title)}
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />
                                   Delete
