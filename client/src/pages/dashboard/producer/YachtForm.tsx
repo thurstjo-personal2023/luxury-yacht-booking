@@ -443,9 +443,14 @@ export default function YachtForm() {
       }
 
       // Invalidate queries to refresh data in the asset management page
-      // For the yachts query, include any possible pagination params by using a partial match
+      // Invalidate all yacht queries regardless of pagination parameters
       queryClient.invalidateQueries({ 
         queryKey: ['/api/yachts/producer']
+      });
+      
+      // Explicitly invalidate the first page to ensure the dashboard refreshes
+      queryClient.invalidateQueries({
+        queryKey: ['/api/yachts/producer', { page: 1, pageSize: 10 }]
       });
       
       // Invalidate the featured experiences query if the yacht is marked as featured

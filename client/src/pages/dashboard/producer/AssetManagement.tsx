@@ -183,7 +183,15 @@ export default function AssetManagement() {
         await deleteDoc(yachtRef);
         
         // Invalidate queries to refresh data
+        // Invalidate all query keys for the yacht producer endpoints
         queryClient.invalidateQueries({ queryKey: ["/api/yachts/producer"] });
+        
+        // Also explicitly invalidate the current page to ensure the list refreshes
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/yachts/producer", { page: yachtPage, pageSize }] 
+        });
+        
+        // Invalidate featured experiences
         queryClient.invalidateQueries({ queryKey: ["/api/experiences/featured"] });
         
         toast({
@@ -233,6 +241,11 @@ export default function AssetManagement() {
       
       // Invalidate cache to refresh data
       queryClient.invalidateQueries({ queryKey: ["/api/yachts/producer"] });
+      
+      // Also explicitly invalidate the current page to ensure the list refreshes
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/yachts/producer", { page: yachtPage, pageSize }] 
+      });
       
       // Also check if this yacht might be featured, and invalidate that query too
       if (yacht.featured) {
