@@ -82,51 +82,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // In a real implementation, we would get the producer ID from auth
       // For now, we'll just query all add-ons since we're in development mode
       
-      // Create a reference to the collection
-      const addonsRef = adminDb.collection('products_add_ons');
+      // Get add-ons with pagination and sorting
+      const addonsResponse = await storage.getAllProductAddOns({
+        page,
+        pageSize,
+        sortByStatus: true
+      });
       
-      // Create a query with ordering by availability (descending - so true comes before false)
-      // and then by lastUpdatedDate (newest first)
-      const addonsQuery = addonsRef.orderBy('availability', 'desc')
-                           .orderBy('lastUpdatedDate', 'desc');
-      
-      // Get the total count first for pagination metadata
-      const totalAddons = await adminDb.collection('products_add_ons').count().get();
-      const totalCount = totalAddons.data().count;
-      
-      // Apply pagination
-      const offset = (page - 1) * pageSize;
-      const paginatedQuery = addonsQuery.offset(offset).limit(pageSize);
-      
-      // Execute the query
-      const snapshot = await paginatedQuery.get();
-      
-      if (snapshot.empty) {
-        return res.json({
-          addons: [],
-          pagination: {
-            currentPage: page,
-            pageSize: pageSize,
-            totalCount: totalCount,
-            totalPages: Math.ceil(totalCount / pageSize)
-          }
-        });
-      }
-      
-      const addons = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        productId: doc.id // Ensure productId is set
-      }));
-      
-      // Return the add-ons along with pagination metadata
+      // Transform response to match the expected format
       res.json({
-        addons: addons,
-        pagination: {
-          currentPage: page,
-          pageSize: pageSize,
-          totalCount: totalCount,
-          totalPages: Math.ceil(totalCount / pageSize)
-        }
+        addons: addonsResponse.data,
+        pagination: addonsResponse.pagination
       });
     } catch (error) {
       console.error("Error fetching producer add-ons:", error);
