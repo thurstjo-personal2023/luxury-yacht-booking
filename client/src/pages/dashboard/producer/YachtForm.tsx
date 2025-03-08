@@ -327,6 +327,27 @@ export default function YachtForm() {
       return;
     }
     
+    // Switch to media tab if no media uploaded
+    if (media.length === 0 && activeTab !== "media") {
+      toast({
+        title: "Media Required",
+        description: "Please upload at least one image of your yacht.",
+      });
+      setActiveTab("media");
+      return;
+    }
+    
+    // Switch to basic tab if no location selected
+    if (!location && activeTab !== "basic") {
+      toast({
+        title: "Location Required",
+        description: "Please select a location for your yacht.",
+      });
+      setActiveTab("basic");
+      return;
+    }
+    
+    // Final validation before submission
     if (!location) {
       toast({
         title: "Location Required",
@@ -377,6 +398,9 @@ export default function YachtForm() {
           scenes: editMode && yachtData?.virtual_tour?.scenes ? yachtData.virtual_tour.scenes : []
         }
       };
+      
+      // Log the object being saved
+      console.log('Saving yacht with data:', yachtObject);
       
       // Save to Firestore
       const yachtRef = doc(db, "yacht_experiences", packageId);
@@ -448,7 +472,14 @@ export default function YachtForm() {
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <Tabs 
+              value={activeTab} 
+              onValueChange={(value) => {
+                // Check if form values are valid before allowing tab change
+                setActiveTab(value);
+              }} 
+              className="space-y-6"
+            >
               <TabsList className="grid grid-cols-3 mb-6">
                 <TabsTrigger value="basic">Basic Information</TabsTrigger>
                 <TabsTrigger value="details">Details & Pricing</TabsTrigger>
@@ -1028,23 +1059,38 @@ export default function YachtForm() {
               </TabsContent>
             </Tabs>
             
-            {/* Form Actions */}
-            <div className="flex justify-end gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={navigateBack}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={loading}
-              >
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {editMode ? 'Update Yacht' : 'Create Yacht'}
-              </Button>
-            </div>
+            {/* Form Actions - Always visible at bottom of form */}
+            <Card className="mt-8 shadow-md">
+              <CardContent className="pt-6">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg font-medium">Ready to {editMode ? 'update' : 'create'} your yacht?</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {editMode 
+                        ? 'Save your changes to update this yacht experience.' 
+                        : 'Complete the form to add this yacht to your fleet.'}
+                    </p>
+                  </div>
+                  <div className="flex gap-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={navigateBack}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={loading}
+                      className="px-6"
+                    >
+                      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {editMode ? 'Update Yacht' : 'Create Yacht'}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </form>
         </Form>
       </div>
