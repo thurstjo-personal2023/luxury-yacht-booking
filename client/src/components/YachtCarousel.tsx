@@ -131,8 +131,10 @@ export function YachtCarousel({
     );
   }
 
-  // Normalize yacht data
-  const normalizedYachts = yachts.map(normalizeYacht);
+  // Normalize yacht data - with safety check to ensure yachts is an array
+  const normalizedYachts = Array.isArray(yachts) 
+    ? yachts.map(normalizeYacht)
+    : [];
 
   return (
     <div className="my-10 px-4">
