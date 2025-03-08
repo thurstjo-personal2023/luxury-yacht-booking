@@ -443,8 +443,17 @@ export default function YachtForm() {
       }
 
       // Invalidate queries to refresh data in the asset management page
-      queryClient.invalidateQueries({ queryKey: ['yachts'] });
-      queryClient.invalidateQueries({ queryKey: ['experiences'] });
+      // For the yachts query, include any possible pagination params by using a partial match
+      queryClient.invalidateQueries({ 
+        queryKey: ['/api/yachts/producer']
+      });
+      
+      // Invalidate the featured experiences query if the yacht is marked as featured
+      if (values.featured) {
+        queryClient.invalidateQueries({ 
+          queryKey: ['/api/experiences/featured']
+        });
+      }
       
       // Navigate back to asset management
       navigateBack();
