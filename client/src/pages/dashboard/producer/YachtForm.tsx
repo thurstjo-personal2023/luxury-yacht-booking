@@ -406,7 +406,28 @@ export default function YachtForm() {
       const yachtRef = doc(db, "yacht_experiences", packageId);
       
       if (editMode) {
-        await updateDoc(yachtRef, yachtObject);
+        // Convert YachtExperience to a plain object for Firestore update
+        const updateData = {
+          title: yachtObject.title,
+          description: yachtObject.description,
+          category: yachtObject.category,
+          yacht_type: yachtObject.yacht_type,
+          location: yachtObject.location,
+          duration: yachtObject.duration,
+          capacity: yachtObject.capacity,
+          pricing: yachtObject.pricing,
+          pricing_model: yachtObject.pricing_model,
+          customization_options: yachtObject.customization_options,
+          media: yachtObject.media,
+          availability_status: yachtObject.availability_status,
+          featured: yachtObject.featured,
+          tags: yachtObject.tags,
+          published_status: yachtObject.published_status,
+          last_updated_date: yachtObject.last_updated_date,
+          virtual_tour: yachtObject.virtual_tour
+        };
+        
+        await updateDoc(yachtRef, updateData);
         toast({
           title: "Yacht Updated",
           description: "Your yacht has been successfully updated.",
