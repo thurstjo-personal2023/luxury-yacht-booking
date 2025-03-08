@@ -1,13 +1,35 @@
 import { adminDb } from "./firebase-admin";
-import type { YachtExperience } from "@shared/firestore-schema";
+import type { ProductAddOn, YachtExperience } from "@shared/firestore-schema";
+
+interface PaginationData {
+  currentPage: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+interface PaginatedResponse<T> {
+  data: T[];
+  pagination: PaginationData;
+}
 
 export interface IStorage {
   getAllExperiencePackages(filters?: {
     type?: string;
     region?: string;
     port_marina?: string;
-  }): Promise<YachtExperience[]>;
+    page?: number;
+    pageSize?: number;
+    sortByStatus?: boolean;
+  }): Promise<PaginatedResponse<YachtExperience>>;
   getFeaturedExperiencePackages(): Promise<YachtExperience[]>;
+  getAllProductAddOns(filters?: {
+    category?: string;
+    partnerId?: string;
+    page?: number;
+    pageSize?: number;
+    sortByStatus?: boolean;
+  }): Promise<PaginatedResponse<ProductAddOn>>;
 }
 
 export class FirestoreStorage implements IStorage {
@@ -15,7 +37,10 @@ export class FirestoreStorage implements IStorage {
     type?: string;
     region?: string;
     port_marina?: string;
-  }): Promise<YachtExperience[]> {
+    page?: number;
+    pageSize?: number;
+    sortByStatus?: boolean;
+  }): Promise<PaginatedResponse<YachtExperience>> {
     try {
       console.log('Getting experiences with filters:', filters);
 
@@ -32,7 +57,15 @@ export class FirestoreStorage implements IStorage {
 
       if (snapshot.empty) {
         console.log('No experiences found in any collection');
-        return [];
+        return {
+          data: [],
+          pagination: {
+            currentPage: 1,
+            pageSize: filters?.pageSize || 10,
+            totalCount: 0,
+            totalPages: 0
+          }
+        };
       }
 
       // Map all experiences first
@@ -73,13 +106,50 @@ export class FirestoreStorage implements IStorage {
           );
           console.log(`After marina filter: ${results.length} experiences`);
         }
+        
+        // Sort by availability status if requested (active first)
+        if (filters.sortByStatus) {
+          console.log('Sorting by availability status (active first)');
+          results.sort((a, b) => {
+            if (a.availability_status === b.availability_status) return 0;
+            return a.availability_status ? -1 : 1; // Active items first
+          });
+        }
       }
 
-      console.log(`Returning ${results.length} experiences`);
-      return results;
+      // Calculate pagination
+      const totalCount = results.length;
+      const pageSize = filters?.pageSize || 10;
+      const totalPages = Math.ceil(totalCount / pageSize);
+      const currentPage = filters?.page || 1;
+      
+      // Apply pagination
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedResults = results.slice(startIndex, endIndex);
+      
+      console.log(`Returning ${paginatedResults.length} experiences (page ${currentPage} of ${totalPages})`);
+      
+      return {
+        data: paginatedResults,
+        pagination: {
+          currentPage,
+          pageSize,
+          totalCount,
+          totalPages
+        }
+      };
     } catch (error) {
       console.error('Error fetching experience packages:', error);
-      return [];
+      return {
+        data: [],
+        pagination: {
+          currentPage: 1,
+          pageSize: filters?.pageSize || 10,
+          totalCount: 0,
+          totalPages: 0
+        }
+      };
     }
   }
 
@@ -122,6 +192,107 @@ export class FirestoreStorage implements IStorage {
     } catch (error) {
       console.error('Error fetching featured experiences:', error);
       return [];
+    }
+  }
+  
+  async getAllProductAddOns(filters?: {
+    category?: string;
+    partnerId?: string;
+    page?: number;
+    pageSize?: number;
+    sortByStatus?: boolean;
+  }): Promise<PaginatedResponse<ProductAddOn>> {
+    try {
+      console.log('Getting add-ons with filters:', filters);
+
+      // Try to get from products_add-ons collection
+      let addOnsRef = adminDb.collection('products_add-ons');
+      let snapshot = await addOnsRef.get();
+
+      if (snapshot.empty) {
+        console.log('No add-ons found in collection');
+        return {
+          data: [],
+          pagination: {
+            currentPage: 1,
+            pageSize: filters?.pageSize || 10,
+            totalCount: 0,
+            totalPages: 0
+          }
+        };
+      }
+
+      // Map all add-ons
+      let results = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+      })) as ProductAddOn[];
+
+      console.log(`Found ${results.length} total add-ons`);
+
+      // Apply filters if they exist
+      if (filters) {
+        // Filter by category
+        if (filters.category) {
+          console.log(`Filtering by category: ${filters.category}`);
+          results = results.filter(addon => 
+            addon.category === filters.category
+          );
+          console.log(`After category filter: ${results.length} add-ons`);
+        }
+
+        // Filter by partnerId
+        if (filters.partnerId) {
+          console.log(`Filtering by partnerId: ${filters.partnerId}`);
+          results = results.filter(addon => 
+            addon.partnerId === filters.partnerId
+          );
+          console.log(`After partnerId filter: ${results.length} add-ons`);
+        }
+        
+        // Sort by availability status if requested (active first)
+        if (filters.sortByStatus) {
+          console.log('Sorting by availability status (active first)');
+          results.sort((a, b) => {
+            if (a.availability === b.availability) return 0;
+            return a.availability ? -1 : 1; // Active items first
+          });
+        }
+      }
+
+      // Calculate pagination
+      const totalCount = results.length;
+      const pageSize = filters?.pageSize || 10;
+      const totalPages = Math.ceil(totalCount / pageSize);
+      const currentPage = filters?.page || 1;
+      
+      // Apply pagination
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedResults = results.slice(startIndex, endIndex);
+      
+      console.log(`Returning ${paginatedResults.length} add-ons (page ${currentPage} of ${totalPages})`);
+      
+      return {
+        data: paginatedResults,
+        pagination: {
+          currentPage,
+          pageSize,
+          totalCount,
+          totalPages
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching add-ons:', error);
+      return {
+        data: [],
+        pagination: {
+          currentPage: 1,
+          pageSize: filters?.pageSize || 10,
+          totalCount: 0,
+          totalPages: 0
+        }
+      };
     }
   }
 }

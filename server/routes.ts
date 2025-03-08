@@ -8,8 +8,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Experience Packages with Filters
   app.get("/api/experiences", async (req, res) => {
     try {
-      const { type, region, port_marina } = req.query;
-      console.log('Received filter request:', { type, region, port_marina });
+      const { type, region, port_marina, page, pageSize, sortByStatus } = req.query;
+      console.log('Received filter request:', { type, region, port_marina, page, pageSize, sortByStatus });
 
       const filters: any = {};
 
@@ -17,13 +17,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (type && type !== '') filters.type = type as string;
       if (region && region !== '') filters.region = region as string;
       if (port_marina && port_marina !== '') filters.port_marina = port_marina as string;
+      if (page) filters.page = parseInt(page as string);
+      if (pageSize) filters.pageSize = parseInt(pageSize as string);
+      if (sortByStatus) filters.sortByStatus = sortByStatus === 'true';
 
-      const experiences = await storage.getAllExperiencePackages(
+      const experiencesResponse = await storage.getAllExperiencePackages(
         Object.keys(filters).length > 0 ? filters : undefined
       );
 
-      console.log(`Returning ${experiences.length} experiences`);
-      res.json(experiences);
+      console.log(`Returning ${experiencesResponse.data.length} experiences (page ${experiencesResponse.pagination.currentPage} of ${experiencesResponse.pagination.totalPages})`);
+      res.json(experiencesResponse);
     } catch (error) {
       console.error("Error fetching experiences:", error);
       res.status(500).json({ error: "Failed to fetch experiences" });
@@ -51,52 +54,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // In a real implementation, we would get the producer ID from auth
       // For now, we'll just query all yachts since we're in development mode
       
-      // Create a reference to the collection
-      const yachtsRef = adminDb.collection('yacht_experiences');
+      // Get experiences with pagination and sorting
+      const experiencesResponse = await storage.getAllExperiencePackages({
+        page,
+        pageSize,
+        sortByStatus: true
+      });
       
-      // Create a query with ordering by availability_status (descending - so true comes before false)
-      // and then by last_updated_date (newest first)
-      const yachtsQuery = yachtsRef.orderBy('availability_status', 'desc')
-                            .orderBy('last_updated_date', 'desc');
-      
-      // Get the total count first for pagination metadata
-      const totalYachts = await adminDb.collection('yacht_experiences').count().get();
-      const totalCount = totalYachts.data().count;
-      
-      // Apply pagination
-      const offset = (page - 1) * pageSize;
-      const paginatedQuery = yachtsQuery.offset(offset).limit(pageSize);
-      
-      // Execute the query
-      const snapshot = await paginatedQuery.get();
-      
-      if (snapshot.empty) {
-        return res.json({
-          yachts: [],
-          pagination: {
-            currentPage: page,
-            pageSize: pageSize,
-            totalCount: totalCount,
-            totalPages: Math.ceil(totalCount / pageSize)
-          }
-        });
-      }
-      
-      const yachts = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-        package_id: doc.id // Ensure package_id is set, using doc.id as fallback
-      }));
-      
-      // Return the yachts along with pagination metadata
+      // Transform response to match the expected format
       res.json({
-        yachts: yachts,
-        pagination: {
-          currentPage: page,
-          pageSize: pageSize,
-          totalCount: totalCount,
-          totalPages: Math.ceil(totalCount / pageSize)
-        }
+        yachts: experiencesResponse.data,
+        pagination: experiencesResponse.pagination
       });
     } catch (error) {
       console.error("Error fetching producer yachts:", error);

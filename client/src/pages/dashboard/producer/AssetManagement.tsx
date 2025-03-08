@@ -99,7 +99,7 @@ export default function AssetManagement() {
   const addonsPagination = addOnsResponse?.pagination;
   
   // Filtered yachts based on search and category
-  const filteredYachts = yachts?.filter(yacht => {
+  const filteredYachts = yachts?.filter((yacht: ExtendedYachtExperience) => {
     const matchesSearch = !searchQuery || 
       yacht.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       yacht.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -110,7 +110,7 @@ export default function AssetManagement() {
   });
   
   // Filtered add-ons based on search and category
-  const filteredAddOns = addOns?.filter(addon => {
+  const filteredAddOns = addOns?.filter((addon: ProductAddOn) => {
     const matchesSearch = !searchQuery || 
       addon.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       addon.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -121,8 +121,8 @@ export default function AssetManagement() {
   });
   
   // Get unique categories
-  const yachtCategories = yachts ? Array.from(new Set(yachts.map(yacht => yacht.category))).sort() : [];
-  const addonCategories = addOns ? Array.from(new Set(addOns.map(addon => addon.category))).sort() : [];
+  const yachtCategories = yachts ? Array.from(new Set(yachts.map((yacht: ExtendedYachtExperience) => yacht.category))).sort() : [];
+  const addonCategories = addOns ? Array.from(new Set(addOns.map((addon: ProductAddOn) => addon.category))).sort() : [];
   
   // Handlers
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -320,7 +320,7 @@ export default function AssetManagement() {
             ) : (
               <div className="space-y-4">
                 {/* Yacht List */}
-                {filteredYachts?.map(yacht => (
+                {filteredYachts?.map((yacht: ExtendedYachtExperience) => (
                   <Card key={yacht.package_id} className="overflow-hidden">
                     <div className="flex flex-col md:flex-row">
                       {/* Image */}
@@ -480,7 +480,7 @@ export default function AssetManagement() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Add-ons List */}
-                {filteredAddOns?.map(addon => (
+                {filteredAddOns?.map((addon: ProductAddOn) => (
                   <Card key={addon.productId}>
                     <div className="relative">
                       <div className="h-40 overflow-hidden">
