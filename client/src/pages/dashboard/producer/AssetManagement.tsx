@@ -43,6 +43,12 @@ import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { YachtExperience, YachtProfile, ProductAddOn } from "@shared/firestore-schema";
 
+// Extended interface to include properties from API response
+interface ExtendedYachtExperience extends YachtExperience {
+  imageUrl?: string;
+  name?: string;
+}
+
 export default function AssetManagement() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -51,7 +57,7 @@ export default function AssetManagement() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
   // Queries
-  const { data: yachts, isLoading: yachtsLoading } = useQuery<YachtExperience[]>({
+  const { data: yachts, isLoading: yachtsLoading } = useQuery<ExtendedYachtExperience[]>({
     queryKey: ["/api/yachts/producer"],
   });
   
@@ -82,8 +88,8 @@ export default function AssetManagement() {
   });
   
   // Get unique categories
-  const yachtCategories = yachts ? [...new Set(yachts.map(yacht => yacht.category))].sort() : [];
-  const addonCategories = addOns ? [...new Set(addOns.map(addon => addon.category))].sort() : [];
+  const yachtCategories = yachts ? Array.from(new Set(yachts.map(yacht => yacht.category))).sort() : [];
+  const addonCategories = addOns ? Array.from(new Set(addOns.map(addon => addon.category))).sort() : [];
   
   // Handlers
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -262,9 +268,14 @@ export default function AssetManagement() {
                       {/* Image */}
                       <div className="w-full md:w-64 h-48 md:h-auto">
                         <img 
-                          src={yacht.media?.[0]?.url || '/yacht-placeholder.jpg'} 
-                          alt={yacht.title}
+                          src={yacht.media?.[0]?.url || yacht.imageUrl || '/yacht-placeholder.jpg'} 
+                          alt={yacht.title || yacht.name}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null;
+                            target.src = '/yacht-placeholder.jpg';
+                          }}
                         />
                       </div>
                       
@@ -385,9 +396,18 @@ export default function AssetManagement() {
                     <div className="relative">
                       <div className="h-40 overflow-hidden">
                         <img 
-                          src={addon.media?.[0]?.url || '/service-placeholder.jpg'} 
+                          src={
+                            (addon.media?.[0]?.url) || 
+                            (typeof addon.media === 'object' && addon.media?.['0']?.url) || 
+                            '/service-placeholder.jpg'
+                          } 
                           alt={addon.name}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null;
+                            target.src = '/service-placeholder.jpg';
+                          }}
                         />
                       </div>
                       <div className="absolute top-2 right-2 flex gap-1">
