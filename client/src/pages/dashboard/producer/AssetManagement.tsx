@@ -42,7 +42,15 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { auth, db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  doc, 
+  updateDoc, 
+  serverTimestamp 
+} from "firebase/firestore";
 import { YachtExperience, YachtProfile, ProductAddOn } from "@shared/firestore-schema";
 
 // Extended interface to include properties from API response
@@ -147,6 +155,36 @@ export default function AssetManagement() {
       description: "Delete functionality will be implemented in a future update.",
       variant: "destructive",
     });
+  };
+  
+  // Toggle yacht activation status
+  const toggleYachtActivation = async (yacht: ExtendedYachtExperience) => {
+    try {
+      const newStatus = !yacht.availability_status;
+      const yachtRef = doc(db, "yacht_experiences", yacht.package_id);
+      await updateDoc(yachtRef, { 
+        availability_status: newStatus,
+        last_updated_date: serverTimestamp()
+      });
+      
+      toast({
+        title: newStatus ? "Yacht Activated" : "Yacht Deactivated",
+        description: `${yacht.title} is now ${newStatus ? 'active' : 'inactive'}.`,
+      });
+      
+      // Refresh the data by invalidating the query
+      // We're manually setting a timeout to ensure the UI updates
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (error) {
+      console.error("Error toggling yacht activation:", error);
+      toast({
+        title: "Action Failed",
+        description: "Failed to update yacht status. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
   
   // Pagination handlers
@@ -379,6 +417,22 @@ export default function AssetManagement() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem 
+                                  onClick={() => toggleYachtActivation(yacht)}
+                                >
+                                  {yacht.availability_status ? (
+                                    <>
+                                      <XCircle className="mr-2 h-4 w-4" />
+                                      Deactivate
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Check className="mr-2 h-4 w-4" />
+                                      Activate
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem 
                                   className="text-destructive focus:text-destructive"
                                   onClick={() => handleDelete(yacht.package_id, 'yacht')}
