@@ -638,6 +638,19 @@ export default function YachtForm() {
                         Select the marina or port where your yacht is located
                       </FormDescription>
                     </div>
+                    
+                    <div className="flex justify-between mt-6">
+                      {/* No Previous button on first tab */}
+                      
+                      <Button 
+                        type="button" 
+                        onClick={() => setActiveTab("details")}
+                        className="flex items-center gap-2 ml-auto"
+                      >
+                        Next: Details & Pricing
+                        <ArrowLeft className="h-4 w-4 rotate-180" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -874,6 +887,27 @@ export default function YachtForm() {
                         )}
                       />
                     </div>
+                    
+                    <div className="flex justify-between mt-6">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => setActiveTab("basic")}
+                        className="flex items-center gap-2"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to Basic Information
+                      </Button>
+                      
+                      <Button 
+                        type="button" 
+                        onClick={() => setActiveTab("media")}
+                        className="flex items-center gap-2"
+                      >
+                        Next: Media & Settings
+                        <ArrowLeft className="h-4 w-4 rotate-180" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -1073,6 +1107,36 @@ export default function YachtForm() {
                             After saving, you can access the Virtual Tour Editor to set up your 360° experience.
                           </AlertDescription>
                         </Alert>
+                      )}
+                    </div>
+                    <div className="flex justify-between mt-6">
+                      {activeTab !== "basic" && (
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          onClick={() => {
+                            const prevTab = activeTab === "media" ? "details" : "basic";
+                            setActiveTab(prevTab);
+                          }}
+                          className="flex items-center gap-2"
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                          Previous
+                        </Button>
+                      )}
+                      
+                      {activeTab !== "media" && (
+                        <Button 
+                          type="button" 
+                          onClick={() => {
+                            const nextTab = activeTab === "basic" ? "details" : "media";
+                            setActiveTab(nextTab);
+                          }}
+                          className="flex items-center gap-2 ml-auto"
+                        >
+                          Next
+                          <ArrowLeft className="h-4 w-4 rotate-180" />
+                        </Button>
                       )}
                     </div>
                   </CardContent>
