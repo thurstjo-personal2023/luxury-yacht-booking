@@ -232,12 +232,15 @@ export class FirestoreStorage implements IStorage {
 
       // Map all add-ons
       let results = snapshot.docs.map(doc => {
+        // Cast FirebaseFirestore.DocumentData to unknown first, then to ProductAddOn
         const data = doc.data();
-        return {
+        const addon = {
           ...data,
           productId: doc.id,
           id: doc.id, // Keep id for backwards compatibility
-        } as ProductAddOn;
+        };
+        // Type assertion after merging with required fields
+        return addon as unknown as ProductAddOn;
       });
 
       console.log(`Found ${results.length} total add-ons`);
