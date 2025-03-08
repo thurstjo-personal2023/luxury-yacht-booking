@@ -27,6 +27,8 @@ import {
 import { 
   AlertCircle,
   ArrowLeft, 
+  ChevronLeft,
+  ChevronRight,
   Check, 
   Edit, 
   Eye, 
@@ -49,6 +51,25 @@ interface ExtendedYachtExperience extends YachtExperience {
   name?: string;
 }
 
+// Pagination interface
+interface PaginationData {
+  currentPage: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+// API response interfaces
+interface YachtsResponse {
+  yachts: ExtendedYachtExperience[];
+  pagination: PaginationData;
+}
+
+interface AddOnsResponse {
+  addons: ProductAddOn[];
+  pagination: PaginationData;
+}
+
 export default function AssetManagement() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -56,14 +77,26 @@ export default function AssetManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
-  // Queries
-  const { data: yachts, isLoading: yachtsLoading } = useQuery<ExtendedYachtExperience[]>({
-    queryKey: ["/api/yachts/producer"],
+  // Pagination state
+  const [yachtPage, setYachtPage] = useState(1);
+  const [addonPage, setAddonPage] = useState(1);
+  const pageSize = 10; // Items per page
+  
+  // Queries with pagination
+  const { data: yachtsResponse, isLoading: yachtsLoading } = useQuery<YachtsResponse>({
+    queryKey: ["/api/yachts/producer", { page: yachtPage, pageSize }],
   });
   
-  const { data: addOns, isLoading: addOnsLoading } = useQuery<ProductAddOn[]>({
-    queryKey: ["/api/addons/producer"],
+  const { data: addOnsResponse, isLoading: addOnsLoading } = useQuery<AddOnsResponse>({
+    queryKey: ["/api/addons/producer", { page: addonPage, pageSize }],
   });
+  
+  // Extract data from responses
+  const yachts = yachtsResponse?.yachts || [];
+  const yachtsPagination = yachtsResponse?.pagination;
+  
+  const addOns = addOnsResponse?.addons || [];
+  const addonsPagination = addOnsResponse?.pagination;
   
   // Filtered yachts based on search and category
   const filteredYachts = yachts?.filter(yacht => {
@@ -116,10 +149,35 @@ export default function AssetManagement() {
     });
   };
   
+  // Pagination handlers
+  const handlePreviousYachtPage = () => {
+    if (yachtPage > 1) {
+      setYachtPage(prev => prev - 1);
+    }
+  };
+
+  const handleNextYachtPage = () => {
+    if (yachtsPagination && yachtPage < yachtsPagination.totalPages) {
+      setYachtPage(prev => prev + 1);
+    }
+  };
+
+  const handlePreviousAddonPage = () => {
+    if (addonPage > 1) {
+      setAddonPage(prev => prev - 1);
+    }
+  };
+
+  const handleNextAddonPage = () => {
+    if (addonsPagination && addonPage < addonsPagination.totalPages) {
+      setAddonPage(prev => prev + 1);
+    }
+  };
+  
   // Create status badge
   const renderStatusBadge = (status: boolean) => {
     return status ? (
-      <Badge variant="success" className="bg-green-100 text-green-800 hover:bg-green-200">
+      <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">
         Active
       </Badge>
     ) : (
@@ -359,6 +417,37 @@ export default function AssetManagement() {
                     </div>
                   </Card>
                 ))}
+                
+                {/* Yacht Pagination */}
+                {yachtsPagination && yachtsPagination.totalPages > 1 && (
+                  <div className="flex items-center justify-center mt-6 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePreviousYachtPage}
+                      disabled={yachtPage === 1}
+                      className="flex items-center gap-1"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous
+                    </Button>
+                    
+                    <span className="text-sm text-muted-foreground">
+                      Page {yachtPage} of {yachtsPagination.totalPages}
+                    </span>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleNextYachtPage}
+                      disabled={yachtPage === yachtsPagination.totalPages}
+                      className="flex items-center gap-1"
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>
@@ -454,6 +543,37 @@ export default function AssetManagement() {
                     </CardFooter>
                   </Card>
                 ))}
+                
+                {/* Add-ons Pagination */}
+                {addonsPagination && addonsPagination.totalPages > 1 && (
+                  <div className="flex items-center justify-center col-span-1 md:col-span-2 lg:col-span-3 mt-6 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePreviousAddonPage}
+                      disabled={addonPage === 1}
+                      className="flex items-center gap-1"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous
+                    </Button>
+                    
+                    <span className="text-sm text-muted-foreground">
+                      Page {addonPage} of {addonsPagination.totalPages}
+                    </span>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleNextAddonPage}
+                      disabled={addonPage === addonsPagination.totalPages}
+                      className="flex items-center gap-1"
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>
