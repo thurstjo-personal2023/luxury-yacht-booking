@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { 
   AlertCircle,
   ArrowLeft, 
@@ -49,7 +60,8 @@ import {
   getDocs, 
   doc, 
   updateDoc, 
-  serverTimestamp 
+  serverTimestamp,
+  deleteDoc
 } from "firebase/firestore";
 import { YachtExperience, YachtProfile, ProductAddOn } from "@shared/firestore-schema";
 
@@ -81,9 +93,14 @@ interface AddOnsResponse {
 export default function AssetManagement() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("yachts");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  
+  // Dialog state for delete confirmation
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'yacht' | 'addon', name: string} | null>(null);
   
   // Pagination state
   const [yachtPage, setYachtPage] = useState(1);
@@ -149,12 +166,59 @@ export default function AssetManagement() {
   const goToEditService = (id: string) => setLocation(`/dashboard/producer/assets/edit-service/${id}`);
   const goToYachtDetails = (id: string) => setLocation(`/yachts/${id}`);
   
-  const handleDelete = (id: string, type: 'yacht' | 'addon') => {
-    toast({
-      title: "Not implemented",
-      description: "Delete functionality will be implemented in a future update.",
-      variant: "destructive",
-    });
+  // Show delete confirmation dialog
+  const openDeleteConfirm = (id: string, type: 'yacht' | 'addon', name: string) => {
+    setItemToDelete({ id, type, name });
+    setDeleteConfirmOpen(true);
+  };
+  
+  // Delete yacht or addon
+  const handleDelete = async (id: string, type: 'yacht' | 'addon') => {
+    if (!id) return;
+    
+    try {
+      if (type === 'yacht') {
+        // Delete from Firestore
+        const yachtRef = doc(db, "yacht_experiences", id);
+        await deleteDoc(yachtRef);
+        
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ["/api/yachts/producer"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/yachts/featured"] });
+        
+        toast({
+          title: "Yacht Deleted",
+          description: "The yacht has been successfully deleted.",
+        });
+      } else {
+        // Delete addon from Firestore
+        const addonRef = doc(db, "products_add_ons", id);
+        await deleteDoc(addonRef);
+        
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ["/api/addons/producer"] });
+        
+        toast({
+          title: "Service Add-on Deleted",
+          description: "The service add-on has been successfully deleted.",
+        });
+      }
+      
+      // Reload page after a short delay to ensure the UI updates
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      console.error(`Error deleting ${type}:`, error);
+      toast({
+        title: "Deletion Failed",
+        description: `Failed to delete the ${type}. Please try again.`,
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteConfirmOpen(false);
+      setItemToDelete(null);
+    }
   };
   
   // Toggle yacht activation status
@@ -172,29 +236,18 @@ export default function AssetManagement() {
         last_updated_date: serverTimestamp()
       });
       
-      // Update local state immediately for better UX
-      if (yachts) {
-        const updatedYachts = yachts.map(y => {
-          if (y.package_id === yacht.package_id) {
-            return {...y, availability_status: newStatus};
-          }
-          return y;
-        });
-        
-        // We need to update the yachts variable directly since it's from a hook
-        // This next line would ideally update via React Query's cache, but we're doing a direct refresh
+      // Invalidate cache to refresh data
+      queryClient.invalidateQueries({ queryKey: ["/api/yachts/producer"] });
+      
+      // Also check if this yacht might be featured, and invalidate that query too
+      if (yacht.featured) {
+        queryClient.invalidateQueries({ queryKey: ["/api/experiences/featured"] });
       }
       
       toast({
         title: newStatus ? "Yacht Activated" : "Yacht Deactivated",
         description: `${yacht.title} is now ${newStatus ? 'active' : 'inactive'}.`,
       });
-      
-      // Refresh the page to get updated data from server
-      // This is a more reliable approach than just updating the UI state
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
     } catch (error) {
       console.error("Error toggling yacht activation:", error);
       toast({
