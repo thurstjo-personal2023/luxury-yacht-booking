@@ -68,7 +68,10 @@ import { YachtExperience, YachtProfile, ProductAddOn } from "@shared/firestore-s
 // Extended interface to include properties from API response
 interface ExtendedYachtExperience extends YachtExperience {
   imageUrl?: string;
-  name?: string;
+  name?: string; 
+  // Additional properties to handle both naming conventions
+  yachtId?: string;
+  available?: boolean;
 }
 
 // Pagination interface
@@ -557,7 +560,7 @@ export default function AssetManagement() {
                               <h3 className="text-lg font-semibold mb-1">{yacht.title || yacht.name}</h3>
                               <div className="flex items-center gap-2 mb-2">
                                 <Badge variant="secondary">{yacht.category}</Badge>
-                                {renderStatusBadge(yacht.availability_status !== undefined ? yacht.availability_status : yacht.available)}
+                                {renderStatusBadge(yacht.availability_status !== undefined ? !!yacht.availability_status : !!yacht.available)}
                                 {yacht.featured && (
                                   <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200">
                                     Featured
@@ -595,7 +598,7 @@ export default function AssetManagement() {
                                   <DropdownMenuItem 
                                     onClick={() => toggleYachtActivation(yacht)}
                                   >
-                                    {(yacht.availability_status !== undefined ? yacht.availability_status : yacht.available) ? (
+                                    {(yacht.availability_status !== undefined ? !!yacht.availability_status : !!yacht.available) ? (
                                       <>
                                         <XCircle className="mr-2 h-4 w-4" />
                                         Deactivate
@@ -610,7 +613,11 @@ export default function AssetManagement() {
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem 
                                     className="text-destructive focus:text-destructive"
-                                    onClick={() => openDeleteConfirm(yacht.package_id, 'yacht', yacht.title)}
+                                    onClick={() => openDeleteConfirm(
+                                      yacht.package_id || yacht.yachtId || yacht.id || '', 
+                                      'yacht', 
+                                      yacht.title || yacht.name || ''
+                                    )}
                                   >
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Delete
