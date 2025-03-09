@@ -117,7 +117,7 @@ export default function AssetManagement() {
   
   // Queries with pagination
   const { data: yachtsResponse, isLoading: yachtsLoading } = useQuery<YachtsResponse>({
-    queryKey: ["/api/yachts/producer", { page: yachtPage, pageSize, producerId }],
+    queryKey: ["/api/producer/yachts", { page: yachtPage, pageSize, producerId }],
   });
   
   const { data: addOnsResponse, isLoading: addOnsLoading } = useQuery<AddOnsResponse>({
@@ -220,18 +220,18 @@ export default function AssetManagement() {
         console.log('Invalidating all yacht queries after deletion...');
         
         // First, remove all yacht producer queries from cache to ensure fresh data
-        queryClient.removeQueries({ queryKey: ["/api/yachts/producer"] });
+        queryClient.removeQueries({ queryKey: ["/api/producer/yachts"] });
         
         // Then invalidate to trigger refetching
         queryClient.invalidateQueries({ 
-          queryKey: ["/api/yachts/producer"],
+          queryKey: ["/api/producer/yachts"],
           refetchType: 'all'
         });
         
         // Explicitly invalidate all pages to ensure complete refresh
         for (let page = 1; page <= 5; page++) { // Assume maximum of 5 pages for safety
           queryClient.invalidateQueries({
-            queryKey: ["/api/yachts/producer", { page, pageSize }],
+            queryKey: ["/api/producer/yachts", { page, pageSize }],
             refetchType: 'all'
           });
         }
@@ -344,18 +344,18 @@ export default function AssetManagement() {
       console.log('Invalidating all yacht queries to refresh data...');
       
       // First, remove all yacht producer queries from cache to ensure fresh data
-      queryClient.removeQueries({ queryKey: ["/api/yachts/producer"] });
+      queryClient.removeQueries({ queryKey: ["/api/producer/yachts"] });
       
       // Then invalidate to trigger refetching
       queryClient.invalidateQueries({ 
-        queryKey: ["/api/yachts/producer"],
+        queryKey: ["/api/producer/yachts"],
         refetchType: 'all'
       });
       
       // Explicitly invalidate all pages to ensure complete refresh
       for (let page = 1; page <= 5; page++) { // Assume maximum of 5 pages for safety
         queryClient.invalidateQueries({
-          queryKey: ["/api/yachts/producer", { page, pageSize }],
+          queryKey: ["/api/producer/yachts", { page, pageSize }],
           refetchType: 'all'
         });
       }
