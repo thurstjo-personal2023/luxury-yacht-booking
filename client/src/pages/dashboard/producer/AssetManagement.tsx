@@ -125,9 +125,13 @@ export default function AssetManagement() {
   
   // Filtered yachts based on search and category
   const filteredYachts = yachts?.filter((yacht: ExtendedYachtExperience) => {
+    // Handle both title and name for search
+    const yachtTitle = yacht.title || yacht.name || '';
+    const yachtDesc = yacht.description || '';
+
     const matchesSearch = !searchQuery || 
-      yacht.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      yacht.description.toLowerCase().includes(searchQuery.toLowerCase());
+      yachtTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      yachtDesc.toLowerCase().includes(searchQuery.toLowerCase());
       
     const matchesCategory = !selectedCategory || yacht.category === selectedCategory;
     
@@ -261,15 +265,23 @@ export default function AssetManagement() {
   // Toggle yacht activation status
   const toggleYachtActivation = async (yacht: ExtendedYachtExperience) => {
     try {
-      const newStatus = !yacht.availability_status;
-      const yachtRef = doc(db, "yacht_experiences", yacht.package_id);
+      // Handle both field naming conventions
+      const isActive = yacht.availability_status !== undefined 
+        ? yacht.availability_status 
+        : (yacht.available || false);
+        
+      const newStatus = !isActive;
+      const docId = yacht.package_id || yacht.yachtId || yacht.id;
+      const yachtRef = doc(db, "yacht_experiences", docId);
       
       // Log the document being updated
-      console.log(`Updating yacht document: ${yacht.package_id}`);
+      console.log(`Updating yacht document: ${docId}`);
       console.log(`Setting availability_status to: ${newStatus}`);
       
+      // Update both field naming conventions for maximum compatibility
       await updateDoc(yachtRef, { 
         availability_status: newStatus,
+        available: newStatus,
         last_updated_date: serverTimestamp()
       });
       
@@ -307,9 +319,11 @@ export default function AssetManagement() {
         });
       }
       
+      const yachtTitle = yacht.title || yacht.name || '';
+      
       toast({
         title: newStatus ? "Yacht Activated" : "Yacht Deactivated",
-        description: `${yacht.title} is now ${newStatus ? 'active' : 'inactive'}.`,
+        description: `${yachtTitle} is now ${newStatus ? 'active' : 'inactive'}.`,
       });
     } catch (error) {
       console.error("Error toggling yacht activation:", error);
@@ -540,10 +554,10 @@ export default function AssetManagement() {
                         <div className="flex-1 p-6">
                           <div className="flex flex-col md:flex-row justify-between mb-2">
                             <div>
-                              <h3 className="text-lg font-semibold mb-1">{yacht.title}</h3>
+                              <h3 className="text-lg font-semibold mb-1">{yacht.title || yacht.name}</h3>
                               <div className="flex items-center gap-2 mb-2">
                                 <Badge variant="secondary">{yacht.category}</Badge>
-                                {renderStatusBadge(yacht.availability_status)}
+                                {renderStatusBadge(yacht.availability_status !== undefined ? yacht.availability_status : yacht.available)}
                                 {yacht.featured && (
                                   <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200">
                                     Featured
@@ -581,7 +595,7 @@ export default function AssetManagement() {
                                   <DropdownMenuItem 
                                     onClick={() => toggleYachtActivation(yacht)}
                                   >
-                                    {yacht.availability_status ? (
+                                    {(yacht.availability_status !== undefined ? yacht.availability_status : yacht.available) ? (
                                       <>
                                         <XCircle className="mr-2 h-4 w-4" />
                                         Deactivate
