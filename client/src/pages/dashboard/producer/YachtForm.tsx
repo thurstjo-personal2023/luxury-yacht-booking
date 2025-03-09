@@ -638,18 +638,18 @@ export default function YachtForm() {
       console.log('Invalidating all yacht queries to refresh data...');
       
       // First, completely remove all yacht producer queries from cache
-      queryClient.removeQueries({ queryKey: ['/api/yachts/producer'] });
+      queryClient.removeQueries({ queryKey: ['/api/producer/yachts'] });
       
       // Then invalidate specific keys to trigger refetching
       queryClient.invalidateQueries({ 
-        queryKey: ['/api/yachts/producer'],
+        queryKey: ['/api/producer/yachts'],
         refetchType: 'all'  // Force refetch all queries that match this key
       });
       
       // Explicitly invalidate all possible pages to ensure complete refresh
       for (let page = 1; page <= 5; page++) { // Assume maximum of 5 pages for safety
         queryClient.invalidateQueries({
-          queryKey: ['/api/yachts/producer', { page, pageSize: 10 }],
+          queryKey: ['/api/producer/yachts', { page, pageSize: 10 }],
           refetchType: 'all'
         });
       }
