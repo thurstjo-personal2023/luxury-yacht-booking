@@ -49,6 +49,14 @@ export interface IStorage {
   updateYacht(id: string, yacht: Partial<Yacht>): Promise<boolean>;
   deleteYacht(id: string): Promise<boolean>;
   
+  // Producer-specific methods
+  getProducerYachts(filters?: {
+    producerId?: string;
+    page?: number;
+    pageSize?: number;
+    sortByStatus?: boolean;
+  }): Promise<PaginatedYachtsResponse>;
+  
   // Product add-ons methods
   getAllProductAddOns(filters?: {
     category?: string;
@@ -423,6 +431,93 @@ export class FirestoreStorage implements IStorage {
     } catch (error) {
       console.error(`Error deleting yacht ${id}:`, error);
       return false;
+    }
+  }
+  
+  // Producer-specific methods
+  async getProducerYachts(filters?: {
+    producerId?: string;
+    page?: number;
+    pageSize?: number;
+    sortByStatus?: boolean;
+  }): Promise<PaginatedYachtsResponse> {
+    try {
+      console.log('Getting producer yachts with filters:', filters);
+      
+      // Use the unified yacht collection
+      const yachtsRef = adminDb.collection(UNIFIED_YACHT_COLLECTION);
+      
+      // Build query based on presence of producerId
+      let query;
+      if (filters?.producerId) {
+        console.log(`Filtering by producer ID: ${filters.producerId}`);
+        // Try both providerId and producerId fields to ensure backward compatibility
+        // This query checks if either field matches the provided ID
+        const producerSnapshot = await yachtsRef
+          .where('providerId', '==', filters.producerId)
+          .get();
+          
+        if (producerSnapshot.empty) {
+          console.log('No yachts found with providerId, trying producerId field');
+          query = yachtsRef.where('producerId', '==', filters.producerId);
+        } else {
+          console.log(`Found ${producerSnapshot.size} yachts with providerId`);
+          query = yachtsRef.where('providerId', '==', filters.producerId);
+        }
+      } else {
+        console.log('No producer ID provided, getting all yachts');
+        query = yachtsRef;
+      }
+      
+      const snapshot = await query.get();
+      
+      if (snapshot.empty) {
+        console.log(`No producer yachts found in ${UNIFIED_YACHT_COLLECTION}`);
+        
+        // Fall back to legacy collection during migration period
+        console.log('Falling back to legacy collection for backwards compatibility');
+        const legacyRef = adminDb.collection(LEGACY_YACHTS);
+        
+        // Try producer query on legacy collection
+        let legacyQuery;
+        if (filters?.producerId) {
+          legacyQuery = legacyRef.where('producerId', '==', filters.producerId);
+        } else {
+          legacyQuery = legacyRef;
+        }
+        
+        const legacySnapshot = await legacyQuery.get();
+        
+        if (legacySnapshot.empty) {
+          console.log('No producer yachts found in legacy collection either');
+          return {
+            yachts: [],
+            pagination: {
+              currentPage: 1,
+              pageSize: filters?.pageSize || 10,
+              totalCount: 0,
+              totalPages: 0
+            }
+          };
+        }
+        
+        console.log(`Found ${legacySnapshot.size} producer yachts in legacy collection, using them instead`);
+        // Continue with legacy data
+        return this.processYachtResults(legacySnapshot, filters);
+      }
+      
+      return this.processYachtResults(snapshot, filters);
+    } catch (error) {
+      console.error('Error fetching producer yachts:', error);
+      return {
+        yachts: [],
+        pagination: {
+          currentPage: 1,
+          pageSize: filters?.pageSize || 10,
+          totalCount: 0,
+          totalPages: 0
+        }
+      };
     }
   }
   
