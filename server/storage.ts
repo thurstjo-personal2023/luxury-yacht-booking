@@ -438,15 +438,22 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log('Getting experiences with filters:', filters);
 
-      // Try the new consolidated collection first
-      let experiencesRef = adminDb.collection('yacht_experiences');
+      // Try the unified collection first
+      let experiencesRef = adminDb.collection(UNIFIED_YACHT_COLLECTION);
       let snapshot = await experiencesRef.get();
-
-      // If no data in consolidated collection, fall back to the old collection
+      
+      // If no data in unified collection, fall back to the yacht_experiences collection
       if (snapshot.empty) {
-        console.log('No experiences found in yacht_experiences collection, trying experience_packages');
-        experiencesRef = adminDb.collection('experience_packages');
+        console.log(`No experiences found in ${UNIFIED_YACHT_COLLECTION} collection, trying yacht_experiences`);
+        experiencesRef = adminDb.collection(LEGACY_YACHT_EXPERIENCES);
         snapshot = await experiencesRef.get();
+        
+        // If still no data, try experience_packages collection
+        if (snapshot.empty) {
+          console.log('No experiences found in yacht_experiences collection, trying experience_packages');
+          experiencesRef = adminDb.collection(LEGACY_EXPERIENCE_PACKAGES);
+          snapshot = await experiencesRef.get();
+        }
       }
 
       if (snapshot.empty) {
@@ -580,13 +587,19 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log('Getting featured experiences');
 
-      // Try the new consolidated collection first
-      let snapshot = await adminDb.collection('yacht_experiences').get();
+      // Try the unified collection first
+      let snapshot = await adminDb.collection(UNIFIED_YACHT_COLLECTION).get();
 
-      // If no data in consolidated collection, fall back to the old collection
+      // If no data in unified collection, fall back to the yacht_experiences collection
       if (snapshot.empty) {
-        console.log('No experiences found in yacht_experiences collection, trying experience_packages');
-        snapshot = await adminDb.collection('experience_packages').get();
+        console.log(`No experiences found in ${UNIFIED_YACHT_COLLECTION} collection, trying yacht_experiences`);
+        snapshot = await adminDb.collection(LEGACY_YACHT_EXPERIENCES).get();
+        
+        // If still no data, try experience_packages collection
+        if (snapshot.empty) {
+          console.log('No experiences found in yacht_experiences collection, trying experience_packages');
+          snapshot = await adminDb.collection(LEGACY_EXPERIENCE_PACKAGES).get();
+        }
       }
 
       if (snapshot.empty) {
@@ -643,7 +656,7 @@ export class FirestoreStorage implements IStorage {
       console.log('Getting add-ons with filters:', filters);
 
       // Try to get from products_add_ons collection (note the underscore)
-      let addOnsRef = adminDb.collection('products_add_ons');
+      let addOnsRef = adminDb.collection(PRODUCTS_ADDONS_COLLECTION);
       let snapshot = await addOnsRef.get();
 
       if (snapshot.empty) {
