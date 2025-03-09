@@ -451,17 +451,19 @@ export class FirestoreStorage implements IStorage {
       let query;
       if (filters?.producerId) {
         console.log(`Filtering by producer ID: ${filters.producerId}`);
-        // Try both providerId and producerId fields to ensure backward compatibility
-        // This query checks if either field matches the provided ID
+        // We need to do two separate queries because Firestore doesn't support OR queries
+        // First try providerId field
         const producerSnapshot = await yachtsRef
           .where('providerId', '==', filters.producerId)
           .get();
           
         if (producerSnapshot.empty) {
           console.log('No yachts found with providerId, trying producerId field');
+          // If no results with providerId, try producerId field
           query = yachtsRef.where('producerId', '==', filters.producerId);
         } else {
           console.log(`Found ${producerSnapshot.size} yachts with providerId`);
+          // If we found yachts with providerId, use that query
           query = yachtsRef.where('providerId', '==', filters.producerId);
         }
       } else {
@@ -481,7 +483,18 @@ export class FirestoreStorage implements IStorage {
         // Try producer query on legacy collection
         let legacyQuery;
         if (filters?.producerId) {
-          legacyQuery = legacyRef.where('producerId', '==', filters.producerId);
+          // First check with producer_id field (commonly used in older documents)
+          const legacyProducerSnapshot = await legacyRef
+            .where('producer_id', '==', filters.producerId)
+            .get();
+          
+          if (legacyProducerSnapshot.empty) {
+            console.log('No yachts found with producer_id, trying producerId field');
+            legacyQuery = legacyRef.where('producerId', '==', filters.producerId);
+          } else {
+            console.log(`Found ${legacyProducerSnapshot.size} yachts with producer_id`);
+            legacyQuery = legacyRef.where('producer_id', '==', filters.producerId);
+          }
         } else {
           legacyQuery = legacyRef;
         }

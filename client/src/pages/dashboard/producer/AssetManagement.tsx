@@ -112,7 +112,7 @@ export default function AssetManagement() {
   const pageSize = 10; // Items per page
   
   // Get current user to determine producer ID
-  const { user } = useAuthState(auth);
+  const [user] = useAuthState(auth);
   const producerId = user?.uid;
   
   // Queries with pagination
