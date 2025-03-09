@@ -169,9 +169,31 @@ export default function AssetManagement() {
   const goToDashboard = () => setLocation("/dashboard/producer");
   const goToAddYacht = () => setLocation("/dashboard/producer/assets/new-yacht");
   const goToAddService = () => setLocation("/dashboard/producer/assets/new-service");
-  const goToEditYacht = (id: string) => setLocation(`/dashboard/producer/assets/edit-yacht/${id}`);
+  const goToEditYacht = (id: string | undefined) => {
+    if (!id) {
+      console.error("Cannot navigate to edit yacht: Missing ID");
+      toast({
+        title: "Navigation Error",
+        description: "Unable to edit this yacht due to missing ID",
+        variant: "destructive"
+      });
+      return;
+    }
+    setLocation(`/dashboard/producer/assets/edit-yacht/${id}`);
+  };
   const goToEditService = (id: string) => setLocation(`/dashboard/producer/assets/edit-service/${id}`);
-  const goToYachtDetails = (id: string) => setLocation(`/yachts/${id}`);
+  const goToYachtDetails = (id: string | undefined) => {
+    if (!id) {
+      console.error("Cannot navigate to yacht details: Missing ID");
+      toast({
+        title: "Navigation Error",
+        description: "Unable to view this yacht due to missing ID",
+        variant: "destructive"
+      });
+      return;
+    }
+    setLocation(`/yachts/${id}`);
+  };
   
   // Show delete confirmation dialog
   const openDeleteConfirm = (id: string, type: 'yacht' | 'addon', name: string) => {
@@ -275,19 +297,43 @@ export default function AssetManagement() {
         
       const newStatus = !isActive;
       const docId = yacht.package_id || yacht.yachtId || yacht.id;
+      
+      if (!docId) {
+        console.error("Cannot update yacht: Missing document ID");
+        throw new Error("Missing yacht ID");
+      }
+      
+      // First try updating in yacht_experiences collection
       const yachtCollection = collection(db, "yacht_experiences");
       const yachtRef = doc(yachtCollection, docId);
       
       // Log the document being updated
-      console.log(`Updating yacht document: ${docId}`);
+      console.log(`Attempting to update yacht document: ${docId} in yacht_experiences collection`);
       console.log(`Setting availability_status to: ${newStatus}`);
       
-      // Update both field naming conventions for maximum compatibility
-      await updateDoc(yachtRef, { 
-        availability_status: newStatus,
-        available: newStatus,
-        last_updated_date: serverTimestamp()
-      });
+      try {
+        // Update both field naming conventions for maximum compatibility
+        await updateDoc(yachtRef, { 
+          availability_status: newStatus,
+          available: newStatus,
+          last_updated_date: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        console.log(`Successfully updated yacht ${docId} in yacht_experiences collection`);
+      } catch (err) {
+        // If update fails, try the experience_packages collection as fallback
+        console.warn(`Failed to update in yacht_experiences, trying experience_packages collection`, err);
+        const expCollection = collection(db, "experience_packages");
+        const expRef = doc(expCollection, docId);
+        
+        await updateDoc(expRef, { 
+          availability_status: newStatus,
+          available: newStatus,
+          last_updated_date: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        console.log(`Successfully updated yacht ${docId} in experience_packages collection`);
+      }
       
       // Use a more aggressive cache invalidation approach
       console.log('Invalidating all yacht queries to refresh data...');
@@ -324,6 +370,11 @@ export default function AssetManagement() {
       }
       
       const yachtTitle = yacht.title || yacht.name || '';
+      
+      // Update the local state to reflect the change immediately
+      // This provides immediate UI feedback before the query refetches
+      yacht.availability_status = newStatus;
+      yacht.available = newStatus;
       
       toast({
         title: newStatus ? "Yacht Activated" : "Yacht Deactivated",
@@ -544,7 +595,7 @@ export default function AssetManagement() {
                         <div className="w-full md:w-64 h-48 md:h-auto">
                           <img 
                             src={yacht.media?.[0]?.url || yacht.imageUrl || '/yacht-placeholder.jpg'} 
-                            alt={yacht.title || yacht.name}
+                            alt={yacht.title || yacht.name || 'Yacht Image'}
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
@@ -575,7 +626,7 @@ export default function AssetManagement() {
                                 variant="outline" 
                                 size="sm" 
                                 className="flex items-center gap-1"
-                                onClick={() => goToYachtDetails(yacht.package_id)}
+                                onClick={() => goToYachtDetails(yacht.package_id || yacht.yachtId || yacht.id || '')}
                               >
                                 <Eye className="h-3.5 w-3.5" />
                                 View
@@ -584,7 +635,7 @@ export default function AssetManagement() {
                                 variant="outline" 
                                 size="sm" 
                                 className="flex items-center gap-1"
-                                onClick={() => goToEditYacht(yacht.package_id)}
+                                onClick={() => goToEditYacht(yacht.package_id || yacht.yachtId || yacht.id || '')}
                               >
                                 <Edit className="h-3.5 w-3.5" />
                                 Edit
