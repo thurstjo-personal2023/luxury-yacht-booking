@@ -226,6 +226,10 @@ function normalizeToUnifiedSchema(doc: FirebaseFirestore.DocumentSnapshot): Yach
   yacht.max_guests = data.max_guests || data.capacity || 0;
   yacht.price = data.price || data.pricing || 0;
   
+  // Ownership and management fields
+  yacht.providerId = data.providerId || data.producerId || data.owner_id || undefined;
+  yacht.producerId = data.producerId || data.providerId || data.owner_id || undefined;
+  
   return yacht as Yacht;
 }
 

@@ -111,6 +111,9 @@ export interface Yacht {
   // Tags and categories
   tags: string[];
   
+  // Ownership and management
+  providerId?: string; // ID of the producer/provider who owns this yacht
+  
   // Reviews
   reviews?: Review[];
   
@@ -131,6 +134,7 @@ export interface Yacht {
   features?: string[];
   max_guests?: number;
   price?: number;
+  producerId?: string; // Legacy field for producer ID
 }
 
 /**

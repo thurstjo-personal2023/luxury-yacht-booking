@@ -176,12 +176,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse pagination parameters from query string
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = parseInt(req.query.pageSize as string) || 10;
+      const producerId = req.query.producerId as string;
       
       // In a real implementation, we would get the producer ID from auth
-      // For now, we'll just query all yachts since we're in development mode
+      // For development, we'll either use the provided producerId or get all yachts with a producer ID
       
-      // Get yachts with pagination and sorting - use unified API
-      const yachtsResponse = await storage.getAllYachts({
+      // Use the storage method to get producer-specific yachts
+      const yachtsResponse = await storage.getProducerYachts({
+        producerId,
         page,
         pageSize,
         sortByStatus: true
