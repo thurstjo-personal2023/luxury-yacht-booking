@@ -14,8 +14,9 @@ import {
 } from "@/components/ui/hover-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import type { Yacht } from "@shared/schema";
+import type { Yacht as LegacyYacht } from "@shared/schema";
 import type { YachtExperience } from "@shared/firestore-schema";
+import type { Yacht as UnifiedYacht } from "@shared/unified-schema";
 
 // Define a normalized yacht type that will work with both data structures
 interface NormalizedYacht {
@@ -30,7 +31,7 @@ interface NormalizedYacht {
 }
 
 interface YachtCarouselProps {
-  yachts: Yacht[] | YachtExperience[] | undefined;
+  yachts: LegacyYacht[] | YachtExperience[] | UnifiedYacht[] | undefined;
   isLoading?: boolean;
   title?: string;
   description?: string;
@@ -41,6 +42,7 @@ function normalizeYacht(yacht: any): NormalizedYacht {
   // Ensure activities is always an array
   let activities: string[] = [];
 
+  // Handle activities/tags from any schema format
   if (yacht.activities && Array.isArray(yacht.activities)) {
     activities = yacht.activities;
   } else if (yacht.tags && Array.isArray(yacht.tags)) {
@@ -53,17 +55,56 @@ function normalizeYacht(yacht: any): NormalizedYacht {
     activities = yacht.tags.split(',').map((item: string) => item.trim());
   }
 
+  // Extract an image URL from any schema format
+  let imageUrl = yacht.imageUrl; // legacy schema
+  
+  // Try media array from various schema formats
+  if (!imageUrl && yacht.media && Array.isArray(yacht.media) && yacht.media.length > 0) {
+    imageUrl = yacht.media[0].url;
+  }
+  
+  // Default image if none found
+  if (!imageUrl) {
+    imageUrl = "https://images.unsplash.com/photo-1577032229840-33197764440d?w=800";
+  }
+
+  // Extract location string from any schema format
+  let locationString = "Location unavailable";
+  if (yacht.location) {
+    if (typeof yacht.location === 'string') {
+      locationString = yacht.location;
+    } else if (yacht.location.address) {
+      locationString = yacht.location.address;
+    } else if (yacht.location.region) {
+      // Handle unified schema location
+      const port = yacht.location.portMarina || yacht.location.port_marina || '';
+      locationString = `${yacht.location.region}${port ? ` - ${port}` : ''}`;
+    }
+  }
+
   return {
-    id: yacht.id || yacht.yacht_id || "",
+    // ID field - try all possible name variants
+    id: yacht.id || yacht.yacht_id || yacht.yachtId || yacht.package_id || "",
+    
+    // Name/title field - try all possible name variants
     name: yacht.name || yacht.title || "Unnamed Package",
+    
+    // Description field
     description: yacht.description || "No description available",
+    
+    // Price field - try all possible price field variants
     price: yacht.price || yacht.pricing || 0,
-    imageUrl: yacht.imageUrl || 
-              (yacht.media && yacht.media.length > 0 ? yacht.media[0].url : 
-              "https://images.unsplash.com/photo-1577032229840-33197764440d?w=800"),
-    location: yacht.location?.address || 
-              (typeof yacht.location === "string" ? yacht.location : "Location unavailable"),
+    
+    // Image URL
+    imageUrl: imageUrl,
+    
+    // Location string
+    location: locationString,
+    
+    // Capacity field - try all possible capacity field variants
     capacity: yacht.capacity || yacht.max_guests || 0,
+    
+    // Activities/tags array
     activities: activities
   };
 }

@@ -10,7 +10,9 @@ import { YachtCarousel } from "@/components/YachtCarousel";
 import { ArrowRight, Compass, Anchor, Star, Map, Calendar } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import type { YachtExperience } from "@shared/firestore-schema";
+import type { Yacht } from "@shared/unified-schema";
 import { Badge } from "@/components/ui/badge";
+import { collectionRefs } from "@/lib/firestore-init";
 
 // Sample data for guest dashboard
 const featuredDestinations = [
@@ -78,29 +80,50 @@ const upcomingEvents = [
 export default function GuestDashboard() {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("discover");
-  const [featuredExperiences, setFeaturedExperiences] = useState<YachtExperience[]>([]);
+  const [featuredExperiences, setFeaturedExperiences] = useState<Yacht[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch featured yacht experiences from Firestore
+  // Fetch featured yacht experiences from unified Firestore collection
   useEffect(() => {
     async function fetchFeaturedExperiences() {
       setLoading(true);
       try {
-        const experiencesRef = collection(db, "experience_packages");
+        // Use the unified collection with appropriate query
         const featuredQuery = query(
-          experiencesRef,
-          where("featured", "==", true),
-          where("published_status", "==", true),
+          collectionRefs.unifiedYachts,
+          where("isFeatured", "==", true),  // Using new field naming
+          where("isPublished", "==", true), // Using new field naming
           limit(6)
         );
 
-        const snapshot = await getDocs(featuredQuery);
+        // Fallback query using legacy fields (for backward compatibility)
+        const legacyFeaturedQuery = query(
+          collectionRefs.unifiedYachts,
+          where("featured", "==", true),    // Legacy field name
+          where("published_status", "==", true), // Legacy field name
+          limit(6)
+        );
+
+        // Try the new field names first
+        let snapshot = await getDocs(featuredQuery);
+        
+        // If no results, try the legacy field names
+        if (snapshot.empty) {
+          console.log("No results with new field names, trying legacy fields");
+          snapshot = await getDocs(legacyFeaturedQuery);
+        }
+
         if (!snapshot.empty) {
           const experiences = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-          })) as YachtExperience[];
+          })) as Yacht[];
+          
+          console.log(`Fetched ${experiences.length} featured yacht experiences`);
           setFeaturedExperiences(experiences);
+        } else {
+          console.log("No featured yacht experiences found");
+          setFeaturedExperiences([]);
         }
       } catch (error) {
         console.error("Error fetching featured experiences:", error);
