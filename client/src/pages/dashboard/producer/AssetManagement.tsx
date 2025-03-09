@@ -275,7 +275,8 @@ export default function AssetManagement() {
         
       const newStatus = !isActive;
       const docId = yacht.package_id || yacht.yachtId || yacht.id;
-      const yachtRef = doc(db, "yacht_experiences", docId);
+      const yachtCollection = collection(db, "yacht_experiences");
+      const yachtRef = doc(yachtCollection, docId);
       
       // Log the document being updated
       console.log(`Updating yacht document: ${docId}`);
