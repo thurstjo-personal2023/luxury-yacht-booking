@@ -1,0 +1,101 @@
+{
+  "message": "Retrieved 3 normalized yacht records",
+  "data": [
+    {
+      "yachtId": "YAC123",
+      "name": "Majestic Pearl",
+      "description": "A 30-meter luxury yacht with state-of-the-art amenities, perfect for sunset cruises and private events.",
+      "capacity": 12,
+      "price": 2500,
+      "imageUrl": "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?w=800",
+      "location": {
+        "latitude": 25.7617,
+        "longitude": -80.1918,
+        "address": "Miami Marina, FL"
+      },
+      "features": [
+        "Jacuzzi",
+        "Sundeck",
+        "Premium Bar",
+        "WiFi"
+      ],
+      "available": true,
+      "createdAt": {
+        "_seconds": 1739990117,
+        "_nanoseconds": 155000000
+      },
+      "updatedAt": {
+        "_seconds": 1739990117,
+        "_nanoseconds": 155000000
+      },
+      "package_id": "YAC123",
+      "id": "YAC123",
+      "title": "Majestic Pearl",
+      "availability_status": true
+    },
+    {
+      "yachtId": "YAC124",
+      "name": "Ocean Empress",
+      "description": "Luxury 35-meter yacht featuring spacious entertainment areas and professional crew service.",
+      "capacity": 15,
+      "price": 3200,
+      "imageUrl": "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?w=800",
+      "location": {
+        "latitude": 25.7617,
+        "longitude": -80.1918,
+        "address": "Miami Marina, FL"
+      },
+      "features": [
+        "Master Suite",
+        "Beach Club",
+        "Water Sports Equipment",
+        "Gourmet Kitchen"
+      ],
+      "available": true,
+      "createdAt": {
+        "_seconds": 1739990117,
+        "_nanoseconds": 155000000
+      },
+      "updatedAt": {
+        "_seconds": 1739990117,
+        "_nanoseconds": 155000000
+      },
+      "package_id": "YAC124",
+      "id": "YAC124",
+      "title": "Ocean Empress",
+      "availability_status": true
+    },
+    {
+      "yachtId": "YAC125",
+      "name": "Royal Navigator",
+      "description": "A 40-meter superyacht offering the ultimate luxury experience with helicopter landing pad.",
+      "capacity": 20,
+      "price": 4500,
+      "imageUrl": "https://images.unsplash.com/photo-1577032229840-33197764440d?w=800",
+      "location": {
+        "latitude": 25.7617,
+        "longitude": -80.1918,
+        "address": "Miami Marina, FL"
+      },
+      "features": [
+        "Helipad",
+        "Cinema Room",
+        "Gym",
+        "Multiple Decks"
+      ],
+      "available": true,
+      "createdAt": {
+        "_seconds": 1739990117,
+        "_nanoseconds": 155000000
+      },
+      "updatedAt": {
+        "_seconds": 1739990117,
+        "_nanoseconds": 155000000
+      },
+      "package_id": "YAC125",
+      "id": "YAC125",
+      "title": "Royal Navigator",
+      "availability_status": true
+    }
+  ]
+}
