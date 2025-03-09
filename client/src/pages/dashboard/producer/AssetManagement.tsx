@@ -600,14 +600,8 @@ export default function AssetManagement() {
                         {/* Image */}
                         <div className="w-full md:w-64 h-48 md:h-auto">
                           <img 
-                            src={yacht.media?.[0]?.url || yacht.imageUrl || '/yacht-placeholder.jpg'} 
-                            alt={yacht.title || yacht.name || 'Yacht Image'}
+                            {...getYachtImageProps(yacht)}
                             className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.onerror = null;
-                              target.src = '/yacht-placeholder.jpg';
-                            }}
                           />
                         </div>
                         
@@ -780,18 +774,8 @@ export default function AssetManagement() {
                       <div className="relative">
                         <div className="h-40 overflow-hidden">
                           <img 
-                            src={
-                              (addon.media?.[0]?.url) || 
-                              (typeof addon.media === 'object' && addon.media?.['0']?.url) || 
-                              '/service-placeholder.jpg'
-                            } 
-                            alt={addon.name}
+                            {...getAddonImageProps(addon)}
                             className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.onerror = null;
-                              target.src = '/service-placeholder.jpg';
-                            }}
                           />
                         </div>
                         <div className="absolute top-2 right-2 flex gap-1">
