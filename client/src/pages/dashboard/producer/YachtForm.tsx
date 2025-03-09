@@ -59,7 +59,21 @@ import {
   getDownloadURL, 
   deleteObject
 } from "firebase/storage";
-import { YachtExperience, Media, Location } from "@shared/firestore-schema";
+import { YachtExperience as BaseYachtExperience, Media, Location } from "@shared/firestore-schema";
+
+// Extended interface to handle both naming conventions
+interface YachtExperience extends BaseYachtExperience {
+  // Legacy fields from old data model
+  yachtId?: string;
+  id?: string;
+  name?: string;
+  price?: number;
+  available?: boolean;
+  features?: string[];
+  max_guests?: number;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
 
 // Form validation schema
 const yachtFormSchema = z.object({
@@ -152,36 +166,82 @@ export default function YachtForm() {
   const fetchYachtDetails = async (yachtId: string) => {
     setInitialLoading(true);
     try {
-      const yachtRef = doc(db, "yacht_experiences", yachtId);
-      const yachtDoc = await getDoc(yachtRef);
+      // Try to fetch from yacht_experiences first
+      let yachtRef = doc(db, "yacht_experiences", yachtId);
+      let yachtDoc = await getDoc(yachtRef);
+      
+      // If not found, try experience_packages collection
+      if (!yachtDoc.exists()) {
+        console.log(`Yacht not found in yacht_experiences, trying experience_packages collection...`);
+        yachtRef = doc(db, "experience_packages", yachtId);
+        yachtDoc = await getDoc(yachtRef);
+      }
       
       if (yachtDoc.exists()) {
         const data = yachtDoc.data() as YachtExperience;
-        setYachtData(data);
-        setMedia(data.media || []);
-        setCustomizationOptions(data.customization_options || []);
-        setLocation_(data.location);
+        console.log("Found yacht data:", data);
         
-        // Set form values
-        form.reset({
-          title: data.title,
-          description: data.description,
-          category: data.category,
+        // Normalize data to handle both formats
+        const normalizedData = {
+          // Create a normalized data structure with both field names
+          package_id: data.package_id || data.yachtId || data.id || yachtId,
+          yachtId: data.package_id || data.yachtId || data.id || yachtId,
+          id: data.package_id || data.yachtId || data.id || yachtId,
+          title: data.title || data.name || "",
+          name: data.title || data.name || "",
+          description: data.description || "",
+          category: data.category || "",
           yacht_type: data.yacht_type || "",
-          duration: data.duration,
-          capacity: data.capacity,
-          pricing: data.pricing,
-          pricing_model: data.pricing_model,
-          tags: data.tags || [],
-          availability_status: data.availability_status,
-          featured: data.featured,
-          published_status: data.published_status,
-          virtual_tour_enabled: data.virtual_tour?.enabled || false,
+          duration: data.duration || 4,
+          capacity: data.capacity || data.max_guests || 10,
+          pricing: data.pricing || data.price || 0,
+          pricing_model: data.pricing_model || "Fixed",
+          customization_options: data.customization_options || [],
+          media: data.media || [],
+          availability_status: data.availability_status !== undefined ? data.availability_status : (data.available !== undefined ? data.available : true),
+          available: data.availability_status !== undefined ? data.availability_status : (data.available !== undefined ? data.available : true),
+          featured: data.featured || false,
+          tags: data.tags || data.features || [],
+          features: data.tags || data.features || [],
+          published_status: data.published_status !== undefined ? data.published_status : true,
+          created_date: data.created_date || Timestamp.now(),
+          last_updated_date: data.last_updated_date || Timestamp.now(),
+          virtual_tour: data.virtual_tour || { enabled: false, scenes: [] },
+          location: data.location || {
+            address: "",
+            latitude: 0,
+            longitude: 0,
+            region: "dubai",
+            port_marina: ""
+          }
+        };
+        
+        // Set the normalized data
+        setYachtData(normalizedData);
+        setMedia(normalizedData.media || []);
+        setCustomizationOptions(normalizedData.customization_options || []);
+        setLocation_(normalizedData.location);
+        
+        // Set form values using the normalized data
+        form.reset({
+          title: normalizedData.title,
+          description: normalizedData.description,
+          category: normalizedData.category,
+          yacht_type: normalizedData.yacht_type || "",
+          duration: normalizedData.duration,
+          capacity: normalizedData.capacity,
+          pricing: normalizedData.pricing,
+          pricing_model: normalizedData.pricing_model,
+          tags: normalizedData.tags || [],
+          availability_status: normalizedData.availability_status,
+          featured: normalizedData.featured,
+          published_status: normalizedData.published_status,
+          virtual_tour_enabled: normalizedData.virtual_tour?.enabled || false,
         });
       } else {
         toast({
           title: "Yacht Not Found",
-          description: "The yacht you're trying to edit could not be found.",
+          description: "The yacht you're trying to edit could not be found in any collection.",
           variant: "destructive",
         });
         navigateBack();
@@ -404,42 +464,174 @@ export default function YachtForm() {
       // Log the object being saved
       console.log('Saving yacht with data:', yachtObject);
       
+      // Determine the correct collection to use
+      // Default to yacht_experiences collection
+      const collectionName = "yacht_experiences";
+      
       // Save to Firestore
-      const yachtRef = doc(db, "yacht_experiences", packageId);
+      const yachtRef = doc(db, collectionName, packageId);
       
       if (editMode) {
-        // Convert YachtExperience to a plain object for Firestore update
-        const updateData = {
-          title: yachtObject.title,
-          description: yachtObject.description,
-          category: yachtObject.category,
-          yacht_type: yachtObject.yacht_type,
-          location: yachtObject.location,
-          duration: yachtObject.duration,
-          capacity: yachtObject.capacity,
-          pricing: yachtObject.pricing,
-          pricing_model: yachtObject.pricing_model,
-          customization_options: yachtObject.customization_options,
-          media: yachtObject.media,
-          availability_status: yachtObject.availability_status,
-          featured: yachtObject.featured,
-          tags: yachtObject.tags,
-          published_status: yachtObject.published_status,
-          last_updated_date: yachtObject.last_updated_date,
-          virtual_tour: yachtObject.virtual_tour
-        };
-        
-        await updateDoc(yachtRef, updateData);
-        toast({
-          title: "Yacht Updated",
-          description: "Your yacht has been successfully updated.",
-        });
+        try {
+          console.log(`Attempting to update yacht with ID ${packageId} in collection ${collectionName}`);
+          
+          // Create dual-field compatible update data that supports both data models
+          const updateData = {
+            // New field names
+            package_id: packageId,
+            title: values.title,
+            description: values.description,
+            category: values.category,
+            yacht_type: values.yacht_type,
+            location: location,
+            duration: values.duration,
+            capacity: values.capacity,
+            pricing: values.pricing,
+            pricing_model: values.pricing_model,
+            customization_options: customizationOptions,
+            media: media,
+            availability_status: values.availability_status,
+            featured: values.featured,
+            tags: values.tags,
+            published_status: values.published_status,
+            last_updated_date: Timestamp.now(),
+            virtual_tour: {
+              enabled: values.virtual_tour_enabled,
+              scenes: editMode && yachtData?.virtual_tour?.scenes ? yachtData.virtual_tour.scenes : []
+            },
+            
+            // Legacy field names for compatibility
+            yachtId: packageId,
+            id: packageId,
+            name: values.title,
+            price: values.pricing,
+            available: values.availability_status,
+            features: values.tags,
+            max_guests: values.capacity,
+            updatedAt: Timestamp.now(),
+          };
+          
+          // If we're editing, make sure to include the creation date from the original
+          if (yachtData && yachtData.created_date) {
+            const fullUpdateData: any = updateData;
+            fullUpdateData.created_date = yachtData.created_date;
+            fullUpdateData.createdAt = yachtData.created_date; // legacy field
+          }
+          
+          console.log('Update data:', updateData);
+          
+          // Attempt to update the document
+          await updateDoc(yachtRef, updateData);
+          
+          console.log('Update successful');
+          toast({
+            title: "Yacht Updated",
+            description: "Your yacht has been successfully updated.",
+          });
+        } catch (error) {
+          console.error('Error updating yacht:', error);
+          
+          // Try creating a new document if update fails
+          try {
+            console.log('Update failed, trying to create new document instead');
+            
+            // Create dual-field compatible yacht data
+            const yachtData = {
+              package_id: packageId,
+              title: values.title,
+              description: values.description,
+              category: values.category,
+              yacht_type: values.yacht_type,
+              location: location,
+              duration: values.duration,
+              capacity: values.capacity,
+              pricing: values.pricing,
+              pricing_model: values.pricing_model,
+              customization_options: customizationOptions,
+              media: media,
+              availability_status: values.availability_status,
+              featured: values.featured,
+              tags: values.tags,
+              published_status: values.published_status,
+              created_date: Timestamp.now(),
+              last_updated_date: Timestamp.now(),
+              virtual_tour: {
+                enabled: values.virtual_tour_enabled,
+                scenes: []
+              },
+              
+              // Legacy field names for compatibility
+              yachtId: packageId,
+              id: packageId,
+              name: values.title,
+              price: values.pricing,
+              available: values.availability_status,
+              features: values.tags,
+              max_guests: values.capacity,
+              createdAt: Timestamp.now(),
+              updatedAt: Timestamp.now(),
+            };
+            
+            await setDoc(yachtRef, yachtData);
+            console.log('Create successful as fallback to update');
+            toast({
+              title: "Yacht Updated",
+              description: "Your yacht has been successfully updated.",
+            });
+          } catch (setDocError) {
+            console.error('Error creating yacht document as fallback:', setDocError);
+            throw error; // re-throw the original error to trigger the error handling below
+          }
+        }
       } else {
-        await setDoc(yachtRef, yachtObject);
-        toast({
-          title: "Yacht Created",
-          description: "Your yacht has been successfully created.",
-        });
+        // For new yachts, create with both field naming conventions
+        try {
+          const newYachtData = {
+            // New field names
+            package_id: packageId,
+            title: values.title,
+            description: values.description,
+            category: values.category,
+            yacht_type: values.yacht_type,
+            location: location,
+            duration: values.duration,
+            capacity: values.capacity,
+            pricing: values.pricing,
+            pricing_model: values.pricing_model,
+            customization_options: customizationOptions,
+            media: media,
+            availability_status: values.availability_status,
+            featured: values.featured,
+            tags: values.tags,
+            published_status: values.published_status,
+            created_date: Timestamp.now(),
+            last_updated_date: Timestamp.now(),
+            virtual_tour: {
+              enabled: values.virtual_tour_enabled,
+              scenes: []
+            },
+            
+            // Legacy field names for compatibility
+            yachtId: packageId,
+            id: packageId,
+            name: values.title,
+            price: values.pricing,
+            available: values.availability_status,
+            features: values.tags,
+            max_guests: values.capacity,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          };
+          
+          await setDoc(yachtRef, newYachtData);
+          toast({
+            title: "Yacht Created",
+            description: "Your yacht has been successfully created.",
+          });
+        } catch (error) {
+          console.error('Error creating new yacht:', error);
+          throw error; // re-throw to trigger the error handling below
+        }
       }
 
       // Invalidate all yacht queries to ensure all cached data is refreshed
