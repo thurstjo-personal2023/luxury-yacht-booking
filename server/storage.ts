@@ -68,14 +68,26 @@ export class FirestoreStorage implements IStorage {
         };
       }
 
-      // Map all experiences first
+      // Map all experiences first and normalize field names
       let results = snapshot.docs.map(doc => {
         const data = doc.data();
-        return {
+        // Spread the original data first to keep all properties
+        const normalized = {
           ...data,
+          // Ensure consistent field names by mapping between different formats
           package_id: doc.id, // Ensure package_id is set
           id: doc.id, // Keep id for backwards compatibility
-        } as YachtExperience;
+          yachtId: data.yachtId || doc.id,
+          // Map between name and title fields
+          name: data.name || data.title || '',
+          title: data.title || data.name || '',
+          // Map between available and availability_status
+          available: data.available !== undefined ? data.available : data.availability_status,
+          availability_status: data.availability_status !== undefined ? data.availability_status : (data.available || false),
+        };
+        
+        console.log(`Normalized yacht data for ${doc.id}:`, JSON.stringify(normalized).substring(0, 100) + '...');
+        return normalized as unknown as YachtExperience;
       });
 
       console.log(`Found ${results.length} total experiences`);
@@ -190,11 +202,21 @@ export class FirestoreStorage implements IStorage {
 
       const allExperiences = snapshot.docs.map(doc => {
         const data = doc.data();
-        return {
+        const normalized = {
           ...data,
+          // Ensure consistent field names by mapping between different formats
           package_id: doc.id, // Ensure package_id is set
           id: doc.id, // Keep id for backwards compatibility
-        } as YachtExperience;
+          yachtId: data.yachtId || doc.id,
+          // Map between name and title fields
+          name: data.name || data.title || '',
+          title: data.title || data.name || '',
+          // Map between available and availability_status
+          available: data.available !== undefined ? data.available : data.availability_status,
+          availability_status: data.availability_status !== undefined ? data.availability_status : (data.available || false),
+        };
+        
+        return normalized as unknown as YachtExperience;
       });
 
       // Get featured experiences based on reviews or featured flag
