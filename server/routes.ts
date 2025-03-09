@@ -5,6 +5,50 @@ import { registerStripeRoutes } from "./stripe";
 import { adminDb } from "./firebase-admin";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Export normalized yacht schema
+  app.get("/api/export/yacht-schema", async (req, res) => {
+    try {
+      // Get yacht data from yacht_experiences collection
+      const snapshot = await adminDb.collection('yacht_experiences').get();
+      
+      if (snapshot.empty) {
+        return res.json({ 
+          message: "No yacht data found",
+          data: [] 
+        });
+      }
+      
+      // Normalize data with consistent field names
+      const normalizedYachts = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          // Ensure consistent field names
+          package_id: doc.id,
+          id: doc.id,
+          yachtId: data.yachtId || doc.id,
+          // Map between name and title fields
+          name: data.name || data.title || '',
+          title: data.title || data.name || '',
+          // Map between available and availability_status
+          available: data.available !== undefined ? data.available : data.availability_status,
+          availability_status: data.availability_status !== undefined ? 
+            data.availability_status : (data.available || false),
+        };
+      });
+      
+      res.json({
+        message: `Retrieved ${normalizedYachts.length} normalized yacht records`,
+        data: normalizedYachts
+      });
+    } catch (error) {
+      console.error("Error exporting yacht schema:", error);
+      res.status(500).json({ 
+        message: "Error exporting yacht schema", 
+        error: String(error)
+      });
+    }
+  });
   // Experience Packages with Filters
   app.get("/api/experiences", async (req, res) => {
     try {
