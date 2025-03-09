@@ -65,6 +65,7 @@ import {
 } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { YachtExperience, YachtProfile, ProductAddOn } from "@shared/firestore-schema";
+import { getYachtImageProps } from "@/lib/image-utils";
 
 // Extended interface to include properties from API response
 interface ExtendedYachtExperience extends YachtExperience {
