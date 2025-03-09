@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getYachtImageProps, getAddonImageProps } from "@/lib/image-utils";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,7 +66,7 @@ import {
 } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { YachtExperience, YachtProfile, ProductAddOn } from "@shared/firestore-schema";
-import { getYachtImageProps } from "@/lib/image-utils";
+
 
 // Extended interface to include properties from API response
 interface ExtendedYachtExperience extends YachtExperience {

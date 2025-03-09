@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { auth, db, storage } from "@/lib/firebase";
+import { getYachtImageProps, handleYachtImageError } from "@/lib/image-utils";
 import { 
   doc, 
   collection, 
@@ -1197,6 +1198,7 @@ export default function YachtForm() {
                                   src={item.url}
                                   alt={`Yacht media ${index + 1}`}
                                   className="w-full h-32 object-cover"
+                                  onError={handleYachtImageError}
                                 />
                               ) : (
                                 <video
