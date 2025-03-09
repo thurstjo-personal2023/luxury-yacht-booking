@@ -1,5 +1,5 @@
 // This script runs the migration of all yacht-related collections to the unified collection
-const { migrateToUnifiedCollection } = require('./migrate-to-unified-yacht-experiences');
+import { migrateToUnifiedCollection } from './migrate-to-unified-yacht-experiences.js';
 
 console.log('Starting migration of yacht data to unified collection...');
 
