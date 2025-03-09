@@ -20,7 +20,8 @@ if (process.env.NODE_ENV === "development") {
 }
 
 const collections = {
-  yacht_experiences: "yacht_experiences",
+  unified_yacht_experiences: "unified_yacht_experiences", // New unified collection
+  yacht_experiences: "yacht_experiences",  // Legacy collection (for backward compatibility)
   user_profiles_tourist: "user_profiles_tourist",
   articles_and_guides: "articles_and_guides",
   event_announcements: "event_announcements",
