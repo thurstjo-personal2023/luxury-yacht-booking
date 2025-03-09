@@ -1,6 +1,6 @@
-import { adminDb } from "../server/firebase-admin";
+import { adminDb } from "../server/firebase-admin.js";
 import type { Timestamp } from "firebase-admin/firestore";
-import { Yacht } from "../shared/unified-schema";
+import { Yacht } from "../shared/unified-schema.js";
 
 interface SourceDocument {
   id?: string;
@@ -292,7 +292,11 @@ export async function migrateToUnifiedCollection() {
 }
 
 // Run migration if this script is executed directly
-if (require.main === module) {
+// Using ESM-compatible approach for detecting direct execution
+import { fileURLToPath } from 'url';
+const isDirectlyExecuted = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isDirectlyExecuted) {
   migrateToUnifiedCollection()
     .then(() => {
       console.log('Migration completed successfully');
