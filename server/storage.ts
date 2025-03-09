@@ -1,5 +1,6 @@
 import { adminDb } from "./firebase-admin";
 import type { ProductAddOn, YachtExperience } from "@shared/firestore-schema";
+import type { Yacht, PaginatedYachtsResponse, YachtSummary } from "@shared/unified-schema";
 
 interface PaginationData {
   currentPage: number;
@@ -14,6 +15,7 @@ interface PaginatedResponse<T> {
 }
 
 export interface IStorage {
+  // Legacy methods (to maintain backward compatibility during transition)
   getAllExperiencePackages(filters?: {
     type?: string;
     region?: string;
@@ -23,6 +25,20 @@ export interface IStorage {
     sortByStatus?: boolean;
   }): Promise<PaginatedResponse<YachtExperience>>;
   getFeaturedExperiencePackages(): Promise<YachtExperience[]>;
+  
+  // New unified methods
+  getAllYachts(filters?: {
+    type?: string;
+    region?: string;
+    portMarina?: string;
+    page?: number;
+    pageSize?: number;
+    sortByStatus?: boolean;
+  }): Promise<PaginatedYachtsResponse>;
+  getYachtById(id: string): Promise<Yacht | null>;
+  getFeaturedYachts(): Promise<YachtSummary[]>;
+  
+  // Product add-ons methods
   getAllProductAddOns(filters?: {
     category?: string;
     partnerId?: string;
@@ -33,6 +49,216 @@ export interface IStorage {
 }
 
 export class FirestoreStorage implements IStorage {
+  // New unified methods
+  
+  async getAllYachts(filters?: {
+    type?: string;
+    region?: string;
+    portMarina?: string;
+    page?: number;
+    pageSize?: number;
+    sortByStatus?: boolean;
+  }): Promise<PaginatedYachtsResponse> {
+    try {
+      console.log('Getting yachts with filters:', filters);
+      
+      // Use the new unified collection
+      const yachtsRef = adminDb.collection('yachts');
+      const snapshot = await yachtsRef.get();
+      
+      if (snapshot.empty) {
+        console.log('No yachts found in unified collection');
+        return {
+          yachts: [],
+          pagination: {
+            currentPage: 1,
+            pageSize: filters?.pageSize || 10,
+            totalCount: 0,
+            totalPages: 0
+          }
+        };
+      }
+      
+      // Map all yachts to the unified schema
+      let results = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || '',
+          description: data.description || '',
+          category: data.category || '',
+          location: {
+            address: data.location?.address || '',
+            latitude: data.location?.latitude || 0,
+            longitude: data.location?.longitude || 0,
+            region: data.location?.region || 'dubai',
+            portMarina: data.location?.portMarina || data.location?.port_marina || ''
+          },
+          pricing: data.pricing || 0,
+          capacity: data.capacity || 0,
+          duration: data.duration || 0,
+          isAvailable: data.isAvailable || data.availability_status || false,
+          isFeatured: data.isFeatured || data.featured || false,
+          mainImage: data.media?.length > 0 ? data.media[0].url : undefined
+        } as YachtSummary;
+      });
+      
+      console.log(`Found ${results.length} total yachts`);
+      
+      // Apply filters progressively if they exist
+      if (filters) {
+        // Filter by type (yacht cruise)
+        if (filters.type === 'yacht-cruise') {
+          console.log('Filtering by yacht cruise...');
+          results = results.filter(yacht => 
+            yacht.category.toLowerCase().includes('cruise') ||
+            yacht.category.toLowerCase().includes('yacht')
+          );
+          console.log(`After yacht filter: ${results.length} yachts`);
+        }
+        
+        // Filter by region
+        if (filters.region) {
+          console.log(`Filtering by region: ${filters.region}`);
+          results = results.filter(yacht => 
+            yacht.location.region === filters.region ||
+            yacht.location.address.toLowerCase().includes((filters.region as string).toLowerCase())
+          );
+          console.log(`After region filter: ${results.length} yachts`);
+        }
+        
+        // Filter by port/marina
+        if (filters.portMarina) {
+          console.log(`Filtering by marina: ${filters.portMarina}`);
+          results = results.filter(yacht => 
+            yacht.location.portMarina === filters.portMarina
+          );
+          console.log(`After marina filter: ${results.length} yachts`);
+        }
+        
+        // Sort by availability status if requested (active first)
+        if (filters.sortByStatus) {
+          console.log('Sorting by availability status (active first)');
+          results.sort((a, b) => {
+            if (a.isAvailable !== b.isAvailable) {
+              return a.isAvailable ? -1 : 1; // Active items first
+            }
+            return 0;
+          });
+        }
+      }
+      
+      // Calculate pagination
+      const totalCount = results.length;
+      const pageSize = filters?.pageSize || 10;
+      const totalPages = Math.ceil(totalCount / pageSize);
+      const currentPage = filters?.page || 1;
+      
+      // Apply pagination
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedResults = results.slice(startIndex, endIndex);
+      
+      console.log(`Returning ${paginatedResults.length} yachts (page ${currentPage} of ${totalPages})`);
+      
+      return {
+        yachts: paginatedResults,
+        pagination: {
+          currentPage,
+          pageSize,
+          totalCount,
+          totalPages
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching yachts:', error);
+      return {
+        yachts: [],
+        pagination: {
+          currentPage: 1,
+          pageSize: filters?.pageSize || 10,
+          totalCount: 0,
+          totalPages: 0
+        }
+      };
+    }
+  }
+  
+  async getYachtById(id: string): Promise<Yacht | null> {
+    try {
+      console.log(`Getting yacht with ID: ${id}`);
+      
+      // Try to get from unified collection
+      const yachtRef = adminDb.collection('yachts').doc(id);
+      const yachtDoc = await yachtRef.get();
+      
+      if (yachtDoc.exists) {
+        console.log('Found yacht in unified collection');
+        const data = yachtDoc.data() as Yacht;
+        return {
+          ...data,
+          id: yachtDoc.id
+        };
+      }
+      
+      console.log('Yacht not found in unified collection');
+      return null;
+    } catch (error) {
+      console.error(`Error fetching yacht with ID ${id}:`, error);
+      return null;
+    }
+  }
+  
+  async getFeaturedYachts(): Promise<YachtSummary[]> {
+    try {
+      console.log('Getting featured yachts');
+      
+      // Use the unified collection
+      const snapshot = await adminDb.collection('yachts').get();
+      
+      if (snapshot.empty) {
+        console.log('No yachts found in unified collection');
+        return [];
+      }
+      
+      // Map all yachts
+      const allYachts = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || '',
+          description: data.description || '',
+          category: data.category || '',
+          location: {
+            address: data.location?.address || '',
+            latitude: data.location?.latitude || 0,
+            longitude: data.location?.longitude || 0,
+            region: data.location?.region || 'dubai',
+            portMarina: data.location?.portMarina || data.location?.port_marina || ''
+          },
+          pricing: data.pricing || 0,
+          capacity: data.capacity || 0,
+          duration: data.duration || 0,
+          isAvailable: data.isAvailable || data.availability_status || false,
+          isFeatured: data.isFeatured || data.featured || false,
+          mainImage: data.media?.length > 0 ? data.media[0].url : undefined
+        } as YachtSummary;
+      });
+      
+      // Get featured yachts
+      const featuredYachts = allYachts
+        .filter(yacht => yacht.isFeatured && yacht.isAvailable)
+        .slice(0, 6); // Limit to 6 featured yachts
+      
+      console.log(`Found ${featuredYachts.length} featured yachts`);
+      return featuredYachts;
+    } catch (error) {
+      console.error('Error fetching featured yachts:', error);
+      return [];
+    }
+  }
+  
+  // Legacy methods - updated to use unified collection where possible
   async getAllExperiencePackages(filters?: {
     type?: string;
     region?: string;

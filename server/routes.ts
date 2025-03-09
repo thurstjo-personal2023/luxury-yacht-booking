@@ -5,6 +5,76 @@ import { registerStripeRoutes } from "./stripe";
 import { adminDb } from "./firebase-admin";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // New unified API endpoints
+  
+  // Get featured yachts (specific route needs to be defined before generic routes with params)
+  app.get("/api/yachts/featured", async (req, res) => {
+    try {
+      const featuredYachts = await storage.getFeaturedYachts();
+      res.json(featuredYachts);
+    } catch (error) {
+      console.error("Error fetching featured yachts:", error);
+      res.status(500).json({ 
+        message: "Error fetching featured yachts", 
+        error: String(error)
+      });
+    }
+  });
+  
+  // Get all yachts with pagination and filtering
+  app.get("/api/yachts", async (req, res) => {
+    try {
+      const { 
+        type, 
+        region, 
+        port_marina: portMarina, 
+        page = '1', 
+        pageSize = '10',
+        sortByStatus = 'true'
+      } = req.query;
+      
+      const filters = {
+        type: type as string | undefined,
+        region: region as string | undefined,
+        portMarina: portMarina as string | undefined,
+        page: parseInt(page as string, 10),
+        pageSize: parseInt(pageSize as string, 10),
+        sortByStatus: sortByStatus === 'true'
+      };
+      
+      // Get the data from storage
+      const result = await storage.getAllYachts(filters);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching yachts:", error);
+      res.status(500).json({ 
+        message: "Error fetching yachts", 
+        error: String(error)
+      });
+    }
+  });
+  
+  // Get yacht by ID
+  app.get("/api/yachts/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const yacht = await storage.getYachtById(id);
+      
+      if (!yacht) {
+        return res.status(404).json({ message: "Yacht not found" });
+      }
+      
+      res.json(yacht);
+    } catch (error) {
+      console.error(`Error fetching yacht with ID ${req.params.id}:`, error);
+      res.status(500).json({ 
+        message: "Error fetching yacht", 
+        error: String(error)
+      });
+    }
+  });
+  
+  // Legacy API endpoints
   // Export normalized yacht schema
   app.get("/api/export/yacht-schema", async (req, res) => {
     try {
