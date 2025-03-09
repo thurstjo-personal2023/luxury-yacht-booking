@@ -188,12 +188,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get producer yachts with pagination and ordering by availability status
-  app.get("/api/yachts/producer", async (req, res) => {
+  // Move this route before the "Get yacht by ID" route to avoid confusion with the :id parameter
+  app.get("/api/producer/yachts", async (req, res) => {
     try {
       // Parse pagination parameters from query string
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = parseInt(req.query.pageSize as string) || 10;
       const producerId = req.query.producerId as string;
+      
+      console.log(`Fetching yachts for producer ID: ${producerId || 'all'}`);
       
       // In a real implementation, we would get the producer ID from auth
       // For development, we'll either use the provided producerId or get all yachts with a producer ID
@@ -214,17 +217,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get producer add-ons with pagination and ordering by availability
-  app.get("/api/addons/producer", async (req, res) => {
+  app.get("/api/producer/addons", async (req, res) => {
     try {
       // Parse pagination parameters from query string
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = parseInt(req.query.pageSize as string) || 10;
+      const producerId = req.query.producerId as string;
+      
+      console.log(`Fetching add-ons for producer ID: ${producerId || 'all'}`);
       
       // In a real implementation, we would get the producer ID from auth
       // For now, we'll just query all add-ons since we're in development mode
       
       // Get add-ons with pagination and sorting
       const addonsResponse = await storage.getAllProductAddOns({
+        partnerId: producerId,  // Use partnerId for filtering if provided
         page,
         pageSize,
         sortByStatus: true
@@ -242,8 +249,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get producer reviews
-  app.get("/api/reviews/producer", async (req, res) => {
+  app.get("/api/producer/reviews", async (req, res) => {
     try {
+      const producerId = req.query.producerId as string;
+      console.log(`Fetching reviews for producer ID: ${producerId || 'all'}`);
+      
       // In a real implementation, we would get the producer ID from auth and filter reviews
       // For now, we'll just return an empty array
       res.json([]);
@@ -254,8 +264,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get producer bookings
-  app.get("/api/bookings/producer", async (req, res) => {
+  app.get("/api/producer/bookings", async (req, res) => {
     try {
+      const producerId = req.query.producerId as string;
+      console.log(`Fetching bookings for producer ID: ${producerId || 'all'}`);
+      
       // In a real implementation, we would get the producer ID from auth and filter bookings
       // For now, we'll just return an empty array
       res.json([]);
