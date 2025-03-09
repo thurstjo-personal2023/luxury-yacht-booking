@@ -182,17 +182,37 @@ export default function AssetManagement() {
         const yachtRef = doc(db, "yacht_experiences", id);
         await deleteDoc(yachtRef);
         
-        // Invalidate queries to refresh data
-        // Invalidate all query keys for the yacht producer endpoints
-        queryClient.invalidateQueries({ queryKey: ["/api/yachts/producer"] });
+        // Use a more aggressive cache invalidation approach
+        console.log('Invalidating all yacht queries after deletion...');
         
-        // Also explicitly invalidate the current page to ensure the list refreshes
+        // First, remove all yacht producer queries from cache to ensure fresh data
+        queryClient.removeQueries({ queryKey: ["/api/yachts/producer"] });
+        
+        // Then invalidate to trigger refetching
         queryClient.invalidateQueries({ 
-          queryKey: ["/api/yachts/producer", { page: yachtPage, pageSize }] 
+          queryKey: ["/api/yachts/producer"],
+          refetchType: 'all'
+        });
+        
+        // Explicitly invalidate all pages to ensure complete refresh
+        for (let page = 1; page <= 5; page++) { // Assume maximum of 5 pages for safety
+          queryClient.invalidateQueries({
+            queryKey: ["/api/yachts/producer", { page, pageSize }],
+            refetchType: 'all'
+          });
+        }
+        
+        // Also invalidate experiences endpoint as it might contain the same data
+        queryClient.invalidateQueries({
+          queryKey: ["/api/experiences"],
+          refetchType: 'all'
         });
         
         // Invalidate featured experiences
-        queryClient.invalidateQueries({ queryKey: ["/api/experiences/featured"] });
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/experiences/featured"],
+          refetchType: 'all'
+        });
         
         toast({
           title: "Yacht Deleted",
@@ -203,8 +223,22 @@ export default function AssetManagement() {
         const addonRef = doc(db, "products_add_ons", id);
         await deleteDoc(addonRef);
         
-        // Invalidate queries to refresh data
-        queryClient.invalidateQueries({ queryKey: ["/api/addons/producer"] });
+        // Use a more aggressive cache invalidation for add-ons as well
+        queryClient.removeQueries({ queryKey: ["/api/addons/producer"] });
+        
+        // Then invalidate to trigger refetching
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/addons/producer"],
+          refetchType: 'all'
+        });
+        
+        // Explicitly invalidate all pages
+        for (let page = 1; page <= 5; page++) {
+          queryClient.invalidateQueries({
+            queryKey: ["/api/addons/producer", { page, pageSize }],
+            refetchType: 'all'
+          });
+        }
         
         toast({
           title: "Service Add-on Deleted",
@@ -239,17 +273,38 @@ export default function AssetManagement() {
         last_updated_date: serverTimestamp()
       });
       
-      // Invalidate cache to refresh data
-      queryClient.invalidateQueries({ queryKey: ["/api/yachts/producer"] });
+      // Use a more aggressive cache invalidation approach
+      console.log('Invalidating all yacht queries to refresh data...');
       
-      // Also explicitly invalidate the current page to ensure the list refreshes
+      // First, remove all yacht producer queries from cache to ensure fresh data
+      queryClient.removeQueries({ queryKey: ["/api/yachts/producer"] });
+      
+      // Then invalidate to trigger refetching
       queryClient.invalidateQueries({ 
-        queryKey: ["/api/yachts/producer", { page: yachtPage, pageSize }] 
+        queryKey: ["/api/yachts/producer"],
+        refetchType: 'all'
+      });
+      
+      // Explicitly invalidate all pages to ensure complete refresh
+      for (let page = 1; page <= 5; page++) { // Assume maximum of 5 pages for safety
+        queryClient.invalidateQueries({
+          queryKey: ["/api/yachts/producer", { page, pageSize }],
+          refetchType: 'all'
+        });
+      }
+      
+      // Also invalidate experiences endpoint as it might contain the same data
+      queryClient.invalidateQueries({
+        queryKey: ["/api/experiences"],
+        refetchType: 'all'
       });
       
       // Also check if this yacht might be featured, and invalidate that query too
       if (yacht.featured) {
-        queryClient.invalidateQueries({ queryKey: ["/api/experiences/featured"] });
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/experiences/featured"],
+          refetchType: 'all'
+        });
       }
       
       toast({
@@ -579,7 +634,8 @@ export default function AssetManagement() {
                   ))}
                   
                   {/* Yacht Pagination */}
-                  {yachtsPagination && yachtsPagination.totalPages > 1 && (
+                  {/* Always show pagination controls when there are results */}
+                  {filteredYachts.length > 0 && (
                     <div className="flex items-center justify-center mt-6 gap-2">
                       <Button
                         variant="outline"

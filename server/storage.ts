@@ -115,9 +115,22 @@ export class FirestoreStorage implements IStorage {
         if (filters.sortByStatus) {
           console.log('Sorting by availability status (active first)');
           results.sort((a, b) => {
-            if (a.availability_status === b.availability_status) return 0;
-            return a.availability_status ? -1 : 1; // Active items first
+            // First, sort by availability_status (active first)
+            if (a.availability_status !== b.availability_status) {
+              return a.availability_status ? -1 : 1; // Active items first
+            }
+            
+            // If availability status is the same, sort by creation date (newest first)
+            if (a.created_date && b.created_date) {
+              return b.created_date.seconds - a.created_date.seconds;
+            }
+            
+            return 0;
           });
+          
+          console.log(`After sorting: First 3 items availability status: ${
+            results.slice(0, 3).map(item => item.availability_status ? 'active' : 'inactive').join(', ')
+          }`);
         }
       }
 
