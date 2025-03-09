@@ -442,21 +442,37 @@ export default function YachtForm() {
         });
       }
 
-      // Invalidate queries to refresh data in the asset management page
-      // Invalidate all yacht queries regardless of pagination parameters
+      // Invalidate all yacht queries to ensure all cached data is refreshed
+      console.log('Invalidating all yacht queries to refresh data...');
+      
+      // First, completely remove all yacht producer queries from cache
+      queryClient.removeQueries({ queryKey: ['/api/yachts/producer'] });
+      
+      // Then invalidate specific keys to trigger refetching
       queryClient.invalidateQueries({ 
-        queryKey: ['/api/yachts/producer']
+        queryKey: ['/api/yachts/producer'],
+        refetchType: 'all'  // Force refetch all queries that match this key
       });
       
-      // Explicitly invalidate the first page to ensure the dashboard refreshes
+      // Explicitly invalidate all possible pages to ensure complete refresh
+      for (let page = 1; page <= 5; page++) { // Assume maximum of 5 pages for safety
+        queryClient.invalidateQueries({
+          queryKey: ['/api/yachts/producer', { page, pageSize: 10 }],
+          refetchType: 'all'
+        });
+      }
+      
+      // Also invalidate experiences endpoint as it might contain the same data
       queryClient.invalidateQueries({
-        queryKey: ['/api/yachts/producer', { page: 1, pageSize: 10 }]
+        queryKey: ['/api/experiences'],
+        refetchType: 'all'
       });
       
       // Invalidate the featured experiences query if the yacht is marked as featured
       if (values.featured) {
         queryClient.invalidateQueries({ 
-          queryKey: ['/api/experiences/featured']
+          queryKey: ['/api/experiences/featured'],
+          refetchType: 'all'
         });
       }
       
