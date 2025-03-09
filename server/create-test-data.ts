@@ -1,4 +1,4 @@
-import { adminDb } from "./firebase-admin";
+import { adminDb } from "./firebase-admin.js";
 import { Timestamp } from 'firebase-admin/firestore';
 
 // Test data for the unified yacht collection
@@ -179,4 +179,107 @@ export async function insertTestYachts() {
     console.error('Error inserting test data:', error);
     return { success: false, error };
   }
+}
+
+// Insert test data into legacy collections
+export async function insertLegacyTestData() {
+  console.log('Inserting test data into legacy yacht collections...');
+  
+  try {
+    // Convert test yachts to legacy format
+    const legacyYachts = testYachts.map(yacht => ({
+      name: yacht.name,
+      description: yacht.description,
+      capacity: yacht.max_guests,
+      price: yacht.price,
+      imageUrl: yacht.media[0]?.url || '',
+      location: {
+        address: yacht.location.address,
+        latitude: yacht.location.latitude,
+        longitude: yacht.location.longitude
+      },
+      features: yacht.features,
+      available: yacht.available,
+      createdAt: yacht.createdAt,
+      updatedAt: yacht.updatedAt
+    }));
+    
+    const legacyExperiences = testYachts.map(yacht => ({
+      title: yacht.title,
+      description: yacht.description,
+      category: yacht.category,
+      location: yacht.location,
+      duration: yacht.duration,
+      capacity: yacht.capacity,
+      pricing: yacht.pricing,
+      pricing_model: yacht.pricingModel,
+      customization_options: yacht.customizationOptions.map(opt => ({
+        name: opt.name,
+        price: opt.price,
+        product_id: opt.id
+      })),
+      media: yacht.media,
+      availability_status: yacht.availability_status,
+      featured: yacht.isFeatured,
+      tags: yacht.tags,
+      created_date: yacht.createdAt,
+      last_updated_date: yacht.updatedAt,
+      published_status: yacht.isPublished,
+      yacht_type: yacht.yacht_type
+    }));
+    
+    // Insert into both legacy collections
+    const batch1 = adminDb.batch();
+    for (let i = 0; i < legacyYachts.length; i++) {
+      const docRef = adminDb.collection('yachts').doc(`yacht-${i+1}`);
+      batch1.set(docRef, legacyYachts[i]);
+    }
+    await batch1.commit();
+    
+    const batch2 = adminDb.batch();
+    for (let i = 0; i < legacyExperiences.length; i++) {
+      const docRef = adminDb.collection('yacht_experiences').doc(`yacht-${i+1}`);
+      batch2.set(docRef, legacyExperiences[i]);
+    }
+    await batch2.commit();
+    
+    console.log(`Successfully inserted test data into legacy collections.`);
+    return { success: true, count: legacyYachts.length };
+  } catch (error) {
+    console.error('Error inserting legacy test data:', error);
+    return { success: false, error };
+  }
+}
+
+// Main function to insert all test data
+export async function insertTestData() {
+  try {
+    // Insert into legacy collections first
+    await insertLegacyTestData();
+    // Don't insert into unified collection here - the migration will do that
+    return { success: true };
+  } catch (error) {
+    console.error('Error in insertTestData:', error);
+    return { success: false, error };
+  }
+}
+
+// Run if script is executed directly
+if (process.argv[1] === import.meta.url || process.argv.includes('--insert-legacy')) {
+  console.log('Running insertTestData directly...');
+  insertTestData()
+    .then(result => {
+      console.log('Test data insertion result:', result);
+      if (result.success) {
+        console.log('Successfully inserted test data');
+        process.exit(0);
+      } else {
+        console.error('Failed to insert test data');
+        process.exit(1);
+      }
+    })
+    .catch(err => {
+      console.error('Error during test data insertion:', err);
+      process.exit(1);
+    });
 }

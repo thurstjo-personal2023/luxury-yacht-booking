@@ -157,12 +157,19 @@ function normalizeToUnifiedSchema(doc: FirebaseFirestore.DocumentSnapshot): Yach
   yacht.tags = data.tags || data.features || [];
   
   // Reviews - using type assertion to handle the Timestamp compatibility issue
-  yacht.reviews = ((data.reviews || []).map(review => ({
-    rating: review.rating,
-    text: review.text || '',
-    userId: review.userId || '',
-    createdAt: review.createdAt
-  })) as any) || [];
+  yacht.reviews = ((data.reviews || []).map(review => {
+    // Make sure we don't have undefined values in the review
+    const cleanReview = {
+      rating: review.rating || 0,
+      text: review.text || '',
+      userId: review.userId || ''
+    };
+    // Only add createdAt if it exists
+    if (review.createdAt) {
+      cleanReview.createdAt = review.createdAt;
+    }
+    return cleanReview;
+  }) as any) || [];
   
   // Virtual tour
   if (data.virtualTour || data.virtual_tour) {
