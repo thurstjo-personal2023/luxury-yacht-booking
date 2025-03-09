@@ -180,18 +180,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // In a real implementation, we would get the producer ID from auth
       // For now, we'll just query all yachts since we're in development mode
       
-      // Get experiences with pagination and sorting
-      const experiencesResponse = await storage.getAllExperiencePackages({
+      // Get yachts with pagination and sorting - use unified API
+      const yachtsResponse = await storage.getAllYachts({
         page,
         pageSize,
         sortByStatus: true
       });
       
-      // Transform response to match the expected format
-      res.json({
-        yachts: experiencesResponse.data,
-        pagination: experiencesResponse.pagination
-      });
+      res.json(yachtsResponse);
     } catch (error) {
       console.error("Error fetching producer yachts:", error);
       res.status(500).json({ error: "Failed to fetch yachts" });

@@ -162,18 +162,18 @@ const testYachts = [
 
 // Export an async function to insert test data
 export async function insertTestYachts() {
-  console.log('Inserting test data into yachts collection...');
+  console.log('Inserting test data into unified_yacht_experiences collection...');
   
   try {
     const batch = adminDb.batch();
     
     for (const yacht of testYachts) {
-      const docRef = adminDb.collection('yachts').doc(yacht.id);
+      const docRef = adminDb.collection('unified_yacht_experiences').doc(yacht.id);
       batch.set(docRef, yacht);
     }
     
     await batch.commit();
-    console.log(`Successfully inserted ${testYachts.length} test yachts into the database.`);
+    console.log(`Successfully inserted ${testYachts.length} test yachts into the unified_yacht_experiences collection.`);
     return { success: true, count: testYachts.length };
   } catch (error) {
     console.error('Error inserting test data:', error);
