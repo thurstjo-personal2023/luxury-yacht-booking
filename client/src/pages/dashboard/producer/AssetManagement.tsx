@@ -538,7 +538,7 @@ export default function AssetManagement() {
                 <div className="space-y-4">
                   {/* Yacht List */}
                   {filteredYachts?.map((yacht: ExtendedYachtExperience) => (
-                    <Card key={yacht.package_id} className="overflow-hidden">
+                    <Card key={yacht.package_id || yacht.yachtId || yacht.id} className="overflow-hidden">
                       <div className="flex flex-col md:flex-row">
                         {/* Image */}
                         <div className="w-full md:w-64 h-48 md:h-auto">
