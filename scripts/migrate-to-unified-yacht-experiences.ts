@@ -143,7 +143,10 @@ function normalizeToUnifiedSchema(doc: FirebaseFirestore.DocumentSnapshot): Yach
   }));
   
   // Media
-  yacht.media = data.media || [];
+  yacht.media = (data.media || []).map(item => ({
+    type: (item.type === 'video' ? 'video' : 'image') as 'image' | 'video',
+    url: item.url
+  }));
   
   // Status flags
   yacht.isAvailable = data.isAvailable || data.availability_status || data.available || false;
@@ -153,33 +156,42 @@ function normalizeToUnifiedSchema(doc: FirebaseFirestore.DocumentSnapshot): Yach
   // Tags and categories
   yacht.tags = data.tags || data.features || [];
   
-  // Reviews
-  yacht.reviews = data.reviews?.map(review => ({
+  // Reviews - using type assertion to handle the Timestamp compatibility issue
+  yacht.reviews = ((data.reviews || []).map(review => ({
     rating: review.rating,
     text: review.text || '',
     userId: review.userId || '',
     createdAt: review.createdAt
-  })) || [];
+  })) as any) || [];
   
   // Virtual tour
   if (data.virtualTour || data.virtual_tour) {
     const sourceTour = data.virtualTour || data.virtual_tour;
-    yacht.virtualTour = {
-      isEnabled: sourceTour.isEnabled || sourceTour.enabled || false,
-      scenes: (sourceTour.scenes || []).map(scene => ({
-        id: scene.id,
-        title: scene.title,
-        imageUrl: scene.imageUrl,
-        thumbnailUrl: scene.thumbnailUrl,
-        hotspots: scene.hotspots || [],
-        initialViewParameters: scene.initialViewParameters || {}
-      }))
-    };
+    if (sourceTour) {
+      // Handle both formats of virtual tour data
+      const isEnabled = typeof (sourceTour as any).isEnabled !== 'undefined' 
+        ? !!(sourceTour as any).isEnabled 
+        : typeof (sourceTour as any).enabled !== 'undefined'
+          ? !!(sourceTour as any).enabled
+          : false;
+      
+      yacht.virtualTour = {
+        isEnabled,
+        scenes: ((sourceTour as any).scenes || []).map((scene: any) => ({
+          id: scene.id || `scene-${Math.random().toString(36).substring(2, 9)}`,
+          title: scene.title || '',
+          imageUrl: scene.imageUrl || '',
+          thumbnailUrl: scene.thumbnailUrl,
+          hotspots: scene.hotspots || [],
+          initialViewParameters: scene.initialViewParameters || {}
+        }))
+      };
+    }
   }
   
-  // Timestamps
-  yacht.createdAt = data.createdAt || data.created_date || null;
-  yacht.updatedAt = data.updatedAt || data.last_updated_date || null;
+  // Timestamps - using type assertion to handle the Timestamp compatibility issue
+  yacht.createdAt = (data.createdAt || data.created_date || undefined) as any;
+  yacht.updatedAt = (data.updatedAt || data.last_updated_date || undefined) as any;
   
   // Legacy fields (for backward compatibility during transition)
   yacht.package_id = data.package_id || doc.id;
