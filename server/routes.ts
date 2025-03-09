@@ -4,7 +4,19 @@ import { storage } from "./storage";
 import { registerStripeRoutes } from "./stripe";
 import { adminDb } from "./firebase-admin";
 
+import { insertTestYachts } from "./create-test-data";
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Development route to create test data
+  app.post("/api/dev/create-test-data", async (req, res) => {
+    try {
+      const result = await insertTestYachts();
+      res.json(result);
+    } catch (error) {
+      console.error("Error creating test data:", error);
+      res.status(500).json({ error: "Failed to create test data" });
+    }
+  });
   // New unified API endpoints
   
   // Get featured yachts (specific route needs to be defined before generic routes with params)
