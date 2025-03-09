@@ -65,7 +65,11 @@ export async function initializeFirestore() {
 
 // Export collection references for use in components
 export const collectionRefs = {
-  yachtExperiences: collection(db, collections.yacht_experiences),
+  // Yacht collections
+  unifiedYachts: collection(db, collections.unified_yacht_experiences), // Primary collection to use
+  yachtExperiences: collection(db, collections.yacht_experiences),      // Legacy collection
+  
+  // Other collections
   touristProfiles: collection(db, collections.user_profiles_tourist),
   articles: collection(db, collections.articles_and_guides),
   events: collection(db, collections.event_announcements),
