@@ -136,16 +136,26 @@ function normalizeToUnifiedSchema(doc: FirebaseFirestore.DocumentSnapshot): Yach
   yacht.pricingModel = (data.pricingModel === 'Variable' || data.pricing_model === 'Variable') ? 'Variable' : 'Fixed';
   
   // Options and customization
-  yacht.customizationOptions = (data.customizationOptions || data.customization_options || []).map(option => ({
-    id: option.id || option.product_id || `option-${Math.random().toString(36).substring(2, 9)}`,
-    name: option.name,
-    price: option.price
+  let sourceOptions = data.customizationOptions || data.customization_options || [];
+  // Ensure sourceOptions is an array before mapping
+  if (!Array.isArray(sourceOptions)) {
+    sourceOptions = [];
+  }
+  yacht.customizationOptions = sourceOptions.map(option => ({
+    id: option?.id || option?.product_id || `option-${Math.random().toString(36).substring(2, 9)}`,
+    name: option?.name || '',
+    price: option?.price || 0
   }));
   
   // Media
-  yacht.media = (data.media || []).map(item => ({
-    type: (item.type === 'video' ? 'video' : 'image') as 'image' | 'video',
-    url: item.url
+  let mediaArray = data.media || [];
+  if (!Array.isArray(mediaArray)) {
+    mediaArray = [];
+  }
+  
+  yacht.media = mediaArray.map(item => ({
+    type: (item?.type === 'video' ? 'video' : 'image') as 'image' | 'video',
+    url: item?.url || ''
   }));
   
   // Status flags
@@ -157,19 +167,24 @@ function normalizeToUnifiedSchema(doc: FirebaseFirestore.DocumentSnapshot): Yach
   yacht.tags = data.tags || data.features || [];
   
   // Reviews - using type assertion to handle the Timestamp compatibility issue
-  yacht.reviews = ((data.reviews || []).map(review => {
+  let reviewsArray = data.reviews || [];
+  if (!Array.isArray(reviewsArray)) {
+    reviewsArray = [];
+  }
+  
+  yacht.reviews = reviewsArray.map(review => {
     // Make sure we don't have undefined values in the review
-    const cleanReview = {
-      rating: review.rating || 0,
-      text: review.text || '',
-      userId: review.userId || ''
+    const cleanReview: any = {
+      rating: review?.rating || 0,
+      text: review?.text || '',
+      userId: review?.userId || ''
     };
     // Only add createdAt if it exists
-    if (review.createdAt) {
+    if (review?.createdAt) {
       cleanReview.createdAt = review.createdAt;
     }
     return cleanReview;
-  }) as any) || [];
+  });
   
   // Virtual tour
   if (data.virtualTour || data.virtual_tour) {
