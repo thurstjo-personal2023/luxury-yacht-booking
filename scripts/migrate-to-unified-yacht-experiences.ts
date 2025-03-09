@@ -112,7 +112,7 @@ function normalizeToUnifiedSchema(doc: FirebaseFirestore.DocumentSnapshot): Yach
   yacht.id = doc.id;
   
   // Store original collection source for debugging
-  yacht._source = doc.ref.parent.id;
+  (yacht as any)._source = doc.ref.parent.id;
   
   // Basic information
   yacht.title = data.title || data.name || '';
@@ -125,7 +125,7 @@ function normalizeToUnifiedSchema(doc: FirebaseFirestore.DocumentSnapshot): Yach
     address: data.location?.address || '',
     latitude: data.location?.latitude || 0,
     longitude: data.location?.longitude || 0,
-    region: data.location?.region || 'dubai',
+    region: (data.location?.region === 'abu-dhabi' ? 'abu-dhabi' : 'dubai') as 'dubai' | 'abu-dhabi',
     portMarina: data.location?.portMarina || data.location?.port_marina || ''
   };
   
@@ -133,7 +133,7 @@ function normalizeToUnifiedSchema(doc: FirebaseFirestore.DocumentSnapshot): Yach
   yacht.capacity = data.capacity || data.max_guests || 0;
   yacht.duration = data.duration || 0;
   yacht.pricing = data.pricing || data.price || 0;
-  yacht.pricingModel = data.pricingModel || data.pricing_model || "Fixed";
+  yacht.pricingModel = (data.pricingModel === 'Variable' || data.pricing_model === 'Variable') ? 'Variable' : 'Fixed';
   
   // Options and customization
   yacht.customizationOptions = (data.customizationOptions || data.customization_options || []).map(option => ({
