@@ -447,79 +447,145 @@ export class FirestoreStorage implements IStorage {
       // Use the unified yacht collection
       const yachtsRef = adminDb.collection(UNIFIED_YACHT_COLLECTION);
       
-      // Build query based on presence of producerId
-      let query;
+      // Build queries based on presence of producerId
+      // Since Firestore doesn't support OR queries directly, we'll need to perform multiple queries
+      // and combine the results
+      let yachtDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+      
       if (filters?.producerId) {
         console.log(`Filtering by producer ID: ${filters.producerId}`);
-        // We need to do two separate queries because Firestore doesn't support OR queries
-        // First try providerId field
-        const producerSnapshot = await yachtsRef
+        
+        // Try all possible variations of producer ID fields to ensure we catch everything
+        // 1. Query with providerId field
+        const providerIdSnapshot = await yachtsRef
           .where('providerId', '==', filters.producerId)
           .get();
-          
-        if (producerSnapshot.empty) {
-          console.log('No yachts found with providerId, trying producerId field');
-          // If no results with providerId, try producerId field
-          query = yachtsRef.where('producerId', '==', filters.producerId);
-        } else {
-          console.log(`Found ${producerSnapshot.size} yachts with providerId`);
-          // If we found yachts with providerId, use that query
-          query = yachtsRef.where('providerId', '==', filters.producerId);
+        
+        if (!providerIdSnapshot.empty) {
+          console.log(`Found ${providerIdSnapshot.size} yachts with providerId field`);
+          yachtDocs = [...yachtDocs, ...providerIdSnapshot.docs];
         }
+        
+        // 2. Query with producerId field
+        const producerIdSnapshot = await yachtsRef
+          .where('producerId', '==', filters.producerId)
+          .get();
+        
+        if (!producerIdSnapshot.empty) {
+          console.log(`Found ${producerIdSnapshot.size} yachts with producerId field`);
+          // Add docs that aren't already in the yachtDocs array (based on ID)
+          const existingIds = new Set(yachtDocs.map(doc => doc.id));
+          const newDocs = producerIdSnapshot.docs.filter(doc => !existingIds.has(doc.id));
+          yachtDocs = [...yachtDocs, ...newDocs];
+        }
+        
+        // 3. Query with producer_id field (legacy format)
+        const producerUnderscoreIdSnapshot = await yachtsRef
+          .where('producer_id', '==', filters.producerId)
+          .get();
+        
+        if (!producerUnderscoreIdSnapshot.empty) {
+          console.log(`Found ${producerUnderscoreIdSnapshot.size} yachts with producer_id field`);
+          // Add docs that aren't already in the yachtDocs array
+          const existingIds = new Set(yachtDocs.map(doc => doc.id));
+          const newDocs = producerUnderscoreIdSnapshot.docs.filter(doc => !existingIds.has(doc.id));
+          yachtDocs = [...yachtDocs, ...newDocs];
+        }
+        
+        console.log(`Total unique yachts found for producer: ${yachtDocs.length}`);
       } else {
         console.log('No producer ID provided, getting all yachts');
-        query = yachtsRef;
+        const snapshot = await yachtsRef.get();
+        yachtDocs = snapshot.docs;
       }
       
-      const snapshot = await query.get();
-      
-      if (snapshot.empty) {
-        console.log(`No producer yachts found in ${UNIFIED_YACHT_COLLECTION}`);
+      // If we don't have any results, try legacy collections
+      if (yachtDocs.length === 0) {
+        console.log('No yachts found in unified collection, trying legacy collection');
         
         // Fall back to legacy collection during migration period
-        console.log('Falling back to legacy collection for backwards compatibility');
         const legacyRef = adminDb.collection(LEGACY_YACHTS);
+        let legacyDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
         
-        // Try producer query on legacy collection
-        let legacyQuery;
         if (filters?.producerId) {
-          // First check with producer_id field (commonly used in older documents)
+          // Try all possible producer ID field variations in legacy collection
+          // 1. First check with producer_id field (commonly used in older documents)
           const legacyProducerSnapshot = await legacyRef
             .where('producer_id', '==', filters.producerId)
             .get();
           
-          if (legacyProducerSnapshot.empty) {
-            console.log('No yachts found with producer_id, trying producerId field');
-            legacyQuery = legacyRef.where('producerId', '==', filters.producerId);
-          } else {
-            console.log(`Found ${legacyProducerSnapshot.size} yachts with producer_id`);
-            legacyQuery = legacyRef.where('producer_id', '==', filters.producerId);
+          if (!legacyProducerSnapshot.empty) {
+            console.log(`Found ${legacyProducerSnapshot.size} legacy yachts with producer_id`);
+            legacyDocs = [...legacyDocs, ...legacyProducerSnapshot.docs];
+          }
+          
+          // 2. Try producerId field
+          const legacyProducerIdSnapshot = await legacyRef
+            .where('producerId', '==', filters.producerId)
+            .get();
+          
+          if (!legacyProducerIdSnapshot.empty) {
+            console.log(`Found ${legacyProducerIdSnapshot.size} legacy yachts with producerId`);
+            // Add docs that aren't already in the array
+            const existingIds = new Set(legacyDocs.map(doc => doc.id));
+            const newDocs = legacyProducerIdSnapshot.docs.filter(doc => !existingIds.has(doc.id));
+            legacyDocs = [...legacyDocs, ...newDocs];
+          }
+          
+          // 3. Try providerId field
+          const legacyProviderIdSnapshot = await legacyRef
+            .where('providerId', '==', filters.producerId)
+            .get();
+          
+          if (!legacyProviderIdSnapshot.empty) {
+            console.log(`Found ${legacyProviderIdSnapshot.size} legacy yachts with providerId`);
+            // Add docs that aren't already in the array
+            const existingIds = new Set(legacyDocs.map(doc => doc.id));
+            const newDocs = legacyProviderIdSnapshot.docs.filter(doc => !existingIds.has(doc.id));
+            legacyDocs = [...legacyDocs, ...newDocs];
           }
         } else {
-          legacyQuery = legacyRef;
+          // Get all legacy yachts
+          const legacySnapshot = await legacyRef.get();
+          if (!legacySnapshot.empty) {
+            legacyDocs = legacySnapshot.docs;
+          }
         }
         
-        const legacySnapshot = await legacyQuery.get();
-        
-        if (legacySnapshot.empty) {
-          console.log('No producer yachts found in legacy collection either');
-          return {
-            yachts: [],
-            pagination: {
-              currentPage: 1,
-              pageSize: filters?.pageSize || 10,
-              totalCount: 0,
-              totalPages: 0
-            }
-          };
+        if (legacyDocs.length > 0) {
+          console.log(`Found ${legacyDocs.length} total legacy yachts, using them instead`);
+          // Create a snapshot-like object to pass to processYachtResults
+          const legacySnapshot = {
+            docs: legacyDocs,
+            empty: legacyDocs.length === 0,
+            size: legacyDocs.length
+          } as FirebaseFirestore.QuerySnapshot;
+          
+          return this.processYachtResults(legacySnapshot, filters);
         }
         
-        console.log(`Found ${legacySnapshot.size} producer yachts in legacy collection, using them instead`);
-        // Continue with legacy data
-        return this.processYachtResults(legacySnapshot, filters);
+        // No yachts found in any collection
+        console.log('No producer yachts found in any collection');
+        return {
+          yachts: [],
+          pagination: {
+            currentPage: 1,
+            pageSize: filters?.pageSize || 10,
+            totalCount: 0,
+            totalPages: 0
+          }
+        };
       }
       
-      return this.processYachtResults(snapshot, filters);
+      // Create a snapshot-like object to pass to processYachtResults
+      const combinedSnapshot = {
+        docs: yachtDocs,
+        empty: yachtDocs.length === 0,
+        size: yachtDocs.length
+      } as FirebaseFirestore.QuerySnapshot;
+      
+      // Process results with pagination and filters
+      return this.processYachtResults(combinedSnapshot, filters);
     } catch (error) {
       console.error('Error fetching producer yachts:', error);
       return {
