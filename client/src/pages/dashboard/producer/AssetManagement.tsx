@@ -649,14 +649,14 @@ export default function AssetManagement() {
                       </Button>
                       
                       <span className="text-sm text-muted-foreground">
-                        Page {yachtPage} of {yachtsPagination.totalPages}
+                        Page {yachtPage} of {yachtsPagination?.totalPages || 1}
                       </span>
                       
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={handleNextYachtPage}
-                        disabled={yachtPage === yachtsPagination.totalPages}
+                        disabled={!yachtsPagination || yachtPage === yachtsPagination.totalPages}
                         className="flex items-center gap-1"
                       >
                         Next
@@ -760,8 +760,8 @@ export default function AssetManagement() {
                     </Card>
                   ))}
                   
-                  {/* Add-ons Pagination */}
-                  {addonsPagination && addonsPagination.totalPages > 1 && (
+                  {/* Add-ons Pagination - Always show when there are results */}
+                  {filteredAddOns.length > 0 && (
                     <div className="flex items-center justify-center col-span-1 md:col-span-2 lg:col-span-3 mt-6 gap-2">
                       <Button
                         variant="outline"
@@ -775,14 +775,14 @@ export default function AssetManagement() {
                       </Button>
                       
                       <span className="text-sm text-muted-foreground">
-                        Page {addonPage} of {addonsPagination.totalPages}
+                        Page {addonPage} of {addonsPagination?.totalPages || 1}
                       </span>
                       
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={handleNextAddonPage}
-                        disabled={addonPage === addonsPagination.totalPages}
+                        disabled={!addonsPagination || addonPage === addonsPagination.totalPages}
                         className="flex items-center gap-1"
                       >
                         Next
