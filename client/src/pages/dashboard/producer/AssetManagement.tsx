@@ -63,6 +63,7 @@ import {
   serverTimestamp,
   deleteDoc
 } from "firebase/firestore";
+import { useAuthState } from "react-firebase-hooks/auth";
 import { YachtExperience, YachtProfile, ProductAddOn } from "@shared/firestore-schema";
 
 // Extended interface to include properties from API response
@@ -110,9 +111,13 @@ export default function AssetManagement() {
   const [addonPage, setAddonPage] = useState(1);
   const pageSize = 10; // Items per page
   
+  // Get current user to determine producer ID
+  const { user } = useAuthState(auth);
+  const producerId = user?.uid;
+  
   // Queries with pagination
   const { data: yachtsResponse, isLoading: yachtsLoading } = useQuery<YachtsResponse>({
-    queryKey: ["/api/yachts/producer", { page: yachtPage, pageSize }],
+    queryKey: ["/api/yachts/producer", { page: yachtPage, pageSize, producerId }],
   });
   
   const { data: addOnsResponse, isLoading: addOnsLoading } = useQuery<AddOnsResponse>({

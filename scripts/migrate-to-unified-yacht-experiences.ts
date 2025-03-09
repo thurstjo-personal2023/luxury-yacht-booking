@@ -227,8 +227,10 @@ function normalizeToUnifiedSchema(doc: FirebaseFirestore.DocumentSnapshot): Yach
   yacht.price = data.price || data.pricing || 0;
   
   // Ownership and management fields
-  yacht.providerId = data.providerId || data.producerId || data.owner_id || undefined;
-  yacht.producerId = data.producerId || data.providerId || data.owner_id || undefined;
+  // Use null instead of undefined to prevent Firestore validation errors
+  const ownershipId = data.providerId || data.producerId || data.owner_id || null;
+  yacht.providerId = ownershipId;
+  yacht.producerId = ownershipId;
   
   return yacht as Yacht;
 }
