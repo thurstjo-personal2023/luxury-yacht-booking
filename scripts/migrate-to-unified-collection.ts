@@ -33,6 +33,66 @@ if (process.env.NODE_ENV !== 'production') {
 /**
  * Migrates data from yacht_experiences and experience_packages collections to a unified yachts collection
  */
+// Define appropriate type for the documents with all possible properties
+interface YachtDocument {
+  id: string;
+  package_id?: string;
+  yachtId?: string;
+  name?: string;
+  title?: string;
+  description?: string;
+  category?: string;
+  yacht_type?: string;
+  location?: {
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+    region?: string;
+    port_marina?: string;
+  };
+  capacity?: number;
+  max_guests?: number;
+  duration?: number;
+  pricing?: number;
+  price?: number;
+  pricing_model?: string;
+  customization_options?: Array<{
+    product_id?: string;
+    name: string;
+    price: number;
+  }>;
+  media?: Array<{
+    type: string;
+    url: string;
+  }>;
+  availability_status?: boolean;
+  available?: boolean;
+  featured?: boolean;
+  published_status?: boolean;
+  tags?: string[];
+  features?: string[];
+  virtual_tour?: {
+    enabled: boolean;
+    scenes?: Array<{
+      id: string;
+      title: string;
+      imageUrl: string;
+      thumbnailUrl?: string;
+      hotspots?: any[];
+      initialViewParameters?: {
+        pitch?: number;
+        yaw?: number;
+        hfov?: number;
+      };
+    }>;
+  };
+  created_date?: any;
+  createdAt?: any;
+  last_updated_date?: any;
+  updatedAt?: any;
+  [key: string]: any; // For any other properties
+}
+
 async function migrateToUnifiedCollection() {
   console.log('Starting migration to unified yachts collection...');
   
@@ -40,7 +100,7 @@ async function migrateToUnifiedCollection() {
     // 1. Get all documents from yacht_experiences collection
     console.log('Fetching documents from yacht_experiences collection...');
     const yachtExperiencesSnapshot = await getDocs(collection(db, "yacht_experiences"));
-    const yachtExperiences = yachtExperiencesSnapshot.docs.map(doc => ({
+    const yachtExperiences: YachtDocument[] = yachtExperiencesSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
@@ -49,21 +109,21 @@ async function migrateToUnifiedCollection() {
     // 2. Get all documents from experience_packages collection
     console.log('Fetching documents from experience_packages collection...');
     const experiencePackagesSnapshot = await getDocs(collection(db, "experience_packages"));
-    const experiencePackages = experiencePackagesSnapshot.docs.map(doc => ({
+    const experiencePackages: YachtDocument[] = experiencePackagesSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
     console.log(`Found ${experiencePackages.length} documents in experience_packages collection`);
     
     // 3. Combine and deduplicate based on ID
-    const combinedData = [...yachtExperiences];
+    const combinedData: YachtDocument[] = [...yachtExperiences];
     let duplicatesSkipped = 0;
     
     experiencePackages.forEach(pkg => {
       if (!combinedData.find(y => 
         y.id === pkg.id || 
-        y.package_id === pkg.id || 
-        y.yachtId === pkg.id
+        (y.package_id && y.package_id === pkg.id) || 
+        (y.yachtId && y.yachtId === pkg.id)
       )) {
         combinedData.push(pkg);
       } else {
@@ -78,75 +138,87 @@ async function migrateToUnifiedCollection() {
     let migratedCount = 0;
     let errorCount = 0;
     
-    for (const doc of combinedData) {
+    for (const sourceDoc of combinedData) {
       try {
-        // Create normalized yacht record
+        // Create normalized yacht record with type safety
         const normalizedYacht = {
           // Core fields with new naming convention
-          id: doc.id || doc.package_id || doc.yachtId || '',
-          title: doc.title || doc.name || "",
-          description: doc.description || "",
-          category: doc.category || "",
-          yachtType: doc.yacht_type || "",
+          id: sourceDoc.id || (sourceDoc.package_id as string) || (sourceDoc.yachtId as string) || '',
+          title: (sourceDoc.title as string) || (sourceDoc.name as string) || "",
+          description: (sourceDoc.description as string) || "",
+          category: (sourceDoc.category as string) || "",
+          yachtType: (sourceDoc.yacht_type as string) || "",
           
           location: {
-            address: doc.location?.address || "",
-            latitude: doc.location?.latitude || 0,
-            longitude: doc.location?.longitude || 0,
-            region: doc.location?.region || "dubai",
-            portMarina: doc.location?.port_marina || ""
+            address: sourceDoc.location?.address || "",
+            latitude: sourceDoc.location?.latitude || 0,
+            longitude: sourceDoc.location?.longitude || 0,
+            region: sourceDoc.location?.region || "dubai",
+            portMarina: sourceDoc.location?.port_marina || ""
           },
           
-          capacity: doc.capacity || doc.max_guests || 10,
-          duration: doc.duration || 4,
-          pricing: doc.pricing || doc.price || 0,
-          pricingModel: doc.pricing_model || "Fixed",
+          capacity: (sourceDoc.capacity as number) || (sourceDoc.max_guests as number) || 10,
+          duration: (sourceDoc.duration as number) || 4,
+          pricing: (sourceDoc.pricing as number) || (sourceDoc.price as number) || 0,
+          pricingModel: (sourceDoc.pricing_model as string) || "Fixed",
           
-          customizationOptions: (doc.customization_options || []).map(option => ({
-            id: option.product_id || `option-${Date.now()}`,
-            name: option.name,
-            price: option.price
-          })),
+          customizationOptions: Array.isArray(sourceDoc.customization_options) 
+            ? sourceDoc.customization_options.map((option: any) => ({
+                id: option.product_id || `option-${Date.now()}`,
+                name: option.name,
+                price: option.price
+              }))
+            : [],
           
-          media: doc.media || [],
+          media: Array.isArray(sourceDoc.media) ? sourceDoc.media : [],
           
-          isAvailable: doc.availability_status !== undefined ? !!doc.availability_status : 
-                      (doc.available !== undefined ? !!doc.available : true),
-          isFeatured: !!doc.featured,
-          isPublished: doc.published_status !== undefined ? !!doc.published_status : true,
+          isAvailable: sourceDoc.availability_status !== undefined 
+            ? !!sourceDoc.availability_status 
+            : (sourceDoc.available !== undefined ? !!sourceDoc.available : true),
+            
+          isFeatured: !!sourceDoc.featured,
+          isPublished: sourceDoc.published_status !== undefined ? !!sourceDoc.published_status : true,
           
-          tags: doc.tags || doc.features || [],
+          tags: Array.isArray(sourceDoc.tags) 
+            ? sourceDoc.tags 
+            : (Array.isArray(sourceDoc.features) ? sourceDoc.features : []),
           
-          virtualTour: doc.virtual_tour ? {
-            isEnabled: !!doc.virtual_tour.enabled,
-            scenes: (doc.virtual_tour.scenes || []).map(scene => ({
-              id: scene.id,
-              title: scene.title,
-              imageUrl: scene.imageUrl,
-              thumbnailUrl: scene.thumbnailUrl,
-              hotspots: scene.hotspots,
-              initialViewParameters: scene.initialViewParameters
-            }))
+          virtualTour: sourceDoc.virtual_tour ? {
+            isEnabled: !!sourceDoc.virtual_tour.enabled,
+            scenes: Array.isArray(sourceDoc.virtual_tour.scenes) 
+              ? sourceDoc.virtual_tour.scenes.map((scene: any) => ({
+                  id: scene.id,
+                  title: scene.title,
+                  imageUrl: scene.imageUrl,
+                  thumbnailUrl: scene.thumbnailUrl,
+                  hotspots: scene.hotspots,
+                  initialViewParameters: scene.initialViewParameters
+                }))
+              : []
           } : {
             isEnabled: false,
             scenes: []
           },
           
-          createdAt: doc.created_date || doc.createdAt || Timestamp.now(),
-          updatedAt: doc.last_updated_date || doc.updatedAt || Timestamp.now(),
+          createdAt: sourceDoc.created_date || sourceDoc.createdAt || Timestamp.now(),
+          updatedAt: sourceDoc.last_updated_date || sourceDoc.updatedAt || Timestamp.now(),
           
           // Legacy fields for backward compatibility
-          package_id: doc.id || doc.package_id || doc.yachtId || '',
-          yachtId: doc.id || doc.package_id || doc.yachtId || '',
-          name: doc.title || doc.name || "",
-          availability_status: doc.availability_status !== undefined ? !!doc.availability_status : 
-                              (doc.available !== undefined ? !!doc.available : true),
-          available: doc.availability_status !== undefined ? !!doc.availability_status : 
-                    (doc.available !== undefined ? !!doc.available : true),
-          yacht_type: doc.yacht_type || "",
-          features: doc.tags || doc.features || [],
-          max_guests: doc.capacity || doc.max_guests || 10,
-          price: doc.pricing || doc.price || 0
+          package_id: sourceDoc.id || (sourceDoc.package_id as string) || (sourceDoc.yachtId as string) || '',
+          yachtId: sourceDoc.id || (sourceDoc.package_id as string) || (sourceDoc.yachtId as string) || '',
+          name: (sourceDoc.title as string) || (sourceDoc.name as string) || "",
+          availability_status: sourceDoc.availability_status !== undefined 
+            ? !!sourceDoc.availability_status 
+            : (sourceDoc.available !== undefined ? !!sourceDoc.available : true),
+          available: sourceDoc.availability_status !== undefined 
+            ? !!sourceDoc.availability_status 
+            : (sourceDoc.available !== undefined ? !!sourceDoc.available : true),
+          yacht_type: (sourceDoc.yacht_type as string) || "",
+          features: Array.isArray(sourceDoc.tags) 
+            ? sourceDoc.tags 
+            : (Array.isArray(sourceDoc.features) ? sourceDoc.features : []),
+          max_guests: (sourceDoc.capacity as number) || (sourceDoc.max_guests as number) || 10,
+          price: (sourceDoc.pricing as number) || (sourceDoc.price as number) || 0
         };
         
         // Write to new collection
@@ -154,7 +226,7 @@ async function migrateToUnifiedCollection() {
         console.log(`Migrated document '${normalizedYacht.id}' to yachts collection`);
         migratedCount++;
       } catch (error) {
-        console.error(`Error migrating document: ${doc.id}`, error);
+        console.error(`Error migrating document: ${sourceDoc.id}`, error);
         errorCount++;
       }
     }
