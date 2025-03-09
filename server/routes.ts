@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage, addProducerIdToTestYachts } from "./storage";
 import { registerStripeRoutes } from "./stripe";
 import { adminDb } from "./firebase-admin";
 
@@ -15,6 +15,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating test data:", error);
       res.status(500).json({ error: "Failed to create test data" });
+    }
+  });
+  
+  // Development route to add producer IDs to test data
+  app.post("/api/dev/add-producer-ids", async (req, res) => {
+    try {
+      const producerId = req.query.producerId as string || 'test-producer-123';
+      const result = await addProducerIdToTestYachts(producerId);
+      
+      if (result) {
+        res.json({ success: true, message: `Added producer ID ${producerId} to test yachts` });
+      } else {
+        res.status(404).json({ success: false, message: "No yachts found to update" });
+      }
+    } catch (error) {
+      console.error("Error adding producer IDs:", error);
+      res.status(500).json({ error: "Failed to add producer IDs" });
     }
   });
   // New unified API endpoints

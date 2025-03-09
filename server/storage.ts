@@ -862,4 +862,36 @@ export class FirestoreStorage implements IStorage {
   }
 }
 
+// Add helper method to add producer IDs for testing
+export async function addProducerIdToTestYachts(producerId: string = 'test-producer-123') {
+  console.log(`Adding producer ID ${producerId} to test yachts...`);
+  
+  // Get yachts from unified collection
+  const yachtsRef = adminDb.collection(UNIFIED_YACHT_COLLECTION);
+  const snapshot = await yachtsRef.limit(5).get();
+  
+  if (snapshot.empty) {
+    console.log('No yachts found for testing');
+    return false;
+  }
+  
+  try {
+    let count = 0;
+    // Update each yacht with the test producer ID
+    for (const doc of snapshot.docs) {
+      await yachtsRef.doc(doc.id).update({
+        providerId: producerId,
+        producerId: producerId
+      });
+      count++;
+    }
+    
+    console.log(`Successfully added producer ID to ${count} yachts`);
+    return true;
+  } catch (error) {
+    console.error('Error adding producer IDs:', error);
+    return false;
+  }
+}
+
 export const storage = new FirestoreStorage();
