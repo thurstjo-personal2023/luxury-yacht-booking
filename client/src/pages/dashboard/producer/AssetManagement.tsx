@@ -46,7 +46,8 @@ import {
   Eye, 
   FileEdit, 
   MoreVertical, 
-  Plus, 
+  Plus,
+  RefreshCw,
   Sailboat, 
   Search, 
   Trash2, 
@@ -128,17 +129,27 @@ export default function AssetManagement() {
   const [user] = useAuthState(auth);
   const producerId = user?.uid;
   
-  // Queries with pagination - add timestamp for forcing refresh
-  const currentTimestamp = useRef(Date.now()).current;
+  // Generate a new timestamp every time the component renders
+  // This ensures fresh data whenever navigating back to this page
+  const [queryTimestamp, setQueryTimestamp] = useState(() => Date.now());
+  
+  // Update timestamp when tab changes to force data refresh
+  useEffect(() => {
+    setQueryTimestamp(Date.now());
+  }, [activeTab]);
   
   const { data: yachtsResponse, isLoading: yachtsLoading } = useQuery<YachtsResponse>({
-    queryKey: ["/api/producer/yachts", { page: yachtPage, pageSize, producerId, timestamp: currentTimestamp }],
+    queryKey: ["/api/producer/yachts", { page: yachtPage, pageSize, producerId, timestamp: queryTimestamp }],
     refetchOnMount: 'always', // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    staleTime: 0, // Consider data stale immediately
   });
   
   const { data: addOnsResponse, isLoading: addOnsLoading } = useQuery<AddOnsResponse>({
-    queryKey: ["/api/addons/producer", { page: addonPage, pageSize, timestamp: currentTimestamp }],
+    queryKey: ["/api/addons/producer", { page: addonPage, pageSize, timestamp: queryTimestamp }],
     refetchOnMount: 'always', // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    staleTime: 0, // Consider data stale immediately
   });
   
   // Extract data from responses
@@ -642,13 +653,36 @@ export default function AssetManagement() {
                     <Card key={yacht.package_id || yacht.yachtId || yacht.id} className="overflow-hidden">
                       <div className="flex flex-col md:flex-row">
                         {/* Image */}
-                        <div className="w-full md:w-64 h-48 md:h-auto">
+                        <div 
+                          className="w-full md:w-64 h-48 md:h-auto relative group"
+                          onClick={() => {
+                            // Force refresh this specific image with a new timestamp
+                            setQueryTimestamp(Date.now());
+                            
+                            // Also invalidate specific queries for this yacht
+                            const docId = yacht.package_id || yacht.yachtId || yacht.id;
+                            if (docId) {
+                              queryClient.invalidateQueries({
+                                queryKey: ['/api/yacht', docId],
+                                refetchType: 'all'
+                              });
+                            }
+                            
+                            toast({
+                              title: "Refreshing Image",
+                              description: "Refreshing yacht image data...",
+                            });
+                          }}
+                        >
                           <img 
                             {...getYachtImageProps(yacht)}
                             className="w-full h-full object-cover"
                             // Generate a more intelligent key based on available timestamps
                             key={`yacht-img-${yacht.id || yacht.package_id || yacht.yachtId}-${yacht._lastUpdated || yacht.last_updated_date?.seconds || yacht.updatedAt?.seconds || Date.now()}`}
                           />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 flex items-center justify-center opacity-0 group-hover:opacity-100 group-hover:bg-opacity-20 transition-all duration-200">
+                            <RefreshCw className="h-8 w-8 text-white" />
+                          </div>
                         </div>
                         
                         {/* Content */}
