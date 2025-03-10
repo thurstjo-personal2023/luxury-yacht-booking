@@ -163,8 +163,15 @@ export class FirestoreStorage implements IStorage {
         isFeatured: 
           data.isFeatured !== undefined ? data.isFeatured :
           data.featured !== undefined ? data.featured : false,
-        mainImage: data.media?.length > 0 ? data.media[0].url : undefined
-      } as YachtSummary;
+        mainImage: data.media?.length > 0 ? data.media[0].url : undefined,
+        // Include timestamp fields for cache busting
+        _lastUpdated: data._lastUpdated || Date.now().toString(),
+        updatedAt: data.updatedAt || data.last_updated_date || null,
+        last_updated_date: data.last_updated_date || data.updatedAt || null,
+        // Include legacy IDs for compatibility
+        package_id: doc.id,
+        yachtId: doc.id
+      } as unknown as YachtSummary;
     });
     
     console.log(`Found ${results.length} total yachts`);
@@ -331,8 +338,15 @@ export class FirestoreStorage implements IStorage {
         isFeatured: 
           data.isFeatured !== undefined ? data.isFeatured :
           data.featured !== undefined ? data.featured : false,
-        mainImage: data.media?.length > 0 ? data.media[0].url : undefined
-      } as YachtSummary;
+        mainImage: data.media?.length > 0 ? data.media[0].url : undefined,
+        // Include timestamp fields for cache busting
+        _lastUpdated: data._lastUpdated || Date.now().toString(),
+        updatedAt: data.updatedAt || data.last_updated_date || null,
+        last_updated_date: data.last_updated_date || data.updatedAt || null,
+        // Include legacy IDs for compatibility
+        package_id: doc.id,
+        yachtId: doc.id
+      } as unknown as YachtSummary;
     });
     
     // Get featured yachts
