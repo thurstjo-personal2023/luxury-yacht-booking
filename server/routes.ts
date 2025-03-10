@@ -144,7 +144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ 
         message: `Yacht ${active ? 'activated' : 'deactivated'} successfully`,
         id,
-        active,
+        active: active, // Ensure correct status is sent back
         timestamp: timestamp || Date.now().toString()
       });
     } catch (error) {
