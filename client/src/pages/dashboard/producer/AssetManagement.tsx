@@ -117,13 +117,17 @@ export default function AssetManagement() {
   const [user] = useAuthState(auth);
   const producerId = user?.uid;
   
-  // Queries with pagination
+  // Queries with pagination - add timestamp for forcing refresh
+  const currentTimestamp = useRef(Date.now()).current;
+  
   const { data: yachtsResponse, isLoading: yachtsLoading } = useQuery<YachtsResponse>({
-    queryKey: ["/api/producer/yachts", { page: yachtPage, pageSize, producerId }],
+    queryKey: ["/api/producer/yachts", { page: yachtPage, pageSize, producerId, timestamp: currentTimestamp }],
+    refetchOnMount: 'always', // Always refetch when component mounts
   });
   
   const { data: addOnsResponse, isLoading: addOnsLoading } = useQuery<AddOnsResponse>({
-    queryKey: ["/api/addons/producer", { page: addonPage, pageSize }],
+    queryKey: ["/api/addons/producer", { page: addonPage, pageSize, timestamp: currentTimestamp }],
+    refetchOnMount: 'always', // Always refetch when component mounts
   });
   
   // Extract data from responses
@@ -622,6 +626,8 @@ export default function AssetManagement() {
                           <img 
                             {...getYachtImageProps(yacht)}
                             className="w-full h-full object-cover"
+                            // Add a timestamp key to force re-render when yacht is updated
+                            key={`yacht-img-${yacht.id || yacht.package_id || yacht.yachtId}-${Date.now()}`}
                           />
                         </div>
                         
@@ -787,6 +793,8 @@ export default function AssetManagement() {
                           <img 
                             {...getAddonImageProps(addon)}
                             className="w-full h-full object-cover"
+                            // Add a timestamp key to force re-render when addon is updated
+                            key={`addon-img-${addon.productId}-${Date.now()}`}
                           />
                         </div>
                         <div className="absolute top-2 right-2 flex gap-1">
