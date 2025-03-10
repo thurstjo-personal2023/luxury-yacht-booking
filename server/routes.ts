@@ -1,8 +1,10 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage, addProducerIdToTestYachts } from "./storage";
 import { registerStripeRoutes } from "./stripe";
 import { adminDb } from "./firebase-admin";
+import { spawn } from "child_process";
+import path from "path";
 
 import { insertTestYachts } from "./create-test-data";
 
@@ -350,9 +352,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch bookings" });
     }
   });
+
+  // Run the collection standardization script
+  app.post("/api/admin/standardize-collection", async (req, res) => {
+    try {
+      console.log("Starting unified_yacht_experiences collection standardization");
+      
+      // Path to the script relative to the project root
+      const scriptPath = path.resolve(process.cwd(), 'scripts', 'standardize-unified-collection.js');
+      console.log(`Running standardization script at ${scriptPath}`);
+      
+      // Execute the script as a child process
+      const child = spawn('node', [scriptPath]);
+      
+      // Collect output
+      let output = '';
+      
+      child.stdout.on('data', (data) => {
+        const dataStr = data.toString();
+        console.log(`Standardization progress: ${dataStr}`);
+        output += dataStr;
+      });
+      
+      child.stderr.on('data', (data) => {
+        const errorStr = data.toString();
+        console.error(`Standardization error: ${errorStr}`);
+        output += `ERROR: ${errorStr}\n`;
+      });
+      
+      // Handle completion
+      child.on('close', (code) => {
+        console.log(`Standardization script completed with code ${code}`);
+        
+        if (code === 0) {
+          // Success
+          res.json({ 
+            success: true, 
+            message: "Collection standardization completed successfully",
+            details: output
+          });
+        } else {
+          // Error
+          res.status(500).json({ 
+            success: false, 
+            message: "Collection standardization failed", 
+            exitCode: code,
+            details: output
+          });
+        }
+      });
+      
+      // Handle error launching the process
+      child.on('error', (error) => {
+        console.error("Failed to start standardization script:", error);
+        res.status(500).json({ 
+          success: false, 
+          message: "Failed to start standardization script", 
+          error: String(error)
+        });
+      });
+      
+    } catch (error) {
+      console.error("Error running collection standardization:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error running collection standardization", 
+        error: String(error)
+      });
+    }
+  });
   
-
-
   // Register Stripe-related routes
   registerStripeRoutes(app);
 
