@@ -1093,7 +1093,7 @@ export default function YachtForm() {
                           <FormItem>
                             <FormLabel>Tags</FormLabel>
                             <div className="flex flex-wrap gap-2 mb-2">
-                              {field.value.map(tag => (
+                              {Array.isArray(field.value) && field.value.map(tag => (
                                 <div key={tag} className="flex items-center gap-1 bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm">
                                   {tag}
                                   <Button
