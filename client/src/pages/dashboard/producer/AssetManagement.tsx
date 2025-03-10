@@ -702,15 +702,28 @@ export default function AssetManagement() {
   
   // Create status badge
   const renderStatusBadge = (yacht: ExtendedYachtExperience) => {
-    // Check all possible status fields to ensure consistency, using !! to convert to boolean
+    // Normalize the status fields from different data sources
+    // Prioritize isAvailable (newer field) but fall back to others for compatibility
     // Force typecast status fields to boolean with !! to handle various truthy/falsy values
+    
+    // Examine each field separately to avoid undefined references in logs
+    const availFields = {
+      isAvailable: yacht.isAvailable,
+      availability_status: yacht.availability_status,
+      available: yacht.available
+    };
+    
+    // Determine active status with fallback hierarchy
     const isActive = yacht.isAvailable !== undefined 
       ? !!yacht.isAvailable 
       : (yacht.availability_status !== undefined 
           ? !!yacht.availability_status 
           : !!yacht.available);
     
-    console.log(`Status badge for yacht ${yacht.title || yacht.name}: isAvailable=${yacht.isAvailable}, availability_status=${yacht.availability_status}, available=${yacht.available}, computed=${isActive}`);
+    // Log the state to help debug status inconsistencies
+    const yachtId = yacht.id || yacht.package_id || yacht.yachtId;
+    const yachtName = yacht.title || yacht.name;
+    console.log(`Status badge for yacht ${yachtName} (${yachtId}): `, availFields, `computed=${isActive}`);
     
     return isActive ? (
       <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">
