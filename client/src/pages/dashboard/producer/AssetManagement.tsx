@@ -573,12 +573,12 @@ export default function AssetManagement() {
   
   // Create status badge
   const renderStatusBadge = (yacht: ExtendedYachtExperience) => {
-    // Check all possible status fields to ensure consistency
+    // Check all possible status fields to ensure consistency, using !! to convert to boolean
     const isActive = yacht.isAvailable !== undefined 
-      ? yacht.isAvailable 
+      ? !!yacht.isAvailable 
       : (yacht.availability_status !== undefined 
-          ? yacht.availability_status 
-          : (yacht.available || false));
+          ? !!yacht.availability_status 
+          : !!yacht.available);
     
     return isActive ? (
       <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">
