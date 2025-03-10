@@ -300,6 +300,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch bookings" });
     }
   });
+  
+  // Yacht activation endpoint
+  app.post("/api/yacht/:id/activate", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { active, timestamp } = req.body;
+      
+      if (active === undefined) {
+        return res.status(400).json({ message: "Missing 'active' parameter" });
+      }
+      
+      console.log(`Setting yacht ${id} activation status to: ${active} (timestamp: ${timestamp || 'none'})`);
+      
+      // Update the yacht in all collections through our storage interface
+      const updateData: Partial<any> = { 
+        isAvailable: active,
+        available: active,
+        availability_status: active,
+      };
+      
+      // Add timestamp for cache busting if provided
+      if (timestamp) {
+        updateData._lastUpdated = timestamp;
+      }
+      
+      const updateResult = await storage.updateYacht(id, updateData);
+      
+      if (updateResult) {
+        res.json({ 
+          success: true, 
+          message: `Yacht activation status updated to ${active}`,
+          id,
+          active,
+          timestamp
+        });
+      } else {
+        res.status(404).json({ message: "Yacht not found or could not be updated" });
+      }
+    } catch (error) {
+      console.error("Error updating yacht activation status:", error);
+      res.status(500).json({ 
+        message: "Error updating yacht activation status", 
+        error: String(error)
+      });
+    }
+  });
 
   // Register Stripe-related routes
   registerStripeRoutes(app);
