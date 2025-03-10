@@ -833,7 +833,12 @@ export default function AssetManagement() {
                                   <DropdownMenuItem 
                                     onClick={() => toggleYachtActivation(yacht)}
                                   >
-                                    {(yacht.availability_status !== undefined ? !!yacht.availability_status : !!yacht.available) ? (
+                                    {/* Use the same logic for status determination as the badge function */}
+                                    {(yacht.isAvailable !== undefined 
+                                      ? !!yacht.isAvailable 
+                                      : (yacht.availability_status !== undefined 
+                                          ? !!yacht.availability_status 
+                                          : !!yacht.available)) ? (
                                       <>
                                         <XCircle className="mr-2 h-4 w-4" />
                                         Deactivate
