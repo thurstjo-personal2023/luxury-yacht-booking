@@ -138,6 +138,54 @@ export default function AssetManagement() {
     setQueryTimestamp(Date.now());
   }, [activeTab]);
   
+  // Manual refresh function
+  const handleRefresh = () => {
+    // Update the timestamp to force data reload
+    setQueryTimestamp(Date.now());
+    
+    // Reset any filters
+    setSearchQuery("");
+    setSelectedCategory(null);
+    
+    // Perform aggressive cache invalidation
+    if (activeTab === "yachts") {
+      // Clear and invalidate all yacht queries
+      queryClient.removeQueries({ queryKey: ["/api/producer/yachts"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/producer/yachts"],
+        refetchType: 'all'
+      });
+      
+      // Explicitly invalidate paginated queries
+      for (let page = 1; page <= 5; page++) {
+        queryClient.invalidateQueries({
+          queryKey: ["/api/producer/yachts", { page, pageSize }],
+          refetchType: 'all'
+        });
+      }
+    } else {
+      // Clear and invalidate all add-on queries
+      queryClient.removeQueries({ queryKey: ["/api/addons/producer"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/addons/producer"],
+        refetchType: 'all'
+      });
+      
+      // Explicitly invalidate paginated queries
+      for (let page = 1; page <= 5; page++) {
+        queryClient.invalidateQueries({
+          queryKey: ["/api/addons/producer", { page, pageSize }],
+          refetchType: 'all'
+        });
+      }
+    }
+    
+    toast({
+      title: "Refreshing Data",
+      description: "Fetching the latest data and images...",
+    });
+  };
+  
   const { data: yachtsResponse, isLoading: yachtsLoading } = useQuery<YachtsResponse>({
     queryKey: ["/api/producer/yachts", { page: yachtPage, pageSize, producerId, timestamp: queryTimestamp }],
     refetchOnMount: 'always', // Always refetch when component mounts
