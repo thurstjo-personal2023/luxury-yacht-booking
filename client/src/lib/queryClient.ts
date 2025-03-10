@@ -47,8 +47,11 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: true, // Enable refetch on window focus for better data freshness
-      staleTime: 30000, // Set stale time to 30 seconds instead of Infinity to help with updates
+      staleTime: 15000, // Lower stale time to 15 seconds to help with updates
       retry: false,
+      // Custom behavior for refetching to catch image updates
+      refetchOnMount: true, // Always refetch when component mounts
+      refetchOnReconnect: true, // Refetch when reconnecting
     },
     mutations: {
       retry: false,
