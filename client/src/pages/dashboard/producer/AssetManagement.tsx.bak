@@ -324,14 +324,11 @@ export default function AssetManagement() {
       
       try {
         // Update both field naming conventions for maximum compatibility
-        // Add additional timestamp field for cache busting
-        const timestamp = Date.now().toString();
         await updateDoc(yachtRef, { 
           availability_status: newStatus,
           available: newStatus,
           last_updated_date: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          _lastUpdated: timestamp // Used for cache busting with images
+          updatedAt: serverTimestamp()
         });
         console.log(`Successfully updated yacht ${docId} in yacht_experiences collection`);
       } catch (err) {
@@ -340,14 +337,11 @@ export default function AssetManagement() {
         const expCollection = collection(db, "experience_packages");
         const expRef = doc(expCollection, docId);
         
-        // Use the same timestamp for consistency across collections
-        const timestamp = Date.now().toString();
         await updateDoc(expRef, { 
           availability_status: newStatus,
           available: newStatus,
           last_updated_date: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          _lastUpdated: timestamp // Used for cache busting with images
+          updatedAt: serverTimestamp()
         });
         console.log(`Successfully updated yacht ${docId} in experience_packages collection`);
       }
@@ -358,15 +352,12 @@ export default function AssetManagement() {
         const unifiedRef = doc(unifiedCollection, docId);
         
         // Update with both property naming conventions to ensure compatibility
-        // Use the same timestamp for consistency across all collections
-        const timestamp = Date.now().toString();
         await updateDoc(unifiedRef, { 
           availability_status: newStatus,
           available: newStatus,
           isAvailable: newStatus, // New unified schema field
           last_updated_date: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          _lastUpdated: timestamp // Used for cache busting with images
+          updatedAt: serverTimestamp()
         });
         console.log(`Successfully updated yacht ${docId} in unified_yacht_experiences collection`);
       } catch (unifiedErr) {
