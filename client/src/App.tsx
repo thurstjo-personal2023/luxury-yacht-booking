@@ -33,6 +33,7 @@ const ComplianceDocuments = lazy(() => import("@/pages/dashboard/producer/Compli
 const ReviewsManagement = lazy(() => import("@/pages/dashboard/producer/ReviewsManagement"));
 const AvailabilityPricing = lazy(() => import("@/pages/dashboard/producer/AvailabilityPricing"));
 const BookingsManagement = lazy(() => import("@/pages/dashboard/producer/BookingsManagement"));
+const AdminUtils = lazy(() => import("@/pages/dashboard/producer/AdminUtils"));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -128,6 +129,9 @@ function App() {
               </Route>
               <Route path="/dashboard/producer/bookings">
                 <PrivateRoute component={BookingsManagement} />
+              </Route>
+              <Route path="/dashboard/producer/admin">
+                <PrivateRoute component={AdminUtils} />
               </Route>
 
               {/* Fallback to 404 */}
