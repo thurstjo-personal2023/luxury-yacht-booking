@@ -86,7 +86,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get yacht by ID
   app.get("/api/yachts/:id", async (req, res) => {
     try {
+      // Set cache control headers to prevent caching
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
       const { id } = req.params;
+      // Force fresh data with a timestamp
+      const forceRefresh = Date.now();
+      console.log(`Getting yacht by ID: ${id} (refresh: ${forceRefresh})`);
+      
       const yacht = await storage.getYachtById(id);
       
       if (!yacht) {
@@ -191,12 +200,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Move this route before the "Get yacht by ID" route to avoid confusion with the :id parameter
   app.get("/api/producer/yachts", async (req, res) => {
     try {
+      // Set cache control headers to prevent caching
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
       // Parse pagination parameters from query string
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = parseInt(req.query.pageSize as string) || 10;
       const producerId = req.query.producerId as string;
       
-      console.log(`Fetching yachts for producer ID: ${producerId || 'all'}`);
+      // Force fresh data with a timestamp to prevent 304 responses
+      const forceRefresh = Date.now();
+      console.log(`Fetching yachts for producer ID: ${producerId || 'all'} (refresh: ${forceRefresh})`);
       
       // In a real implementation, we would get the producer ID from auth
       // For development, we'll either use the provided producerId or get all yachts with a producer ID
@@ -219,12 +235,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get producer add-ons with pagination and ordering by availability
   app.get("/api/producer/addons", async (req, res) => {
     try {
+      // Set cache control headers to prevent caching
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
       // Parse pagination parameters from query string
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = parseInt(req.query.pageSize as string) || 10;
       const producerId = req.query.producerId as string;
       
-      console.log(`Fetching add-ons for producer ID: ${producerId || 'all'}`);
+      // Force fresh data with a timestamp
+      const forceRefresh = Date.now();
+      console.log(`Fetching add-ons for producer ID: ${producerId || 'all'} (refresh: ${forceRefresh})`);
       
       // In a real implementation, we would get the producer ID from auth
       // For now, we'll just query all add-ons since we're in development mode
