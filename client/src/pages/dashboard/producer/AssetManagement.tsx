@@ -386,10 +386,15 @@ export default function AssetManagement() {
   // Toggle yacht activation status
   const toggleYachtActivation = async (yacht: ExtendedYachtExperience) => {
     try {
-      // Handle both field naming conventions
-      const isActive = yacht.availability_status !== undefined 
-        ? yacht.availability_status 
-        : (yacht.available || false);
+      // Use our consistent helper function to get the status
+      const isActive = getYachtActiveStatus(yacht);
+      
+      console.log('Current availability status:', {
+        isAvailable: yacht.isAvailable,
+        availability_status: yacht.availability_status,
+        available: yacht.available,
+        computed: isActive
+      });
         
       const newStatus = !isActive;
       const docId = yacht.package_id || yacht.yachtId || yacht.id;
@@ -700,25 +705,28 @@ export default function AssetManagement() {
     }
   };
   
-  // Create status badge
-  const renderStatusBadge = (yacht: ExtendedYachtExperience) => {
-    // Normalize the status fields from different data sources
+  // Helper to consistently get the active status across the component
+  const getYachtActiveStatus = (yacht: ExtendedYachtExperience): boolean => {
     // Prioritize isAvailable (newer field) but fall back to others for compatibility
     // Force typecast status fields to boolean with !! to handle various truthy/falsy values
-    
-    // Examine each field separately to avoid undefined references in logs
+    return yacht.isAvailable !== undefined 
+      ? !!yacht.isAvailable 
+      : (yacht.availability_status !== undefined 
+          ? !!yacht.availability_status 
+          : !!yacht.available);
+  };
+  
+  // Create status badge
+  const renderStatusBadge = (yacht: ExtendedYachtExperience) => {
+    // Get all available status fields for logging
     const availFields = {
       isAvailable: yacht.isAvailable,
       availability_status: yacht.availability_status,
       available: yacht.available
     };
     
-    // Determine active status with fallback hierarchy
-    const isActive = yacht.isAvailable !== undefined 
-      ? !!yacht.isAvailable 
-      : (yacht.availability_status !== undefined 
-          ? !!yacht.availability_status 
-          : !!yacht.available);
+    // Get active status consistently
+    const isActive = getYachtActiveStatus(yacht);
     
     // Log the state to help debug status inconsistencies
     const yachtId = yacht.id || yacht.package_id || yacht.yachtId;
@@ -978,12 +986,8 @@ export default function AssetManagement() {
                                   <DropdownMenuItem 
                                     onClick={() => toggleYachtActivation(yacht)}
                                   >
-                                    {/* Use the same logic for status determination as the badge function */}
-                                    {(yacht.isAvailable !== undefined 
-                                      ? !!yacht.isAvailable 
-                                      : (yacht.availability_status !== undefined 
-                                          ? !!yacht.availability_status 
-                                          : !!yacht.available)) ? (
+                                    {/* Use the same helper function for consistency */}
+                                    {getYachtActiveStatus(yacht) ? (
                                       <>
                                         <XCircle className="mr-2 h-4 w-4" />
                                         Deactivate
