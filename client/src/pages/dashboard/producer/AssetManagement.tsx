@@ -728,19 +728,33 @@ export default function AssetManagement() {
     // Get active status consistently
     const isActive = getYachtActiveStatus(yacht);
     
+    // Check if the yacht has been standardized based on the presence of mainImage field
+    // mainImage is added during standardization
+    const isStandardized = !!yacht.mainImage;
+    
     // Log the state to help debug status inconsistencies
     const yachtId = yacht.id || yacht.package_id || yacht.yachtId;
     const yachtName = yacht.title || yacht.name;
-    console.log(`Status badge for yacht ${yachtName} (${yachtId}): `, availFields, `computed=${isActive}`);
+    console.log(`Status badge for yacht ${yachtName} (${yachtId}): `, availFields, `computed=${isActive}, standardized=${isStandardized}`);
     
-    return isActive ? (
-      <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">
-        Active
-      </Badge>
-    ) : (
-      <Badge variant="outline" className="bg-gray-100 text-gray-800 hover:bg-gray-200">
-        Inactive
-      </Badge>
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        {isActive ? (
+          <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">
+            Active
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="bg-gray-100 text-gray-800 hover:bg-gray-200">
+            Inactive
+          </Badge>
+        )}
+        
+        {isStandardized && (
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
+            Standardized
+          </Badge>
+        )}
+      </div>
     );
   };
   

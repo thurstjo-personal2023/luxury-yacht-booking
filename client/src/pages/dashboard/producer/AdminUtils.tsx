@@ -40,10 +40,13 @@ export default function AdminUtils() {
     try {
       const response = await apiRequest('/api/admin/standardize-collection', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           collection: 'unified_yacht_experiences'
         })
-      });
+      } as RequestInit);
       
       const result = await response.json();
       
