@@ -83,6 +83,7 @@ interface ExtendedYachtExperience extends YachtExperience {
   // Additional properties to handle both naming conventions
   yachtId?: string;
   available?: boolean;
+  isAvailable?: boolean;
   // Timestamp properties for cache busting
   _lastUpdated?: string;
   updatedAt?: any; // Can be Timestamp or serialized format
@@ -200,11 +201,24 @@ export default function AssetManagement() {
     staleTime: 0, // Consider data stale immediately
   });
   
-  // Extract data from responses
-  const yachts = yachtsResponse?.yachts || [];
-  const yachtsPagination = yachtsResponse?.pagination;
+  // Extract data from responses and create state for direct manipulation
+  const [yachts, setYachts] = useState<ExtendedYachtExperience[]>([]); 
+  const [addOns, setAddOns] = useState<ExtendedProductAddOn[]>([]);
   
-  const addOns = addOnsResponse?.addons || [];
+  // Update state whenever response changes
+  useEffect(() => {
+    if (yachtsResponse?.yachts) {
+      setYachts(yachtsResponse.yachts);
+    }
+  }, [yachtsResponse]);
+  
+  useEffect(() => {
+    if (addOnsResponse?.addons) {
+      setAddOns(addOnsResponse.addons);
+    }
+  }, [addOnsResponse]);
+  
+  const yachtsPagination = yachtsResponse?.pagination;
   const addonsPagination = addOnsResponse?.pagination;
   
   // Filtered yachts based on search and category
@@ -384,106 +398,139 @@ export default function AssetManagement() {
         throw new Error("Missing yacht ID");
       }
       
-      // First try updating in yacht_experiences collection
-      const yachtCollection = collection(db, "yacht_experiences");
-      const yachtRef = doc(yachtCollection, docId);
+      // Generate a timestamp for cache busting
+      const timestamp = Date.now().toString();
       
-      // Log the document being updated
-      console.log(`Attempting to update yacht document: ${docId} in yacht_experiences collection`);
-      console.log(`Setting availability_status to: ${newStatus}`);
-      
+      // Use a direct API call to server to ensure consistent update
       try {
-        // Update both field naming conventions for maximum compatibility
-        // Add additional timestamp field for cache busting
-        const timestamp = Date.now().toString();
-        await updateDoc(yachtRef, { 
-          availability_status: newStatus,
-          available: newStatus,
-          last_updated_date: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          _lastUpdated: timestamp // Used for cache busting with images
+        const response = await fetch(`/api/yacht/${docId}/activate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            active: newStatus,
+            timestamp: timestamp
+          }),
         });
-        console.log(`Successfully updated yacht ${docId} in yacht_experiences collection`);
-      } catch (err) {
-        // If update fails, try the experience_packages collection as fallback
-        console.warn(`Failed to update in yacht_experiences, trying experience_packages collection`, err);
-        const expCollection = collection(db, "experience_packages");
-        const expRef = doc(expCollection, docId);
         
-        // Use the same timestamp for consistency across collections
-        const timestamp = Date.now().toString();
-        await updateDoc(expRef, { 
-          availability_status: newStatus,
-          available: newStatus,
-          last_updated_date: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          _lastUpdated: timestamp // Used for cache busting with images
-        });
-        console.log(`Successfully updated yacht ${docId} in experience_packages collection`);
+        if (!response.ok) {
+          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        }
+        
+        console.log(`Successfully activated/deactivated yacht ${docId} via API`);
+      } catch (apiError) {
+        console.error('API activation failed, falling back to direct Firestore update', apiError);
+        
+        // Fall back to direct Firestore updates if API fails
+        
+        // Try the unified collection first
+        try {
+          const unifiedCollection = collection(db, "unified_yacht_experiences");
+          const unifiedRef = doc(unifiedCollection, docId);
+          
+          // Update with both property naming conventions to ensure compatibility
+          await updateDoc(unifiedRef, { 
+            availability_status: newStatus,
+            available: newStatus,
+            isAvailable: newStatus, // New unified schema field
+            last_updated_date: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            _lastUpdated: timestamp // Used for cache busting with images
+          });
+          console.log(`Successfully updated yacht ${docId} in unified_yacht_experiences collection`);
+        } catch (unifiedErr) {
+          console.warn(`Failed to update in unified_yacht_experiences collection`, unifiedErr);
+        }
+        
+        // Then try the legacy collections
+        try {
+          const yachtCollection = collection(db, "yacht_experiences");
+          const yachtRef = doc(yachtCollection, docId);
+          
+          // Update both field naming conventions for maximum compatibility
+          await updateDoc(yachtRef, { 
+            availability_status: newStatus,
+            available: newStatus,
+            last_updated_date: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            _lastUpdated: timestamp // Used for cache busting with images
+          });
+          console.log(`Successfully updated yacht ${docId} in yacht_experiences collection`);
+        } catch (err) {
+          console.warn(`Failed to update in yacht_experiences:`, err);
+          
+          try {
+            const expCollection = collection(db, "experience_packages");
+            const expRef = doc(expCollection, docId);
+            
+            await updateDoc(expRef, { 
+              availability_status: newStatus,
+              available: newStatus,
+              last_updated_date: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              _lastUpdated: timestamp // Used for cache busting with images
+            });
+            console.log(`Successfully updated yacht ${docId} in experience_packages collection`);
+          } catch (expErr) {
+            console.warn(`Failed to update in experience_packages:`, expErr);
+            throw new Error('Failed to update in any collection');
+          }
+        }
       }
       
-      // Always try to update the unified collection as well
-      try {
-        const unifiedCollection = collection(db, "unified_yacht_experiences");
-        const unifiedRef = doc(unifiedCollection, docId);
-        
-        // Update with both property naming conventions to ensure compatibility
-        // Use the same timestamp for consistency across all collections
-        const timestamp = Date.now().toString();
-        await updateDoc(unifiedRef, { 
-          availability_status: newStatus,
-          available: newStatus,
-          isAvailable: newStatus, // New unified schema field
-          last_updated_date: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          _lastUpdated: timestamp // Used for cache busting with images
-        });
-        console.log(`Successfully updated yacht ${docId} in unified_yacht_experiences collection`);
-      } catch (unifiedErr) {
-        // Log but don't throw error if unified collection update fails
-        console.warn(`Failed to update in unified_yacht_experiences collection`, unifiedErr);
-      }
+      // Force reload with a fresh timestamp
+      setQueryTimestamp(Date.now());
       
-      // Use a more aggressive cache invalidation approach
-      console.log('Invalidating all yacht queries to refresh data...');
+      // Perform more aggressive cache invalidation
+      console.log('Performing aggressive cache invalidation...');
       
-      // First, remove all yacht producer queries from cache to ensure fresh data
-      queryClient.removeQueries({ queryKey: ["/api/producer/yachts"] });
+      // First reset the entire query cache
+      queryClient.resetQueries();
       
-      // Then invalidate to trigger refetching
+      // Then specifically invalidate producer yachts
       queryClient.invalidateQueries({ 
         queryKey: ["/api/producer/yachts"],
         refetchType: 'all'
       });
       
       // Explicitly invalidate all pages to ensure complete refresh
-      for (let page = 1; page <= 5; page++) { // Assume maximum of 5 pages for safety
+      for (let page = 1; page <= 5; page++) {
         queryClient.invalidateQueries({
           queryKey: ["/api/producer/yachts", { page, pageSize }],
           refetchType: 'all'
         });
       }
       
-      // Also invalidate experiences endpoint as it might contain the same data
+      // Invalidate all other yacht-related endpoints
       queryClient.invalidateQueries({
         queryKey: ["/api/experiences"],
         refetchType: 'all'
       });
       
-      // Also check if this yacht might be featured, and invalidate that query too
-      if (yacht.featured) {
-        queryClient.invalidateQueries({ 
-          queryKey: ["/api/experiences/featured"],
-          refetchType: 'all'
-        });
-      }
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/experiences/featured"],
+        refetchType: 'all'
+      });
       
-      const yachtTitle = yacht.title || yacht.name || '';
+      queryClient.invalidateQueries({
+        queryKey: ["/api/yacht", docId],
+        refetchType: 'all'
+      });
       
-      // Update the local state to reflect the change immediately
-      // This provides immediate UI feedback before the query refetches
+      // Provide immediate feedback by updating local state
       yacht.availability_status = newStatus;
       yacht.available = newStatus;
+      yacht.isAvailable = newStatus;
+      yacht._lastUpdated = timestamp;
+      
+      // Force component update
+      setYachts(prev => {
+        if (!prev) return prev;
+        return [...prev];
+      });
+      
+      const yachtTitle = yacht.title || yacht.name || '';
       
       toast({
         title: newStatus ? "Yacht Activated" : "Yacht Deactivated",
