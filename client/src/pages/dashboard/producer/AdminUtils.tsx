@@ -38,15 +38,13 @@ export default function AdminUtils() {
     setStandardizationResult(null);
     
     try {
-      const response = await apiRequest('/api/admin/standardize-collection', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const response = await apiRequest(
+        'POST',
+        '/api/admin/standardize-collection',
+        {
           collection: 'unified_yacht_experiences'
-        })
-      } as RequestInit);
+        }
+      );
       
       const result = await response.json();
       
