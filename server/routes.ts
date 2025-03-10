@@ -112,6 +112,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Activate/deactivate yacht endpoint
+  app.post("/api/yachts/:id/activate", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { active, timestamp } = req.body;
+      
+      console.log(`Activating/deactivating yacht ${id}: setting active=${active}, timestamp=${timestamp}`);
+      
+      // Verify we have the required parameters
+      if (active === undefined) {
+        return res.status(400).json({ message: "Missing 'active' field in request body" });
+      }
+      
+      // Make the update through storage interface
+      const updateData: any = { 
+        isAvailable: active,
+        // Include both naming conventions for maximum compatibility
+        available: active,
+        availability_status: active,
+        // Add timestamp for cache busting
+        _lastUpdated: timestamp || Date.now().toString()
+      };
+      
+      const success = await storage.updateYacht(id, updateData);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Yacht not found or update failed" });
+      }
+      
+      res.json({ 
+        message: `Yacht ${active ? 'activated' : 'deactivated'} successfully`,
+        id,
+        active,
+        timestamp: timestamp || Date.now().toString()
+      });
+    } catch (error) {
+      console.error(`Error updating activation for yacht ${req.params.id}:`, error);
+      res.status(500).json({ 
+        message: "Error updating yacht activation status", 
+        error: String(error)
+      });
+    }
+  });
+
   // Legacy API endpoints
   // Export normalized yacht schema
   app.get("/api/export/yacht-schema", async (req, res) => {
@@ -301,51 +345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Yacht activation endpoint
-  app.post("/api/yacht/:id/activate", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { active, timestamp } = req.body;
-      
-      if (active === undefined) {
-        return res.status(400).json({ message: "Missing 'active' parameter" });
-      }
-      
-      console.log(`Setting yacht ${id} activation status to: ${active} (timestamp: ${timestamp || 'none'})`);
-      
-      // Update the yacht in all collections through our storage interface
-      const updateData: Partial<any> = { 
-        isAvailable: active,
-        available: active,
-        availability_status: active,
-      };
-      
-      // Add timestamp for cache busting if provided
-      if (timestamp) {
-        updateData._lastUpdated = timestamp;
-      }
-      
-      const updateResult = await storage.updateYacht(id, updateData);
-      
-      if (updateResult) {
-        res.json({ 
-          success: true, 
-          message: `Yacht activation status updated to ${active}`,
-          id,
-          active,
-          timestamp
-        });
-      } else {
-        res.status(404).json({ message: "Yacht not found or could not be updated" });
-      }
-    } catch (error) {
-      console.error("Error updating yacht activation status:", error);
-      res.status(500).json({ 
-        message: "Error updating yacht activation status", 
-        error: String(error)
-      });
-    }
-  });
+
 
   // Register Stripe-related routes
   registerStripeRoutes(app);

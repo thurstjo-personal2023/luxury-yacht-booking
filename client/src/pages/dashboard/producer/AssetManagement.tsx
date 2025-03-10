@@ -63,7 +63,8 @@ import {
   doc, 
   updateDoc, 
   serverTimestamp,
-  deleteDoc
+  deleteDoc,
+  writeBatch
 } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { YachtExperience, YachtProfile, ProductAddOn } from "@shared/firestore-schema";
