@@ -411,10 +411,31 @@ export class FirestoreStorage implements IStorage {
       
       // Set legacy fields for backward compatibility if present in update
       if (yacht.title !== undefined) updateData.name = yacht.title;
+      
+      // Strict availability synchronization is critical for status badges
       if (yacht.isAvailable !== undefined) {
-        updateData.availability_status = yacht.isAvailable;
-        updateData.available = yacht.isAvailable;
+        // Cast to boolean to ensure consistent values
+        const availStatus = !!yacht.isAvailable;
+        updateData.isAvailable = availStatus;
+        updateData.availability_status = availStatus;
+        updateData.available = availStatus;
+        console.log(`Setting all availability fields to ${availStatus}`);
+      } else if (yacht.availability_status !== undefined) {
+        // Handle updates coming from legacy fields
+        const availStatus = !!yacht.availability_status;
+        updateData.isAvailable = availStatus;
+        updateData.availability_status = availStatus;
+        updateData.available = availStatus;
+        console.log(`Setting all availability fields from availability_status to ${availStatus}`);
+      } else if (yacht.available !== undefined) {
+        // Handle updates coming from legacy fields
+        const availStatus = !!yacht.available;
+        updateData.isAvailable = availStatus;
+        updateData.availability_status = availStatus;
+        updateData.available = availStatus;
+        console.log(`Setting all availability fields from available to ${availStatus}`);
       }
+      
       if (yacht.yachtType !== undefined) updateData.yacht_type = yacht.yachtType;
       if (yacht.tags !== undefined) updateData.features = yacht.tags;
       if (yacht.capacity !== undefined) updateData.max_guests = yacht.capacity;

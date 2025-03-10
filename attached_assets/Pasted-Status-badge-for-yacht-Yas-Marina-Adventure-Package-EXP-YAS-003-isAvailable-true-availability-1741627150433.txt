@@ -1,0 +1,19 @@
+Status badge for yacht Yas Marina Adventure Package (EXP_YAS_003):  {isAvailable: true, availability_status: undefined, available: undefined} computed=true
+image-utils.ts:143 No valid image found, using placeholder
+AssetManagement.tsx:734 Status badge for yacht Majestic Pearl (YAC123):  {isAvailable: true, availability_status: undefined, available: undefined} computed=true
+image-utils.ts:143 No valid image found, using placeholder
+AssetManagement.tsx:734 Status badge for yacht Ocean Empress (YAC124):  {isAvailable: true, availability_status: undefined, available: undefined} computed=true
+image-utils.ts:143 No valid image found, using placeholder
+AssetManagement.tsx:734 Status badge for yacht Royal Navigator (YAC125):  {isAvailable: true, availability_status: undefined, available: undefined} computed=true
+image-utils.ts:143 No valid image found, using placeholder
+AssetManagement.tsx:734 Status badge for yacht Luxury Sunset Yacht Cruise (EXP123):  {isAvailable: true, availability_status: undefined, available: undefined} computed=true
+image-utils.ts:132 Using mainImage
+image-utils.ts:57 Available timestamp fields for image cache busting: {_lastUpdated: '1741626837988', updatedAt: 'other', last_updated_date: 'other'}
+image-utils.ts:66 Using _lastUpdated for cache busting: 1741626837988
+AssetManagement.tsx:734 Status badge for yacht Saadiyat Island Marina Experience (EXP_AUH_002):  {isAvailable: true, availability_status: undefined, available: undefined} computed=true
+image-utils.ts:132 Using mainImage
+image-utils.ts:57 Available timestamp fields for image cache busting: {_lastUpdated: '1741626837988', updatedAt: 'other', last_updated_date: 'other'}
+image-utils.ts:66 Using _lastUpdated for cache busting: 1741626837988
+AssetManagement.tsx:734 Status badge for yacht Dubai Marina Yacht Club Experience (EXP_DXB_001):  {isAvailable: true, availability_status: undefined, available: undefined} computed=true
+image-utils.ts:132 Using mainImage
+image-utils.ts:57 Available timestamp fields for image cache busting: {_lastUpdated: '1741626837988', updatedAt: 'other', last_updated_date: 'other'}
