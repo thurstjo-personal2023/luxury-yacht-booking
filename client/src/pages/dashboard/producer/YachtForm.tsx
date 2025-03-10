@@ -668,36 +668,53 @@ export default function YachtForm() {
       // Invalidate all yacht queries to ensure all cached data is refreshed
       console.log('Invalidating all yacht queries to refresh data...');
       
-      // First, completely remove all yacht producer queries from cache
-      queryClient.removeQueries({ queryKey: ['/api/producer/yachts'] });
+      // Perform aggressive cache invalidation for all possible data sources
+      console.log("Performing comprehensive cache invalidation after yacht update...");
       
-      // Then invalidate specific keys to trigger refetching
+      // First, reset the entire cache to ensure fresh data from all endpoints
+      queryClient.resetQueries();
+      
+      // Then, explicitly invalidate specific endpoint queries
+      // Producer yacht queries (main asset management page)
+      queryClient.removeQueries({ queryKey: ['/api/producer/yachts'] });
       queryClient.invalidateQueries({ 
         queryKey: ['/api/producer/yachts'],
-        refetchType: 'all'  // Force refetch all queries that match this key
+        refetchType: 'all'
       });
       
-      // Explicitly invalidate all possible pages to ensure complete refresh
-      for (let page = 1; page <= 5; page++) { // Assume maximum of 5 pages for safety
+      // Paginated yacht queries
+      for (let page = 1; page <= 10; page++) { // Higher safety margin
         queryClient.invalidateQueries({
           queryKey: ['/api/producer/yachts', { page, pageSize: 10 }],
           refetchType: 'all'
         });
       }
       
-      // Also invalidate experiences endpoint as it might contain the same data
+      // General experiences endpoints
       queryClient.invalidateQueries({
         queryKey: ['/api/experiences'],
         refetchType: 'all'
       });
       
-      // Invalidate the featured experiences query if the yacht is marked as featured
-      if (values.featured) {
-        queryClient.invalidateQueries({ 
-          queryKey: ['/api/experiences/featured'],
+      // Specific yacht query by ID
+      if (packageId) {
+        queryClient.invalidateQueries({
+          queryKey: ['/api/yacht', packageId],
           refetchType: 'all'
         });
       }
+      
+      // Featured experiences
+      queryClient.invalidateQueries({ 
+        queryKey: ['/api/experiences/featured'],
+        refetchType: 'all'
+      });
+      
+      // Unified yacht queries
+      queryClient.invalidateQueries({
+        queryKey: ['/api/unified/yachts'],
+        refetchType: 'all'
+      });
       
       // Navigate back to asset management
       navigateBack();

@@ -627,15 +627,6 @@ export default function AssetManagement() {
                                 variant="outline" 
                                 size="sm" 
                                 className="flex items-center gap-1"
-                                onClick={() => goToYachtDetails(yacht.package_id || yacht.yachtId || yacht.id || '')}
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                                View
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="flex items-center gap-1"
                                 onClick={() => goToEditYacht(yacht.package_id || yacht.yachtId || yacht.id || '')}
                               >
                                 <Edit className="h-3.5 w-3.5" />
