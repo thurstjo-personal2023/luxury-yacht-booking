@@ -572,8 +572,15 @@ export default function AssetManagement() {
   };
   
   // Create status badge
-  const renderStatusBadge = (status: boolean) => {
-    return status ? (
+  const renderStatusBadge = (yacht: ExtendedYachtExperience) => {
+    // Check all possible status fields to ensure consistency
+    const isActive = yacht.isAvailable !== undefined 
+      ? yacht.isAvailable 
+      : (yacht.availability_status !== undefined 
+          ? yacht.availability_status 
+          : (yacht.available || false));
+    
+    return isActive ? (
       <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">
         Active
       </Badge>
@@ -797,7 +804,7 @@ export default function AssetManagement() {
                               <h3 className="text-lg font-semibold mb-1">{yacht.title || yacht.name}</h3>
                               <div className="flex items-center gap-2 mb-2">
                                 <Badge variant="secondary">{yacht.category}</Badge>
-                                {renderStatusBadge(yacht.availability_status !== undefined ? !!yacht.availability_status : !!yacht.available)}
+                                {renderStatusBadge(yacht)}
                                 {yacht.featured && (
                                   <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200">
                                     Featured
@@ -957,7 +964,15 @@ export default function AssetManagement() {
                           />
                         </div>
                         <div className="absolute top-2 right-2 flex gap-1">
-                          {renderStatusBadge(addon.availability)}
+                          {addon.availability ? (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">
+                              Active
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-gray-100 text-gray-800 hover:bg-gray-200">
+                              Inactive
+                            </Badge>
+                          )}
                         </div>
                       </div>
                       
