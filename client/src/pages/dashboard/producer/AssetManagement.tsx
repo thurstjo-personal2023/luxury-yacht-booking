@@ -617,6 +617,16 @@ export default function AssetManagement() {
                   />
                 </div>
                 
+                <Button 
+                  variant="outline"
+                  onClick={handleRefresh}
+                  className="flex items-center gap-1"
+                  title="Refresh data and images"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  <span className="hidden sm:inline">Refresh</span>
+                </Button>
+                
                 {activeTab === "yachts" && yachtCategories.length > 0 && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
