@@ -342,6 +342,25 @@ export default function AssetManagement() {
         console.log(`Successfully updated yacht ${docId} in experience_packages collection`);
       }
       
+      // Always try to update the unified collection as well
+      try {
+        const unifiedCollection = collection(db, "unified_yacht_experiences");
+        const unifiedRef = doc(unifiedCollection, docId);
+        
+        // Update with both property naming conventions to ensure compatibility
+        await updateDoc(unifiedRef, { 
+          availability_status: newStatus,
+          available: newStatus,
+          isAvailable: newStatus, // New unified schema field
+          last_updated_date: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        console.log(`Successfully updated yacht ${docId} in unified_yacht_experiences collection`);
+      } catch (unifiedErr) {
+        // Log but don't throw error if unified collection update fails
+        console.warn(`Failed to update in unified_yacht_experiences collection`, unifiedErr);
+      }
+      
       // Use a more aggressive cache invalidation approach
       console.log('Invalidating all yacht queries to refresh data...');
       
