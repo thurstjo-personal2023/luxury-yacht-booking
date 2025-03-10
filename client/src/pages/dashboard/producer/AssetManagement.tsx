@@ -475,8 +475,8 @@ export default function AssetManagement() {
           throw new Error(`Server returned ${response.status}: ${response.statusText}`);
         }
         
-        const responseData = await response.json();
-        console.log(`API response:`, responseData);
+        const result = await response.json();
+        console.log(`API response:`, result);
         console.log(`Successfully activated/deactivated yacht ${docId} via API`);
       } catch (apiError) {
         console.error('API activation failed, falling back to direct Firestore update', apiError);
