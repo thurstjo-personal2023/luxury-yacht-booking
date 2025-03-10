@@ -501,8 +501,6 @@ export default function YachtForm() {
       
       // Save to Firestore
       const yachtRef = doc(db, collectionName, packageId);
-      // Save to Firestore
-      const yachtRef = doc(db, collectionName, packageId);
       
       // Create a comprehensive data object with all field naming conventions
       const newYachtData: Record<string, any> = {
@@ -566,22 +564,25 @@ export default function YachtForm() {
         try {
           console.log(`Attempting to update yacht with ID ${packageId} in collection ${collectionName}`);
           
-          console.log('Update data:', yachtData);
+          // Add a cache-busting timestamp to force updates to be seen
+          newYachtData._lastUpdated = Date.now();
+          console.log('Update data:', newYachtData);
           
           // Attempt to update the document
-          await updateDoc(yachtRef, yachtData);
+          await updateDoc(yachtRef, newYachtData);
           
           // Now, always ensure the unified collection is updated as well
           try {
             const unifiedRef = doc(db, "unified_yacht_experiences", packageId);
             console.log(`Also updating unified collection for yacht ID ${packageId}`);
             
-            // For unified collection, make sure to include a timestamp to help with cache busting
+            // For unified collection, use the same data with a fresh timestamp
             const unifiedData = {
-              ...yachtData,
+              ...newYachtData,
               _lastUpdated: Date.now() // Special field to force updates
             };
             
+            // Use setDoc with merge: true to ensure all fields are updated
             await setDoc(unifiedRef, unifiedData, { merge: true });
             console.log('Unified collection update successful');
           } catch (unifiedError) {
@@ -601,44 +602,19 @@ export default function YachtForm() {
           try {
             console.log('Update failed, trying to create new document instead');
             
-            // Create dual-field compatible yacht data
-            const yachtData = {
-              package_id: packageId,
-              title: values.title,
-              description: values.description,
-              category: values.category,
-              yacht_type: values.yacht_type,
-              location: location,
-              duration: values.duration,
-              capacity: values.capacity,
-              pricing: values.pricing,
-              pricing_model: values.pricing_model,
-              customization_options: customizationOptions,
-              media: media,
-              availability_status: values.availability_status,
-              featured: values.featured,
-              tags: values.tags,
-              published_status: values.published_status,
-              created_date: Timestamp.now(),
-              last_updated_date: Timestamp.now(),
-              virtual_tour: {
-                enabled: values.virtual_tour_enabled,
-                scenes: []
-              },
-              
-              // Legacy field names for compatibility
-              yachtId: packageId,
-              id: packageId,
-              name: values.title,
-              price: values.pricing,
-              available: values.availability_status,
-              features: values.tags,
-              max_guests: values.capacity,
-              createdAt: Timestamp.now(),
-              updatedAt: Timestamp.now(),
+            // Use the same newYachtData object, but reset a few fields that might be causing issues
+            newYachtData.created_date = Timestamp.now();
+            newYachtData.createdAt = Timestamp.now();
+            newYachtData.last_updated_date = Timestamp.now();
+            newYachtData.updatedAt = Timestamp.now();
+            newYachtData._lastUpdated = Date.now(); // Force cache update
+            newYachtData.virtual_tour = {
+              enabled: values.virtual_tour_enabled,
+              scenes: []
             };
             
-            await setDoc(yachtRef, yachtData);
+            // Use setDoc instead of updateDoc to create the document if it doesn't exist
+            await setDoc(yachtRef, newYachtData);
             console.log('Create successful as fallback to update');
             toast({
               title: "Yacht Updated",
@@ -652,8 +628,12 @@ export default function YachtForm() {
       } else {
         // For new yachts, create with both field naming conventions
         try {
-          // We already created the yachtData object with all the proper fields above
-          await setDoc(yachtRef, yachtData);
+          // Add cache-busting timestamp
+          newYachtData._lastUpdated = Date.now();
+          console.log('Create data:', newYachtData);
+          
+          // Create document in main collection
+          await setDoc(yachtRef, newYachtData);
           
           // Now, always ensure the unified collection is updated as well
           try {
@@ -662,7 +642,7 @@ export default function YachtForm() {
             
             // For unified collection, make sure to include a timestamp to help with cache busting
             const unifiedData = {
-              ...yachtData,
+              ...newYachtData,
               _lastUpdated: Date.now() // Special field to force updates
             };
             
