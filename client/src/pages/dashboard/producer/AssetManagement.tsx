@@ -520,7 +520,7 @@ export default function AssetManagement() {
       
       // Provide immediate feedback by updating local state
       yacht.availability_status = newStatus;
-      yacht.available = newStatus;
+      yacht.available = newStatus; 
       yacht.isAvailable = newStatus;
       yacht._lastUpdated = timestamp;
       
