@@ -501,58 +501,93 @@ export default function YachtForm() {
       
       // Save to Firestore
       const yachtRef = doc(db, collectionName, packageId);
+      // Save to Firestore
+      const yachtRef = doc(db, collectionName, packageId);
+      
+      // Create a comprehensive data object with all field naming conventions
+      const newYachtData: Record<string, any> = {
+        // Core unified schema fields
+        id: packageId,
+        title: values.title,
+        description: values.description,
+        category: values.category,
+        yachtType: values.yacht_type, // unified field
+        location: location,
+        duration: values.duration,
+        capacity: values.capacity,
+        pricing: values.pricing,
+        pricingModel: values.pricing_model, // unified field
+        customizationOptions: customizationOptions.map(opt => ({ 
+          id: opt.product_id || `opt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name: opt.name,
+          price: opt.price 
+        })), // unified field
+        media: media,
+        isAvailable: values.availability_status, // unified field
+        isFeatured: values.featured, // unified field
+        isPublished: values.published_status, // unified field
+        tags: values.tags,
+        virtualTour: {
+          isEnabled: values.virtual_tour_enabled, // unified field
+          scenes: editMode && yachtData?.virtual_tour?.scenes ? yachtData.virtual_tour.scenes : []
+        },
+        
+        // Legacy fields for backward compatibility
+        package_id: packageId,
+        yacht_type: values.yacht_type,
+        pricing_model: values.pricing_model,
+        customization_options: customizationOptions,
+        availability_status: values.availability_status,
+        featured: values.featured,
+        published_status: values.published_status,
+        yachtId: packageId,
+        name: values.title,
+        price: values.pricing,
+        available: values.availability_status,
+        features: values.tags,
+        max_guests: values.capacity,
+      };
+      
+      // Add updated timestamp fields - ensuring we don't duplicate them
+      const now = Timestamp.now();
+      newYachtData.last_updated_date = now;
+      newYachtData.updatedAt = now;
+      
+      // Add creation date fields - either from existing doc or new
+      if (editMode && yachtData?.created_date) {
+        newYachtData.created_date = yachtData.created_date;
+        newYachtData.createdAt = yachtData.created_date; // legacy field
+      } else {
+        newYachtData.created_date = now;
+        newYachtData.createdAt = now; // legacy field
+      }
       
       if (editMode) {
         try {
           console.log(`Attempting to update yacht with ID ${packageId} in collection ${collectionName}`);
           
-          // Create dual-field compatible update data that supports both data models
-          const updateData = {
-            // New field names
-            package_id: packageId,
-            title: values.title,
-            description: values.description,
-            category: values.category,
-            yacht_type: values.yacht_type,
-            location: location,
-            duration: values.duration,
-            capacity: values.capacity,
-            pricing: values.pricing,
-            pricing_model: values.pricing_model,
-            customization_options: customizationOptions,
-            media: media,
-            availability_status: values.availability_status,
-            featured: values.featured,
-            tags: values.tags,
-            published_status: values.published_status,
-            last_updated_date: Timestamp.now(),
-            virtual_tour: {
-              enabled: values.virtual_tour_enabled,
-              scenes: editMode && yachtData?.virtual_tour?.scenes ? yachtData.virtual_tour.scenes : []
-            },
-            
-            // Legacy field names for compatibility
-            yachtId: packageId,
-            id: packageId,
-            name: values.title,
-            price: values.pricing,
-            available: values.availability_status,
-            features: values.tags,
-            max_guests: values.capacity,
-            updatedAt: Timestamp.now(),
-          };
-          
-          // If we're editing, make sure to include the creation date from the original
-          if (yachtData && yachtData.created_date) {
-            const fullUpdateData: any = updateData;
-            fullUpdateData.created_date = yachtData.created_date;
-            fullUpdateData.createdAt = yachtData.created_date; // legacy field
-          }
-          
-          console.log('Update data:', updateData);
+          console.log('Update data:', yachtData);
           
           // Attempt to update the document
-          await updateDoc(yachtRef, updateData);
+          await updateDoc(yachtRef, yachtData);
+          
+          // Now, always ensure the unified collection is updated as well
+          try {
+            const unifiedRef = doc(db, "unified_yacht_experiences", packageId);
+            console.log(`Also updating unified collection for yacht ID ${packageId}`);
+            
+            // For unified collection, make sure to include a timestamp to help with cache busting
+            const unifiedData = {
+              ...yachtData,
+              _lastUpdated: Date.now() // Special field to force updates
+            };
+            
+            await setDoc(unifiedRef, unifiedData, { merge: true });
+            console.log('Unified collection update successful');
+          } catch (unifiedError) {
+            console.warn('Error updating unified collection:', unifiedError);
+            // Continue even if unified update fails
+          }
           
           console.log('Update successful');
           toast({
@@ -617,44 +652,27 @@ export default function YachtForm() {
       } else {
         // For new yachts, create with both field naming conventions
         try {
-          const newYachtData = {
-            // New field names
-            package_id: packageId,
-            title: values.title,
-            description: values.description,
-            category: values.category,
-            yacht_type: values.yacht_type,
-            location: location,
-            duration: values.duration,
-            capacity: values.capacity,
-            pricing: values.pricing,
-            pricing_model: values.pricing_model,
-            customization_options: customizationOptions,
-            media: media,
-            availability_status: values.availability_status,
-            featured: values.featured,
-            tags: values.tags,
-            published_status: values.published_status,
-            created_date: Timestamp.now(),
-            last_updated_date: Timestamp.now(),
-            virtual_tour: {
-              enabled: values.virtual_tour_enabled,
-              scenes: []
-            },
-            
-            // Legacy field names for compatibility
-            yachtId: packageId,
-            id: packageId,
-            name: values.title,
-            price: values.pricing,
-            available: values.availability_status,
-            features: values.tags,
-            max_guests: values.capacity,
-            createdAt: Timestamp.now(),
-            updatedAt: Timestamp.now(),
-          };
+          // We already created the yachtData object with all the proper fields above
+          await setDoc(yachtRef, yachtData);
           
-          await setDoc(yachtRef, newYachtData);
+          // Now, always ensure the unified collection is updated as well
+          try {
+            const unifiedRef = doc(db, "unified_yacht_experiences", packageId);
+            console.log(`Also creating in unified collection for yacht ID ${packageId}`);
+            
+            // For unified collection, make sure to include a timestamp to help with cache busting
+            const unifiedData = {
+              ...yachtData,
+              _lastUpdated: Date.now() // Special field to force updates
+            };
+            
+            await setDoc(unifiedRef, unifiedData);
+            console.log('Unified collection update successful');
+          } catch (unifiedError) {
+            console.warn('Error updating unified collection:', unifiedError);
+            // Continue even if unified update fails
+          }
+          
           toast({
             title: "Yacht Created",
             description: "Your yacht has been successfully created.",
