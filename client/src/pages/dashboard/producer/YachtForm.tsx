@@ -167,18 +167,30 @@ export default function YachtForm() {
   const fetchYachtDetails = async (yachtId: string) => {
     setInitialLoading(true);
     try {
-      // Try to fetch from yacht_experiences first
-      let yachtRef = doc(db, "yacht_experiences", yachtId);
-      let yachtDoc = await getDoc(yachtRef);
+      // Collections to search in the preferred order
+      const collectionsToSearch = [
+        "yacht_experiences",
+        "experience_packages",
+        "unified_yacht_experiences"
+      ];
       
-      // If not found, try experience_packages collection
-      if (!yachtDoc.exists()) {
-        console.log(`Yacht not found in yacht_experiences, trying experience_packages collection...`);
-        yachtRef = doc(db, "experience_packages", yachtId);
+      let yachtDoc;
+      let collectionFound = "";
+      
+      // Try each collection until we find the yacht
+      for (const collectionName of collectionsToSearch) {
+        console.log(`Searching for yacht ID ${yachtId} in ${collectionName} collection...`);
+        const yachtRef = doc(db, collectionName, yachtId);
         yachtDoc = await getDoc(yachtRef);
+        
+        if (yachtDoc.exists()) {
+          console.log(`Found yacht in ${collectionName} collection!`);
+          collectionFound = collectionName;
+          break;
+        }
       }
       
-      if (yachtDoc.exists()) {
+      if (yachtDoc && yachtDoc.exists()) {
         const data = yachtDoc.data() as YachtExperience;
         console.log("Found yacht data:", data);
         
@@ -466,8 +478,19 @@ export default function YachtForm() {
       console.log('Saving yacht with data:', yachtObject);
       
       // Determine the correct collection to use
-      // Default to yacht_experiences collection
-      const collectionName = "yacht_experiences";
+      // If we found the yacht in a specific collection, use that collection
+      // Otherwise default to yacht_experiences collection
+      let collectionName = "yacht_experiences";
+      
+      // If we're in edit mode and we found the yacht in a specific collection during loading
+      if (editMode && yachtData && collectionFound) {
+        collectionName = collectionFound;
+        console.log(`Using the original collection: ${collectionName} for yacht update`);
+      } else {
+        // For new yachts, use the unified collection if the document does not yet exist
+        // But only if we explicitly checked and it doesn't exist
+        console.log(`Using default collection: ${collectionName} for yacht creation/update`)
+      }
       
       // Save to Firestore
       const yachtRef = doc(db, collectionName, packageId);
