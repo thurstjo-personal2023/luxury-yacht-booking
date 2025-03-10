@@ -72,11 +72,30 @@ export default function YachtDetails() {
 
       setLoading(true);
       try {
-        const yachtRef = doc(db, "experience_packages", yachtId);
-        const yachtDoc = await getDoc(yachtRef);
+        // Try to fetch from multiple collections to support the transition
+        let yachtDoc;
+        
+        // First try yacht_experiences collection
+        let yachtRef = doc(db, "yacht_experiences", yachtId);
+        yachtDoc = await getDoc(yachtRef);
+        
+        // If not found, try experience_packages collection
+        if (!yachtDoc.exists()) {
+          console.log(`Yacht not found in yacht_experiences, trying experience_packages...`);
+          yachtRef = doc(db, "experience_packages", yachtId);
+          yachtDoc = await getDoc(yachtRef);
+        }
+        
+        // If still not found, try unified_yacht_experiences collection
+        if (!yachtDoc.exists()) {
+          console.log(`Yacht not found in experience_packages, trying unified_yacht_experiences...`);
+          yachtRef = doc(db, "unified_yacht_experiences", yachtId);
+          yachtDoc = await getDoc(yachtRef);
+        }
 
         if (yachtDoc.exists()) {
           const yachtData = { id: yachtDoc.id, ...yachtDoc.data() } as YachtExperience;
+          console.log("Found yacht data:", yachtData);
           setYacht(yachtData);
 
           // Set initial total price
@@ -107,66 +126,80 @@ export default function YachtDetails() {
 
           // Fetch related yachts
           try {
-            const experiencesRef = collection(db, "experience_packages");
-            let relatedQuery;
+            // Try to fetch related yachts from multiple collections to support the transition period
+            const collectionsToSearch = ["yacht_experiences", "experience_packages", "unified_yacht_experiences"];
+            let foundRelatedYachts = false;
+            
+            // Try each collection until we find related yachts
+            for (const collectionName of collectionsToSearch) {
+              if (foundRelatedYachts) break; // Stop if we already found yachts
+              
+              console.log(`Searching for related yachts in ${collectionName} collection...`);
+              const experiencesRef = collection(db, collectionName);
+              let relatedQuery;
 
-            // First try to find yachts in the same category
-            if (yachtData.category) {
-              relatedQuery = query(
-                experiencesRef, 
-                where("category", "==", yachtData.category),
-                where("id", "!=", yachtId),
-                limit(3)
-              );
-            } else if (yachtData.location && yachtData.location.address) {
-              // If no category, try to find yachts in the same region
-              const regionTerms = ["Dubai", "Abu Dhabi"];
-              let region = "";
-
-              for (const term of regionTerms) {
-                if (yachtData.location.address.includes(term)) {
-                  region = term;
-                  break;
-                }
-              }
-
-              if (region) {
+              // First try to find yachts in the same category
+              if (yachtData.category) {
                 relatedQuery = query(
-                  experiencesRef,
-                  where("location.address", "array-contains", region),
+                  experiencesRef, 
+                  where("category", "==", yachtData.category),
                   where("id", "!=", yachtId),
                   limit(3)
                 );
+              } else if (yachtData.location && yachtData.location.address) {
+                // If no category, try to find yachts in the same region
+                const regionTerms = ["Dubai", "Abu Dhabi"];
+                let region = "";
+
+                for (const term of regionTerms) {
+                  if (yachtData.location.address.includes(term)) {
+                    region = term;
+                    break;
+                  }
+                }
+
+                if (region) {
+                  relatedQuery = query(
+                    experiencesRef,
+                    where("location.address", "array-contains", region),
+                    where("id", "!=", yachtId),
+                    limit(3)
+                  );
+                }
               }
-            }
 
-            if (relatedQuery) {
-              const relatedSnapshot = await getDocs(relatedQuery);
-              if (!relatedSnapshot.empty) {
-                const relatedData = relatedSnapshot.docs.map(doc => ({
-                  id: doc.id,
-                  ...doc.data()
-                })) as YachtExperience[];
-                setRelatedYachts(relatedData);
+              if (relatedQuery) {
+                const relatedSnapshot = await getDocs(relatedQuery);
+                if (!relatedSnapshot.empty) {
+                  const relatedYachtData = relatedSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                  })) as YachtExperience[];
+                  setRelatedYachts(relatedYachtData);
+                  foundRelatedYachts = true;
+                  console.log(`Found ${relatedYachtData.length} related yachts in ${collectionName}`);
+                }
               }
-            }
 
-            // If no related yachts found by category or location, get random ones
-            if (!relatedYachts.length) {
-              const randomQuery = query(
-                experiencesRef,
-                where("published_status", "==", true),
-                where("id", "!=", yachtId),
-                limit(3)
-              );
+              // If no related yachts found by category or location, get random ones
+              if (!foundRelatedYachts) {
+                const randomQuery = query(
+                  experiencesRef,
+                  where("published_status", "==", true),
+                  where("id", "!=", yachtId),
+                  limit(3)
+                );
 
-              const randomSnapshot = await getDocs(randomQuery);
-              if (!randomSnapshot.empty) {
-                const randomData = randomSnapshot.docs.map(doc => ({
-                  id: doc.id,
-                  ...doc.data()
-                })) as YachtExperience[];
-                setRelatedYachts(randomData);
+                const randomSnapshot = await getDocs(randomQuery);
+                if (!randomSnapshot.empty) {
+                  const randomYachtData = randomSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                  })) as YachtExperience[];
+                  setRelatedYachts(randomYachtData);
+                  foundRelatedYachts = true;
+                  console.log(`Found ${randomYachtData.length} random yachts in ${collectionName}`);
+                }
               }
             }
           } catch (error) {
