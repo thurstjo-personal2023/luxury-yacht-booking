@@ -278,14 +278,16 @@ export default function YachtForm() {
     
     setUploadingMedia(true);
     const newMedia: Media[] = [...media];
+    const uploadedMedia: Media[] = [];
     
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const isVideo = file.type.startsWith('video/');
         
-        // Create a unique file path
-        const storagePath = `yacht_media/${auth.currentUser.uid}/${Date.now()}_${file.name}`;
+        // Create a unique file path with timestamp for cache busting
+        const timestamp = Date.now();
+        const storagePath = `yacht_media/${auth.currentUser.uid}/${timestamp}_${file.name}`;
         const storageRef = ref(storage, storagePath);
         
         // Upload the file
@@ -294,18 +296,33 @@ export default function YachtForm() {
         // Get download URL
         const downloadURL = await getDownloadURL(storageRef);
         
-        // Add to media array
-        newMedia.push({
+        // Add to uploaded media array
+        uploadedMedia.push({
           type: isVideo ? 'video' : 'image',
           url: downloadURL
         });
       }
       
-      setMedia(newMedia);
-      toast({
-        title: "Upload Complete",
-        description: `Successfully uploaded ${files.length} file(s)`,
-      });
+      // Determine if this is the first upload (no existing media)
+      const isFirstUpload = newMedia.length === 0;
+      
+      if (isFirstUpload) {
+        // If this is the first upload, these become our media with first image as cover
+        setMedia([...uploadedMedia, ...newMedia]);
+        
+        toast({
+          title: "Upload Complete",
+          description: `Successfully uploaded ${files.length} file(s). First image set as cover.`,
+        });
+      } else {
+        // Otherwise add to end of existing media
+        setMedia([...newMedia, ...uploadedMedia]);
+        
+        toast({
+          title: "Upload Complete",
+          description: `Successfully uploaded ${files.length} file(s). Use "Set as Cover" to make any image the cover image.`,
+        });
+      }
     } catch (error) {
       console.error("Error uploading media:", error);
       toast({
@@ -326,6 +343,25 @@ export default function YachtForm() {
     // Note: We're not actually deleting from storage here, that would be another step
     newMedia.splice(index, 1);
     setMedia(newMedia);
+  };
+  
+  // Set an image as cover image (move to first position in array)
+  const setCoverImage = (index: number) => {
+    if (index < 0 || index >= media.length || index === 0) return;
+    
+    // Make a copy of the media array
+    const newMedia = [...media];
+    
+    // Move the selected image to the first position (as cover image)
+    const [selectedImage] = newMedia.splice(index, 1);
+    newMedia.unshift(selectedImage);
+    
+    setMedia(newMedia);
+    
+    toast({
+      title: "Cover Image Set",
+      description: "The selected image will be used as the cover image",
+    });
   };
   
   // Handle location selection
@@ -1253,7 +1289,19 @@ export default function YachtForm() {
                                 />
                               )}
                               
-                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {index !== 0 && (
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setCoverImage(index)}
+                                    className="text-white"
+                                  >
+                                    <Camera className="h-4 w-4 mr-1" />
+                                    Set as Cover
+                                  </Button>
+                                )}
                                 <Button
                                   type="button"
                                   variant="destructive"
@@ -1267,7 +1315,7 @@ export default function YachtForm() {
                               </div>
                               
                               {index === 0 && (
-                                <div className="absolute top-2 left-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs">
+                                <div className="absolute top-2 left-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium shadow-sm">
                                   Cover Photo
                                 </div>
                               )}
