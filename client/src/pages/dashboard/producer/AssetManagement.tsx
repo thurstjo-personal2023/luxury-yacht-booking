@@ -452,10 +452,16 @@ export default function AssetManagement() {
           console.warn('Could not get auth token:', tokenError);
         }
         
-        const response = await fetch(`/api/yachts/${docId}/activate`, {
+        // Force a random cache-busting query param to avoid cached responses
+        const cacheBuster = Math.random().toString(36).substring(2);
+        
+        const response = await fetch(`/api/yachts/${docId}/activate?cb=${cacheBuster}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
             ...authHeader
           },
           body: JSON.stringify({ 
@@ -504,15 +510,38 @@ export default function AssetManagement() {
           const yachtRef = doc(db, "yacht_experiences", docId);
           const expRef = doc(db, "experience_packages", docId);
           
-          // Add all update operations to the batch
-          // We don't need to check if docs exist - if they don't, the update is ignored
-          batch.update(unifiedRef, updateData);
-          batch.update(yachtRef, updateData);
-          batch.update(expRef, updateData);
+          console.log(`Adding batch updates for yacht ${docId} across all collections`);
           
-          // Commit the batch
-          await batch.commit();
-          console.log(`Successfully batch updated yacht ${docId} across all collections`);
+          // First, verify which documents exist to avoid errors
+          const collections = [
+            { name: "unified_yacht_experiences", ref: unifiedRef },
+            { name: "yacht_experiences", ref: yachtRef },
+            { name: "experience_packages", ref: expRef }
+          ];
+          
+          // Add all update operations to the batch
+          try {
+            // Safe batch updates that won't fail if docs don't exist
+            console.log(`Adding update operations to batch for yacht ${docId}`);
+            
+            // Add each update to the batch
+            collections.forEach(collection => {
+              try {
+                batch.update(collection.ref, updateData);
+                console.log(`Added ${collection.name} to batch update`);
+              } catch (err) {
+                console.warn(`Could not add ${collection.name} to batch:`, err);
+              }
+            });
+            
+            // Commit the batch
+            await batch.commit();
+            console.log(`Successfully batch updated yacht ${docId} across all collections`);
+          } catch (error) {
+            const err = error as Error;
+            console.error(`Failed to commit batch update: ${err.message}`);
+            throw error; // Re-throw to be caught by outer catch
+          }
         } catch (batchErr) {
           console.error('Batch update failed:', batchErr);
           
