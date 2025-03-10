@@ -85,6 +85,8 @@ interface ExtendedYachtExperience extends YachtExperience {
   yachtId?: string;
   available?: boolean;
   isAvailable?: boolean;
+  // Property for standardized entries
+  mainImage?: string;
   // Timestamp properties for cache busting
   _lastUpdated?: string;
   updatedAt?: any; // Can be Timestamp or serialized format

@@ -367,17 +367,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Collect output
       let output = '';
+      let errors: string[] = [];
+      let processedCount = 0;
+      let updatedCount = 0;
       
       child.stdout.on('data', (data) => {
         const dataStr = data.toString();
         console.log(`Standardization progress: ${dataStr}`);
         output += dataStr;
+        
+        // Parse output to extract statistics
+        if (dataStr.includes('Found')) {
+          const match = dataStr.match(/Found (\d+) documents/);
+          if (match && match[1]) {
+            processedCount = parseInt(match[1], 10);
+          }
+        }
+        
+        if (dataStr.includes('Successfully standardized')) {
+          const match = dataStr.match(/Successfully standardized (\d+) documents/);
+          if (match && match[1]) {
+            updatedCount = parseInt(match[1], 10);
+          }
+        }
       });
       
       child.stderr.on('data', (data) => {
         const errorStr = data.toString();
         console.error(`Standardization error: ${errorStr}`);
         output += `ERROR: ${errorStr}\n`;
+        errors.push(errorStr);
       });
       
       // Handle completion
@@ -389,7 +408,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           res.json({ 
             success: true, 
             message: "Collection standardization completed successfully",
-            details: output
+            details: {
+              processedCount,
+              updatedCount,
+              errors,
+              output
+            }
           });
         } else {
           // Error
@@ -397,7 +421,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             success: false, 
             message: "Collection standardization failed", 
             exitCode: code,
-            details: output
+            details: {
+              processedCount,
+              updatedCount,
+              errors,
+              output
+            }
           });
         }
       });
@@ -408,7 +437,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(500).json({ 
           success: false, 
           message: "Failed to start standardization script", 
-          error: String(error)
+          error: String(error),
+          details: {
+            processedCount: 0,
+            updatedCount: 0,
+            errors: [String(error)],
+            output
+          }
         });
       });
       
@@ -417,7 +452,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false, 
         message: "Error running collection standardization", 
-        error: String(error)
+        error: String(error),
+        details: {
+          processedCount: 0,
+          updatedCount: 0,
+          errors: [String(error)],
+          output: ""
+        }
       });
     }
   });
