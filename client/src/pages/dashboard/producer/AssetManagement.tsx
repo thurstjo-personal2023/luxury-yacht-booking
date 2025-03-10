@@ -67,6 +67,13 @@ import {
 import { useAuthState } from "react-firebase-hooks/auth";
 import { YachtExperience, YachtProfile, ProductAddOn } from "@shared/firestore-schema";
 
+// Extended ProductAddOn interface with cache busting fields
+interface ExtendedProductAddOn extends Omit<ProductAddOn, 'lastUpdatedDate'> {
+  lastUpdatedDate?: any; // Make it optional for compatibility
+  _lastUpdated?: string;
+  updatedAt?: any;
+}
+
 
 // Extended interface to include properties from API response
 interface ExtendedYachtExperience extends YachtExperience {
@@ -75,6 +82,10 @@ interface ExtendedYachtExperience extends YachtExperience {
   // Additional properties to handle both naming conventions
   yachtId?: string;
   available?: boolean;
+  // Timestamp properties for cache busting
+  _lastUpdated?: string;
+  updatedAt?: any; // Can be Timestamp or serialized format
+  createdAt?: any;
 }
 
 // Pagination interface
@@ -92,7 +103,7 @@ interface YachtsResponse {
 }
 
 interface AddOnsResponse {
-  addons: ProductAddOn[];
+  addons: ExtendedProductAddOn[];
   pagination: PaginationData;
 }
 
@@ -153,7 +164,7 @@ export default function AssetManagement() {
   });
   
   // Filtered add-ons based on search and category
-  const filteredAddOns = addOns?.filter((addon: ProductAddOn) => {
+  const filteredAddOns = addOns?.filter((addon: ExtendedProductAddOn) => {
     const matchesSearch = !searchQuery || 
       addon.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       addon.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -165,7 +176,7 @@ export default function AssetManagement() {
   
   // Get unique categories
   const yachtCategories = yachts ? Array.from(new Set(yachts.map((yacht: ExtendedYachtExperience) => yacht.category))).sort() : [];
-  const addonCategories = addOns ? Array.from(new Set(addOns.map((addon: ProductAddOn) => addon.category))).sort() : [];
+  const addonCategories = addOns ? Array.from(new Set(addOns.map((addon: ExtendedProductAddOn) => addon.category))).sort() : [];
   
   // Handlers
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -635,8 +646,8 @@ export default function AssetManagement() {
                           <img 
                             {...getYachtImageProps(yacht)}
                             className="w-full h-full object-cover"
-                            // Add a timestamp key to force re-render when yacht is updated
-                            key={`yacht-img-${yacht.id || yacht.package_id || yacht.yachtId}-${Date.now()}`}
+                            // Generate a more intelligent key based on available timestamps
+                            key={`yacht-img-${yacht.id || yacht.package_id || yacht.yachtId}-${yacht._lastUpdated || yacht.last_updated_date?.seconds || yacht.updatedAt?.seconds || Date.now()}`}
                           />
                         </div>
                         
@@ -795,15 +806,15 @@ export default function AssetManagement() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {/* Add-ons List */}
-                  {filteredAddOns?.map((addon: ProductAddOn) => (
+                  {filteredAddOns?.map((addon: ExtendedProductAddOn) => (
                     <Card key={addon.productId}>
                       <div className="relative">
                         <div className="h-40 overflow-hidden">
                           <img 
                             {...getAddonImageProps(addon)}
                             className="w-full h-full object-cover"
-                            // Add a timestamp key to force re-render when addon is updated
-                            key={`addon-img-${addon.productId}-${Date.now()}`}
+                            // Generate a more intelligent key based on available timestamps
+                            key={`addon-img-${addon.productId}-${addon._lastUpdated || addon.lastUpdatedDate?.seconds || addon.createdDate?.seconds || Date.now()}`}
                           />
                         </div>
                         <div className="absolute top-2 right-2 flex gap-1">
