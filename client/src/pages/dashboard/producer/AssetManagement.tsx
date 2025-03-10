@@ -199,7 +199,7 @@ export default function AssetManagement() {
       });
       return;
     }
-    setLocation(`/yachts/${id}`);
+    setLocation(`/yacht/${id}`);
   };
   
   // Show delete confirmation dialog
