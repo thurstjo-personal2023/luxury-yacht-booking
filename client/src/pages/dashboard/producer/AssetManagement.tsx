@@ -401,8 +401,37 @@ export default function AssetManagement() {
       // Generate a timestamp for cache busting
       const timestamp = Date.now().toString();
       
+      // Find the index of the yacht in the array before modification
+      // This will help us update the UI more reliably
+      const yachtIndex = yachts.findIndex(y => 
+        (y.package_id === docId) || (y.yachtId === docId) || (y.id === docId)
+      );
+      
+      if (yachtIndex === -1) {
+        console.warn(`Could not find yacht with ID ${docId} in local state`);
+      }
+      
+      // Immediately update the UI for responsive feedback
+      // This provides an instant visual update even before the API call succeeds
+      const updatedYachts = [...yachts];
+      if (yachtIndex !== -1) {
+        console.log(`Updating yacht at index ${yachtIndex} in local state to isActive=${newStatus}`);
+        // Create a new object with updated status to ensure React detects the change
+        updatedYachts[yachtIndex] = {
+          ...updatedYachts[yachtIndex],
+          availability_status: newStatus,
+          available: newStatus,
+          isAvailable: newStatus,
+          _lastUpdated: timestamp
+        };
+        setYachts(updatedYachts);
+      }
+
+      console.log(`Toggling activation for yacht ${docId}: ${isActive} → ${newStatus}`);
+      
       // Use a direct API call to server to ensure consistent update
       try {
+        console.log(`Sending API request to /api/yacht/${docId}/activate with active=${newStatus}`);
         const response = await fetch(`/api/yacht/${docId}/activate`, {
           method: 'POST',
           headers: {
@@ -418,6 +447,8 @@ export default function AssetManagement() {
           throw new Error(`Server returned ${response.status}: ${response.statusText}`);
         }
         
+        const responseData = await response.json();
+        console.log(`API response:`, responseData);
         console.log(`Successfully activated/deactivated yacht ${docId} via API`);
       } catch (apiError) {
         console.error('API activation failed, falling back to direct Firestore update', apiError);
@@ -518,17 +549,20 @@ export default function AssetManagement() {
         refetchType: 'all'
       });
       
-      // Provide immediate feedback by updating local state
-      yacht.availability_status = newStatus;
-      yacht.available = newStatus; 
-      yacht.isAvailable = newStatus;
-      yacht._lastUpdated = timestamp;
-      
-      // Force component update
-      setYachts(prev => {
-        if (!prev) return prev;
-        return [...prev];
-      });
+      // Ensure our local state object is also updated (double-check)
+      if (yachtIndex === -1) {
+        // Direct modification of the yacht object is a fallback in case we couldn't find it by index
+        yacht.availability_status = newStatus;
+        yacht.available = newStatus;
+        yacht.isAvailable = newStatus;
+        yacht._lastUpdated = timestamp;
+        
+        // Force component update using the spread operator to create a new array
+        setYachts(prev => {
+          if (!prev) return prev;
+          return [...prev];
+        });
+      }
       
       const yachtTitle = yacht.title || yacht.name || '';
       
@@ -574,11 +608,14 @@ export default function AssetManagement() {
   // Create status badge
   const renderStatusBadge = (yacht: ExtendedYachtExperience) => {
     // Check all possible status fields to ensure consistency, using !! to convert to boolean
+    // Force typecast status fields to boolean with !! to handle various truthy/falsy values
     const isActive = yacht.isAvailable !== undefined 
       ? !!yacht.isAvailable 
       : (yacht.availability_status !== undefined 
           ? !!yacht.availability_status 
           : !!yacht.available);
+    
+    console.log(`Status badge for yacht ${yacht.title || yacht.name}: isAvailable=${yacht.isAvailable}, availability_status=${yacht.availability_status}, available=${yacht.available}, computed=${isActive}`);
     
     return isActive ? (
       <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">
