@@ -352,16 +352,26 @@ export default function YachtForm() {
   
   // Handle adding a tag
   const handleAddTag = () => {
-    if (tagInput.trim() && !form.getValues().tags.includes(tagInput.trim())) {
-      const currentTags = form.getValues().tags;
-      form.setValue('tags', [...currentTags, tagInput.trim()]);
-      setTagInput("");
+    const tagValue = tagInput.trim();
+    if (!tagValue) return;
+    
+    // Get current tags, ensure it's an array
+    const currentTags = Array.isArray(form.getValues().tags) ? form.getValues().tags : [];
+    
+    // Only add if tag doesn't already exist
+    if (!currentTags.includes(tagValue)) {
+      form.setValue('tags', [...currentTags, tagValue]);
     }
+    
+    setTagInput("");
   };
   
   // Handle removing a tag
   const handleRemoveTag = (tag: string) => {
-    const currentTags = form.getValues().tags;
+    // Get current tags, ensure it's an array
+    const currentTags = Array.isArray(form.getValues().tags) ? form.getValues().tags : [];
+    
+    // Filter out the tag to remove
     form.setValue('tags', currentTags.filter(t => t !== tag));
   };
   
