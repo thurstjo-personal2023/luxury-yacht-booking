@@ -1,181 +1,203 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, RefreshCw } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, CheckCircle, Database, Wrench } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { ProducerSidebar } from "@/components/layout/ProducerSidebar";
 
 export default function AdminUtils() {
   const { toast } = useToast();
-  const [standardizationRunning, setStandardizationRunning] = useState(false);
-  const [standardizationOutput, setStandardizationOutput] = useState<string | null>(null);
-  const [showInactiveYachts, setShowInactiveYachts] = useState(false);
+  const [activeTab, setActiveTab] = useState("data-tools");
+  const [isStandardizing, setIsStandardizing] = useState(false);
+  const [lastStandardization, setLastStandardization] = useState<string | null>(null);
+  const [standardizationResult, setStandardizationResult] = useState<{
+    success: boolean;
+    message: string;
+    details?: {
+      processedCount: number;
+      updatedCount: number;
+      errors: string[];
+    };
+  } | null>(null);
 
   const runStandardization = async () => {
+    setIsStandardizing(true);
+    setStandardizationResult(null);
+    
     try {
-      setStandardizationRunning(true);
-      setStandardizationOutput("Starting standardization process...");
-
-      const response = await fetch('/api/admin/standardize-collection', {
+      const response = await apiRequest('/api/admin/standardize-collection', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        body: JSON.stringify({
+          collection: 'unified_yacht_experiences'
+        })
       });
-
+      
       const result = await response.json();
-
-      if (response.ok) {
+      
+      setStandardizationResult({
+        success: result.success,
+        message: result.message,
+        details: result.details
+      });
+      
+      if (result.success) {
         toast({
           title: "Standardization Complete",
-          description: "All yacht records have been standardized successfully.",
+          description: `Successfully processed ${result.details.processedCount} documents and updated ${result.details.updatedCount} documents.`,
           variant: "default",
         });
-        setStandardizationOutput(result.details || "Standardization completed successfully. No details provided.");
+        setLastStandardization(new Date().toLocaleString());
       } else {
         toast({
           title: "Standardization Failed",
-          description: result.message || "An error occurred during standardization.",
+          description: result.message,
           variant: "destructive",
         });
-        setStandardizationOutput(result.details || "Standardization failed. No details provided.");
       }
     } catch (error) {
-      console.error("Error running standardization:", error);
+      console.error("Error standardizing collection:", error);
+      setStandardizationResult({
+        success: false,
+        message: "An unexpected error occurred while standardizing the collection.",
+      });
       toast({
-        title: "Standardization Error",
-        description: "An unexpected error occurred while attempting to standardize records.",
+        title: "Standardization Failed",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
-      setStandardizationOutput("Error: " + (error instanceof Error ? error.message : String(error)));
     } finally {
-      setStandardizationRunning(false);
+      setIsStandardizing(false);
     }
   };
 
-  const updateShowInactiveYachts = async (checked: boolean) => {
-    setShowInactiveYachts(checked);
-    
-    // Implementation to update user preferences or apply filter would go here
-    // For now, we just show a toast message
-    
-    toast({
-      title: checked ? "Showing Inactive Yachts" : "Hiding Inactive Yachts",
-      description: checked 
-        ? "Inactive yachts will now be visible in listings with an inactive badge." 
-        : "Inactive yachts are now hidden from listings.",
-      variant: "default",
-    });
-  };
-
   return (
-    <div className="container mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold mb-6">Administration Tools</h1>
-      
-      <Tabs defaultValue="schema">
-        <TabsList className="mb-4">
-          <TabsTrigger value="schema">Schema Management</TabsTrigger>
-          <TabsTrigger value="settings">Display Settings</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="schema">
-          <div className="grid grid-cols-1 gap-6 mb-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Collection Standardization</CardTitle>
-                <CardDescription>
-                  Standardize all records in the unified_yacht_experiences collection to ensure consistency.
-                  This process will update all fields to follow the standardized schema.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-4">
-                  <div className="bg-muted p-4 rounded-md">
-                    <h3 className="font-medium mb-2">Changes that will be applied:</h3>
-                    <ul className="list-disc ml-4 space-y-1 text-sm">
-                      <li>Standardize field names to camelCase (e.g., isAvailable, mainImage, etc.)</li>
-                      <li>Extract and normalize mainImage for consistent image handling</li>
-                      <li>Ensure all status fields are synchronized (isAvailable, availability_status, available)</li>
-                      <li>Add mainImage field based on media arrays</li>
-                      <li>Normalize location and virtual tour data structures</li>
-                      <li>Fill in missing fields with default values</li>
-                    </ul>
-                  </div>
-                  
-                  <div className="flex justify-end">
-                    <Button 
-                      onClick={runStandardization} 
-                      disabled={standardizationRunning}
-                      className="flex items-center gap-2"
-                    >
-                      {standardizationRunning ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Standardizing...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="h-4 w-4" />
-                          Standardize Collection
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-              
-              {standardizationOutput && (
-                <CardFooter className="flex-col items-start border-t pt-4">
-                  <h4 className="font-medium mb-2">Process Output:</h4>
-                  <pre className="bg-muted p-4 rounded-md text-xs w-full h-40 overflow-auto">
-                    {standardizationOutput}
-                  </pre>
-                </CardFooter>
-              )}
-            </Card>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle>Display Preferences</CardTitle>
-              <CardDescription>
-                Configure how yacht data is displayed throughout the application.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="show-inactive" 
-                    checked={showInactiveYachts} 
-                    onCheckedChange={(checked) => 
-                      updateShowInactiveYachts(checked as boolean)
-                    }
-                  />
-                  <Label htmlFor="show-inactive">Show inactive yacht experiences</Label>
-                </div>
-                <p className="text-sm text-muted-foreground ml-6">
-                  When enabled, inactive yacht experiences will be shown in listings with an inactive badge.
-                  When disabled, inactive yacht experiences are hidden from all listings.
-                </p>
-                
-                <Separator className="my-4" />
-                
-                <div className="bg-muted p-4 rounded-md">
-                  <p className="text-sm">
-                    Additional display settings will be available in future releases.
+    <DashboardLayout>
+      <div className="flex h-screen overflow-hidden">
+        <aside className="hidden md:block w-64 border-r bg-background">
+          <ProducerSidebar />
+        </aside>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <main className="flex-1 overflow-y-auto p-6">
+            <div className="flex flex-col space-y-6 max-w-5xl mx-auto">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold">Admin Utilities</h1>
+                  <p className="text-muted-foreground">
+                    Advanced tools for system maintenance and data management
                   </p>
                 </div>
+                <Badge variant="outline" className="px-3 py-1 text-xs">Admin Access</Badge>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+              
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                <TabsList className="grid grid-cols-2 gap-2">
+                  <TabsTrigger value="data-tools">
+                    <Database className="h-4 w-4 mr-2" /> Data Tools
+                  </TabsTrigger>
+                  <TabsTrigger value="system-maintenance">
+                    <Wrench className="h-4 w-4 mr-2" /> System Maintenance
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="data-tools" className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Yacht Collection Standardization</CardTitle>
+                      <CardDescription>
+                        Standardize all documents in the unified yacht experiences collection to ensure
+                        consistent field naming and data structure.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Important</AlertTitle>
+                        <AlertDescription>
+                          This operation will standardize field names and data structure across all yacht experience documents.
+                          It will normalize availability statuses, standardize location data, and ensure proper virtual tour structures.
+                          This operation is safe and does not delete data, but make sure to back up your database before proceeding.
+                        </AlertDescription>
+                      </Alert>
+                      
+                      {standardizationResult && (
+                        <Alert variant={standardizationResult.success ? "default" : "destructive"}>
+                          {standardizationResult.success ? (
+                            <CheckCircle className="h-4 w-4" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4" />
+                          )}
+                          <AlertTitle>
+                            {standardizationResult.success ? "Standardization Complete" : "Standardization Failed"}
+                          </AlertTitle>
+                          <AlertDescription>
+                            {standardizationResult.message}
+                            {standardizationResult.details && (
+                              <div className="mt-2">
+                                <p>Processed: {standardizationResult.details.processedCount} documents</p>
+                                <p>Updated: {standardizationResult.details.updatedCount} documents</p>
+                                {standardizationResult.details.errors.length > 0 && (
+                                  <div className="mt-2">
+                                    <p className="font-semibold">Errors:</p>
+                                    <ul className="list-disc list-inside text-sm">
+                                      {standardizationResult.details.errors.slice(0, 5).map((error, index) => (
+                                        <li key={index}>{error}</li>
+                                      ))}
+                                      {standardizationResult.details.errors.length > 5 && (
+                                        <li>...and {standardizationResult.details.errors.length - 5} more errors</li>
+                                      )}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </CardContent>
+                    <CardFooter className="flex justify-between border-t px-6 py-4">
+                      <div className="text-sm text-muted-foreground">
+                        {lastStandardization ? `Last run: ${lastStandardization}` : "Never run"}
+                      </div>
+                      <Button onClick={runStandardization} disabled={isStandardizing}>
+                        {isStandardizing ? "Standardizing..." : "Run Standardization"}
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="system-maintenance" className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>System Maintenance Tools</CardTitle>
+                      <CardDescription>
+                        Tools for system maintenance and monitoring
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="py-10 text-center">
+                      <p className="text-muted-foreground">
+                        System maintenance tools will be available in a future update.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </main>
+        </div>
+      </div>
+    </DashboardLayout>
   );
 }
