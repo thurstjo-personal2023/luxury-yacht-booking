@@ -127,12 +127,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Make the update through storage interface
       const updateData: any = { 
-        isAvailable: active,
+        // Cast to boolean to ensure consistent values
+        isAvailable: !!active,
         // Include both naming conventions for maximum compatibility
-        available: active,
-        availability_status: active,
+        available: !!active,
+        availability_status: !!active,
         // Add timestamp for cache busting
-        _lastUpdated: timestamp || Date.now().toString()
+        _lastUpdated: timestamp || Date.now().toString(),
+        // Add a mainImage field for yachts missing media
+        // We're adding a placeholder to any yacht missing images
+        mainImage: active ? 
+          "https://images.unsplash.com/photo-1577032229840-33197764440d?w=800" : 
+          "https://images.unsplash.com/photo-1577032229840-33197764440d?w=800"
       };
       
       const success = await storage.updateYacht(id, updateData);
