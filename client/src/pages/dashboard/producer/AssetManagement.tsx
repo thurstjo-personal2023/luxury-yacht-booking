@@ -427,15 +427,35 @@ export default function AssetManagement() {
         setYachts(updatedYachts);
       }
 
+      // Log debugging information for current yacht data
+      if (yachtIndex !== -1) {
+        console.log('Current yacht data:', JSON.stringify(updatedYachts[yachtIndex], null, 2));
+      }
+      
       console.log(`Toggling activation for yacht ${docId}: ${isActive} → ${newStatus}`);
       
       // Use a direct API call to server to ensure consistent update
       try {
-        console.log(`Sending API request to /api/yacht/${docId}/activate with active=${newStatus}`);
-        const response = await fetch(`/api/yacht/${docId}/activate`, {
+        // Updated endpoint URL to match server routes
+        console.log(`Sending API request to /api/yachts/${docId}/activate with active=${newStatus}`);
+        
+        // Get the user token if available
+        let authHeader = {};
+        try {
+          const user = auth.currentUser;
+          if (user) {
+            const token = await user.getIdToken();
+            authHeader = { 'Authorization': `Bearer ${token}` };
+          }
+        } catch (tokenError) {
+          console.warn('Could not get auth token:', tokenError);
+        }
+        
+        const response = await fetch(`/api/yachts/${docId}/activate`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...authHeader
           },
           body: JSON.stringify({ 
             active: newStatus,
@@ -444,6 +464,7 @@ export default function AssetManagement() {
         });
         
         if (!response.ok) {
+          console.error(`Server returned ${response.status}: ${response.statusText}`);
           throw new Error(`Server returned ${response.status}: ${response.statusText}`);
         }
         
@@ -454,57 +475,101 @@ export default function AssetManagement() {
         console.error('API activation failed, falling back to direct Firestore update', apiError);
         
         // Fall back to direct Firestore updates if API fails
+        // Use writeBatch for atomic updates across collections
+        console.log('API call failed, using batch update across all collections');
         
-        // Try the unified collection first
         try {
-          const unifiedCollection = collection(db, "unified_yacht_experiences");
-          const unifiedRef = doc(unifiedCollection, docId);
-          
-          // Update with both property naming conventions to ensure compatibility
-          await updateDoc(unifiedRef, { 
+          // Define update object once to ensure consistency
+          const updateData = {
+            // Standardize on isAvailable as the primary field
+            isAvailable: newStatus,
+            // Keep backwards compatibility fields
             availability_status: newStatus,
             available: newStatus,
-            isAvailable: newStatus, // New unified schema field
+            // Add timestamp fields for tracking
             last_updated_date: serverTimestamp(),
             updatedAt: serverTimestamp(),
-            _lastUpdated: timestamp // Used for cache busting with images
-          });
-          console.log(`Successfully updated yacht ${docId} in unified_yacht_experiences collection`);
-        } catch (unifiedErr) {
-          console.warn(`Failed to update in unified_yacht_experiences collection`, unifiedErr);
-        }
-        
-        // Then try the legacy collections
-        try {
-          const yachtCollection = collection(db, "yacht_experiences");
-          const yachtRef = doc(yachtCollection, docId);
+            // Add explicit string timestamp for cache busting with images
+            _lastUpdated: timestamp
+          };
           
-          // Update both field naming conventions for maximum compatibility
-          await updateDoc(yachtRef, { 
-            availability_status: newStatus,
-            available: newStatus,
-            last_updated_date: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-            _lastUpdated: timestamp // Used for cache busting with images
-          });
-          console.log(`Successfully updated yacht ${docId} in yacht_experiences collection`);
-        } catch (err) {
-          console.warn(`Failed to update in yacht_experiences:`, err);
+          console.log('Update payload:', JSON.stringify(updateData, null, 2));
           
+          // Create a batch for atomic updates
+          const batch = writeBatch(db);
+          
+          // Reference all possible collections where the yacht might exist
+          const unifiedRef = doc(db, "unified_yacht_experiences", docId);
+          const yachtRef = doc(db, "yacht_experiences", docId);
+          const expRef = doc(db, "experience_packages", docId);
+          
+          // Add all update operations to the batch
+          // We don't need to check if docs exist - if they don't, the update is ignored
+          batch.update(unifiedRef, updateData);
+          batch.update(yachtRef, updateData);
+          batch.update(expRef, updateData);
+          
+          // Commit the batch
+          await batch.commit();
+          console.log(`Successfully batch updated yacht ${docId} across all collections`);
+        } catch (batchErr) {
+          console.error('Batch update failed:', batchErr);
+          
+          // If batch fails, try individual updates as fallback
+          console.log('Attempting individual collection updates as fallback...');
+          
+          let updateSucceeded = false;
+          
+          // Try each collection individually
           try {
-            const expCollection = collection(db, "experience_packages");
-            const expRef = doc(expCollection, docId);
-            
-            await updateDoc(expRef, { 
+            const unifiedRef = doc(db, "unified_yacht_experiences", docId);
+            await updateDoc(unifiedRef, { 
+              isAvailable: newStatus,
               availability_status: newStatus,
               available: newStatus,
               last_updated_date: serverTimestamp(),
               updatedAt: serverTimestamp(),
-              _lastUpdated: timestamp // Used for cache busting with images
+              _lastUpdated: timestamp
             });
-            console.log(`Successfully updated yacht ${docId} in experience_packages collection`);
+            console.log(`Updated yacht in unified_yacht_experiences collection`);
+            updateSucceeded = true;
+          } catch (unifiedErr) {
+            console.warn(`Failed to update in unified_yacht_experiences:`, unifiedErr);
+          }
+          
+          try {
+            const yachtRef = doc(db, "yacht_experiences", docId);
+            await updateDoc(yachtRef, { 
+              isAvailable: newStatus,
+              availability_status: newStatus,
+              available: newStatus,
+              last_updated_date: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              _lastUpdated: timestamp
+            });
+            console.log(`Updated yacht in yacht_experiences collection`);
+            updateSucceeded = true;
+          } catch (yachtErr) {
+            console.warn(`Failed to update in yacht_experiences:`, yachtErr);
+          }
+          
+          try {
+            const expRef = doc(db, "experience_packages", docId);
+            await updateDoc(expRef, { 
+              isAvailable: newStatus,
+              availability_status: newStatus,
+              available: newStatus,
+              last_updated_date: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              _lastUpdated: timestamp
+            });
+            console.log(`Updated yacht in experience_packages collection`);
+            updateSucceeded = true;
           } catch (expErr) {
             console.warn(`Failed to update in experience_packages:`, expErr);
+          }
+          
+          if (!updateSucceeded) {
             throw new Error('Failed to update in any collection');
           }
         }
