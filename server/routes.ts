@@ -269,7 +269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Cast to boolean to ensure consistent values
         availability: !!isActive,
         // Add timestamp for cache busting
-        lastUpdatedDate: adminDb.FieldValue.serverTimestamp(),
+        lastUpdatedDate: new Date(),
         _lastUpdated: timestamp || Date.now().toString()
       });
       
