@@ -6,6 +6,7 @@ import { adminDb } from "./firebase-admin";
 import { spawn } from "child_process";
 import path from "path";
 import { FieldValue } from "firebase-admin/firestore";
+import { standardizeUser, UserType } from "../shared/user-schema";
 
 import { insertTestYachts } from "./create-test-data";
 
@@ -305,28 +306,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Use the standardizeUser function to ensure consistent user schema
       const users = usersSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          userId: doc.id, // Ensure userId is always the same as document id
-          name: data.name || '',
-          email: data.email || '',
-          phone: data.phone || '',
-          role: (data.role || 'consumer').toLowerCase(),
-          emailVerified: data.emailVerified === true,
-          points: data.points || 0,
-          createdAt: data.createdAt || null,
-          updatedAt: data.updatedAt || null,
-          // Add role-specific fields
-          ...(data.role === 'producer' ? {
-            producerId: doc.id,
-            providerId: doc.id
-          } : {}),
-          ...(data.role === 'partner' ? {
-            partnerId: doc.id
-          } : {})
-        };
+        const rawData = doc.data();
+        // Ensure the ID is set correctly
+        const userData = { ...rawData, id: doc.id, userId: doc.id };
+        return standardizeUser(userData);
       });
       
       res.json({
@@ -354,28 +339,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      const userData = userDoc.data() || {};
+      // Get raw data and ensure ID is set
+      const rawUserData = userDoc.data() || {};
+      const userData = { ...rawUserData, id: userDoc.id, userId: userDoc.id };
       
-      const standardizedUser = {
-        id: userDoc.id,
-        userId: userDoc.id, // Ensure userId is always the same as document id
-        name: userData.name || '',
-        email: userData.email || '',
-        phone: userData.phone || '',
-        role: (userData.role || 'consumer').toLowerCase(),
-        emailVerified: userData.emailVerified === true,
-        points: userData.points || 0,
-        createdAt: userData.createdAt || null,
-        updatedAt: userData.updatedAt || null,
-        // Add role-specific fields
-        ...(userData.role === 'producer' ? {
-          producerId: userDoc.id,
-          providerId: userDoc.id
-        } : {}),
-        ...(userData.role === 'partner' ? {
-          partnerId: userDoc.id
-        } : {})
-      };
+      // Use standardizeUser function to ensure consistent schema
+      const standardizedUser = standardizeUser(userData);
+      
+      // Log for debugging
+      console.log(`Retrieved standardized user with ID ${id} and role ${standardizedUser.role}`);
       
       res.json(standardizedUser);
     } catch (error) {

@@ -56,27 +56,32 @@ export default function Login() {
         throw new Error("Please verify your email before logging in. Check your inbox for the verification link.");
       }
 
-      // Get user profile from Firestore
-      const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
-      const userData = userDoc.data();
+      // Get user profile from Firestore using the harmonized users collection
+      const userDoc = await getDoc(doc(collectionRefs.users, userCredential.user.uid));
+      const userData = userDoc.data() as UserType;
 
       if (!userData) {
         throw new Error("User profile not found. Please contact support.");
       }
+
+      // Log the standardized user data for debugging
+      console.log("Successfully retrieved harmonized user profile:", userData);
 
       toast({
         title: "Logged in successfully",
         duration: 2000,
       });
 
-      // Role-based redirection
+      // Role-based redirection using the standardized role field
       const roleRedirects = {
         [UserRole.CONSUMER]: "/dashboard/consumer",
         [UserRole.PRODUCER]: "/dashboard/producer",
         [UserRole.PARTNER]: "/dashboard/partner"
       };
 
-      setLocation(roleRedirects[userData.role as UserRoleType] || "/");
+      // Make sure role is lowercase for consistent lookup
+      const userRole = (userData.role || "consumer").toLowerCase() as UserRoleType;
+      setLocation(roleRedirects[userRole] || "/");
     } catch (error: any) {
       setError(error.message);
       toast({
