@@ -29,42 +29,33 @@ const adminAuth = getAuth(app);
 const adminDb = getFirestore(app);
 const adminStorage = getStorage(app);
 
-// Always connect to emulators in Replit environment
-// Force development mode for Replit environment
-process.env.NODE_ENV = "development";
+// Always connect to emulators in development mode
+process.env.NODE_ENV = "development"; 
 
-// Use a proxy URL for Firebase Emulator access from Replit
-// The Firebase Emulator is running externally and exposing its ports
-// When running in Replit, we need to access the emulator through the
-// external host's IP address
-
-// Use the production project configuration while connecting to emulator
-console.log("Running Firebase Admin with emulator settings");
-
-// Set up Firestore emulator explicitly
+// Configure Firestore to use emulator
 adminDb.settings({
-  host: "localhost:8080", // Try localhost instead of 127.0.0.1
+  host: "localhost:8080",
   ssl: false,
   ignoreUndefinedProperties: true // Handle undefined values gracefully
 });
+
+// Set environment variables for other Firebase emulators
+process.env.FIREBASE_AUTH_EMULATOR_HOST = "localhost:9099";
+process.env.FIREBASE_STORAGE_EMULATOR_HOST = "localhost:9199";
 
 console.log("Connected to Firebase Admin emulators");
 
 // Debug connection
 setTimeout(async () => {
   try {
-    console.log("Testing connection to Firestore emulator...");
+    console.log("Testing connection to Firestore...");
     const testDoc = await adminDb.collection('test').doc('test-connection').set({
       timestamp: Date.now(),
-      message: 'Testing emulator connection'
+      message: 'Testing Firebase connection from Replit'
     });
-    console.log("✓ Successfully connected to Firestore emulator");
+    console.log("✓ Successfully connected to Firestore");
   } catch (error) {
-    console.error("❌ Failed to connect to Firestore emulator:", error.message);
-    console.error("Firestore connection details:", {
-      host: adminDb._settings.host,
-      ssl: adminDb._settings.ssl
-    });
+    console.error("❌ Failed to connect to Firestore:", error.message);
   }
 }, 3000);
 
