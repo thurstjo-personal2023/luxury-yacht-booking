@@ -57,6 +57,7 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { auth, db, getCurrentToken, isAuthenticated } from "@/lib/firebase";
+import { getAuthHeader, getApiRequestHeaders } from "@/lib/auth-utils";
 import { 
   collection, 
   query, 
