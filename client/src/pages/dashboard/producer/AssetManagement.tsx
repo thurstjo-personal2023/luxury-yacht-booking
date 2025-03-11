@@ -570,16 +570,14 @@ export default function AssetManagement() {
         // Updated endpoint URL to match server routes
         console.log(`Sending API request to /api/yachts/${docId}/activate with active=${newStatus}`);
         
-        // Get the user token if available
+        // Get fresh authentication headers using our improved utilities
         let authHeader = {};
         try {
-          const user = auth.currentUser;
-          if (user) {
-            const token = await user.getIdToken();
-            authHeader = { 'Authorization': `Bearer ${token}` };
-          }
+          // Use our improved auth utilities to get a fresh token
+          authHeader = await getApiRequestHeaders(true);
+          console.log('Successfully obtained fresh auth headers for yacht activation');
         } catch (tokenError) {
-          console.warn('Could not get auth token:', tokenError);
+          console.error('Could not get fresh auth headers:', tokenError);
         }
         
         // Force a random cache-busting query param to avoid cached responses
@@ -872,16 +870,14 @@ export default function AssetManagement() {
       
       try {
         // First try updating via API
-        // Get the user token if available
+        // Get fresh authentication headers using our improved utilities
         let authHeader = {};
         try {
-          const user = auth.currentUser;
-          if (user) {
-            const token = await user.getIdToken();
-            authHeader = { 'Authorization': `Bearer ${token}` };
-          }
+          // Use our improved auth utilities to get a fresh token
+          authHeader = await getApiRequestHeaders(true);
+          console.log('Successfully obtained fresh auth headers for addon activation');
         } catch (tokenError) {
-          console.warn('Could not get auth token:', tokenError);
+          console.error('Could not get fresh auth headers:', tokenError);
         }
         
         // Force a random cache-busting query param to avoid cached responses
