@@ -138,25 +138,67 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    // Enable debug logging
+    const enableDebug = true;
+    
+    if (enableDebug) {
+      console.log(`QueryFn: Fetching data from ${queryKey[0]}`);
+    }
+    
     // Get standardized request headers with auth
     const headers = await createRequestHeaders();
     
-    // Make API request
-    const res = await fetch(queryKey[0] as string, {
-      credentials: "include",
-      headers
-    });
-
-    // Handle 401 according to specified behavior
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    if (enableDebug && 'Authorization' in headers) {
+      const token = headers['Authorization'].replace('Bearer ', '');
+      const tokenPreview = token.length > 10 ? 
+        `${token.substring(0, 10)}...${token.substring(token.length - 5)}` : 
+        '[invalid token]';
+      console.log(`QueryFn: Using token: ${tokenPreview}`);
+    } else if (enableDebug) {
+      console.warn('QueryFn: No authorization header available');
     }
-
-    // Check for errors
-    await throwIfResNotOk(res);
     
-    // Parse and return JSON response
-    return await res.json();
+    try {
+      // Make API request
+      if (enableDebug) console.log('QueryFn: Sending fetch request...');
+      
+      const res = await fetch(queryKey[0] as string, {
+        credentials: "include",
+        headers
+      });
+      
+      if (enableDebug) {
+        console.log(`QueryFn: Response status: ${res.status} ${res.statusText}`);
+      }
+  
+      // Handle 401 according to specified behavior
+      if (res.status === 401) {
+        if (enableDebug) console.warn('QueryFn: Received 401 Unauthorized response');
+        
+        if (unauthorizedBehavior === "returnNull") {
+          console.log('QueryFn: Returning null for 401 as configured');
+          return null;
+        }
+      }
+  
+      // Check for errors
+      await throwIfResNotOk(res);
+      
+      // Parse and return JSON response
+      const data = await res.json();
+      
+      if (enableDebug) {
+        console.log(`QueryFn: Successfully parsed JSON response with ${Object.keys(data).length} keys`);
+        if (Array.isArray(data)) {
+          console.log(`QueryFn: Array response with ${data.length} items`);
+        }
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('QueryFn: Error fetching data:', error);
+      throw error;
+    }
   };
 
 /**
