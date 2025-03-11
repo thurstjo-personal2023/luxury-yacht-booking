@@ -29,29 +29,30 @@ const adminAuth = getAuth(app);
 const adminDb = getFirestore(app);
 const adminStorage = getStorage(app);
 
-// Set up emulators in development
-if (process.env.NODE_ENV === "development") {
-  // Auth emulator
-  process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
+// Always connect to emulators in Replit environment
+// Force development mode for Replit environment
+process.env.NODE_ENV = "development";
 
-  // Firestore emulator
-  const FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
-  adminDb.settings({
-    host: FIRESTORE_EMULATOR_HOST,
-    ssl: false,
-  });
+// Auth emulator
+process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 
-  // Storage emulator
-  process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
+// Firestore emulator
+const FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
+adminDb.settings({
+  host: FIRESTORE_EMULATOR_HOST,
+  ssl: false,
+});
 
-  // Functions emulator
-  process.env.FUNCTIONS_EMULATOR_HOST = "127.0.0.1:5001";
+// Storage emulator
+process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
 
-  // Database emulator
-  process.env.FIREBASE_DATABASE_EMULATOR_HOST = "127.0.0.1:9001";
+// Functions emulator
+process.env.FUNCTIONS_EMULATOR_HOST = "127.0.0.1:5001";
 
-  console.log("Connected to Firebase Admin emulators");
-}
+// Database emulator
+process.env.FIREBASE_DATABASE_EMULATOR_HOST = "127.0.0.1:9001";
+
+console.log("Connected to Firebase Admin emulators");
 
 // Export the initialized services
 export { adminAuth, adminDb, adminStorage };
