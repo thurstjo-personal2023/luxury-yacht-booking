@@ -58,14 +58,21 @@ export default function Login() {
 
       // Get user profile from Firestore using the harmonized users collection
       const userDoc = await getDoc(doc(collectionRefs.users, userCredential.user.uid));
-      const userData = userDoc.data() as UserType;
+      const rawUserData = userDoc.data();
 
-      if (!userData) {
+      if (!rawUserData) {
         throw new Error("User profile not found. Please contact support.");
       }
 
+      // Ensure consistent user schema by applying standardizeUser function
+      const userData = standardizeUser({
+        ...rawUserData, 
+        id: userCredential.user.uid, 
+        userId: userCredential.user.uid
+      }) as UserType;
+
       // Log the standardized user data for debugging
-      console.log("Successfully retrieved harmonized user profile:", userData);
+      console.log("Successfully retrieved and standardized user profile:", userData);
 
       toast({
         title: "Logged in successfully",

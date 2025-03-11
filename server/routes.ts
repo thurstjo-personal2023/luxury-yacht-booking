@@ -412,16 +412,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       
-      // Check if user exists and is a producer
+      // Check if user exists and is a producer using standardized schema
       const userDoc = await adminDb.collection('users').doc(id).get();
       
       if (!userDoc.exists) {
         return res.status(404).json({ message: "User not found" });
       }
       
-      const userData = userDoc.data() || {};
+      // Get raw data and use standardizeUser to ensure consistent schema
+      const rawUserData = userDoc.data() || {};
+      const userData = standardizeUser({ ...rawUserData, id, userId: id });
       
-      if (userData.role !== 'producer') {
+      // Check if user is a producer (case-insensitive) - using standardized schema
+      if (userData.role.toLowerCase() !== 'producer') {
         return res.status(400).json({ message: "User is not a producer" });
       }
       
@@ -480,16 +483,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       
-      // Check if user exists and is a producer
+      // Check if user exists and is a producer using standardized schema
       const userDoc = await adminDb.collection('users').doc(id).get();
       
       if (!userDoc.exists) {
         return res.status(404).json({ message: "User not found" });
       }
       
-      const userData = userDoc.data() || {};
+      // Get raw data and use standardizeUser to ensure consistent schema
+      const rawUserData = userDoc.data() || {};
+      const userData = standardizeUser({ ...rawUserData, id, userId: id });
       
-      if (userData.role !== 'producer') {
+      // Check if user is a producer (case-insensitive) - using standardized schema
+      if (userData.role.toLowerCase() !== 'producer') {
         return res.status(400).json({ message: "User is not a producer" });
       }
       
