@@ -637,7 +637,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Get producer yachts with pagination and ordering by availability status
   // Move this route before the "Get yacht by ID" route to avoid confusion with the :id parameter
-  app.get("/api/producer/yachts", verifyAuth, async (req, res) => {
+  app.get("/api/producer/yachts", verifyAuth, async (req: Request, res: Response) => {
     try {
       // Set cache control headers to prevent caching
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -649,7 +649,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pageSize = parseInt(req.query.pageSize as string) || 10;
       
       // Get producerId directly from verified auth token (req.user is set by verifyAuth middleware)
-      let producerId = req.user.uid;
+      const producerId = req.user?.uid;
+      if (!producerId) {
+        return res.status(401).json({ error: "Unauthorized. Valid producer authentication required." });
+      }
       console.log(`Using authenticated user ID as producer ID: ${producerId}`);
       
       // Force fresh data with a timestamp to prevent 304 responses
@@ -672,7 +675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get producer add-ons with pagination and ordering by availability
-  app.get("/api/producer/addons", verifyAuth, async (req, res) => {
+  app.get("/api/producer/addons", verifyAuth, async (req: Request, res: Response) => {
     try {
       // Set cache control headers to prevent caching
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -684,7 +687,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pageSize = parseInt(req.query.pageSize as string) || 10;
       
       // Get producerId directly from verified auth token (req.user is set by verifyAuth middleware)
-      let producerId = req.user.uid;
+      const producerId = req.user?.uid;
+      if (!producerId) {
+        return res.status(401).json({ error: "Unauthorized. Valid producer authentication required." });
+      }
       console.log(`Using authenticated user ID as producer ID: ${producerId}`);
       
       // Force fresh data with a timestamp
@@ -761,14 +767,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get producer reviews
-  app.get("/api/producer/reviews", async (req, res) => {
+  app.get("/api/producer/reviews", verifyAuth, async (req: Request, res: Response) => {
     try {
-      const producerId = req.query.producerId as string;
-      console.log(`Fetching reviews for producer ID: ${producerId || 'all'}`);
+      // Get producerId directly from verified auth token
+      const producerId = req.user?.uid;
+      console.log(`Fetching reviews for authenticated producer ID: ${producerId}`);
       
-      // In a real implementation, we would get the producer ID from auth and filter reviews
-      // For now, we'll just return an empty array
-      res.json([]);
+      // Return reviews where the relatedContentId matches any yacht owned by this producer
+      // First, get all of this producer's yachts
+      const yachtsSnapshot = await adminDb.collection('unified_yacht_experiences')
+        .where('producerId', '==', producerId)
+        .get();
+      
+      if (yachtsSnapshot.empty) {
+        return res.json([]);
+      }
+      
+      // Get the IDs of all yachts owned by this producer
+      const yachtIds = yachtsSnapshot.docs.map(doc => doc.id);
+      
+      // Now fetch reviews for these yachts
+      const reviewsSnapshot = await adminDb.collection('reviews_and_feedback')
+        .where('relatedContentId', 'in', yachtIds)
+        .get();
+      
+      const reviews = reviewsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      res.json(reviews);
     } catch (error) {
       console.error("Error fetching producer reviews:", error);
       res.status(500).json({ error: "Failed to fetch reviews" });
@@ -776,13 +804,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get producer bookings
-  app.get("/api/producer/bookings", async (req, res) => {
+  app.get("/api/producer/bookings", verifyAuth, async (req: Request, res: Response) => {
     try {
-      const producerId = req.query.producerId as string;
-      console.log(`Fetching bookings for producer ID: ${producerId || 'all'}`);
+      // Get producerId directly from verified auth token
+      const producerId = req.user?.uid;
+      console.log(`Fetching bookings for authenticated producer ID: ${producerId}`);
       
-      // In a real implementation, we would get the producer ID from auth and filter bookings
-      // For now, we'll just return an empty array
+      // Query bookings related to yachts owned by this producer
+      // First, get all yacht IDs owned by this producer
+      const yachtsSnapshot = await adminDb.collection('unified_yacht_experiences')
+        .where('producerId', '==', producerId)
+        .get();
+      
+      if (yachtsSnapshot.empty) {
+        return res.json([]);
+      }
+      
+      // Get the IDs of all yachts owned by this producer
+      const yachtIds = yachtsSnapshot.docs.map(doc => doc.id);
+      
+      // Fetch bookings for these yacht IDs
+      // Note: This is a placeholder. In a real implementation, you'd query a bookings collection
+      // For now, return an empty array
       res.json([]);
     } catch (error) {
       console.error("Error fetching producer bookings:", error);
