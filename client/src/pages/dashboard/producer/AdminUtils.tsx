@@ -12,19 +12,22 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, CheckCircle, Database, Wrench } from "lucide-react";
+import { AlertCircle, CheckCircle, Database, Wrench, Link } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProducerSidebar } from "@/components/layout/ProducerSidebar";
+import { setProducerIdForAllYachts } from "@/lib/producer-utils";
 
 export default function AdminUtils() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("data-tools");
   const [isStandardizing, setIsStandardizing] = useState(false);
   const [isAddonStandardizing, setIsAddonStandardizing] = useState(false);
+  const [isSettingProducerId, setIsSettingProducerId] = useState(false);
   const [lastStandardization, setLastStandardization] = useState<string | null>(null);
   const [lastAddonStandardization, setLastAddonStandardization] = useState<string | null>(null);
+  const [lastProducerIdUpdate, setLastProducerIdUpdate] = useState<string | null>(null);
   const [standardizationResult, setStandardizationResult] = useState<{
     success: boolean;
     message: string;
@@ -42,6 +45,11 @@ export default function AdminUtils() {
       updatedCount: number;
       errors: string[];
     };
+  } | null>(null);
+  const [producerIdResult, setProducerIdResult] = useState<{
+    success: boolean;
+    message: string;
+    producerId?: string;
   } | null>(null);
 
   const runStandardization = async () => {
@@ -143,6 +151,47 @@ export default function AdminUtils() {
       });
     } finally {
       setIsAddonStandardizing(false);
+    }
+  };
+  
+  // Function to associate producer ID with all yachts
+  const runSetProducerId = async () => {
+    setIsSettingProducerId(true);
+    setProducerIdResult(null);
+    
+    try {
+      // Use the default producer ID (V4aiP9ihPbdnWNO6UbiZKEt1GoCZ)
+      const result = await setProducerIdForAllYachts();
+      
+      setProducerIdResult(result);
+      
+      if (result.success) {
+        toast({
+          title: "Producer ID Assignment Complete",
+          description: `Successfully associated producer ID with all yachts: ${result.producerId}`,
+          variant: "default",
+        });
+        setLastProducerIdUpdate(new Date().toLocaleString());
+      } else {
+        toast({
+          title: "Producer ID Assignment Failed",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error setting producer ID:", error);
+      setProducerIdResult({
+        success: false,
+        message: "An unexpected error occurred while setting producer ID."
+      });
+      toast({
+        title: "Producer ID Assignment Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSettingProducerId(false);
     }
   };
 
