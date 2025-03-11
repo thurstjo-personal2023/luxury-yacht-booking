@@ -9,18 +9,16 @@
 const admin = require('firebase-admin');
 const serviceAccount = require('../firebase-data-connect.json');
 
-// Constants
-const ADDONS_COLLECTION = 'products_add_ons';
-const STD_VERSION = 1; // Increment this when making changes to standardization logic
-
-// Initialize Firebase Admin
+// Only initialize once
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: "https://yacht-rentals-dev.firebaseio.com",
   });
 }
 
 const db = admin.firestore();
+const ADDONS_COLLECTION = 'products_add_ons';
 
 /**
  * Standardize the document fields for consistency
@@ -28,56 +26,127 @@ const db = admin.firestore();
  */
 async function standardizeDocument(doc) {
   const data = doc.data();
-  const id = doc.id;
+  const docId = doc.id;
   
-  console.log(`Standardizing add-on: ${data.name || id}`);
+  console.log(`Standardizing add-on document ${docId}`);
   
-  // Create standardized object with consistent field naming
+  // Helper to normalize timestamps consistently
+  const normalizeTimestamp = (timestamp) => {
+    if (!timestamp) return admin.firestore.FieldValue.serverTimestamp();
+    
+    // Handle Firestore Timestamp objects directly
+    if (timestamp.toMillis && typeof timestamp.toMillis === 'function') {
+      return timestamp;
+    }
+    
+    // Handle serialized Firestore Timestamps
+    if (typeof timestamp === 'object' && timestamp._seconds !== undefined) {
+      return new admin.firestore.Timestamp(timestamp._seconds, timestamp._nanoseconds || 0);
+    }
+    
+    // Handle ISO string dates
+    if (typeof timestamp === 'string') {
+      try {
+        const date = new Date(timestamp);
+        if (!isNaN(date.getTime())) {
+          return admin.firestore.Timestamp.fromDate(date);
+        }
+      } catch (e) {
+        console.warn('Failed to parse timestamp string:', timestamp);
+      }
+    }
+    
+    // Handle numeric timestamps (milliseconds)
+    if (typeof timestamp === 'number') {
+      return admin.firestore.Timestamp.fromMillis(timestamp);
+    }
+    
+    return admin.firestore.FieldValue.serverTimestamp();
+  };
+  
+  // Helper to normalize numeric fields
+  const normalizeNumber = (value, defaultValue = 0) => {
+    if (value === undefined || value === null) return defaultValue;
+    if (typeof value === 'number') return value;
+    
+    // Try to convert string to number
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      if (!isNaN(parsed)) return parsed;
+    }
+    
+    return defaultValue;
+  };
+  
+  // Prepare the standardized document
   const standardized = {
-    // Add standardization metadata
-    _standardized: true,
-    _standardizedVersion: STD_VERSION,
-    _lastUpdated: new Date().toISOString(),
+    // Primary identifier
+    id: data.productId || data.id || docId,
     
-    // Ensure ID is set
-    productId: data.productId || id,
+    // Basic information - standardized to camelCase
+    name: data.name || '',
+    description: data.description || '',
+    category: data.category || '',
     
-    // Basic information
-    name: data.name || "Unnamed Add-on",
-    description: data.description || "",
-    category: data.category || "Other",
+    // Media handling - ensure media is always a properly structured array
+    media: ensureArray(data.media).map(item => {
+      // Standardize media item structure
+      if (typeof item === 'string') {
+        return { type: 'image', url: item };
+      } else if (typeof item === 'object' && item !== null) {
+        return {
+          type: item.type || 'image',
+          url: item.url || ''
+        };
+      }
+      return { type: 'image', url: '' };
+    }).filter(item => item.url), // Remove empty items
     
-    // Pricing
-    pricing: typeof data.pricing === 'number' ? data.pricing : 0,
-    
-    // Status flags - ensure boolean type
-    availability: typeof data.availability === 'boolean' ? data.availability : true,
-    isAvailable: typeof data.availability === 'boolean' ? data.availability : true,  // Alias for unified schema
-    
-    // Extract and standardize main image
+    // Add a mainImage field for simpler frontend access
     mainImage: getMainImageURL(data),
     
-    // Media array - ensure proper format
-    media: ensureArray(data.media).map(item => ({
-      type: item.type || 'image',
-      url: item.url || ''
-    })),
+    // Status fields - standardize on camelCase and ensure boolean type
+    isAvailable: determineAvailabilityStatus(data),
     
-    // Tags - ensure array
+    // Pricing - standardize numeric fields
+    pricing: normalizeNumber(data.pricing || data.price),
+    
+    // Arrays - ensure they are always properly structured arrays
     tags: ensureArray(data.tags),
     
-    // Service provider
-    partnerId: data.partnerId || "",
+    // Partner/Provider information
+    partnerId: data.partnerId || data.provider_id || null,
     
-    // Timestamps - keep original values
-    createdDate: data.createdDate || admin.firestore.FieldValue.serverTimestamp(),
+    // Timestamps - standardize to camelCase
+    createdAt: normalizeTimestamp(data.createdDate || data.created_date),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    
+    // Special field for cache busting in UI
+    _lastUpdated: Date.now().toString(),
+    
+    // Legacy fields preserved for backward compatibility
+    productId: data.productId || data.id || docId,
+    availability: determineAvailabilityStatus(data),
+    createdDate: normalizeTimestamp(data.createdDate || data.created_date),
     lastUpdatedDate: admin.firestore.FieldValue.serverTimestamp(),
     
-    // Keep original data for reference (non-destructive approach)
-    ...data
+    // Source tracking to identify which records have been standardized
+    _standardized: true,
+    _standardizedVersion: 1  // Increment this when making significant changes to the standardization logic
   };
   
   return standardized;
+}
+
+/**
+ * Helper to determine availability status with consistent boolean values
+ */
+function determineAvailabilityStatus(data) {
+  // Prioritize in this order: isAvailable, availability, available
+  if (data.isAvailable !== undefined) return !!data.isAvailable; 
+  if (data.availability !== undefined) return !!data.availability;
+  if (data.available !== undefined) return !!data.available;
+  return true; // Default to available
 }
 
 /**
@@ -87,38 +156,98 @@ async function standardizeDocument(doc) {
 function ensureArray(value) {
   if (!value) return [];
   
-  // Handle if value is already an array
+  // Already an array - perfect!
   if (Array.isArray(value)) return value;
   
-  // Handle case where it's an object with numeric keys (like a pseudo-array)
+  // Handle object with numeric keys that should be an array
+  // This happens when Firestore serializes arrays with empty slots
   if (typeof value === 'object') {
-    // Check if it has numeric keys like {0: item1, 1: item2}
     const keys = Object.keys(value);
-    if (keys.length > 0 && keys.every(key => !isNaN(parseInt(key)))) {
-      return Object.values(value);
+    if (keys.some(k => !isNaN(parseInt(k)))) {
+      // Sort keys numerically to maintain array order
+      const numericKeys = keys
+        .filter(k => !isNaN(parseInt(k)))
+        .sort((a, b) => parseInt(a) - parseInt(b));
+      
+      // Create properly ordered array
+      return numericKeys.map(k => value[k]).filter(Boolean);
     }
   }
   
-  // Last resort: wrap in array
+  // Handle string values that might be serialized JSON arrays
+  if (typeof value === 'string' && value.startsWith('[') && value.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        console.log('Successfully parsed JSON string into array');
+        return parsed;
+      }
+    } catch (e) {
+      console.log('Failed to parse potential JSON array string', e.message);
+    }
+  }
+  
+  // Default case: wrap single value in array
   return [value];
 }
 
 /**
- * Extract main image URL from media array
+ * Extract main image URL from media array or other fields
  */
 function getMainImageURL(data) {
-  // Check for media array
-  if (Array.isArray(data.media) && data.media.length > 0) {
-    // Find first image
-    const firstImage = data.media.find(item => item.type === 'image' && item.url);
-    if (firstImage && firstImage.url) return firstImage.url;
+  // Check for existing mainImage field
+  if (data.mainImage && typeof data.mainImage === 'string') {
+    return data.mainImage;
   }
   
-  // Check for existing mainImage field
-  if (data.mainImage) return data.mainImage;
+  // Check for imageUrl field
+  if (data.imageUrl && typeof data.imageUrl === 'string') {
+    return data.imageUrl;
+  }
   
-  // Return default image if nothing found
-  return '/placeholder-addon.png';
+  // Check for coverImage field
+  if (data.coverImage && typeof data.coverImage === 'string') {
+    return data.coverImage;
+  }
+  
+  // Check for media array
+  if (Array.isArray(data.media) && data.media.length > 0) {
+    const firstImage = data.media[0];
+    // Handle standard media object format
+    if (firstImage && typeof firstImage === 'object' && firstImage.url) {
+      return firstImage.url;
+    }
+    
+    // Handle case where media item is a string directly
+    if (typeof firstImage === 'string') {
+      return firstImage;
+    }
+  }
+  
+  // Handle case where media is a string directly
+  if (typeof data.media === 'string' && data.media) {
+    return data.media;
+  }
+  
+  // Handle media as object with numeric keys
+  if (data.media && typeof data.media === 'object') {
+    // Check for '0' key first
+    if (data.media['0'] && data.media['0'].url) {
+      return data.media['0'].url;
+    }
+    
+    // Try to get any media item
+    const keys = Object.keys(data.media);
+    for (const key of keys) {
+      const mediaItem = data.media[key];
+      if (mediaItem && mediaItem.url) {
+        return mediaItem.url;
+      }
+    }
+  }
+  
+  // Default to a standard add-on image
+  return "https://images.unsplash.com/photo-1578592338145-e1844658b5c3?w=800";
 }
 
 /**
@@ -152,30 +281,26 @@ async function standardizeCollection() {
       count++;
       
       // If batch size limit is reached, commit and create a new batch
-      if (count >= BATCH_SIZE) {
+      if (count % BATCH_SIZE === 0) {
+        console.log(`Committing batch of ${BATCH_SIZE} documents...`);
         await batch.commit();
         batch = db.batch();
-        count = 0;
-        console.log(`Committed batch of ${BATCH_SIZE} documents.`);
       }
     }
     
-    // Commit any remaining documents in the batch
-    if (count > 0) {
+    // Commit any remaining updates
+    if (count % BATCH_SIZE !== 0) {
+      console.log(`Committing final batch of ${count % BATCH_SIZE} documents...`);
       await batch.commit();
-      console.log(`Committed remaining ${count} documents.`);
     }
     
-    console.log(`Successfully standardized ${snapshot.size} documents in the ${ADDONS_COLLECTION} collection.`);
+    console.log(`Successfully standardized ${count} documents in ${ADDONS_COLLECTION} collection.`);
   } catch (error) {
     console.error('Error standardizing collection:', error);
   }
 }
 
-// Execute the standardization function
+// Run the standardization
 standardizeCollection()
-  .then(() => process.exit(0))
-  .catch(error => {
-    console.error('Unhandled error:', error);
-    process.exit(1);
-  });
+  .then(() => console.log('Add-on standardization completed successfully.'))
+  .catch(error => console.error('Add-on standardization failed:', error));

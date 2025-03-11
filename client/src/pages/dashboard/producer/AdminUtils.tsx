@@ -67,31 +67,82 @@ export default function AdminUtils() {
       
       if (result.success) {
         toast({
-          title: "Standardization Complete",
+          title: "Yacht Standardization Complete",
           description: `Successfully processed ${result.details.processedCount} documents and updated ${result.details.updatedCount} documents.`,
           variant: "default",
         });
         setLastStandardization(new Date().toLocaleString());
       } else {
         toast({
-          title: "Standardization Failed",
+          title: "Yacht Standardization Failed",
           description: result.message,
           variant: "destructive",
         });
       }
     } catch (error) {
-      console.error("Error standardizing collection:", error);
+      console.error("Error standardizing yacht collection:", error);
       setStandardizationResult({
         success: false,
-        message: "An unexpected error occurred while standardizing the collection.",
+        message: "An unexpected error occurred while standardizing the yacht collection.",
       });
       toast({
-        title: "Standardization Failed",
+        title: "Yacht Standardization Failed",
         description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsStandardizing(false);
+    }
+  };
+  
+  const runAddonStandardization = async () => {
+    setIsAddonStandardizing(true);
+    setAddonStandardizationResult(null);
+    
+    try {
+      const response = await apiRequest(
+        'POST',
+        '/api/admin/standardize-collection',
+        {
+          collection: 'products_add_ons'
+        }
+      );
+      
+      const result = await response.json();
+      
+      setAddonStandardizationResult({
+        success: result.success,
+        message: result.message,
+        details: result.details
+      });
+      
+      if (result.success) {
+        toast({
+          title: "Add-on Standardization Complete",
+          description: `Successfully processed ${result.details.processedCount} documents and updated ${result.details.updatedCount} documents.`,
+          variant: "default",
+        });
+        setLastAddonStandardization(new Date().toLocaleString());
+      } else {
+        toast({
+          title: "Add-on Standardization Failed",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error standardizing add-on collection:", error);
+      setAddonStandardizationResult({
+        success: false,
+        message: "An unexpected error occurred while standardizing the add-on collection.",
+      });
+      toast({
+        title: "Add-on Standardization Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddonStandardizing(false);
     }
   };
 
@@ -185,6 +236,70 @@ export default function AdminUtils() {
                       </div>
                       <Button onClick={runStandardization} disabled={isStandardizing}>
                         {isStandardizing ? "Standardizing..." : "Run Standardization"}
+                      </Button>
+                    </CardFooter>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Add-on Collection Standardization</CardTitle>
+                      <CardDescription>
+                        Standardize all documents in the products add-ons collection to ensure
+                        consistent field naming and data structure across all product add-ons.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Important</AlertTitle>
+                        <AlertDescription>
+                          This operation will standardize field names and data structure across all product add-on documents.
+                          It will normalize availability status fields, ensure consistent naming conventions, and add standardization tracking.
+                          This standardization ensures compatibility with the unified schema and image utilities.
+                        </AlertDescription>
+                      </Alert>
+                      
+                      {addonStandardizationResult && (
+                        <Alert variant={addonStandardizationResult.success ? "default" : "destructive"}>
+                          {addonStandardizationResult.success ? (
+                            <CheckCircle className="h-4 w-4" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4" />
+                          )}
+                          <AlertTitle>
+                            {addonStandardizationResult.success ? "Add-on Standardization Complete" : "Add-on Standardization Failed"}
+                          </AlertTitle>
+                          <AlertDescription>
+                            {addonStandardizationResult.message}
+                            {addonStandardizationResult.details && (
+                              <div className="mt-2">
+                                <p>Processed: {addonStandardizationResult.details.processedCount} documents</p>
+                                <p>Updated: {addonStandardizationResult.details.updatedCount} documents</p>
+                                {addonStandardizationResult.details.errors.length > 0 && (
+                                  <div className="mt-2">
+                                    <p className="font-semibold">Errors:</p>
+                                    <ul className="list-disc list-inside text-sm">
+                                      {addonStandardizationResult.details.errors.slice(0, 5).map((error, index) => (
+                                        <li key={index}>{error}</li>
+                                      ))}
+                                      {addonStandardizationResult.details.errors.length > 5 && (
+                                        <li>...and {addonStandardizationResult.details.errors.length - 5} more errors</li>
+                                      )}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </CardContent>
+                    <CardFooter className="flex justify-between border-t px-6 py-4">
+                      <div className="text-sm text-muted-foreground">
+                        {lastAddonStandardization ? `Last run: ${lastAddonStandardization}` : "Never run"}
+                      </div>
+                      <Button onClick={runAddonStandardization} disabled={isAddonStandardizing}>
+                        {isAddonStandardizing ? "Standardizing..." : "Run Add-on Standardization"}
                       </Button>
                     </CardFooter>
                   </Card>
