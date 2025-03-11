@@ -288,6 +288,276 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User API endpoints
+  app.get("/api/users", async (req, res) => {
+    try {
+      const usersSnapshot = await adminDb.collection('users').get();
+      
+      if (usersSnapshot.empty) {
+        return res.json({
+          users: [],
+          pagination: {
+            currentPage: 1,
+            pageSize: 10,
+            totalCount: 0,
+            totalPages: 0
+          }
+        });
+      }
+      
+      const users = usersSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          userId: doc.id, // Ensure userId is always the same as document id
+          name: data.name || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          role: (data.role || 'consumer').toLowerCase(),
+          emailVerified: data.emailVerified === true,
+          points: data.points || 0,
+          createdAt: data.createdAt || null,
+          updatedAt: data.updatedAt || null,
+          // Add role-specific fields
+          ...(data.role === 'producer' ? {
+            producerId: doc.id,
+            providerId: doc.id
+          } : {}),
+          ...(data.role === 'partner' ? {
+            partnerId: doc.id
+          } : {})
+        };
+      });
+      
+      res.json({
+        users,
+        pagination: {
+          currentPage: 1,
+          pageSize: users.length,
+          totalCount: users.length,
+          totalPages: 1
+        }
+      });
+    } catch (error) {
+      console.error("Error getting users:", error);
+      res.status(500).json({ message: "Error fetching users", error: String(error) });
+    }
+  });
+  
+  // Get user by ID
+  app.get("/api/users/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userDoc = await adminDb.collection('users').doc(id).get();
+      
+      if (!userDoc.exists) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const userData = userDoc.data() || {};
+      
+      const standardizedUser = {
+        id: userDoc.id,
+        userId: userDoc.id, // Ensure userId is always the same as document id
+        name: userData.name || '',
+        email: userData.email || '',
+        phone: userData.phone || '',
+        role: (userData.role || 'consumer').toLowerCase(),
+        emailVerified: userData.emailVerified === true,
+        points: userData.points || 0,
+        createdAt: userData.createdAt || null,
+        updatedAt: userData.updatedAt || null,
+        // Add role-specific fields
+        ...(userData.role === 'producer' ? {
+          producerId: userDoc.id,
+          providerId: userDoc.id
+        } : {}),
+        ...(userData.role === 'partner' ? {
+          partnerId: userDoc.id
+        } : {})
+      };
+      
+      res.json(standardizedUser);
+    } catch (error) {
+      console.error(`Error getting user ${req.params.id}:`, error);
+      res.status(500).json({ message: "Error fetching user", error: String(error) });
+    }
+  });
+  
+  // Update user
+  app.put("/api/users/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userDoc = await adminDb.collection('users').doc(id).get();
+      
+      if (!userDoc.exists) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const updateData = {
+        ...req.body,
+        updatedAt: FieldValue.serverTimestamp()
+      };
+      
+      // Ensure role-specific fields are consistent
+      if (updateData.role === 'producer') {
+        updateData.producerId = id;
+        updateData.providerId = id;
+      } else if (updateData.role === 'partner') {
+        updateData.partnerId = id;
+      }
+      
+      await adminDb.collection('users').doc(id).update(updateData);
+      
+      res.json({ 
+        success: true, 
+        message: "User updated successfully",
+        userId: id
+      });
+    } catch (error) {
+      console.error(`Error updating user ${req.params.id}:`, error);
+      res.status(500).json({ message: "Error updating user", error: String(error) });
+    }
+  });
+  
+  // Get all yachts for a producer
+  app.get("/api/users/:id/yachts", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Check if user exists and is a producer
+      const userDoc = await adminDb.collection('users').doc(id).get();
+      
+      if (!userDoc.exists) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const userData = userDoc.data();
+      
+      if (userData.role !== 'producer') {
+        return res.status(400).json({ message: "User is not a producer" });
+      }
+      
+      // Get all yachts for this producer
+      const yachtSnapshot = await adminDb.collection('unified_yacht_experiences')
+        .where('producerId', '==', id)
+        .get();
+      
+      if (yachtSnapshot.empty) {
+        return res.json({
+          yachts: [],
+          pagination: {
+            currentPage: 1,
+            pageSize: 10,
+            totalCount: 0,
+            totalPages: 0
+          }
+        });
+      }
+      
+      const yachts = yachtSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || data.name || '',
+          description: data.description || '',
+          category: data.category || '',
+          location: data.location || {},
+          pricing: data.pricing || data.price || 0,
+          capacity: data.capacity || data.max_guests || 0,
+          duration: data.duration || 0,
+          isAvailable: data.isAvailable || data.available || data.availability_status || false,
+          isFeatured: data.isFeatured || data.featured || false,
+          mainImage: data.mainImage || (data.media && data.media.length > 0 ? data.media[0].url : ''),
+          producerId: id
+        };
+      });
+      
+      res.json({
+        yachts,
+        pagination: {
+          currentPage: 1,
+          pageSize: yachts.length,
+          totalCount: yachts.length,
+          totalPages: 1
+        }
+      });
+    } catch (error) {
+      console.error(`Error getting yachts for producer ${req.params.id}:`, error);
+      res.status(500).json({ message: "Error fetching producer yachts", error: String(error) });
+    }
+  });
+  
+  // Get all add-ons for a producer
+  app.get("/api/users/:id/addons", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Check if user exists and is a producer
+      const userDoc = await adminDb.collection('users').doc(id).get();
+      
+      if (!userDoc.exists) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const userData = userDoc.data();
+      
+      if (userData.role !== 'producer') {
+        return res.status(400).json({ message: "User is not a producer" });
+      }
+      
+      // Get all add-ons for this producer
+      const addonsSnapshot = await adminDb.collection('products_add_ons')
+        .where('partnerId', '==', id)
+        .get();
+      
+      if (addonsSnapshot.empty) {
+        return res.json({
+          addons: [],
+          pagination: {
+            currentPage: 1,
+            pageSize: 10,
+            totalCount: 0,
+            totalPages: 0
+          }
+        });
+      }
+      
+      const addons = addonsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          productId: doc.id,
+          name: data.name || '',
+          description: data.description || '',
+          category: data.category || '',
+          pricing: data.pricing || data.price || 0,
+          media: data.media || [],
+          mainImage: data.mainImage || (data.media && data.media.length > 0 ? data.media[0].url : ''),
+          availability: data.availability || data.isAvailable || false,
+          tags: data.tags || [],
+          partnerId: id,
+          producerId: id,
+          createdDate: data.createdDate || data.created_date || null,
+          lastUpdatedDate: data.lastUpdatedDate || data.updatedAt || null
+        };
+      });
+      
+      res.json({
+        addons,
+        pagination: {
+          currentPage: 1,
+          pageSize: addons.length,
+          totalCount: addons.length,
+          totalPages: 1
+        }
+      });
+    } catch (error) {
+      console.error(`Error getting add-ons for producer ${req.params.id}:`, error);
+      res.status(500).json({ message: "Error fetching producer add-ons", error: String(error) });
+    }
+  });
+
   // Legacy API endpoints
   // Export normalized yacht schema
   app.get("/api/export/yacht-schema", async (req, res) => {

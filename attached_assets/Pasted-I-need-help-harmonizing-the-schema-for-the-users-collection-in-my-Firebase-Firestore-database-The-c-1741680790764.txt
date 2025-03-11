@@ -1,0 +1,25 @@
+I need help harmonizing the schema for the users collection in my Firebase Firestore database. The current schema has inconsistencies in field names and types, which is causing issues in both the frontend and backend of my application. Additionally, when a user of type Producer creates a new Yacht Experience or Product Add-on, it must be associated with their unique ID. Here’s the problem:
+
+Current Schema Issues :
+Fields like userId, user_id, producerId, and providerId are inconsistently named or used across documents.
+Some fields have different types (e.g., userType may be a string in some documents and an enum-like value in others).
+These inconsistencies lead to errors in API responses, frontend rendering, and backend logic.
+Desired Outcome :
+Harmonize the schema for users into a consistent design where the same type is always used for the same field.
+Ensure that when a Producer creates a new Yacht Experience or Product Add-on, it is automatically associated with their unique ID (userId).
+Update the application on both the frontend and backend (including API endpoints) to align with the harmonized schema.
+Requirements :
+Analyze the existing users collection to identify inconsistencies in field names and types.
+Define a harmonized schema that standardizes field names and types.
+Migrate existing data in the users collection to conform to the new schema.
+Update the backend API endpoints to use the harmonized schema.
+Update the frontend code to fetch, display, and interact with data using the harmonized schema.
+Ensure that new Yacht Experiences and Product Add-ons are automatically linked to the Producer's unique ID.
+Write tests to validate the functionality of the updated application.
+Please provide a solution that includes:
+
+Steps to analyze and harmonize the schema.
+Example code for migrating existing data to the new schema.
+Updates to the backend API endpoints and frontend code.
+Suggestions for creating unit and integration tests.
+Ensure the solution is beginner-friendly and suitable for testing in a Replit environment."
