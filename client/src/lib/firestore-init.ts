@@ -28,7 +28,7 @@ if (process.env.NODE_ENV === "development") {
 
 const collections = {
   // User collections
-  users: "users", // Harmonized users collection
+  users: "harmonized_users", // Harmonized users collection
   
   // Yacht collections
   unified_yacht_experiences: "unified_yacht_experiences", // New unified collection
