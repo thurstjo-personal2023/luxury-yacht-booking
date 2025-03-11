@@ -1,8 +1,8 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage, addProducerIdToTestYachts } from "./storage";
 import { registerStripeRoutes } from "./stripe";
-import { adminDb } from "./firebase-admin";
+import { adminDb, adminAuth, verifyAuth } from "./firebase-admin";
 import { spawn } from "child_process";
 import path from "path";
 import { FieldValue } from "firebase-admin/firestore";
@@ -647,14 +647,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse pagination parameters from query string
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = parseInt(req.query.pageSize as string) || 10;
-      const producerId = req.query.producerId as string;
+      
+      // Get producerId from request - this can come from the query or from auth
+      let producerId = req.query.producerId as string;
+      
+      // Get the authenticated user from Firebase Auth (if available)
+      const authHeader = req.headers.authorization;
+      
+      if (!producerId && authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split('Bearer ')[1];
+          const decodedToken = await adminAuth.verifyIdToken(token);
+          producerId = decodedToken.uid;
+          console.log(`Using authenticated user ID as producer ID: ${producerId}`);
+        } catch (authError) {
+          console.error('Error verifying auth token:', authError);
+          // Continue with undefined producerId - will return all yachts
+        }
+      }
       
       // Force fresh data with a timestamp to prevent 304 responses
       const forceRefresh = Date.now();
       console.log(`Fetching yachts for producer ID: ${producerId || 'all'} (refresh: ${forceRefresh})`);
-      
-      // In a real implementation, we would get the producer ID from auth
-      // For development, we'll either use the provided producerId or get all yachts with a producer ID
       
       // Use the storage method to get producer-specific yachts
       const yachtsResponse = await storage.getProducerYachts({
@@ -682,14 +696,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse pagination parameters from query string
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = parseInt(req.query.pageSize as string) || 10;
-      const producerId = req.query.producerId as string;
+      
+      // Get producerId from request - this can come from the query or from auth
+      let producerId = req.query.producerId as string;
+      
+      // Get the authenticated user from Firebase Auth (if available)
+      const authHeader = req.headers.authorization;
+      
+      if (!producerId && authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split('Bearer ')[1];
+          const decodedToken = await adminAuth.verifyIdToken(token);
+          producerId = decodedToken.uid;
+          console.log(`Using authenticated user ID as producer ID: ${producerId}`);
+        } catch (authError) {
+          console.error('Error verifying auth token:', authError);
+          // Continue with undefined producerId - will return all add-ons
+        }
+      }
       
       // Force fresh data with a timestamp
       const forceRefresh = Date.now();
       console.log(`Fetching add-ons for producer ID: ${producerId || 'all'} (refresh: ${forceRefresh})`);
-      
-      // In a real implementation, we would get the producer ID from auth
-      // For now, we'll just query all add-ons since we're in development mode
       
       // Get add-ons with pagination and sorting
       const addonsResponse = await storage.getAllProductAddOns({
@@ -714,6 +742,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/producer/addons/create", async (req, res) => {
     try {
       const addonData = req.body;
+      
+      // Get the authenticated user ID from the auth token
+      let producerId = addonData.producerId;
+      let partnerId = addonData.partnerId;
+      const authHeader = req.headers.authorization;
+      
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split('Bearer ')[1];
+          const decodedToken = await adminAuth.verifyIdToken(token);
+          // Use the authenticated user ID if not provided in request
+          producerId = producerId || decodedToken.uid;
+          partnerId = partnerId || decodedToken.uid;
+          console.log(`Using authenticated user ID for addon creation: ${producerId}`);
+        } catch (authError) {
+          console.error('Error verifying auth token:', authError);
+          // Continue with existing producerId values
+        }
+      }
+      
+      // Update the addon data with the producer/partner IDs
+      addonData.producerId = producerId;
+      addonData.partnerId = partnerId;
+      
       console.log("Creating new add-on:", addonData);
       
       // Validate required fields
