@@ -21,7 +21,7 @@ import { auth, db } from "@/lib/firebase";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { collectionRefs } from "@/lib/firestore-init";
-import { UserRole, UserRoleType, UserType } from "@shared/user-schema";
+import { UserRole, UserRoleType, UserType, standardizeUser } from "@shared/user-schema";
 
 const loginSchema = z.object({
   email: z.string().email(),
