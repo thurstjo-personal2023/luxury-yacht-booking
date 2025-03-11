@@ -48,14 +48,44 @@ console.log("Connected to Firebase Admin emulators");
 // Debug connection
 setTimeout(async () => {
   try {
-    console.log("Testing connection to Firestore...");
+    console.log("Testing connection to Firestore emulator...");
+    // Get Firestore settings in a type-safe way
+    const settings = adminDb.settings();
+    console.log("Firestore emulator settings:", {
+      host: settings.host || "Not set",
+      ssl: settings.ssl,
+      ignoreUndefinedProperties: settings.ignoreUndefinedProperties
+    });
+    
+    // Test query to verify connection
     const testDoc = await adminDb.collection('test').doc('test-connection').set({
       timestamp: Date.now(),
-      message: 'Testing Firebase connection from Replit'
+      message: 'Testing Firestore emulator connection from Replit'
     });
-    console.log("✓ Successfully connected to Firestore");
-  } catch (error) {
-    console.error("❌ Failed to connect to Firestore:", error.message);
+    console.log("✓ Successfully connected to Firestore emulator");
+    
+    // Now try to read from the unified_yacht_experiences collection
+    try {
+      console.log("Testing read from unified_yacht_experiences collection...");
+      const snapshot = await adminDb.collection('unified_yacht_experiences').limit(1).get();
+      console.log(`✓ Successfully read from unified_yacht_experiences, found ${snapshot.size} documents`);
+      
+      // Additional diagnostic info
+      console.log("Environment variables:");
+      console.log("- NODE_ENV:", process.env.NODE_ENV);
+      console.log("- FIREBASE_AUTH_EMULATOR_HOST:", process.env.FIREBASE_AUTH_EMULATOR_HOST);
+      console.log("- FIREBASE_STORAGE_EMULATOR_HOST:", process.env.FIREBASE_STORAGE_EMULATOR_HOST);
+      console.log("isEmulatorMode():", isEmulatorMode());
+    } catch (readError: any) {
+      console.error("❌ Failed to read from unified_yacht_experiences:", readError.message);
+    }
+  } catch (error: any) {
+    console.error("❌ Failed to connect to Firestore emulator:", error.message);
+    // Safe error logging
+    if (error && typeof error === 'object') {
+      console.error("Error code:", error.code);
+      console.error("Error message:", error.message);
+    }
   }
 }, 3000);
 
