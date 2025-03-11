@@ -10,6 +10,60 @@ import { standardizeUser, UserType } from "../shared/user-schema";
 
 import { insertTestYachts } from "./create-test-data";
 
+/**
+ * Get the harmonized producer ID for a user
+ * This helps ensure consistent producer/provider ID usage across the application
+ * 
+ * @param authUserId The authenticated user ID from Firebase Auth (or undefined)
+ * @returns Object with producerId and partnerId
+ */
+async function getHarmonizedProducerIds(authUserId: string | undefined): Promise<{
+  producerId: string,
+  partnerId: string
+}> {
+  // Default to using auth ID as fallback, or 'unknown-producer' if undefined
+  const defaultId = authUserId || 'unknown-producer';
+  let producerId = defaultId;
+  let partnerId = defaultId;
+  
+  try {
+    // Skip the query if auth ID is undefined
+    if (!authUserId) {
+      console.log('No auth user ID provided, using default ID');
+      return { producerId, partnerId };
+    }
+    
+    // Query the harmonized_users collection
+    const userSnapshot = await adminDb.collection('harmonized_users')
+      .where('userId', '==', authUserId)
+      .limit(1)
+      .get();
+    
+    if (!userSnapshot.empty) {
+      const userData = userSnapshot.docs[0].data();
+      console.log(`Found harmonized user data for ID ${authUserId}`);
+      
+      // Use the standardized producer/provider IDs if available
+      if (userData.role === 'producer' && userData.producerId) {
+        producerId = userData.producerId;
+        partnerId = userData.producerId; // Use same ID for both by default
+      }
+      
+      // Use partnerId if explicitly different
+      if (userData.role === 'producer' && userData.partnerId) {
+        partnerId = userData.partnerId;
+      }
+    } else {
+      console.log(`No harmonized user found for ID ${authUserId}, using auth ID as fallback`);
+    }
+  } catch (error) {
+    console.warn(`Error fetching harmonized user data for ID ${authUserId}:`, error);
+    // Continue with auth ID as fallback
+  }
+  
+  return { producerId, partnerId };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Development route to create test data
   app.post("/api/dev/create-test-data", async (req, res) => {
@@ -724,38 +778,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get the authenticated user ID from the auth token (set by verifyAuth middleware)
       const authUserId = req.user?.uid;
       
-      // Try to get harmonized producer data from the harmonized_users collection
-      let producerId = authUserId;
-      let partnerId = authUserId;
-      
-      try {
-        // Query the harmonized_users collection to get the standardized user data
-        const userSnapshot = await adminDb.collection('harmonized_users')
-          .where('userId', '==', authUserId)
-          .limit(1)
-          .get();
-        
-        if (!userSnapshot.empty) {
-          const userData = userSnapshot.docs[0].data();
-          console.log(`Found harmonized user data for ID ${authUserId}`, userData);
-          
-          // Use the standardized producer/provider IDs if available
-          if (userData.role === 'producer' && userData.producerId) {
-            producerId = userData.producerId;
-            partnerId = userData.producerId; // Use same ID for both by default
-          }
-          
-          // Use partnerId if explicitly different
-          if (userData.role === 'producer' && userData.partnerId) {
-            partnerId = userData.partnerId;
-          }
-        } else {
-          console.log(`No harmonized user found for ID ${authUserId}, using auth ID as fallback`);
-        }
-      } catch (error) {
-        console.warn(`Error fetching harmonized user data for ID ${authUserId}:`, error);
-        // Continue with auth ID as fallback
-      }
+      // Use our helper function to get harmonized IDs
+      const { producerId, partnerId } = await getHarmonizedProducerIds(authUserId);
       
       console.log(`Using producer ID: ${producerId} and partner ID: ${partnerId} for addon creation`);
       
@@ -804,28 +828,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get auth user ID from verified auth token
       const authUserId = req.user?.uid;
       
-      // Try to get harmonized producer ID
-      let producerId = authUserId;
-      
-      try {
-        // Query the harmonized_users collection
-        const userSnapshot = await adminDb.collection('harmonized_users')
-          .where('userId', '==', authUserId)
-          .limit(1)
-          .get();
-        
-        if (!userSnapshot.empty) {
-          const userData = userSnapshot.docs[0].data();
-          
-          // Use the standardized producer ID if available
-          if (userData.role === 'producer' && userData.producerId) {
-            producerId = userData.producerId;
-          }
-        }
-      } catch (error) {
-        console.warn(`Error fetching harmonized user data for reviews (ID ${authUserId}):`, error);
-        // Continue with auth ID as fallback
-      }
+      // Use our helper function to get harmonized producer ID
+      const { producerId } = await getHarmonizedProducerIds(authUserId);
       
       console.log(`Fetching reviews for producer ID: ${producerId} (auth user: ${authUserId})`);
       
@@ -862,9 +866,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get producer bookings
   app.get("/api/producer/bookings", verifyAuth, async (req: Request, res: Response) => {
     try {
-      // Get producerId directly from verified auth token
-      const producerId = req.user?.uid;
-      console.log(`Fetching bookings for authenticated producer ID: ${producerId}`);
+      // Get auth user ID from verified auth token
+      const authUserId = req.user?.uid;
+      
+      // Use our helper function to get harmonized producer ID
+      const { producerId } = await getHarmonizedProducerIds(authUserId);
+      
+      console.log(`Fetching bookings for producer ID: ${producerId} (auth user: ${authUserId})`);
       
       // Query bookings related to yachts owned by this producer
       // First, get all yacht IDs owned by this producer
