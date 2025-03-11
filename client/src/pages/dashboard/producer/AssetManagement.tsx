@@ -81,6 +81,11 @@ interface ExtendedProductAddOn extends Omit<ProductAddOn, 'lastUpdatedDate'> {
   _standardizedVersion?: number;
   // Standard cover image
   mainImage?: string;
+  // Additional fields for multi-standard support
+  isAvailable?: boolean;
+  active?: boolean;
+  id?: string;
+  productId: string;
 }
 
 
@@ -928,10 +933,22 @@ export default function AssetManagement() {
           : !!yacht.available);
   };
   
-  // Helper to get the addon availability status
+  // Helper to get the addon availability status with improved standardization
   const getAddonActiveStatus = (addon: ExtendedProductAddOn): boolean => {
-    // Standardize availability/active status - cast to boolean for consistency
-    return !!addon.availability;
+    // Standardize availability/active status
+    // Check for all possible field names with consistent boolean conversion
+    if (addon.availability !== undefined) {
+      return !!addon.availability;
+    } 
+    // Fall back to other possible field names if they exist
+    if (addon.isAvailable !== undefined) {
+      return !!addon.isAvailable;
+    }
+    if (addon.active !== undefined) {
+      return !!addon.active;
+    }
+    // Default to false if no availability field is found
+    return false;
   };
   
   // Create status badge for yachts
@@ -987,7 +1004,7 @@ export default function AssetManagement() {
     );
   };
   
-  // Create status badge for addons
+  // Create status badge for addons with enhanced logging and display
   const renderAddonStatusBadge = (addon: ExtendedProductAddOn) => {
     // Get active status consistently
     const isActive = getAddonActiveStatus(addon);
@@ -998,9 +1015,18 @@ export default function AssetManagement() {
     // Get standardization version if available
     const standardVersion = addon._standardizedVersion || (isStandardized ? 1 : 0);
     
-    // Log for debugging
+    // Get all available status fields for detailed logging
+    const availFields = {
+      availability: addon.availability,
+      isAvailable: addon.isAvailable,
+      active: addon.active
+    };
+    
+    // Log detailed information for debugging
     console.log(`Status badge for addon ${addon.name} (${addon.productId}): `, 
-      `availability=${addon.availability}, computed=${isActive}, standardized=${isStandardized}, version=${standardVersion}`
+      availFields,
+      `computed=${isActive}, standardized=${isStandardized}, version=${standardVersion}`,
+      `lastUpdated=${addon._lastUpdated || addon.lastUpdatedDate?.seconds || addon.updatedAt?.seconds}`
     );
     
     return (
@@ -1024,6 +1050,12 @@ export default function AssetManagement() {
         {!isStandardized && (
           <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">
             Legacy Format
+          </Badge>
+        )}
+        
+        {addon._lastUpdated && (
+          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 text-xs">
+            Updated: {new Date(parseInt(addon._lastUpdated)).toLocaleTimeString()}
           </Badge>
         )}
       </div>
