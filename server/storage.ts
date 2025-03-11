@@ -786,8 +786,7 @@ export async function addProducerIdToTestYachts(producerId: string = 'test-produ
     for (const doc of snapshot.docs) {
       batch.update(doc.ref, {
         providerId: producerId,
-        producerId: producerId,
-        updatedAt: adminDb.FieldValue.serverTimestamp()
+        producerId: producerId
       });
       batchCount++;
       count++;
