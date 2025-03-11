@@ -487,14 +487,32 @@ export default function AssetManagement() {
           }),
         });
         
-        if (!response.ok) {
-          console.error(`Server returned ${response.status}: ${response.statusText}`);
-          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        if (response.ok) {
+          const result = await response.json();
+          console.log(`Successfully updated yacht ${docId} via API:`, result);
+          
+          // Update timestamp from server response if available
+          if (result.timestamp) {
+            console.log(`Updating yacht with server timestamp: ${result.timestamp}`);
+            const updatedYachts = [...yachts];
+            const yachtIndex = updatedYachts.findIndex(y => 
+              (y.package_id === docId) || (y.yachtId === docId) || (y.id === docId)
+            );
+            if (yachtIndex !== -1) {
+              updatedYachts[yachtIndex] = {
+                ...updatedYachts[yachtIndex],
+                _lastUpdated: result.timestamp
+              };
+              setYachts(updatedYachts);
+            }
+          }
+          
+          console.log(`Successfully activated/deactivated yacht ${docId} via API`);
+        } else {
+          const errorText = await response.text();
+          console.error(`Server returned ${response.status}: ${response.statusText}`, errorText);
+          throw new Error(`Server returned ${response.status}: ${errorText}`);
         }
-        
-        const result = await response.json();
-        console.log(`API response:`, result);
-        console.log(`Successfully activated/deactivated yacht ${docId} via API`);
       } catch (apiError) {
         console.error('API activation failed, falling back to direct Firestore update', apiError);
         
@@ -772,15 +790,32 @@ export default function AssetManagement() {
         });
         
         if (response.ok) {
-          console.log(`Successfully updated add-on ${docId} via API`);
+          const responseData = await response.json();
+          console.log(`Successfully updated add-on ${docId} via API:`, responseData);
           
           // Force query refetching to ensure consistency
           queryClient.invalidateQueries({
             queryKey: ["/api/addons/producer"],
             refetchType: 'all'
           });
+          
+          // Update timestamp from server response if available
+          if (responseData.timestamp) {
+            console.log(`Updating addon with server timestamp: ${responseData.timestamp}`);
+            const updatedAddOns = [...addOns];
+            const addonIndex = updatedAddOns.findIndex(a => a.productId === docId);
+            if (addonIndex !== -1) {
+              updatedAddOns[addonIndex] = {
+                ...updatedAddOns[addonIndex],
+                _lastUpdated: responseData.timestamp
+              };
+              setAddOns(updatedAddOns);
+            }
+          }
         } else {
-          throw new Error(`API call failed: ${response.status}`);
+          const errorText = await response.text();
+          console.error(`API call failed: ${response.status}`, errorText);
+          throw new Error(`API call failed: ${response.status} - ${errorText}`);
         }
       } catch (error) {
         console.warn("API call failed, falling back to direct Firestore update", error);
