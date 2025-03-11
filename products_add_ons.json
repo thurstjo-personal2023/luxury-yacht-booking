@@ -1,0 +1,129 @@
+[
+  {
+    "id": "ADD001",
+    "name": "Premium Catering Package",
+    "description": "Gourmet catering service with chef on board",
+    "category": "Food & Beverage",
+    "media": [
+      {
+        "type": "image",
+        "url": "https://images.unsplash.com/photo-1555244162-803834f70033?w=800"
+      }
+    ],
+    "mainImage": "https://images.unsplash.com/photo-1555244162-803834f70033?w=800",
+    "isAvailable": true,
+    "pricing": 1500,
+    "tags": [
+      "catering",
+      "food",
+      "premium",
+      "service"
+    ],
+    "partnerId": "partner-001",
+    "createdAt": {
+      "_seconds": 1635724800,
+      "_nanoseconds": 0
+    },
+    "updatedAt": {
+      "_seconds": 1741677800,
+      "_nanoseconds": 0
+    },
+    "_lastUpdated": "1741677627235",
+    "productId": "ADD001",
+    "availability": true,
+    "createdDate": {
+      "_seconds": 1635724800,
+      "_nanoseconds": 0
+    },
+    "lastUpdatedDate": {
+      "_seconds": 1741677800,
+      "_nanoseconds": 0
+    },
+    "_standardized": true,
+    "_standardizedVersion": 1
+  },
+  {
+    "id": "ADD002",
+    "name": "Professional Photography",
+    "description": "Professional photographer to capture your experience",
+    "category": "Photography",
+    "media": [
+      {
+        "type": "image",
+        "url": "https://images.unsplash.com/photo-1554048612-b6a482bc67e5?w=800"
+      }
+    ],
+    "mainImage": "https://images.unsplash.com/photo-1554048612-b6a482bc67e5?w=800",
+    "isAvailable": true,
+    "pricing": 800,
+    "tags": [
+      "photography",
+      "memories",
+      "service"
+    ],
+    "partnerId": "partner-002",
+    "createdAt": {
+      "_seconds": 1638316800,
+      "_nanoseconds": 0
+    },
+    "updatedAt": {
+      "_seconds": 1741678000,
+      "_nanoseconds": 0
+    },
+    "_lastUpdated": "1741677627235",
+    "productId": "ADD002",
+    "availability": true,
+    "createdDate": {
+      "_seconds": 1638316800,
+      "_nanoseconds": 0
+    },
+    "lastUpdatedDate": {
+      "_seconds": 1741678000,
+      "_nanoseconds": 0
+    },
+    "_standardized": true,
+    "_standardizedVersion": 1
+  },
+  {
+    "id": "ADD003",
+    "name": "Water Sports Package",
+    "description": "Includes jet ski rental, banana boat, and paddleboards",
+    "category": "Activities",
+    "media": [
+      {
+        "type": "image",
+        "url": "https://images.unsplash.com/photo-1599137937039-eb04c6419dd8?w=800"
+      }
+    ],
+    "mainImage": "https://images.unsplash.com/photo-1599137937039-eb04c6419dd8?w=800",
+    "isAvailable": false,
+    "pricing": 1200,
+    "tags": [
+      "water sports",
+      "activities",
+      "adventure"
+    ],
+    "partnerId": "partner-003",
+    "createdAt": {
+      "_seconds": 1640995200,
+      "_nanoseconds": 0
+    },
+    "updatedAt": {
+      "_seconds": 1741678200,
+      "_nanoseconds": 0
+    },
+    "_lastUpdated": "1741677627235",
+    "productId": "ADD003",
+    "availability": false,
+    "createdDate": {
+      "_seconds": 1640995200,
+      "_nanoseconds": 0
+    },
+    "lastUpdatedDate": {
+      "_seconds": 1741678200,
+      "_nanoseconds": 0
+    },
+    "_standardized": true,
+    "_standardizedVersion": 1
+  }
+]
