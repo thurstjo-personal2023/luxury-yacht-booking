@@ -1,0 +1,100 @@
+[
+  {
+    "id": "1",
+    "userId": "1",
+    "name": "John Boyd",
+    "email": "thurstjo@icloud.com",
+    "phone": "+971528001340",
+    "role": "consumer",
+    "emailVerified": false,
+    "points": 0,
+    "preferences": [],
+    "wishlist": [],
+    "bookingHistory": [],
+    "createdAt": {
+      "_seconds": 1740019657,
+      "_nanoseconds": 470000000
+    },
+    "updatedAt": {
+      "_seconds": 1740019657,
+      "_nanoseconds": 470000000
+    },
+    "_standardized": true,
+    "_standardizedVersion": 1
+  },
+  {
+    "id": "2",
+    "userId": "2",
+    "name": "Ally Gee",
+    "email": "ally.gee@hotmail.com",
+    "phone": "+447438117798",
+    "role": "producer",
+    "emailVerified": false,
+    "points": 0,
+    "producerId": "2",
+    "providerId": "2",
+    "businessName": "Ally Gee",
+    "yearsOfExperience": 0,
+    "certifications": [],
+    "servicesOffered": [],
+    "createdAt": {
+      "_seconds": 1740020258,
+      "_nanoseconds": 740000000
+    },
+    "updatedAt": {
+      "_seconds": 1740020258,
+      "_nanoseconds": 740000000
+    },
+    "_standardized": true,
+    "_standardizedVersion": 1
+  },
+  {
+    "id": "3",
+    "userId": "3",
+    "name": "Linwood Boyd",
+    "email": "linwoody@hotmail.com",
+    "phone": "+19178765432",
+    "role": "partner",
+    "emailVerified": false,
+    "points": 0,
+    "partnerId": "3",
+    "businessName": "Linwood Boyd",
+    "serviceTypes": [],
+    "createdAt": {
+      "_seconds": 1740020318,
+      "_nanoseconds": 433000000
+    },
+    "updatedAt": {
+      "_seconds": 1740020318,
+      "_nanoseconds": 433000000
+    },
+    "_standardized": true,
+    "_standardizedVersion": 1
+  },
+  {
+    "id": "kugcfIVXOkIj4NSUQEEr4ZGLyPDY",
+    "userId": "kugcfIVXOkIj4NSUQEEr4ZGLyPDY",
+    "name": "Ally Gee",
+    "email": "ally.gee@hotmail.com",
+    "phone": "+447458904321",
+    "role": "producer",
+    "emailVerified": false,
+    "points": 0,
+    "producerId": "kugcfIVXOkIj4NSUQEEr4ZGLyPDY",
+    "providerId": "kugcfIVXOkIj4NSUQEEr4ZGLyPDY",
+    "businessName": "Ally Gee",
+    "yearsOfExperience": 0,
+    "certifications": [],
+    "servicesOffered": [],
+    "createdAt": {
+      "_seconds": 1741026102,
+      "_nanoseconds": 4000000
+    },
+    "updatedAt": {
+      "_seconds": 1741682149,
+      "_nanoseconds": 0
+    },
+    "_standardized": true,
+    "_standardizedVersion": 1
+  }
+]
