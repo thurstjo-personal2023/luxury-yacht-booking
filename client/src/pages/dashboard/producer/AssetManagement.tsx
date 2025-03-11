@@ -60,14 +60,14 @@ import { auth, db, getCurrentToken, isAuthenticated } from "@/lib/firebase";
 import { getAuthHeader, getApiRequestHeaders } from "@/lib/auth-utils";
 import { 
   collection, 
+  doc, 
   query, 
   where, 
   getDocs, 
-  doc, 
-  updateDoc, 
-  serverTimestamp,
-  deleteDoc,
-  writeBatch
+  deleteDoc, 
+  updateDoc,
+  writeBatch,
+  serverTimestamp
 } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { YachtExperience, YachtProfile, ProductAddOn } from "@shared/firestore-schema";
@@ -147,11 +147,73 @@ export default function AssetManagement() {
   
   // Get current user to determine producer ID
   const [user] = useAuthState(auth);
-  const producerId = user?.uid;
+  const [producerData, setProducerData] = useState<{
+    producerId: string;
+    providerId: string;
+  } | null>(null);
   
   // Generate a new timestamp every time the component renders
   // This ensures fresh data whenever navigating back to this page
   const [queryTimestamp, setQueryTimestamp] = useState(() => Date.now());
+  
+  // Fetch producer details from harmonized_users collection
+  const fetchProducerData = async (userId: string) => {
+    try {
+      console.log(`Fetching producer data for user ID: ${userId}`);
+      
+      // Create a query to find the user in the harmonized_users collection
+      const usersRef = collection(db, "harmonized_users");
+      const q = query(usersRef, where("userId", "==", userId));
+      
+      // Execute the query
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        // Get the first matching document
+        const userDoc = querySnapshot.docs[0];
+        const userData = userDoc.data();
+        
+        // Check if the user is a producer
+        if (userData.role === 'producer') {
+          console.log("Found producer data:", userData);
+          
+          // Set the producerId and providerId from the harmonized_users collection
+          setProducerData({
+            producerId: userData.producerId || userData.id,
+            providerId: userData.providerId || userData.id
+          });
+        } else {
+          console.warn(`User ${userId} is not a producer. Role: ${userData.role}`);
+          // Fallback to using the auth ID directly
+          setProducerData({
+            producerId: userId,
+            providerId: userId
+          });
+        }
+      } else {
+        console.warn(`No user found in harmonized_users with ID: ${userId}`);
+        // Fallback to using the auth ID directly
+        setProducerData({
+          producerId: userId,
+          providerId: userId
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching producer data:", error);
+      // Fallback to using the auth ID directly
+      setProducerData({
+        producerId: userId,
+        providerId: userId
+      });
+    }
+  };
+  
+  // Fetch producer data when user is available
+  useEffect(() => {
+    if (user) {
+      fetchProducerData(user.uid);
+    }
+  }, [user]);
   
   // Update timestamp when tab changes to force data refresh
   useEffect(() => {
@@ -207,14 +269,24 @@ export default function AssetManagement() {
   };
   
   const { data: yachtsResponse, isLoading: yachtsLoading } = useQuery<YachtsResponse>({
-    queryKey: ["/api/producer/yachts", { page: yachtPage, pageSize, producerId, timestamp: queryTimestamp }],
+    queryKey: ["/api/producer/yachts", { 
+      page: yachtPage, 
+      pageSize, 
+      producerId: producerData?.producerId || user?.uid, 
+      timestamp: queryTimestamp 
+    }],
     refetchOnMount: 'always', // Always refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window gains focus
     staleTime: 0, // Consider data stale immediately
   });
   
   const { data: addOnsResponse, isLoading: addOnsLoading } = useQuery<AddOnsResponse>({
-    queryKey: ["/api/producer/addons", { page: addonPage, pageSize, producerId, timestamp: queryTimestamp }],
+    queryKey: ["/api/producer/addons", { 
+      page: addonPage, 
+      pageSize, 
+      producerId: producerData?.producerId || user?.uid, 
+      timestamp: queryTimestamp 
+    }],
     refetchOnMount: 'always', // Always refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window gains focus
     staleTime: 0, // Consider data stale immediately
