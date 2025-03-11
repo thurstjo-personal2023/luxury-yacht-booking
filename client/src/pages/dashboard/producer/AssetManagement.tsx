@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getYachtImageProps, getAddonImageProps } from "@/lib/image-utils";
-import { apiRequest } from "@/lib/queryClient";
+
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
