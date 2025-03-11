@@ -50,7 +50,6 @@ import {
   MoreVertical, 
   Plus,
   RefreshCw,
-  XCircle,
   Sailboat, 
   Search, 
   Trash2, 
@@ -742,15 +741,37 @@ export default function AssetManagement() {
       
       try {
         // First try updating via API
-        const res = await apiRequest(`/api/addon/${docId}/activate`, {
-          method: 'POST',
-          body: {
-            isActive: newStatus,
-            timestamp
+        // Get the user token if available
+        let authHeader = {};
+        try {
+          const user = auth.currentUser;
+          if (user) {
+            const token = await user.getIdToken();
+            authHeader = { 'Authorization': `Bearer ${token}` };
           }
+        } catch (tokenError) {
+          console.warn('Could not get auth token:', tokenError);
+        }
+        
+        // Force a random cache-busting query param to avoid cached responses
+        const cacheBuster = Math.random().toString(36).substring(2);
+        
+        const response = await fetch(`/api/addon/${docId}/activate?cb=${cacheBuster}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            ...authHeader
+          },
+          body: JSON.stringify({ 
+            isActive: newStatus,
+            timestamp: timestamp
+          }),
         });
         
-        if (res.ok) {
+        if (response.ok) {
           console.log(`Successfully updated add-on ${docId} via API`);
           
           // Force query refetching to ensure consistency
@@ -759,7 +780,7 @@ export default function AssetManagement() {
             refetchType: 'all'
           });
         } else {
-          throw new Error(`API call failed: ${res.status}`);
+          throw new Error(`API call failed: ${response.status}`);
         }
       } catch (error) {
         console.warn("API call failed, falling back to direct Firestore update", error);
