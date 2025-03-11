@@ -91,6 +91,9 @@ interface ExtendedYachtExperience extends YachtExperience {
   _lastUpdated?: string;
   updatedAt?: any; // Can be Timestamp or serialized format
   createdAt?: any;
+  // Standardization tracking
+  _standardized?: boolean;
+  _standardizedVersion?: number;
 }
 
 // Pagination interface
