@@ -896,6 +896,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch bookings" });
     }
   });
+  
+  // Endpoint to add producer ID to all yachts
+  app.post("/api/producer/set-producer-id", async (req: Request, res: Response) => {
+    try {
+      // Get producer ID from request body or use a default
+      const producerId = req.body?.producerId || 'V4aiP9ihPbdnWNO6UbiZKEt1GoCZ';
+      
+      console.log(`Setting producer ID ${producerId} for all yachts in unified_yacht_experiences collection...`);
+      
+      const result = await addProducerIdToTestYachts(producerId);
+      
+      if (result) {
+        res.json({ 
+          success: true, 
+          message: "Producer ID added to all yachts successfully", 
+          producerId 
+        });
+      } else {
+        res.status(500).json({ 
+          success: false, 
+          message: "Failed to add producer ID to yachts or no yachts found" 
+        });
+      }
+    } catch (error) {
+      console.error("Error adding producer ID:", error);
+      res.status(500).json({ 
+        error: "Failed to add producer ID to yachts", 
+        message: String(error) 
+      });
+    }
+  });
 
   // Remove duplicate standardize-collection route since we already defined it above
 
