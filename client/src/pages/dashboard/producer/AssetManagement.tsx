@@ -56,7 +56,7 @@ import {
   XCircle 
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, getCurrentToken, isAuthenticated } from "@/lib/firebase";
 import { 
   collection, 
   query, 
