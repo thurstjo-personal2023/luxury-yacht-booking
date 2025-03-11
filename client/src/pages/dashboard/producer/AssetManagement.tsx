@@ -184,16 +184,16 @@ export default function AssetManagement() {
       }
     } else {
       // Clear and invalidate all add-on queries
-      queryClient.removeQueries({ queryKey: ["/api/addons/producer"] });
+      queryClient.removeQueries({ queryKey: ["/api/producer/addons"] });
       queryClient.invalidateQueries({ 
-        queryKey: ["/api/addons/producer"],
+        queryKey: ["/api/producer/addons"],
         refetchType: 'all'
       });
       
       // Explicitly invalidate paginated queries
       for (let page = 1; page <= 5; page++) {
         queryClient.invalidateQueries({
-          queryKey: ["/api/addons/producer", { page, pageSize }],
+          queryKey: ["/api/producer/addons", { page, pageSize }],
           refetchType: 'all'
         });
       }
@@ -366,18 +366,18 @@ export default function AssetManagement() {
         await deleteDoc(addonRef);
         
         // Use a more aggressive cache invalidation for add-ons as well
-        queryClient.removeQueries({ queryKey: ["/api/addons/producer"] });
+        queryClient.removeQueries({ queryKey: ["/api/producer/addons"] });
         
         // Then invalidate to trigger refetching
         queryClient.invalidateQueries({ 
-          queryKey: ["/api/addons/producer"],
+          queryKey: ["/api/producer/addons"],
           refetchType: 'all'
         });
         
         // Explicitly invalidate all pages
         for (let page = 1; page <= 5; page++) {
           queryClient.invalidateQueries({
-            queryKey: ["/api/addons/producer", { page, pageSize }],
+            queryKey: ["/api/producer/addons", { page, pageSize }],
             refetchType: 'all'
           });
         }
@@ -800,7 +800,7 @@ export default function AssetManagement() {
           
           // Force query refetching to ensure consistency
           queryClient.invalidateQueries({
-            queryKey: ["/api/addons/producer"],
+            queryKey: ["/api/producer/addons"],
             refetchType: 'all'
           });
           
@@ -847,7 +847,7 @@ export default function AssetManagement() {
           
           // Force query refetching to ensure consistency
           queryClient.invalidateQueries({
-            queryKey: ["/api/addons/producer"],
+            queryKey: ["/api/producer/addons"],
             refetchType: 'all'
           });
         } catch (fbError) {
@@ -858,14 +858,14 @@ export default function AssetManagement() {
       
       // Force query cache invalidation
       queryClient.invalidateQueries({ 
-        queryKey: ["/api/addons/producer"],
+        queryKey: ["/api/producer/addons"],
         refetchType: 'all'
       });
       
       // Explicitly invalidate all pages
       for (let page = 1; page <= 5; page++) {
         queryClient.invalidateQueries({
-          queryKey: ["/api/addons/producer", { page, pageSize }],
+          queryKey: ["/api/producer/addons", { page, pageSize }],
           refetchType: 'all'
         });
       }
