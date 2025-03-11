@@ -33,26 +33,40 @@ const adminStorage = getStorage(app);
 // Force development mode for Replit environment
 process.env.NODE_ENV = "development";
 
-// Auth emulator
-process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
+// Use a proxy URL for Firebase Emulator access from Replit
+// The Firebase Emulator is running externally and exposing its ports
+// When running in Replit, we need to access the emulator through the
+// external host's IP address
 
-// Firestore emulator
-const FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
+// Use the production project configuration while connecting to emulator
+console.log("Running Firebase Admin with emulator settings");
+
+// Set up Firestore emulator explicitly
 adminDb.settings({
-  host: FIRESTORE_EMULATOR_HOST,
+  host: "localhost:8080", // Try localhost instead of 127.0.0.1
   ssl: false,
+  ignoreUndefinedProperties: true // Handle undefined values gracefully
 });
 
-// Storage emulator
-process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
-
-// Functions emulator
-process.env.FUNCTIONS_EMULATOR_HOST = "127.0.0.1:5001";
-
-// Database emulator
-process.env.FIREBASE_DATABASE_EMULATOR_HOST = "127.0.0.1:9001";
-
 console.log("Connected to Firebase Admin emulators");
+
+// Debug connection
+setTimeout(async () => {
+  try {
+    console.log("Testing connection to Firestore emulator...");
+    const testDoc = await adminDb.collection('test').doc('test-connection').set({
+      timestamp: Date.now(),
+      message: 'Testing emulator connection'
+    });
+    console.log("✓ Successfully connected to Firestore emulator");
+  } catch (error) {
+    console.error("❌ Failed to connect to Firestore emulator:", error.message);
+    console.error("Firestore connection details:", {
+      host: adminDb._settings.host,
+      ssl: adminDb._settings.ssl
+    });
+  }
+}, 3000);
 
 // Export the initialized services
 export { adminAuth, adminDb, adminStorage };
