@@ -68,8 +68,6 @@ export interface IStorage {
 }
 
 export class FirestoreStorage implements IStorage {
-  // New unified methods
-  
   async getAllYachts(filters?: {
     type?: string;
     region?: string;
@@ -79,36 +77,22 @@ export class FirestoreStorage implements IStorage {
     sortByStatus?: boolean;
   }): Promise<PaginatedYachtsResponse> {
     try {
-      console.log('Getting yachts with filters:', filters);
+      console.log('Getting all yachts with filters:', filters);
       
-      // Use the unified yacht collection
-      const yachtsRef = adminDb.collection(UNIFIED_YACHT_COLLECTION);
-      const snapshot = await yachtsRef.get();
+      // Get data from unified collection
+      const snapshot = await adminDb.collection(UNIFIED_YACHT_COLLECTION).get();
       
       if (snapshot.empty) {
-        console.log(`No yachts found in ${UNIFIED_YACHT_COLLECTION}`);
-        
-        // Fall back to legacy collection for migration period
-        console.log('Falling back to legacy collection for backwards compatibility');
-        const legacyRef = adminDb.collection(LEGACY_YACHTS);
-        const legacySnapshot = await legacyRef.get();
-        
-        if (legacySnapshot.empty) {
-          console.log('No yachts found in legacy collection either');
-          return {
-            yachts: [],
-            pagination: {
-              currentPage: 1,
-              pageSize: filters?.pageSize || 10,
-              totalCount: 0,
-              totalPages: 0
-            }
-          };
-        }
-        
-        console.log(`Found ${legacySnapshot.size} yachts in legacy collection, using them instead`);
-        // Continue with legacy data
-        return this.processYachtResults(legacySnapshot, filters);
+        console.log('No yachts found in unified collection');
+        return {
+          yachts: [],
+          pagination: {
+            currentPage: 1,
+            pageSize: filters?.pageSize || 10,
+            totalCount: 0,
+            totalPages: 0
+          }
+        };
       }
       
       return this.processYachtResults(snapshot, filters);
@@ -126,7 +110,166 @@ export class FirestoreStorage implements IStorage {
     }
   }
   
-  // Helper method to process yacht query results
+  async getYachtById(id: string): Promise<Yacht | null> {
+    try {
+      console.log(`Getting yacht with ID: ${id}`);
+      
+      // Try to get from unified_yacht_experiences first
+      const unifiedDocRef = adminDb.collection(UNIFIED_YACHT_COLLECTION).doc(id);
+      const unifiedDoc = await unifiedDocRef.get();
+      
+      if (unifiedDoc.exists) {
+        const data = unifiedDoc.data() as Yacht;
+        console.log(`Found yacht in unified collection`);
+        return {
+          ...data,
+          id
+        };
+      }
+      
+      // If not found in unified collection, try legacy collections
+      console.log(`Yacht not found in unified collection, trying legacy collections`);
+      
+      // Try yacht_experiences
+      const legacyExpRef = adminDb.collection(LEGACY_YACHT_EXPERIENCES).doc(id);
+      const legacyExpDoc = await legacyExpRef.get();
+      
+      if (legacyExpDoc.exists) {
+        console.log(`Found yacht in yacht_experiences collection`);
+        const data = legacyExpDoc.data() as any;
+        // Convert to Yacht format
+        return {
+          id,
+          title: data.title || data.name || '',
+          description: data.description || '',
+          category: data.category || 'standard',
+          yachtType: data.yacht_type || '',
+          location: {
+            address: data.location?.address || '',
+            latitude: data.location?.latitude || 0,
+            longitude: data.location?.longitude || 0,
+            region: data.location?.region || 'dubai',
+            portMarina: data.location?.port_marina || ''
+          },
+          capacity: data.capacity || data.max_guests || 0,
+          duration: data.duration || 0,
+          pricing: data.pricing || data.price || 0,
+          pricingModel: data.pricing_model || 'Fixed',
+          customizationOptions: data.customization_options || [],
+          media: data.media || [],
+          isAvailable: data.availability_status || data.available || false,
+          isFeatured: data.featured || false,
+          isPublished: data.published_status || true,
+          tags: data.tags || [],
+          providerId: data.providerId || data.producerId || data.producer_id || '',
+          reviews: data.reviews || [],
+          virtualTour: data.virtual_tour ? {
+            isEnabled: data.virtual_tour.enabled || false,
+            scenes: data.virtual_tour.scenes || []
+          } : undefined,
+          createdAt: data.created_date || data.createdAt || new Date(),
+          updatedAt: data.last_updated_date || data.updatedAt || new Date()
+        };
+      }
+      
+      // If still not found, try final legacy collection
+      const legacyYachtRef = adminDb.collection(LEGACY_YACHTS).doc(id);
+      const legacyYachtDoc = await legacyYachtRef.get();
+      
+      if (legacyYachtDoc.exists) {
+        console.log(`Found yacht in yachts collection`);
+        const data = legacyYachtDoc.data() as any;
+        // Convert to Yacht format
+        return {
+          id,
+          title: data.name || '',
+          description: data.description || '',
+          category: 'yacht',
+          yachtType: data.model || '',
+          location: {
+            address: data.location?.address || '',
+            latitude: data.location?.latitude || 0,
+            longitude: data.location?.longitude || 0,
+            region: 'dubai',
+            portMarina: ''
+          },
+          capacity: data.capacity || data.max_guests || 0,
+          duration: 4, // Default duration
+          pricing: data.price || 0,
+          pricingModel: 'Fixed',
+          customizationOptions: [],
+          media: data.media || [],
+          isAvailable: data.available || false,
+          isFeatured: false,
+          isPublished: true,
+          tags: data.features || [],
+          reviews: [],
+          createdAt: data.createdAt || new Date(),
+          updatedAt: data.updatedAt || new Date()
+        };
+      }
+      
+      console.log(`Yacht not found in any collection`);
+      return null;
+    } catch (error) {
+      console.error(`Error fetching yacht with ID ${id}:`, error);
+      return null;
+    }
+  }
+  
+  async getFeaturedYachts(): Promise<YachtSummary[]> {
+    try {
+      console.log('Getting featured yachts');
+      
+      // Get featured yachts from unified collection
+      const featuredQuery = adminDb.collection(UNIFIED_YACHT_COLLECTION)
+        .where('isFeatured', '==', true)
+        .limit(6);
+      
+      const snapshot = await featuredQuery.get();
+      
+      return this.extractFeaturedYachts(snapshot);
+    } catch (error) {
+      console.error('Error fetching featured yachts:', error);
+      return [];
+    }
+  }
+  
+  private extractFeaturedYachts(snapshot: FirebaseFirestore.QuerySnapshot): YachtSummary[] {
+    if (snapshot.empty) {
+      console.log('No featured yachts found');
+      return [];
+    }
+    
+    console.log(`Found ${snapshot.size} featured yachts`);
+    
+    return snapshot.docs.map(doc => {
+      const data = doc.data() as Yacht;
+      // Extract main image URL from media array if available
+      const mainImage = data.media && data.media.length > 0 ? data.media[0].url : undefined;
+      
+      return {
+        id: doc.id,
+        title: data.title || '',
+        description: data.description || '',
+        category: data.category || '',
+        location: data.location || {
+          address: '',
+          latitude: 0,
+          longitude: 0,
+          region: 'dubai',
+          portMarina: ''
+        },
+        pricing: data.pricing || 0,
+        capacity: data.capacity || 0,
+        duration: data.duration || 0,
+        isAvailable: data.isAvailable || false,
+        isFeatured: data.isFeatured || false,
+        mainImage
+      };
+    });
+  }
+  
   private processYachtResults(
     snapshot: FirebaseFirestore.QuerySnapshot,
     filters?: {
@@ -138,62 +281,49 @@ export class FirestoreStorage implements IStorage {
       sortByStatus?: boolean;
     }
   ): PaginatedYachtsResponse {
-    // Map all yachts to the unified schema
+    // Map all documents to the Yacht type
     let results = snapshot.docs.map(doc => {
-      const data = doc.data();
+      const data = doc.data() as Yacht;
+      // Extract main image URL from media array if available
+      const mainImage = data.media && data.media.length > 0 ? data.media[0].url : undefined;
+      
       return {
         id: doc.id,
-        title: data.title || data.name || '',
+        title: data.title || '',
         description: data.description || '',
         category: data.category || '',
-        location: {
-          address: data.location?.address || '',
-          latitude: data.location?.latitude || 0,
-          longitude: data.location?.longitude || 0,
-          region: data.location?.region || 'dubai',
-          portMarina: data.location?.portMarina || data.location?.port_marina || ''
+        location: data.location || {
+          address: '',
+          latitude: 0,
+          longitude: 0,
+          region: 'dubai',
+          portMarina: ''
         },
-        pricing: data.pricing || data.price || 0,
-        capacity: data.capacity || data.max_guests || 0,
+        pricing: data.pricing || 0,
+        capacity: data.capacity || 0,
         duration: data.duration || 0,
-        isAvailable: 
-          data.isAvailable !== undefined ? data.isAvailable :
-          data.availability_status !== undefined ? data.availability_status :
-          data.available !== undefined ? data.available : false,
-        isFeatured: 
-          data.isFeatured !== undefined ? data.isFeatured :
-          data.featured !== undefined ? data.featured : false,
-        mainImage: data.media?.length > 0 ? data.media[0].url : undefined,
-        // Include timestamp fields for cache busting
-        _lastUpdated: data._lastUpdated || Date.now().toString(),
-        updatedAt: data.updatedAt || data.last_updated_date || null,
-        last_updated_date: data.last_updated_date || data.updatedAt || null,
-        // Include legacy IDs for compatibility
-        package_id: doc.id,
-        yachtId: doc.id
-      } as unknown as YachtSummary;
+        isAvailable: data.isAvailable || false,
+        isFeatured: data.isFeatured || false,
+        mainImage
+      };
     });
-    
-    console.log(`Found ${results.length} total yachts`);
     
     // Apply filters progressively if they exist
     if (filters) {
-      // Filter by type (yacht cruise)
-      if (filters.type === 'yacht-cruise') {
-        console.log('Filtering by yacht cruise...');
+      // Filter by type
+      if (filters.type) {
+        console.log(`Filtering by type: ${filters.type}`);
         results = results.filter(yacht => 
-          yacht.category.toLowerCase().includes('cruise') ||
-          yacht.category.toLowerCase().includes('yacht')
+          yacht.category.toLowerCase() === filters.type?.toLowerCase()
         );
-        console.log(`After yacht filter: ${results.length} yachts`);
+        console.log(`After type filter: ${results.length} yachts`);
       }
       
       // Filter by region
       if (filters.region) {
         console.log(`Filtering by region: ${filters.region}`);
         results = results.filter(yacht => 
-          yacht.location.region === filters.region ||
-          yacht.location.address.toLowerCase().includes((filters.region as string).toLowerCase())
+          yacht.location.region === filters.region
         );
         console.log(`After region filter: ${results.length} yachts`);
       }
@@ -243,154 +373,21 @@ export class FirestoreStorage implements IStorage {
     };
   }
   
-  async getYachtById(id: string): Promise<Yacht | null> {
-    try {
-      console.log(`Getting yacht with ID: ${id}`);
-      
-      // Try to get from unified collection
-      const yachtRef = adminDb.collection(UNIFIED_YACHT_COLLECTION).doc(id);
-      const yachtDoc = await yachtRef.get();
-      
-      if (yachtDoc.exists) {
-        console.log(`Found yacht in ${UNIFIED_YACHT_COLLECTION}`);
-        const data = yachtDoc.data() as Yacht;
-        return {
-          ...data,
-          id: yachtDoc.id
-        };
-      }
-      
-      // Fallback to legacy collection during migration
-      console.log(`Yacht not found in ${UNIFIED_YACHT_COLLECTION}, trying legacy collection`);
-      const legacyRef = adminDb.collection(LEGACY_YACHTS).doc(id);
-      const legacyDoc = await legacyRef.get();
-      
-      if (legacyDoc.exists) {
-        console.log('Found yacht in legacy collection');
-        const data = legacyDoc.data() as Yacht;
-        return {
-          ...data,
-          id: legacyDoc.id
-        };
-      }
-      
-      console.log('Yacht not found in any collection');
-      return null;
-    } catch (error) {
-      console.error(`Error fetching yacht with ID ${id}:`, error);
-      return null;
-    }
-  }
-  
-  async getFeaturedYachts(): Promise<YachtSummary[]> {
-    try {
-      console.log('Getting featured yachts');
-      
-      // Use the unified collection
-      const snapshot = await adminDb.collection(UNIFIED_YACHT_COLLECTION).get();
-      
-      if (snapshot.empty) {
-        console.log(`No yachts found in ${UNIFIED_YACHT_COLLECTION}`);
-        
-        // Fall back to legacy collection
-        console.log('Falling back to legacy collection for backwards compatibility');
-        const legacySnapshot = await adminDb.collection(LEGACY_YACHTS).get();
-        
-        if (legacySnapshot.empty) {
-          console.log('No yachts found in legacy collection either');
-          return [];
-        }
-        
-        return this.extractFeaturedYachts(legacySnapshot);
-      }
-      
-      return this.extractFeaturedYachts(snapshot);
-    } catch (error) {
-      console.error('Error fetching featured yachts:', error);
-      return [];
-    }
-  }
-  
-  // Helper method to extract featured yachts from query results
-  private extractFeaturedYachts(snapshot: FirebaseFirestore.QuerySnapshot): YachtSummary[] {
-    // Map all yachts
-    const allYachts = snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        title: data.title || data.name || '',
-        description: data.description || '',
-        category: data.category || '',
-        location: {
-          address: data.location?.address || '',
-          latitude: data.location?.latitude || 0,
-          longitude: data.location?.longitude || 0,
-          region: data.location?.region || 'dubai',
-          portMarina: data.location?.portMarina || data.location?.port_marina || ''
-        },
-        pricing: data.pricing || data.price || 0,
-        capacity: data.capacity || data.max_guests || 0,
-        duration: data.duration || 0,
-        isAvailable: 
-          data.isAvailable !== undefined ? data.isAvailable :
-          data.availability_status !== undefined ? data.availability_status :
-          data.available !== undefined ? data.available : false,
-        isFeatured: 
-          data.isFeatured !== undefined ? data.isFeatured :
-          data.featured !== undefined ? data.featured : false,
-        mainImage: data.media?.length > 0 ? data.media[0].url : undefined,
-        // Include timestamp fields for cache busting
-        _lastUpdated: data._lastUpdated || Date.now().toString(),
-        updatedAt: data.updatedAt || data.last_updated_date || null,
-        last_updated_date: data.last_updated_date || data.updatedAt || null,
-        // Include legacy IDs for compatibility
-        package_id: doc.id,
-        yachtId: doc.id
-      } as unknown as YachtSummary;
-    });
-    
-    // Get featured yachts
-    const featuredYachts = allYachts
-      .filter(yacht => yacht.isFeatured && yacht.isAvailable)
-      .slice(0, 6); // Limit to 6 featured yachts
-    
-    console.log(`Found ${featuredYachts.length} featured yachts`);
-    return featuredYachts;
-  }
-  
-  // Implement CRUD operations for the unified collection
   async createYacht(yacht: Yacht): Promise<string> {
     try {
       console.log('Creating new yacht');
       
-      // Ensure yachtId and other compatibility fields are set
-      const yachtWithLegacyFields = {
+      // Add timestamps
+      const yachtWithTimestamps = {
         ...yacht,
-        // Set legacy fields for backward compatibility
-        package_id: yacht.id,
-        yachtId: yacht.id,
-        name: yacht.title,
-        availability_status: yacht.isAvailable,
-        available: yacht.isAvailable,
-        yacht_type: yacht.yachtType,
-        features: yacht.tags,
-        max_guests: yacht.capacity,
-        price: yacht.pricing,
-        // Ensure timestamps are set
-        createdAt: yacht.createdAt || FieldValue.serverTimestamp(),
-        updatedAt: yacht.updatedAt || FieldValue.serverTimestamp(),
-        created_date: yacht.createdAt || FieldValue.serverTimestamp(),
-        last_updated_date: yacht.updatedAt || FieldValue.serverTimestamp(),
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
       
-      // Use the unified collection
-      const docRef = yacht.id 
-        ? adminDb.collection(UNIFIED_YACHT_COLLECTION).doc(yacht.id)
-        : adminDb.collection(UNIFIED_YACHT_COLLECTION).doc();
+      // Add to unified collection
+      const docRef = await adminDb.collection(UNIFIED_YACHT_COLLECTION).add(yachtWithTimestamps);
+      console.log(`Created yacht with ID: ${docRef.id}`);
       
-      await docRef.set(yachtWithLegacyFields);
-      
-      console.log(`Yacht created with ID: ${docRef.id}`);
       return docRef.id;
     } catch (error) {
       console.error('Error creating yacht:', error);
@@ -402,53 +399,19 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log(`Updating yacht with ID: ${id}`);
       
-      // Prepare update data with legacy fields
-      const updateData: Record<string, any> = {
+      // Add timestamp
+      const updates = {
         ...yacht,
-        updatedAt: FieldValue.serverTimestamp(),
-        last_updated_date: FieldValue.serverTimestamp(),
+        updatedAt: new Date()
       };
       
-      // Set legacy fields for backward compatibility if present in update
-      if (yacht.title !== undefined) updateData.name = yacht.title;
-      
-      // Strict availability synchronization is critical for status badges
-      if (yacht.isAvailable !== undefined) {
-        // Cast to boolean to ensure consistent values
-        const availStatus = !!yacht.isAvailable;
-        updateData.isAvailable = availStatus;
-        updateData.availability_status = availStatus;
-        updateData.available = availStatus;
-        console.log(`Setting all availability fields to ${availStatus}`);
-      } else if (yacht.availability_status !== undefined) {
-        // Handle updates coming from legacy fields
-        const availStatus = !!yacht.availability_status;
-        updateData.isAvailable = availStatus;
-        updateData.availability_status = availStatus;
-        updateData.available = availStatus;
-        console.log(`Setting all availability fields from availability_status to ${availStatus}`);
-      } else if (yacht.available !== undefined) {
-        // Handle updates coming from legacy fields
-        const availStatus = !!yacht.available;
-        updateData.isAvailable = availStatus;
-        updateData.availability_status = availStatus;
-        updateData.available = availStatus;
-        console.log(`Setting all availability fields from available to ${availStatus}`);
-      }
-      
-      if (yacht.yachtType !== undefined) updateData.yacht_type = yacht.yachtType;
-      if (yacht.tags !== undefined) updateData.features = yacht.tags;
-      if (yacht.capacity !== undefined) updateData.max_guests = yacht.capacity;
-      if (yacht.pricing !== undefined) updateData.price = yacht.pricing;
-      
       // Update in unified collection
-      const docRef = adminDb.collection(UNIFIED_YACHT_COLLECTION).doc(id);
-      await docRef.update(updateData);
+      await adminDb.collection(UNIFIED_YACHT_COLLECTION).doc(id).update(updates);
+      console.log(`Updated yacht with ID: ${id}`);
       
-      console.log(`Yacht ${id} updated successfully`);
       return true;
     } catch (error) {
-      console.error(`Error updating yacht ${id}:`, error);
+      console.error(`Error updating yacht with ID ${id}:`, error);
       return false;
     }
   }
@@ -458,13 +421,12 @@ export class FirestoreStorage implements IStorage {
       console.log(`Deleting yacht with ID: ${id}`);
       
       // Delete from unified collection
-      const docRef = adminDb.collection(UNIFIED_YACHT_COLLECTION).doc(id);
-      await docRef.delete();
+      await adminDb.collection(UNIFIED_YACHT_COLLECTION).doc(id).delete();
+      console.log(`Deleted yacht with ID: ${id}`);
       
-      console.log(`Yacht ${id} deleted successfully`);
       return true;
     } catch (error) {
-      console.error(`Error deleting yacht ${id}:`, error);
+      console.error(`Error deleting yacht with ID ${id}:`, error);
       return false;
     }
   }
@@ -534,57 +496,49 @@ export class FirestoreStorage implements IStorage {
         yachtDocs = snapshot.docs;
       }
       
-      // If we don't have any results, try legacy collections
-      if (yachtDocs.length === 0) {
-        console.log('No yachts found in unified collection, trying legacy collection');
+      // If we don't have any results and a producerId is provided, try legacy collections
+      if (yachtDocs.length === 0 && filters?.producerId) {
+        console.log('No yachts found in unified collection for this producer, trying legacy collection');
         
         // Fall back to legacy collection during migration period
         const legacyRef = adminDb.collection(LEGACY_YACHTS);
         let legacyDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
         
-        if (filters?.producerId) {
-          // Try all possible producer ID field variations in legacy collection
-          // 1. First check with producer_id field (commonly used in older documents)
-          const legacyProducerSnapshot = await legacyRef
-            .where('producer_id', '==', filters.producerId)
-            .get();
-          
-          if (!legacyProducerSnapshot.empty) {
-            console.log(`Found ${legacyProducerSnapshot.size} legacy yachts with producer_id`);
-            legacyDocs = [...legacyDocs, ...legacyProducerSnapshot.docs];
-          }
-          
-          // 2. Try producerId field
-          const legacyProducerIdSnapshot = await legacyRef
-            .where('producerId', '==', filters.producerId)
-            .get();
-          
-          if (!legacyProducerIdSnapshot.empty) {
-            console.log(`Found ${legacyProducerIdSnapshot.size} legacy yachts with producerId`);
-            // Add docs that aren't already in the array
-            const existingIds = new Set(legacyDocs.map(doc => doc.id));
-            const newDocs = legacyProducerIdSnapshot.docs.filter(doc => !existingIds.has(doc.id));
-            legacyDocs = [...legacyDocs, ...newDocs];
-          }
-          
-          // 3. Try providerId field
-          const legacyProviderIdSnapshot = await legacyRef
-            .where('providerId', '==', filters.producerId)
-            .get();
-          
-          if (!legacyProviderIdSnapshot.empty) {
-            console.log(`Found ${legacyProviderIdSnapshot.size} legacy yachts with providerId`);
-            // Add docs that aren't already in the array
-            const existingIds = new Set(legacyDocs.map(doc => doc.id));
-            const newDocs = legacyProviderIdSnapshot.docs.filter(doc => !existingIds.has(doc.id));
-            legacyDocs = [...legacyDocs, ...newDocs];
-          }
-        } else {
-          // Get all legacy yachts
-          const legacySnapshot = await legacyRef.get();
-          if (!legacySnapshot.empty) {
-            legacyDocs = legacySnapshot.docs;
-          }
+        // Try all possible producer ID field variations in legacy collection
+        // 1. First check with producer_id field (commonly used in older documents)
+        const legacyProducerSnapshot = await legacyRef
+          .where('producer_id', '==', filters.producerId)
+          .get();
+        
+        if (!legacyProducerSnapshot.empty) {
+          console.log(`Found ${legacyProducerSnapshot.size} legacy yachts with producer_id`);
+          legacyDocs = [...legacyDocs, ...legacyProducerSnapshot.docs];
+        }
+        
+        // 2. Try producerId field
+        const legacyProducerIdSnapshot = await legacyRef
+          .where('producerId', '==', filters.producerId)
+          .get();
+        
+        if (!legacyProducerIdSnapshot.empty) {
+          console.log(`Found ${legacyProducerIdSnapshot.size} legacy yachts with producerId`);
+          // Add docs that aren't already in the array
+          const existingIds = new Set(legacyDocs.map(doc => doc.id));
+          const newDocs = legacyProducerIdSnapshot.docs.filter(doc => !existingIds.has(doc.id));
+          legacyDocs = [...legacyDocs, ...newDocs];
+        }
+        
+        // 3. Try providerId field
+        const legacyProviderIdSnapshot = await legacyRef
+          .where('providerId', '==', filters.producerId)
+          .get();
+        
+        if (!legacyProviderIdSnapshot.empty) {
+          console.log(`Found ${legacyProviderIdSnapshot.size} legacy yachts with providerId`);
+          // Add docs that aren't already in the array
+          const existingIds = new Set(legacyDocs.map(doc => doc.id));
+          const newDocs = legacyProviderIdSnapshot.docs.filter(doc => !existingIds.has(doc.id));
+          legacyDocs = [...legacyDocs, ...newDocs];
         }
         
         if (legacyDocs.length > 0) {
