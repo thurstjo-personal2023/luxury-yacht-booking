@@ -717,6 +717,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Create a new add-on for a producer
+  app.post("/api/producer/addons/create", async (req, res) => {
+    try {
+      const addonData = req.body;
+      console.log("Creating new add-on:", addonData);
+      
+      // Validate required fields
+      if (!addonData.name || !addonData.producerId || !addonData.partnerId) {
+        return res.status(400).json({ 
+          error: "Missing required fields", 
+          message: "Name, producerId, and partnerId are required fields" 
+        });
+      }
+      
+      // Ensure consistent field naming
+      addonData.productId = addonData.productId || `ADD-${Date.now()}`;
+      addonData.availability = addonData.availability !== undefined ? addonData.availability : true;
+      addonData.isAvailable = addonData.availability;
+      addonData.createdDate = addonData.createdDate || FieldValue.serverTimestamp();
+      addonData.lastUpdatedDate = FieldValue.serverTimestamp();
+      addonData.updatedAt = FieldValue.serverTimestamp();
+      addonData._standardized = true;
+      addonData._standardizedVersion = 1;
+      
+      // Add to Firestore
+      const addonRef = adminDb.collection('products_add_ons').doc(addonData.productId);
+      await addonRef.set(addonData);
+      
+      res.json({ 
+        success: true, 
+        message: "Add-on created successfully",
+        productId: addonData.productId
+      });
+    } catch (error) {
+      console.error("Error creating add-on:", error);
+      res.status(500).json({ error: "Failed to create add-on", message: String(error) });
+    }
+  });
+  
   // Get producer reviews
   app.get("/api/producer/reviews", async (req, res) => {
     try {
