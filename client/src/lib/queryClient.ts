@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { auth } from "./firebase";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -12,13 +13,27 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Get auth token from Firebase
-  const authToken = localStorage.getItem('authToken');
+  // Get a fresh token directly from Firebase Auth
+  let token = null;
+  if (auth.currentUser) {
+    try {
+      token = await auth.currentUser.getIdToken(true);
+      // Update stored token
+      localStorage.setItem('authToken', token);
+    } catch (error) {
+      console.error('Error getting fresh ID token:', error);
+      // Fall back to stored token
+      token = localStorage.getItem('authToken');
+    }
+  } else {
+    // Fall back to stored token
+    token = localStorage.getItem('authToken');
+  }
   
   // Build headers
   const headers: Record<string, string> = {
     ...(data ? { "Content-Type": "application/json" } : {}),
-    ...(authToken ? { "Authorization": `Bearer ${authToken}` } : {})
+    ...(token ? { "Authorization": `Bearer ${token}` } : {})
   };
   
   const res = await fetch(url, {
@@ -38,12 +53,26 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    // Get auth token from Firebase/localStorage
-    const authToken = localStorage.getItem('authToken');
+    // Get a fresh token directly from Firebase Auth
+    let token = null;
+    if (auth.currentUser) {
+      try {
+        token = await auth.currentUser.getIdToken(true);
+        // Update stored token
+        localStorage.setItem('authToken', token);
+      } catch (error) {
+        console.error('Error getting fresh ID token in query:', error);
+        // Fall back to stored token
+        token = localStorage.getItem('authToken');
+      }
+    } else {
+      // Fall back to stored token
+      token = localStorage.getItem('authToken');
+    }
     
     // Build headers with auth token if available
     const headers: Record<string, string> = 
-      authToken ? { "Authorization": `Bearer ${authToken}` } : {};
+      token ? { "Authorization": `Bearer ${token}` } : {};
     
     const res = await fetch(queryKey[0] as string, {
       credentials: "include",

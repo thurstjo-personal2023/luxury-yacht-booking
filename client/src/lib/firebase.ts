@@ -145,10 +145,11 @@ export const loginWithEmail = async (email: string, password: string) => {
     const userCredential = await retry(() => signInWithEmailAndPassword(auth, email, password));
     
     // Get auth token and store in localStorage for API requests
-    const token = await userCredential.user.getIdToken();
+    // Force a refresh of the token to ensure it has all required claims
+    const token = await userCredential.user.getIdToken(true);
     localStorage.setItem('authToken', token);
     
-    console.log("User logged in successfully, token stored in localStorage");
+    console.log("User logged in successfully, fresh token stored in localStorage");
     return userCredential;
   } catch (error: any) {
     console.error("Login error:", error);
@@ -161,10 +162,11 @@ export const registerWithEmail = async (email: string, password: string) => {
     const userCredential = await retry(() => createUserWithEmailAndPassword(auth, email, password));
     
     // Get auth token and store in localStorage for API requests
-    const token = await userCredential.user.getIdToken();
+    // Force a refresh of the token to ensure it has all required claims
+    const token = await userCredential.user.getIdToken(true);
     localStorage.setItem('authToken', token);
     
-    console.log("Successfully created Firebase Auth user, token stored in localStorage");
+    console.log("Successfully created Firebase Auth user, fresh token stored in localStorage");
     return userCredential;
   } catch (error: any) {
     console.error("Registration error:", error);
@@ -198,13 +200,28 @@ export const signOutUser = async () => {
 };
 
 // Get current auth token from localStorage
-export const getCurrentToken = (): string | null => {
-  return localStorage.getItem('authToken');
+export const getCurrentToken = async (): Promise<string | null> => {
+  // Get token directly from Firebase Auth current user
+  if (auth.currentUser) {
+    try {
+      // This ensures we get a fresh token with all required claims
+      const token = await auth.currentUser.getIdToken(true);
+      // Store for convenience but always get fresh one when needed
+      localStorage.setItem('authToken', token);
+      return token;
+    } catch (error) {
+      console.error('Error getting ID token:', error);
+      return null;
+    }
+  } else {
+    // Return stored token as fallback (if user is in memory but not fully loaded)
+    return localStorage.getItem('authToken');
+  }
 };
 
-// Check if user is authenticated by verifying token exists
+// Check if user is authenticated by verifying auth.currentUser exists
 export const isAuthenticated = (): boolean => {
-  return !!getCurrentToken();
+  return !!auth.currentUser || !!localStorage.getItem('authToken');
 };
 
 // Helper to get user-friendly error messages
