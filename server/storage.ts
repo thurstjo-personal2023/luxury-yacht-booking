@@ -5,9 +5,6 @@ import type { Yacht, PaginatedYachtsResponse, YachtSummary } from "@shared/unifi
 
 // Constants for collection names
 const UNIFIED_YACHT_COLLECTION = 'unified_yacht_experiences';
-const LEGACY_YACHT_EXPERIENCES = 'yacht_experiences';
-const LEGACY_EXPERIENCE_PACKAGES = 'experience_packages';
-const LEGACY_YACHTS = 'yachts';
 const PRODUCTS_ADDONS_COLLECTION = 'products_add_ons';
 
 interface PaginationData {
@@ -114,102 +111,20 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log(`Getting yacht with ID: ${id}`);
       
-      // Try to get from unified_yacht_experiences first
-      const unifiedDocRef = adminDb.collection(UNIFIED_YACHT_COLLECTION).doc(id);
-      const unifiedDoc = await unifiedDocRef.get();
+      // Get from unified collection
+      const docRef = adminDb.collection(UNIFIED_YACHT_COLLECTION).doc(id);
+      const doc = await docRef.get();
       
-      if (unifiedDoc.exists) {
-        const data = unifiedDoc.data() as Yacht;
-        console.log(`Found yacht in unified collection`);
+      if (doc.exists) {
+        const data = doc.data() as Yacht;
+        console.log(`Found yacht in collection`);
         return {
           ...data,
           id
         };
       }
       
-      // If not found in unified collection, try legacy collections
-      console.log(`Yacht not found in unified collection, trying legacy collections`);
-      
-      // Try yacht_experiences
-      const legacyExpRef = adminDb.collection(LEGACY_YACHT_EXPERIENCES).doc(id);
-      const legacyExpDoc = await legacyExpRef.get();
-      
-      if (legacyExpDoc.exists) {
-        console.log(`Found yacht in yacht_experiences collection`);
-        const data = legacyExpDoc.data() as any;
-        // Convert to Yacht format
-        return {
-          id,
-          title: data.title || data.name || '',
-          description: data.description || '',
-          category: data.category || 'standard',
-          yachtType: data.yacht_type || '',
-          location: {
-            address: data.location?.address || '',
-            latitude: data.location?.latitude || 0,
-            longitude: data.location?.longitude || 0,
-            region: data.location?.region || 'dubai',
-            portMarina: data.location?.port_marina || ''
-          },
-          capacity: data.capacity || data.max_guests || 0,
-          duration: data.duration || 0,
-          pricing: data.pricing || data.price || 0,
-          pricingModel: data.pricing_model || 'Fixed',
-          customizationOptions: data.customization_options || [],
-          media: data.media || [],
-          isAvailable: data.availability_status || data.available || false,
-          isFeatured: data.featured || false,
-          isPublished: data.published_status || true,
-          tags: data.tags || [],
-          providerId: data.providerId || data.producerId || data.producer_id || '',
-          reviews: data.reviews || [],
-          virtualTour: data.virtual_tour ? {
-            isEnabled: data.virtual_tour.enabled || false,
-            scenes: data.virtual_tour.scenes || []
-          } : undefined,
-          createdAt: data.created_date || data.createdAt || new Date(),
-          updatedAt: data.last_updated_date || data.updatedAt || new Date()
-        };
-      }
-      
-      // If still not found, try final legacy collection
-      const legacyYachtRef = adminDb.collection(LEGACY_YACHTS).doc(id);
-      const legacyYachtDoc = await legacyYachtRef.get();
-      
-      if (legacyYachtDoc.exists) {
-        console.log(`Found yacht in yachts collection`);
-        const data = legacyYachtDoc.data() as any;
-        // Convert to Yacht format
-        return {
-          id,
-          title: data.name || '',
-          description: data.description || '',
-          category: 'yacht',
-          yachtType: data.model || '',
-          location: {
-            address: data.location?.address || '',
-            latitude: data.location?.latitude || 0,
-            longitude: data.location?.longitude || 0,
-            region: 'dubai',
-            portMarina: ''
-          },
-          capacity: data.capacity || data.max_guests || 0,
-          duration: 4, // Default duration
-          pricing: data.price || 0,
-          pricingModel: 'Fixed',
-          customizationOptions: [],
-          media: data.media || [],
-          isAvailable: data.available || false,
-          isFeatured: false,
-          isPublished: true,
-          tags: data.features || [],
-          reviews: [],
-          createdAt: data.createdAt || new Date(),
-          updatedAt: data.updatedAt || new Date()
-        };
-      }
-      
-      console.log(`Yacht not found in any collection`);
+      console.log(`Yacht with ID ${id} not found`);
       return null;
     } catch (error) {
       console.error(`Error fetching yacht with ID ${id}:`, error);
@@ -496,65 +411,8 @@ export class FirestoreStorage implements IStorage {
         yachtDocs = snapshot.docs;
       }
       
-      // If we don't have any results and a producerId is provided, try legacy collections
       if (yachtDocs.length === 0 && filters?.producerId) {
-        console.log('No yachts found in unified collection for this producer, trying legacy collection');
-        
-        // Fall back to legacy collection during migration period
-        const legacyRef = adminDb.collection(LEGACY_YACHTS);
-        let legacyDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
-        
-        // Try all possible producer ID field variations in legacy collection
-        // 1. First check with producer_id field (commonly used in older documents)
-        const legacyProducerSnapshot = await legacyRef
-          .where('producer_id', '==', filters.producerId)
-          .get();
-        
-        if (!legacyProducerSnapshot.empty) {
-          console.log(`Found ${legacyProducerSnapshot.size} legacy yachts with producer_id`);
-          legacyDocs = [...legacyDocs, ...legacyProducerSnapshot.docs];
-        }
-        
-        // 2. Try producerId field
-        const legacyProducerIdSnapshot = await legacyRef
-          .where('producerId', '==', filters.producerId)
-          .get();
-        
-        if (!legacyProducerIdSnapshot.empty) {
-          console.log(`Found ${legacyProducerIdSnapshot.size} legacy yachts with producerId`);
-          // Add docs that aren't already in the array
-          const existingIds = new Set(legacyDocs.map(doc => doc.id));
-          const newDocs = legacyProducerIdSnapshot.docs.filter(doc => !existingIds.has(doc.id));
-          legacyDocs = [...legacyDocs, ...newDocs];
-        }
-        
-        // 3. Try providerId field
-        const legacyProviderIdSnapshot = await legacyRef
-          .where('providerId', '==', filters.producerId)
-          .get();
-        
-        if (!legacyProviderIdSnapshot.empty) {
-          console.log(`Found ${legacyProviderIdSnapshot.size} legacy yachts with providerId`);
-          // Add docs that aren't already in the array
-          const existingIds = new Set(legacyDocs.map(doc => doc.id));
-          const newDocs = legacyProviderIdSnapshot.docs.filter(doc => !existingIds.has(doc.id));
-          legacyDocs = [...legacyDocs, ...newDocs];
-        }
-        
-        if (legacyDocs.length > 0) {
-          console.log(`Found ${legacyDocs.length} total legacy yachts, using them instead`);
-          // Create a snapshot-like object to pass to processYachtResults
-          const legacySnapshot = {
-            docs: legacyDocs,
-            empty: legacyDocs.length === 0,
-            size: legacyDocs.length
-          } as FirebaseFirestore.QuerySnapshot;
-          
-          return this.processYachtResults(legacySnapshot, filters);
-        }
-        
-        // No yachts found in any collection
-        console.log('No producer yachts found in any collection');
+        console.log('No yachts found for this producer ID');
         return {
           yachts: [],
           pagination: {
@@ -589,7 +447,7 @@ export class FirestoreStorage implements IStorage {
     }
   }
   
-  // Legacy methods - updated to use unified collection where possible
+  // Legacy methods - updated to use unified collection
   async getAllExperiencePackages(filters?: {
     type?: string;
     region?: string;
@@ -601,22 +459,21 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log('Getting experiences with filters:', filters);
 
-      // Try the unified collection first
-      let experiencesRef = adminDb.collection(UNIFIED_YACHT_COLLECTION);
-      let snapshot = await experiencesRef.get();
+      // Use the unified collection
+      const experiencesRef = adminDb.collection(UNIFIED_YACHT_COLLECTION);
+      const snapshot = await experiencesRef.get();
       
-      // If no data in unified collection, fall back to the yacht_experiences collection
       if (snapshot.empty) {
-        console.log(`No experiences found in ${UNIFIED_YACHT_COLLECTION} collection, trying yacht_experiences`);
-        experiencesRef = adminDb.collection(LEGACY_YACHT_EXPERIENCES);
-        snapshot = await experiencesRef.get();
-        
-        // If still no data, try experience_packages collection
-        if (snapshot.empty) {
-          console.log('No experiences found in yacht_experiences collection, trying experience_packages');
-          experiencesRef = adminDb.collection(LEGACY_EXPERIENCE_PACKAGES);
-          snapshot = await experiencesRef.get();
-        }
+        console.log(`No experiences found in ${UNIFIED_YACHT_COLLECTION} collection`);
+        return {
+          data: [],
+          pagination: {
+            currentPage: 1,
+            pageSize: filters?.pageSize || 10,
+            totalCount: 0,
+            totalPages: 0
+          }
+        };
       }
 
       if (snapshot.empty) {
@@ -750,23 +607,11 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log('Getting featured experiences');
 
-      // Try the unified collection first
-      let snapshot = await adminDb.collection(UNIFIED_YACHT_COLLECTION).get();
-
-      // If no data in unified collection, fall back to the yacht_experiences collection
-      if (snapshot.empty) {
-        console.log(`No experiences found in ${UNIFIED_YACHT_COLLECTION} collection, trying yacht_experiences`);
-        snapshot = await adminDb.collection(LEGACY_YACHT_EXPERIENCES).get();
-        
-        // If still no data, try experience_packages collection
-        if (snapshot.empty) {
-          console.log('No experiences found in yacht_experiences collection, trying experience_packages');
-          snapshot = await adminDb.collection(LEGACY_EXPERIENCE_PACKAGES).get();
-        }
-      }
+      // Get from the unified collection
+      const snapshot = await adminDb.collection(UNIFIED_YACHT_COLLECTION).get();
 
       if (snapshot.empty) {
-        console.log('No experiences found in any collection');
+        console.log('No experiences found in collection');
         return [];
       }
 
