@@ -366,24 +366,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
+      // Get existing user data
+      const existingData = userDoc.data() || {};
+      
+      // Prepare update data with standardization tracking
       const updateData = {
         ...req.body,
-        updatedAt: FieldValue.serverTimestamp()
+        updatedAt: FieldValue.serverTimestamp(),
+        _standardized: true,
+        _standardizedVersion: 1
       };
       
-      // Ensure role-specific fields are consistent
-      if (updateData.role === 'producer') {
+      // Make sure IDs are consistent
+      updateData.id = id;
+      updateData.userId = id;
+      
+      // Ensure role-specific fields are consistent based on the role
+      const role = (updateData.role || existingData.role || 'consumer').toLowerCase();
+      
+      if (role === 'producer') {
         updateData.producerId = id;
         updateData.providerId = id;
-      } else if (updateData.role === 'partner') {
+      } else if (role === 'partner') {
         updateData.partnerId = id;
       }
+      
+      // Log the update for debugging
+      console.log(`Updating user ${id} with role ${role}`, updateData);
       
       await adminDb.collection('users').doc(id).update(updateData);
       
       res.json({ 
         success: true, 
-        message: "User updated successfully",
+        message: "User updated successfully with standardized schema",
         userId: id
       });
     } catch (error) {
@@ -774,23 +789,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const collections = await adminDb.listCollections();
       const collectionIds = collections.map(col => col.id);
       
-      let collectionData = {};
+      // Create a result object for collection data
+      const result: {
+        collections: string[];
+        data: {
+          [key: string]: {
+            count: number;
+            samples: Array<{
+              id: string;
+              data: any;
+            }>;
+          }
+        }
+      } = {
+        collections: collectionIds,
+        data: {}
+      };
+      
+      // Populate the data for each collection
       for (const colId of collectionIds) {
         const snapshot = await adminDb.collection(colId).limit(5).get();
         const docs = snapshot.docs.map(doc => ({ 
           id: doc.id, 
           data: doc.data(),
         }));
-        collectionData[colId] = {
+        
+        result.data[colId] = {
           count: docs.length,
           samples: docs
         };
       }
       
-      res.json({
-        collections: collectionIds,
-        data: collectionData
-      });
+      res.json(result);
     } catch (error) {
       console.error("Error listing collections:", error);
       res.status(500).json({ error: String(error) });
