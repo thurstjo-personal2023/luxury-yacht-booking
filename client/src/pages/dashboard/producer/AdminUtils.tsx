@@ -357,14 +357,63 @@ export default function AdminUtils() {
                 <TabsContent value="system-maintenance" className="space-y-6">
                   <Card>
                     <CardHeader>
-                      <CardTitle>System Maintenance Tools</CardTitle>
+                      <CardTitle>Producer ID Association</CardTitle>
                       <CardDescription>
-                        Tools for system maintenance and monitoring
+                        Associate all yacht experiences with a producer ID to ensure proper functionality
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <Alert>
+                        <Link className="h-4 w-4" />
+                        <AlertTitle>Important</AlertTitle>
+                        <AlertDescription>
+                          This operation will associate all yacht experiences with the default producer ID (V4aiP9ihPbdnWNO6UbiZKEt1GoCZ).
+                          This ensures that all yachts appear in the producer dashboard and can be properly managed.
+                          This operation is safe and does not delete any data.
+                        </AlertDescription>
+                      </Alert>
+                      
+                      {producerIdResult && (
+                        <Alert variant={producerIdResult.success ? "default" : "destructive"}>
+                          {producerIdResult.success ? (
+                            <CheckCircle className="h-4 w-4" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4" />
+                          )}
+                          <AlertTitle>
+                            {producerIdResult.success ? "Producer ID Association Complete" : "Producer ID Association Failed"}
+                          </AlertTitle>
+                          <AlertDescription>
+                            {producerIdResult.message}
+                            {producerIdResult.producerId && (
+                              <div className="mt-2">
+                                <p>Producer ID: <code className="bg-muted p-1 rounded">{producerIdResult.producerId}</code></p>
+                              </div>
+                            )}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </CardContent>
+                    <CardFooter className="flex justify-between border-t px-6 py-4">
+                      <div className="text-sm text-muted-foreground">
+                        {lastProducerIdUpdate ? `Last run: ${lastProducerIdUpdate}` : "Never run"}
+                      </div>
+                      <Button onClick={runSetProducerId} disabled={isSettingProducerId}>
+                        {isSettingProducerId ? "Associating..." : "Associate Producer ID"}
+                      </Button>
+                    </CardFooter>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Other System Maintenance Tools</CardTitle>
+                      <CardDescription>
+                        Additional tools for system maintenance and monitoring
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="py-10 text-center">
                       <p className="text-muted-foreground">
-                        System maintenance tools will be available in a future update.
+                        Additional system maintenance tools will be available in a future update.
                       </p>
                     </CardContent>
                   </Card>
