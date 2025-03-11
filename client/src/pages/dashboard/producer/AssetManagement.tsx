@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getYachtImageProps, getAddonImageProps } from "@/lib/image-utils";
+import { apiRequest } from "@/lib/queryClient";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,12 +43,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Check, 
+  CheckCircle,
   Edit, 
   Eye, 
   FileEdit, 
   MoreVertical, 
   Plus,
   RefreshCw,
+  XCircle,
   Sailboat, 
   Search, 
   Trash2, 
@@ -690,6 +693,149 @@ export default function AssetManagement() {
     }
   };
   
+  // Toggle addon activation status
+  const toggleAddonActivation = async (addon: ExtendedProductAddOn) => {
+    try {
+      // Use our consistent helper function to get the status
+      const isActive = getAddonActiveStatus(addon);
+      
+      console.log('Current add-on availability status:', {
+        availability: addon.availability,
+        computed: isActive
+      });
+        
+      const newStatus = !isActive;
+      const docId = addon.productId;
+      
+      if (!docId) {
+        console.error("Cannot update add-on: Missing product ID");
+        throw new Error("Missing product ID");
+      }
+      
+      // Generate a timestamp for cache busting
+      const timestamp = Date.now().toString();
+      
+      // Find the index of the add-on in the array before modification
+      const addonIndex = addOns.findIndex(a => a.productId === docId);
+      
+      if (addonIndex === -1) {
+        console.warn(`Could not find add-on with ID ${docId} in local state`);
+      }
+      
+      // Immediately update the UI for responsive feedback
+      const updatedAddOns = [...addOns];
+      if (addonIndex !== -1) {
+        console.log(`Updating add-on at index ${addonIndex} in local state to availability=${newStatus}`);
+        // Create a new object with updated status to ensure React detects the change
+        updatedAddOns[addonIndex] = {
+          ...updatedAddOns[addonIndex],
+          availability: newStatus,
+          _lastUpdated: timestamp
+        };
+        setAddOns(updatedAddOns);
+      }
+
+      // Log debugging information for current add-on data
+      if (addonIndex !== -1) {
+        console.log('Current add-on data:', JSON.stringify(updatedAddOns[addonIndex], null, 2));
+      }
+      
+      try {
+        // First try updating via API
+        const res = await apiRequest(`/api/addon/${docId}/activate`, {
+          method: 'POST',
+          body: {
+            isActive: newStatus,
+            timestamp
+          }
+        });
+        
+        if (res.ok) {
+          console.log(`Successfully updated add-on ${docId} via API`);
+          
+          // Force query refetching to ensure consistency
+          queryClient.invalidateQueries({
+            queryKey: ["/api/addons/producer"],
+            refetchType: 'all'
+          });
+        } else {
+          throw new Error(`API call failed: ${res.status}`);
+        }
+      } catch (error) {
+        console.warn("API call failed, falling back to direct Firestore update", error);
+        
+        try {
+          // Define update object once to ensure consistency
+          const updateData = {
+            // Standardize on availability field
+            availability: newStatus,
+            // Add timestamp fields for tracking
+            lastUpdatedDate: serverTimestamp(),
+            // Add explicit string timestamp for cache busting with images
+            _lastUpdated: timestamp
+          };
+          
+          console.log('Update payload:', JSON.stringify(updateData, null, 2));
+          
+          // Reference the collection where add-ons exist
+          const addonRef = doc(db, "products_add_ons", docId);
+          
+          // Update the document
+          await updateDoc(addonRef, updateData);
+          console.log(`Successfully updated add-on ${docId} in Firestore`);
+          
+          // Force query refetching to ensure consistency
+          queryClient.invalidateQueries({
+            queryKey: ["/api/addons/producer"],
+            refetchType: 'all'
+          });
+        } catch (fbError) {
+          console.error("Firestore update attempt failed:", fbError);
+          throw fbError;
+        }
+      }
+      
+      // Force query cache invalidation
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/addons/producer"],
+        refetchType: 'all'
+      });
+      
+      // Explicitly invalidate all pages
+      for (let page = 1; page <= 5; page++) {
+        queryClient.invalidateQueries({
+          queryKey: ["/api/addons/producer", { page, pageSize }],
+          refetchType: 'all'
+        });
+      }
+      
+      // Ensure our local state object is also updated (double-check)
+      if (addonIndex === -1) {
+        // Direct modification of the addon object is a fallback
+        addon.availability = newStatus;
+        addon._lastUpdated = timestamp;
+        
+        // Force component update using the spread operator to create a new array
+        setAddOns(prev => {
+          if (!prev) return prev;
+          return [...prev];
+        });
+      }
+      
+      toast({
+        title: newStatus ? "Add-on Activated" : "Add-on Deactivated",
+        description: `${addon.name} is now ${newStatus ? 'active' : 'inactive'}.`,
+      });
+    } catch (error) {
+      console.error("Error toggling add-on activation:", error);
+      toast({
+        title: "Action Failed",
+        description: "Failed to update add-on status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
   // Pagination handlers
   const handlePreviousYachtPage = () => {
     if (yachtPage > 1) {
@@ -1223,24 +1369,46 @@ export default function AssetManagement() {
                       </CardContent>
                       
                       <CardFooter className="border-t p-4">
-                        <div className="flex justify-between w-full">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="text-xs"
-                            onClick={() => goToEditService(addon.productId)}
-                          >
-                            Edit
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-destructive hover:text-destructive text-xs"
-                            onClick={() => openDeleteConfirm(addon.productId, 'addon', addon.name)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5 mr-1" />
-                            Delete
-                          </Button>
+                        <div className="flex flex-col gap-2 w-full">
+                          <div className="flex justify-between w-full">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-xs"
+                              onClick={() => goToEditService(addon.productId)}
+                            >
+                              Edit
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-destructive hover:text-destructive text-xs"
+                              onClick={() => openDeleteConfirm(addon.productId, 'addon', addon.name)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
+                          <div className="border-t pt-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`w-full text-xs ${getAddonActiveStatus(addon) ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}`}
+                              onClick={() => toggleAddonActivation(addon)}
+                            >
+                              {getAddonActiveStatus(addon) ? (
+                                <>
+                                  <XCircle className="h-3.5 w-3.5 mr-1" />
+                                  Deactivate
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                                  Activate
+                                </>
+                              )}
+                            </Button>
+                          </div>
                         </div>
                       </CardFooter>
                     </Card>
