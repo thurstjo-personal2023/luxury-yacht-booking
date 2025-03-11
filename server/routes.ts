@@ -247,6 +247,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // Activate/deactivate add-on endpoint
+  app.post("/api/addon/:id/activate", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isActive, timestamp } = req.body;
+      
+      console.log(`Activating/deactivating add-on ${id}: setting isActive=${isActive}, timestamp=${timestamp}`);
+      
+      // Verify we have the required parameters
+      if (isActive === undefined) {
+        return res.status(400).json({ message: "Missing 'isActive' field in request body" });
+      }
+      
+      // Directly update in Firestore for now (we can add a storage method later)
+      const addonRef = adminDb.collection('products_add_ons').doc(id);
+      
+      // Make the update
+      await addonRef.update({
+        // Cast to boolean to ensure consistent values
+        availability: !!isActive,
+        // Add timestamp for cache busting
+        lastUpdatedDate: adminDb.FieldValue.serverTimestamp(),
+        _lastUpdated: timestamp || Date.now().toString()
+      });
+      
+      res.json({ 
+        success: true, 
+        message: `Add-on ${id} activation status updated successfully`,
+        timestamp: timestamp || Date.now().toString()
+      });
+    } catch (error) {
+      console.error(`Error updating activation for add-on ${req.params.id}:`, error);
+      res.status(500).json({ 
+        message: "Error updating add-on activation status", 
+        error: String(error)
+      });
+    }
+  });
 
   // Legacy API endpoints
   // Export normalized yacht schema
