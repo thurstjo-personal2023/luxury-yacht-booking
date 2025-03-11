@@ -74,6 +74,11 @@ interface ExtendedProductAddOn extends Omit<ProductAddOn, 'lastUpdatedDate'> {
   lastUpdatedDate?: any; // Make it optional for compatibility
   _lastUpdated?: string;
   updatedAt?: any;
+  // Standardization tracking
+  _standardized?: boolean;
+  _standardizedVersion?: number;
+  // Standard cover image
+  mainImage?: string;
 }
 
 
@@ -733,14 +738,19 @@ export default function AssetManagement() {
     // Get active status consistently
     const isActive = getYachtActiveStatus(yacht);
     
-    // Check if the yacht has been standardized based on the presence of mainImage field
-    // mainImage is added during standardization
-    const isStandardized = !!yacht.mainImage;
+    // Check for standardization using explicit marker or fallback to mainImage presence
+    const isStandardized = yacht._standardized === true || !!yacht.mainImage;
+    
+    // Get standardization version if available
+    const standardVersion = yacht._standardizedVersion || (isStandardized ? 1 : 0);
     
     // Log the state to help debug status inconsistencies
     const yachtId = yacht.id || yacht.package_id || yacht.yachtId;
     const yachtName = yacht.title || yacht.name;
-    console.log(`Status badge for yacht ${yachtName} (${yachtId}): `, availFields, `computed=${isActive}, standardized=${isStandardized}`);
+    console.log(`Status badge for yacht ${yachtName} (${yachtId}): `, 
+      availFields, 
+      `computed=${isActive}, standardized=${isStandardized}, version=${standardVersion}`
+    );
     
     return (
       <div className="flex flex-wrap gap-1.5">
@@ -756,7 +766,13 @@ export default function AssetManagement() {
         
         {isStandardized && (
           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
-            Standardized
+            {standardVersion > 1 ? `Standardized v${standardVersion}` : 'Standardized'}
+          </Badge>
+        )}
+        
+        {!isStandardized && (
+          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">
+            Legacy Format
           </Badge>
         )}
       </div>
