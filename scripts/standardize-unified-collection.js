@@ -29,9 +29,57 @@ async function standardizeDocument(doc) {
   
   console.log(`Standardizing document ${docId}`);
   
+  // Helper to normalize timestamps consistently
+  const normalizeTimestamp = (timestamp) => {
+    if (!timestamp) return admin.firestore.FieldValue.serverTimestamp();
+    
+    // Handle Firestore Timestamp objects directly
+    if (timestamp.toMillis && typeof timestamp.toMillis === 'function') {
+      return timestamp;
+    }
+    
+    // Handle serialized Firestore Timestamps
+    if (typeof timestamp === 'object' && timestamp._seconds !== undefined) {
+      return new admin.firestore.Timestamp(timestamp._seconds, timestamp._nanoseconds || 0);
+    }
+    
+    // Handle ISO string dates
+    if (typeof timestamp === 'string') {
+      try {
+        const date = new Date(timestamp);
+        if (!isNaN(date.getTime())) {
+          return admin.firestore.Timestamp.fromDate(date);
+        }
+      } catch (e) {
+        console.warn('Failed to parse timestamp string:', timestamp);
+      }
+    }
+    
+    // Handle numeric timestamps (milliseconds)
+    if (typeof timestamp === 'number') {
+      return admin.firestore.Timestamp.fromMillis(timestamp);
+    }
+    
+    return admin.firestore.FieldValue.serverTimestamp();
+  };
+  
+  // Helper to normalize numeric fields
+  const normalizeNumber = (value, defaultValue = 0) => {
+    if (value === undefined || value === null) return defaultValue;
+    if (typeof value === 'number') return value;
+    
+    // Try to convert string to number
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value);
+      if (!isNaN(parsed)) return parsed;
+    }
+    
+    return defaultValue;
+  };
+  
   // Prepare the standardized document
   const standardized = {
-    // Use either the existing id or the document ID
+    // Primary identifier - use either existing id or document ID
     id: data.id || docId,
     
     // Basic information - standardize on camelCase
@@ -40,30 +88,63 @@ async function standardizeDocument(doc) {
     category: data.category || data.type || '',
     yachtType: data.yachtType || data.yacht_type || '',
     
-    // Media handling - ensure media is always an array
-    media: Array.isArray(data.media) ? data.media : [],
+    // Media handling - ensure media is always a properly structured array
+    media: ensureArray(data.media).map(item => {
+      // Standardize media item structure
+      if (typeof item === 'string') {
+        return { type: 'image', url: item };
+      } else if (typeof item === 'object' && item !== null) {
+        return {
+          type: item.type || 'image',
+          url: item.url || ''
+        };
+      }
+      return { type: 'image', url: '' };
+    }).filter(item => item.url), // Remove empty items
     
-    // Add a mainImage field for simpler access
+    // Add a mainImage field for simpler frontend access
     mainImage: getMainImageURL(data),
     
     // Status fields - standardize on camelCase
     isAvailable: determineAvailabilityStatus(data),
-    isFeatured: !!data.featured || !!data.isFeatured || false,
-    isPublished: !!data.published_status || !!data.isPublished || true,
+    isFeatured: !!data.isFeatured || !!data.featured || false,
+    isPublished: !!data.isPublished || !!data.published_status || true,
     
     // Location information - standardize structure
     location: standardizeLocation(data.location),
     
-    // Capacity and pricing - standardize
-    capacity: data.capacity || data.max_guests || 0,
-    duration: data.duration || 0,
-    pricing: data.pricing || data.price || 0,
+    // Capacity and pricing - standardize numeric fields
+    capacity: normalizeNumber(data.capacity || data.max_guests),
+    duration: normalizeNumber(data.duration),
+    pricing: normalizeNumber(data.pricing || data.price),
     pricingModel: data.pricingModel || data.pricing_model || "Fixed",
     
-    // Arrays - ensure they are always arrays
-    customizationOptions: ensureArray(data.customizationOptions || data.customization_options),
+    // Arrays - ensure they are always properly structured arrays
+    customizationOptions: ensureArray(data.customizationOptions || data.customization_options).map(option => {
+      if (typeof option === 'object' && option !== null) {
+        return {
+          id: option.id || option.product_id || Math.random().toString(36).substring(2, 15),
+          name: option.name || '',
+          price: normalizeNumber(option.price)
+        };
+      }
+      return null;
+    }).filter(Boolean), // Remove null items
+    
     tags: ensureArray(data.tags || data.features),
-    reviews: ensureArray(data.reviews),
+    
+    // Reviews - ensure consistent structure
+    reviews: ensureArray(data.reviews).map(review => {
+      if (typeof review === 'object' && review !== null) {
+        return {
+          rating: normalizeNumber(review.rating),
+          text: review.text || review.reviewText || '',
+          userId: review.userId || '',
+          createdAt: normalizeTimestamp(review.createdAt || review.date)
+        };
+      }
+      return null;
+    }).filter(Boolean),
     
     // Owner/provider info
     providerId: data.providerId || data.producerId || data.producer_id || null,
@@ -72,7 +153,7 @@ async function standardizeDocument(doc) {
     virtualTour: standardizeVirtualTour(data.virtualTour || data.virtual_tour),
     
     // Timestamps - standardize to camelCase
-    createdAt: data.createdAt || data.created_date || admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: normalizeTimestamp(data.createdAt || data.created_date),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     
     // Special field for cache busting
@@ -84,10 +165,14 @@ async function standardizeDocument(doc) {
     available: determineAvailabilityStatus(data),
     features: ensureArray(data.tags || data.features),
     yacht_type: data.yachtType || data.yacht_type || '',
-    price: data.pricing || data.price || 0,
-    max_guests: data.capacity || data.max_guests || 0,
-    created_date: data.createdAt || data.created_date || admin.firestore.FieldValue.serverTimestamp(),
+    price: normalizeNumber(data.pricing || data.price),
+    max_guests: normalizeNumber(data.capacity || data.max_guests),
+    created_date: normalizeTimestamp(data.createdAt || data.created_date),
     last_updated_date: admin.firestore.FieldValue.serverTimestamp(),
+    
+    // Source tracking to identify which records have been standardized
+    _standardized: true,
+    _standardizedVersion: 2  // Increment this when making significant changes to the standardization logic
   };
   
   return standardized;
@@ -153,20 +238,44 @@ function standardizeVirtualTour(tourData) {
 
 /**
  * Helper to ensure a value is an array
+ * Handles various problematic array formats found in the data
  */
 function ensureArray(value) {
   if (!value) return [];
+  
+  // Already an array - perfect!
   if (Array.isArray(value)) return value;
   
   // Handle object with numeric keys that should be an array
+  // This happens when Firestore serializes arrays with empty slots
   if (typeof value === 'object') {
     const keys = Object.keys(value);
     if (keys.some(k => !isNaN(parseInt(k)))) {
-      return keys.map(k => value[k]).filter(Boolean);
+      // Sort keys numerically to maintain array order
+      const numericKeys = keys
+        .filter(k => !isNaN(parseInt(k)))
+        .sort((a, b) => parseInt(a) - parseInt(b));
+      
+      // Create properly ordered array
+      return numericKeys.map(k => value[k]).filter(Boolean);
     }
   }
   
-  return [value]; // Wrap single value in array
+  // Handle string values that might be serialized JSON arrays
+  if (typeof value === 'string' && value.startsWith('[') && value.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        console.log('Successfully parsed JSON string into array');
+        return parsed;
+      }
+    } catch (e) {
+      console.log('Failed to parse potential JSON array string', e.message);
+    }
+  }
+  
+  // Default case: wrap single value in array
+  return [value];
 }
 
 /**
