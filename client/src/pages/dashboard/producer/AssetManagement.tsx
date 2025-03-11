@@ -210,9 +210,29 @@ export default function AssetManagement() {
   
   // Fetch producer data when user is available
   useEffect(() => {
-    if (user) {
-      fetchProducerData(user.uid);
-    }
+    const initializeProducerData = async () => {
+      if (user) {
+        try {
+          // First ensure we have a fresh token
+          if (auth.currentUser) {
+            await auth.currentUser.getIdToken(true);
+            console.log("Refreshed token before fetching producer data");
+          }
+          
+          // Then fetch producer data
+          await fetchProducerData(user.uid);
+        } catch (error) {
+          console.error("Error initializing producer data:", error);
+          toast({
+            title: "Authentication Error",
+            description: "Please try refreshing the page or signing in again.",
+            variant: "destructive"
+          });
+        }
+      }
+    };
+    
+    initializeProducerData();
   }, [user]);
   
   // Update timestamp when tab changes to force data refresh
@@ -221,51 +241,66 @@ export default function AssetManagement() {
   }, [activeTab]);
   
   // Manual refresh function
-  const handleRefresh = () => {
-    // Update the timestamp to force data reload
-    setQueryTimestamp(Date.now());
-    
-    // Reset any filters
-    setSearchQuery("");
-    setSelectedCategory(null);
-    
-    // Perform aggressive cache invalidation
-    if (activeTab === "yachts") {
-      // Clear and invalidate all yacht queries
-      queryClient.removeQueries({ queryKey: ["/api/producer/yachts"] });
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/producer/yachts"],
-        refetchType: 'all'
-      });
+  const handleRefresh = async () => {
+    try {
+      // First refresh the auth token
+      if (auth.currentUser) {
+        await auth.currentUser.getIdToken(true);
+        console.log("Refreshed token before data refresh");
+      }
       
-      // Explicitly invalidate paginated queries
-      for (let page = 1; page <= 5; page++) {
-        queryClient.invalidateQueries({
-          queryKey: ["/api/producer/yachts", { page, pageSize }],
+      // Update the timestamp to force data reload
+      setQueryTimestamp(Date.now());
+      
+      // Reset any filters
+      setSearchQuery("");
+      setSelectedCategory(null);
+      
+      // Perform aggressive cache invalidation
+      if (activeTab === "yachts") {
+        // Clear and invalidate all yacht queries
+        queryClient.removeQueries({ queryKey: ["/api/producer/yachts"] });
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/producer/yachts"],
           refetchType: 'all'
         });
-      }
-    } else {
-      // Clear and invalidate all add-on queries
-      queryClient.removeQueries({ queryKey: ["/api/producer/addons"] });
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/producer/addons"],
-        refetchType: 'all'
-      });
-      
-      // Explicitly invalidate paginated queries
-      for (let page = 1; page <= 5; page++) {
-        queryClient.invalidateQueries({
-          queryKey: ["/api/producer/addons", { page, pageSize }],
+        
+        // Explicitly invalidate paginated queries
+        for (let page = 1; page <= 5; page++) {
+          queryClient.invalidateQueries({
+            queryKey: ["/api/producer/yachts", { page, pageSize }],
+            refetchType: 'all'
+          });
+        }
+      } else {
+        // Clear and invalidate all add-on queries
+        queryClient.removeQueries({ queryKey: ["/api/producer/addons"] });
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/producer/addons"],
           refetchType: 'all'
         });
+        
+        // Explicitly invalidate paginated queries
+        for (let page = 1; page <= 5; page++) {
+          queryClient.invalidateQueries({
+            queryKey: ["/api/producer/addons", { page, pageSize }],
+            refetchType: 'all'
+          });
+        }
       }
+      
+      toast({
+        title: "Refreshing Data",
+        description: "Fetching the latest data with fresh authentication...",
+      });
+    } catch (error) {
+      console.error("Error during refresh:", error);
+      toast({
+        title: "Refresh Failed",
+        description: "Could not refresh data. Please try again.",
+        variant: "destructive"
+      });
     }
-    
-    toast({
-      title: "Refreshing Data",
-      description: "Fetching the latest data and images...",
-    });
   };
   
   const { data: yachtsResponse, isLoading: yachtsLoading } = useQuery<YachtsResponse>({
