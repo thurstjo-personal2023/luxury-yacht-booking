@@ -726,7 +726,13 @@ export default function AssetManagement() {
           : !!yacht.available);
   };
   
-  // Create status badge
+  // Helper to get the addon availability status
+  const getAddonActiveStatus = (addon: ExtendedProductAddOn): boolean => {
+    // Standardize availability/active status - cast to boolean for consistency
+    return !!addon.availability;
+  };
+  
+  // Create status badge for yachts
   const renderStatusBadge = (yacht: ExtendedYachtExperience) => {
     // Get all available status fields for logging
     const availFields = {
@@ -750,6 +756,49 @@ export default function AssetManagement() {
     console.log(`Status badge for yacht ${yachtName} (${yachtId}): `, 
       availFields, 
       `computed=${isActive}, standardized=${isStandardized}, version=${standardVersion}`
+    );
+    
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        {isActive ? (
+          <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">
+            Active
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="bg-gray-100 text-gray-800 hover:bg-gray-200">
+            Inactive
+          </Badge>
+        )}
+        
+        {isStandardized && (
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
+            {standardVersion > 1 ? `Standardized v${standardVersion}` : 'Standardized'}
+          </Badge>
+        )}
+        
+        {!isStandardized && (
+          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">
+            Legacy Format
+          </Badge>
+        )}
+      </div>
+    );
+  };
+  
+  // Create status badge for addons
+  const renderAddonStatusBadge = (addon: ExtendedProductAddOn) => {
+    // Get active status consistently
+    const isActive = getAddonActiveStatus(addon);
+    
+    // Check standardization status
+    const isStandardized = addon._standardized === true || !!addon.mainImage;
+    
+    // Get standardization version if available
+    const standardVersion = addon._standardizedVersion || (isStandardized ? 1 : 0);
+    
+    // Log for debugging
+    console.log(`Status badge for addon ${addon.name} (${addon.productId}): `, 
+      `availability=${addon.availability}, computed=${isActive}, standardized=${isStandardized}, version=${standardVersion}`
     );
     
     return (
@@ -1153,15 +1202,7 @@ export default function AssetManagement() {
                           />
                         </div>
                         <div className="absolute top-2 right-2 flex gap-1">
-                          {addon.availability ? (
-                            <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">
-                              Active
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-gray-100 text-gray-800 hover:bg-gray-200">
-                              Inactive
-                            </Badge>
-                          )}
+                          {renderAddonStatusBadge(addon)}
                         </div>
                       </div>
                       
