@@ -432,7 +432,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      const userData = userDoc.data();
+      const userData = userDoc.data() || {};
       
       if (userData.role !== 'producer') {
         return res.status(400).json({ message: "User is not a producer" });
@@ -500,7 +500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      const userData = userDoc.data();
+      const userData = userDoc.data() || {};
       
       if (userData.role !== 'producer') {
         return res.status(400).json({ message: "User is not a producer" });
