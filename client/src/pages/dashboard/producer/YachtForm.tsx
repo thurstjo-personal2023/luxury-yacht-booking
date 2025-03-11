@@ -561,6 +561,9 @@ export default function YachtForm() {
         isFeatured: values.featured, // unified field
         isPublished: values.published_status, // unified field
         tags: values.tags,
+        // Add producer ID from authenticated user
+        producerId: auth.currentUser?.uid || 'unknown-producer',
+        providerId: auth.currentUser?.uid || 'unknown-producer',
         virtualTour: {
           isEnabled: values.virtual_tour_enabled, // unified field
           scenes: editMode && yachtData?.virtual_tour?.scenes ? yachtData.virtual_tour.scenes : []
