@@ -2,6 +2,7 @@ import { initializeApp, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { Request, Response, NextFunction } from "express";
 
 // Initialize Firebase Admin with service account
 const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT) : {
@@ -55,8 +56,23 @@ if (process.env.NODE_ENV === "development") {
 // Export the initialized services
 export { adminAuth, adminDb, adminStorage };
 
+// Augment Express Request type to include user property
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        uid: string;
+        email?: string;
+        role?: string;
+        name?: string;
+        [key: string]: any;
+      };
+    }
+  }
+}
+
 // Middleware to verify Firebase Auth tokens
-export const verifyAuth = async (req: any, res: any, next: any) => {
+export const verifyAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
@@ -65,7 +81,16 @@ export const verifyAuth = async (req: any, res: any, next: any) => {
 
     const token = authHeader.split('Bearer ')[1];
     const decodedToken = await adminAuth.verifyIdToken(token);
-    req.user = decodedToken;
+    
+    // Set user information in the request object
+    req.user = {
+      uid: decodedToken.uid,
+      email: decodedToken.email,
+      role: decodedToken.role || 'consumer', // Default role
+      name: decodedToken.name,
+      ...decodedToken // Include all other token claims
+    };
+    
     next();
   } catch (error) {
     console.error('Auth Middleware Error:', error);
