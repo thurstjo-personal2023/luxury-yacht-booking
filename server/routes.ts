@@ -36,6 +36,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to add producer IDs" });
     }
   });
+  
+  // Admin route for standardizing collections (yachts and add-ons)
+  app.post("/api/admin/standardize-collection", async (req, res) => {
+    try {
+      const { collection } = req.body;
+      
+      if (!collection) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Collection name is required" 
+        });
+      }
+      
+      // Execute the appropriate standardization script based on collection name
+      let scriptPath = '';
+      if (collection === 'unified_yacht_experiences') {
+        scriptPath = path.resolve(__dirname, '../scripts/standardize-unified-collection.js');
+      } else if (collection === 'products_add_ons') {
+        scriptPath = path.resolve(__dirname, '../scripts/standardize-addons-collection.js');
+      } else {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Unsupported collection: ${collection}` 
+        });
+      }
+      
+      // Run the standardization script as a separate process
+      const standardizeProcess = spawn('node', [scriptPath]);
+      
+      let dataOutput = '';
+      let errorOutput = '';
+      
+      standardizeProcess.stdout.on('data', (data) => {
+        dataOutput += data.toString();
+        console.log(`Standardization stdout: ${data}`);
+      });
+      
+      standardizeProcess.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+        console.error(`Standardization stderr: ${data}`);
+      });
+      
+      standardizeProcess.on('close', (code) => {
+        if (code === 0) {
+          const processedCount = (dataOutput.match(/Found (\d+) documents to standardize/)?.[1] || '0');
+          const updatedCount = (dataOutput.match(/Successfully standardized (\d+) documents/)?.[1] || '0');
+          
+          res.json({
+            success: true,
+            message: `Successfully standardized ${collection} collection`,
+            details: {
+              processedCount: parseInt(processedCount, 10),
+              updatedCount: parseInt(updatedCount, 10),
+              errors: []
+            }
+          });
+        } else {
+          // Extract error details from stderr output if available
+          const errors = errorOutput.split('\n').filter(line => line.includes('Error') || line.includes('error'));
+          
+          res.status(500).json({
+            success: false,
+            message: `Failed to standardize ${collection} collection (exit code ${code})`,
+            details: {
+              processedCount: 0,
+              updatedCount: 0,
+              errors: errors.length > 0 ? errors : [`Script exited with code ${code}`]
+            }
+          });
+        }
+      });
+    } catch (error) {
+      console.error(`Error standardizing collection:`, error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error standardizing collection",
+        details: {
+          processedCount: 0,
+          updatedCount: 0,
+          errors: [String(error)]
+        }
+      });
+    }
+  });
   // New unified API endpoints
   
   // Get featured yachts (specific route needs to be defined before generic routes with params)
@@ -353,115 +437,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Run the collection standardization script
+  // Remove duplicate standardize-collection route since we already defined it above
+
+  /* 
+  // Run the collection standardization script - REMOVED (duplicate route)
   app.post("/api/admin/standardize-collection", async (req, res) => {
-    try {
-      console.log("Starting unified_yacht_experiences collection standardization");
-      
-      // Path to the script relative to the project root
-      const scriptPath = path.resolve(process.cwd(), 'scripts', 'standardize-unified-collection.js');
-      console.log(`Running standardization script at ${scriptPath}`);
-      
-      // Execute the script as a child process
-      const child = spawn('node', [scriptPath]);
-      
-      // Collect output
-      let output = '';
-      let errors: string[] = [];
-      let processedCount = 0;
-      let updatedCount = 0;
-      
-      child.stdout.on('data', (data) => {
-        const dataStr = data.toString();
-        console.log(`Standardization progress: ${dataStr}`);
-        output += dataStr;
-        
-        // Parse output to extract statistics
-        if (dataStr.includes('Found')) {
-          const match = dataStr.match(/Found (\d+) documents/);
-          if (match && match[1]) {
-            processedCount = parseInt(match[1], 10);
-          }
-        }
-        
-        if (dataStr.includes('Successfully standardized')) {
-          const match = dataStr.match(/Successfully standardized (\d+) documents/);
-          if (match && match[1]) {
-            updatedCount = parseInt(match[1], 10);
-          }
-        }
-      });
-      
-      child.stderr.on('data', (data) => {
-        const errorStr = data.toString();
-        console.error(`Standardization error: ${errorStr}`);
-        output += `ERROR: ${errorStr}\n`;
-        errors.push(errorStr);
-      });
-      
-      // Handle completion
-      child.on('close', (code) => {
-        console.log(`Standardization script completed with code ${code}`);
-        
-        if (code === 0) {
-          // Success
-          res.json({ 
-            success: true, 
-            message: "Collection standardization completed successfully",
-            details: {
-              processedCount,
-              updatedCount,
-              errors,
-              output
-            }
-          });
-        } else {
-          // Error
-          res.status(500).json({ 
-            success: false, 
-            message: "Collection standardization failed", 
-            exitCode: code,
-            details: {
-              processedCount,
-              updatedCount,
-              errors,
-              output
-            }
-          });
-        }
-      });
-      
-      // Handle error launching the process
-      child.on('error', (error) => {
-        console.error("Failed to start standardization script:", error);
-        res.status(500).json({ 
-          success: false, 
-          message: "Failed to start standardization script", 
-          error: String(error),
-          details: {
-            processedCount: 0,
-            updatedCount: 0,
-            errors: [String(error)],
-            output
-          }
-        });
-      });
-      
-    } catch (error) {
-      console.error("Error running collection standardization:", error);
-      res.status(500).json({ 
-        success: false, 
-        message: "Error running collection standardization", 
-        error: String(error),
-        details: {
-          processedCount: 0,
-          updatedCount: 0,
-          errors: [String(error)],
-          output: ""
-        }
-      });
-    }
+    // This route was removed to resolve the duplicate route definition
+    // The implementation is moved to line 41
   });
+  */
   
   // Register Stripe-related routes
   registerStripeRoutes(app);
