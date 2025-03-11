@@ -561,7 +561,7 @@ export default function YachtForm() {
         isFeatured: values.featured, // unified field
         isPublished: values.published_status, // unified field
         tags: values.tags,
-        // Add producer ID from authenticated user
+        // Add producer ID from authenticated user - properly linked with harmonized_users collection
         producerId: auth.currentUser?.uid || 'unknown-producer',
         providerId: auth.currentUser?.uid || 'unknown-producer',
         virtualTour: {
