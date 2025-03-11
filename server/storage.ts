@@ -762,28 +762,49 @@ export class FirestoreStorage implements IStorage {
   }
 }
 
-// Add helper method to add producer IDs for testing
+// Helper method to add producer IDs to all yachts
 export async function addProducerIdToTestYachts(producerId: string = 'test-producer-123') {
-  console.log(`Adding producer ID ${producerId} to test yachts...`);
+  console.log(`Adding producer ID ${producerId} to all yachts...`);
   
   // Get yachts from unified collection
   const yachtsRef = adminDb.collection(UNIFIED_YACHT_COLLECTION);
-  const snapshot = await yachtsRef.limit(5).get();
+  const snapshot = await yachtsRef.get(); // Removed limit to get all yachts
   
   if (snapshot.empty) {
-    console.log('No yachts found for testing');
+    console.log('No yachts found in collection');
     return false;
   }
   
   try {
+    // Create a batch for more efficient writes
+    let batch = adminDb.batch();
+    let batchCount = 0;
     let count = 0;
-    // Update each yacht with the test producer ID
+    const BATCH_SIZE = 500; // Firestore batch limit
+    
+    // Update each yacht with the producer ID
     for (const doc of snapshot.docs) {
-      await yachtsRef.doc(doc.id).update({
+      batch.update(doc.ref, {
         providerId: producerId,
-        producerId: producerId
+        producerId: producerId,
+        updatedAt: adminDb.FieldValue.serverTimestamp()
       });
+      batchCount++;
       count++;
+      
+      // If we reach the batch limit, commit and start a new batch
+      if (batchCount >= BATCH_SIZE) {
+        await batch.commit();
+        console.log(`Committed batch of ${batchCount} updates`);
+        batch = adminDb.batch();
+        batchCount = 0;
+      }
+    }
+    
+    // Commit any remaining updates
+    if (batchCount > 0) {
+      await batch.commit();
+      console.log(`Committed final batch of ${batchCount} updates`);
     }
     
     console.log(`Successfully added producer ID to ${count} yachts`);

@@ -39,12 +39,8 @@ console.log(`Connected to Firestore emulator at: ${FIRESTORE_EMULATOR_HOST}`);
 const PRODUCER_ID = 'V4aiP9ihPbdnWNO6UbiZKEt1GoCZ';
 console.log(`Using producer ID: ${PRODUCER_ID}`);
 
-// Collections to update
-const COLLECTIONS = [
-  'unified_yacht_experiences',
-  'yacht_experiences',
-  'yachts'
-];
+// Collection to update
+const COLLECTION = 'unified_yacht_experiences';
 
 /**
  * Associate all yachts with the given producer ID
@@ -52,75 +48,62 @@ const COLLECTIONS = [
 async function associateYachtsWithProducer() {
   console.log('Starting to associate yachts with producer...');
   
-  let totalUpdated = 0;
-  
-  // Process each collection
-  for (const collectionName of COLLECTIONS) {
-    console.log(`\nProcessing collection: ${collectionName}`);
+  try {
+    console.log(`\nProcessing collection: ${COLLECTION}`);
     
-    try {
-      // Get all documents in the collection
-      const snapshot = await db.collection(collectionName).get();
-      
-      if (snapshot.empty) {
-        console.log(`No documents found in ${collectionName}`);
-        continue;
-      }
-      
-      console.log(`Found ${snapshot.size} documents in ${collectionName}`);
-      
-      // Keep track of how many documents are updated in this collection
-      let collectionUpdateCount = 0;
-      
-      // Create a batch for more efficient writes
-      let batch = db.batch();
-      let batchCount = 0;
-      const BATCH_SIZE = 500; // Firestore batch limit
-      
-      // Process each document
-      for (const doc of snapshot.docs) {
-        // Add all producer ID field variations to ensure compatibility
-        const updates = {
-          producerId: PRODUCER_ID,
-          providerId: PRODUCER_ID,
-          producer_id: PRODUCER_ID,
-          provider_id: PRODUCER_ID,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        };
-        
-        // Add the field in the format that matches the collection's schema
-        if (collectionName === 'yacht_experiences') {
-          updates.last_updated_date = admin.firestore.FieldValue.serverTimestamp();
-        }
-        
-        // Add to batch
-        batch.update(doc.ref, updates);
-        batchCount++;
-        collectionUpdateCount++;
-        
-        // If we reach the batch limit, commit and start a new batch
-        if (batchCount >= BATCH_SIZE) {
-          await batch.commit();
-          console.log(`Committed batch of ${batchCount} updates`);
-          batch = db.batch();
-          batchCount = 0;
-        }
-      }
-      
-      // Commit any remaining updates
-      if (batchCount > 0) {
-        await batch.commit();
-        console.log(`Committed final batch of ${batchCount} updates`);
-      }
-      
-      console.log(`Updated ${collectionUpdateCount} documents in ${collectionName}`);
-      totalUpdated += collectionUpdateCount;
-    } catch (error) {
-      console.error(`Error updating ${collectionName}:`, error);
+    // Get all documents in the collection
+    const snapshot = await db.collection(COLLECTION).get();
+    
+    if (snapshot.empty) {
+      console.log(`No documents found in ${COLLECTION}`);
+      return;
     }
+    
+    console.log(`Found ${snapshot.size} documents in ${COLLECTION}`);
+    
+    // Keep track of how many documents are updated
+    let updatedCount = 0;
+    
+    // Create a batch for more efficient writes
+    let batch = db.batch();
+    let batchCount = 0;
+    const BATCH_SIZE = 500; // Firestore batch limit
+    
+    // Process each document
+    for (const doc of snapshot.docs) {
+      // Add all producer ID field variations to ensure compatibility
+      const updates = {
+        producerId: PRODUCER_ID,
+        providerId: PRODUCER_ID,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      
+      // Add to batch
+      batch.update(doc.ref, updates);
+      batchCount++;
+      updatedCount++;
+      
+      // If we reach the batch limit, commit and start a new batch
+      if (batchCount >= BATCH_SIZE) {
+        await batch.commit();
+        console.log(`Committed batch of ${batchCount} updates`);
+        batch = db.batch();
+        batchCount = 0;
+      }
+    }
+    
+    // Commit any remaining updates
+    if (batchCount > 0) {
+      await batch.commit();
+      console.log(`Committed final batch of ${batchCount} updates`);
+    }
+    
+    console.log(`Updated ${updatedCount} documents in ${COLLECTION}`);
+    
+    console.log(`\nCompleted! Total documents updated: ${updatedCount}`);
+  } catch (error) {
+    console.error(`Error updating ${COLLECTION}:`, error);
   }
-  
-  console.log(`\nCompleted! Total documents updated: ${totalUpdated}`);
 }
 
 // Execute the function
