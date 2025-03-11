@@ -722,10 +722,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const addonData = req.body;
       
       // Get the authenticated user ID from the auth token (set by verifyAuth middleware)
-      const producerId = req.user?.uid;
-      const partnerId = producerId; // Use same ID for both
+      const authUserId = req.user?.uid;
       
-      console.log(`Using authenticated user ID for addon creation: ${producerId}`);
+      // Try to get harmonized producer data from the harmonized_users collection
+      let producerId = authUserId;
+      let partnerId = authUserId;
+      
+      try {
+        // Query the harmonized_users collection to get the standardized user data
+        const userSnapshot = await adminDb.collection('harmonized_users')
+          .where('userId', '==', authUserId)
+          .limit(1)
+          .get();
+        
+        if (!userSnapshot.empty) {
+          const userData = userSnapshot.docs[0].data();
+          console.log(`Found harmonized user data for ID ${authUserId}`, userData);
+          
+          // Use the standardized producer/provider IDs if available
+          if (userData.role === 'producer' && userData.producerId) {
+            producerId = userData.producerId;
+            partnerId = userData.producerId; // Use same ID for both by default
+          }
+          
+          // Use partnerId if explicitly different
+          if (userData.role === 'producer' && userData.partnerId) {
+            partnerId = userData.partnerId;
+          }
+        } else {
+          console.log(`No harmonized user found for ID ${authUserId}, using auth ID as fallback`);
+        }
+      } catch (error) {
+        console.warn(`Error fetching harmonized user data for ID ${authUserId}:`, error);
+        // Continue with auth ID as fallback
+      }
+      
+      console.log(`Using producer ID: ${producerId} and partner ID: ${partnerId} for addon creation`);
       
       // Update the addon data with the producer/partner IDs
       addonData.producerId = producerId;
@@ -769,9 +801,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get producer reviews
   app.get("/api/producer/reviews", verifyAuth, async (req: Request, res: Response) => {
     try {
-      // Get producerId directly from verified auth token
-      const producerId = req.user?.uid;
-      console.log(`Fetching reviews for authenticated producer ID: ${producerId}`);
+      // Get auth user ID from verified auth token
+      const authUserId = req.user?.uid;
+      
+      // Try to get harmonized producer ID
+      let producerId = authUserId;
+      
+      try {
+        // Query the harmonized_users collection
+        const userSnapshot = await adminDb.collection('harmonized_users')
+          .where('userId', '==', authUserId)
+          .limit(1)
+          .get();
+        
+        if (!userSnapshot.empty) {
+          const userData = userSnapshot.docs[0].data();
+          
+          // Use the standardized producer ID if available
+          if (userData.role === 'producer' && userData.producerId) {
+            producerId = userData.producerId;
+          }
+        }
+      } catch (error) {
+        console.warn(`Error fetching harmonized user data for reviews (ID ${authUserId}):`, error);
+        // Continue with auth ID as fallback
+      }
+      
+      console.log(`Fetching reviews for producer ID: ${producerId} (auth user: ${authUserId})`);
       
       // Return reviews where the relatedContentId matches any yacht owned by this producer
       // First, get all of this producer's yachts
