@@ -1,0 +1,43 @@
+Step 1: Analyze and Harmonize the Schema
+The provided users.json file contains inconsistencies, including:
+Duplicate ID fields (id vs. userId).
+Varying ID formats (numeric vs. alphanumeric).
+Missing fields in some entries (e.g., updatedAt missing in some records).
+Inconsistent timestamp formats (ISO 8601 format should be used).
+Inconsistent phone number formatting.
+Apply the following harmonization rules:
+Use id as the primary identifier (remove userId).
+Ensure all timestamps (createdAt, updatedAt) use ISO 8601 format.
+All phone numbers should follow E.164 format.
+Ensure all records include updatedAt (set it to createdAt if missing).
+Consistent field ordering for readability and maintainability.
+Write a script to clean and reformat the JSON data accordingly.
+Step 2: Update the Backend
+Modify the backend API to:
+
+Validate Requests:
+Ensure all new user submissions follow the harmonized schema.
+Reject malformed data with proper error messages.
+Modify Database Schema:
+Update user table structure (SQL) or document schema (NoSQL).
+Implement a migration script to reformat existing data.
+Update API Endpoints:
+Ensure GET requests return user data in the correct format.
+Modify POST and PUT requests to accept only harmonized data.
+Implement validation for phone numbers, timestamps, and required fields.
+Step 3: Update the Frontend
+Adjust UI Components:
+Ensure consistent ID usage (id instead of userId).
+Format timestamps for user display.
+Validate phone numbers before submission.
+Refactor API Calls:
+Update the frontend to fetch and send data in the new format.
+Ensure correct handling of form submissions.
+Testing & Debugging:
+Implement automated tests to verify frontend-backend integration.
+Manually test different scenarios (e.g., user registration, profile updates).
+Expected Output:
+Backend API correctly returns all users in the harmonized schema.
+Frontend properly displays and submits data using the new format.
+Existing user data is successfully migrated.
+Automated validation ensures future data remains consistent.
