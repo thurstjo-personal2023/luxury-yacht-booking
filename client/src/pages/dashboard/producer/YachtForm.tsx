@@ -185,7 +185,7 @@ export default function YachtForm() {
       
       // Create a query to find the user in the harmonized_users collection
       const usersRef = collection(db, "harmonized_users");
-      const q = query(usersRef, where("id", "==", userId));
+      const q = query(usersRef, where("userId", "==", userId));
       
       // Execute the query
       const querySnapshot = await getDocs(q);
