@@ -637,7 +637,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Get producer yachts with pagination and ordering by availability status
   // Move this route before the "Get yacht by ID" route to avoid confusion with the :id parameter
-  app.get("/api/producer/yachts", async (req, res) => {
+  app.get("/api/producer/yachts", verifyAuth, async (req, res) => {
     try {
       // Set cache control headers to prevent caching
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -648,23 +648,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = parseInt(req.query.pageSize as string) || 10;
       
-      // Get producerId from request - this can come from the query or from auth
-      let producerId = req.query.producerId as string;
-      
-      // Get the authenticated user from Firebase Auth (if available)
-      const authHeader = req.headers.authorization;
-      
-      if (!producerId && authHeader && authHeader.startsWith('Bearer ')) {
-        try {
-          const token = authHeader.split('Bearer ')[1];
-          const decodedToken = await adminAuth.verifyIdToken(token);
-          producerId = decodedToken.uid;
-          console.log(`Using authenticated user ID as producer ID: ${producerId}`);
-        } catch (authError) {
-          console.error('Error verifying auth token:', authError);
-          // Continue with undefined producerId - will return all yachts
-        }
-      }
+      // Get producerId directly from verified auth token (req.user is set by verifyAuth middleware)
+      let producerId = req.user.uid;
+      console.log(`Using authenticated user ID as producer ID: ${producerId}`);
       
       // Force fresh data with a timestamp to prevent 304 responses
       const forceRefresh = Date.now();
@@ -686,7 +672,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get producer add-ons with pagination and ordering by availability
-  app.get("/api/producer/addons", async (req, res) => {
+  app.get("/api/producer/addons", verifyAuth, async (req, res) => {
     try {
       // Set cache control headers to prevent caching
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -697,23 +683,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = parseInt(req.query.pageSize as string) || 10;
       
-      // Get producerId from request - this can come from the query or from auth
-      let producerId = req.query.producerId as string;
-      
-      // Get the authenticated user from Firebase Auth (if available)
-      const authHeader = req.headers.authorization;
-      
-      if (!producerId && authHeader && authHeader.startsWith('Bearer ')) {
-        try {
-          const token = authHeader.split('Bearer ')[1];
-          const decodedToken = await adminAuth.verifyIdToken(token);
-          producerId = decodedToken.uid;
-          console.log(`Using authenticated user ID as producer ID: ${producerId}`);
-        } catch (authError) {
-          console.error('Error verifying auth token:', authError);
-          // Continue with undefined producerId - will return all add-ons
-        }
-      }
+      // Get producerId directly from verified auth token (req.user is set by verifyAuth middleware)
+      let producerId = req.user.uid;
+      console.log(`Using authenticated user ID as producer ID: ${producerId}`);
       
       // Force fresh data with a timestamp
       const forceRefresh = Date.now();
@@ -739,28 +711,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create a new add-on for a producer
-  app.post("/api/producer/addons/create", async (req, res) => {
+  app.post("/api/producer/addons/create", verifyAuth, async (req: Request, res: Response) => {
     try {
       const addonData = req.body;
       
-      // Get the authenticated user ID from the auth token
-      let producerId = addonData.producerId;
-      let partnerId = addonData.partnerId;
-      const authHeader = req.headers.authorization;
+      // Get the authenticated user ID from the auth token (set by verifyAuth middleware)
+      const producerId = req.user?.uid;
+      const partnerId = producerId; // Use same ID for both
       
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        try {
-          const token = authHeader.split('Bearer ')[1];
-          const decodedToken = await adminAuth.verifyIdToken(token);
-          // Use the authenticated user ID if not provided in request
-          producerId = producerId || decodedToken.uid;
-          partnerId = partnerId || decodedToken.uid;
-          console.log(`Using authenticated user ID for addon creation: ${producerId}`);
-        } catch (authError) {
-          console.error('Error verifying auth token:', authError);
-          // Continue with existing producerId values
-        }
-      }
+      console.log(`Using authenticated user ID for addon creation: ${producerId}`);
       
       // Update the addon data with the producer/partner IDs
       addonData.producerId = producerId;
