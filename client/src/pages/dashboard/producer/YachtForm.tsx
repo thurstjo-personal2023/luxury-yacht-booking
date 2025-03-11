@@ -52,7 +52,10 @@ import {
   setDoc, 
   updateDoc, 
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  query,
+  where,
+  getDocs
 } from "firebase/firestore";
 import { 
   ref, 
@@ -121,6 +124,10 @@ export default function YachtForm() {
     product_id: string;
   }[]>([]);
   const [location, setLocation_] = useState<Location | null>(null);
+  const [producerData, setProducerData] = useState<{
+    producerId: string;
+    providerId: string;
+  } | null>(null);
   
   // Initialize form with default values
   const form = useForm<YachtFormValues>({
@@ -156,6 +163,13 @@ export default function YachtForm() {
     "Diving Adventure"
   ];
   
+  // Fetch producer data from harmonized_users collection
+  useEffect(() => {
+    if (auth.currentUser) {
+      fetchProducerData(auth.currentUser.uid);
+    }
+  }, []);
+
   // Initialize edit mode if yacht ID is provided
   useEffect(() => {
     if (params.id) {
@@ -163,6 +177,58 @@ export default function YachtForm() {
       fetchYachtDetails(params.id);
     }
   }, [params.id]);
+  
+  // Fetch producer details from harmonized_users collection
+  const fetchProducerData = async (userId: string) => {
+    try {
+      console.log(`Fetching producer data for user ID: ${userId}`);
+      
+      // Create a query to find the user in the harmonized_users collection
+      const usersRef = collection(db, "harmonized_users");
+      const q = query(usersRef, where("id", "==", userId));
+      
+      // Execute the query
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        // Get the first matching document
+        const userDoc = querySnapshot.docs[0];
+        const userData = userDoc.data();
+        
+        // Check if the user is a producer
+        if (userData.role === 'producer') {
+          console.log("Found producer data:", userData);
+          
+          // Set the producerId and providerId from the harmonized_users collection
+          setProducerData({
+            producerId: userData.producerId || userData.id,
+            providerId: userData.providerId || userData.id
+          });
+        } else {
+          console.warn(`User ${userId} is not a producer. Role: ${userData.role}`);
+          // Fallback to using the auth ID directly
+          setProducerData({
+            producerId: userId,
+            providerId: userId
+          });
+        }
+      } else {
+        console.warn(`No user found in harmonized_users with ID: ${userId}`);
+        // Fallback to using the auth ID directly
+        setProducerData({
+          producerId: userId,
+          providerId: userId
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching producer data:", error);
+      // Fallback to using the auth ID directly
+      setProducerData({
+        producerId: userId,
+        providerId: userId
+      });
+    }
+  };
   
   // Fetch yacht details for editing
   const fetchYachtDetails = async (yachtId: string) => {
