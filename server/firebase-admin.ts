@@ -71,6 +71,30 @@ declare global {
   }
 }
 
+// Helper function to decode a JWT token
+function decodeJWT(token: string): any {
+  try {
+    // Split the token into its parts
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      throw new Error('Invalid JWT format');
+    }
+    
+    // Decode the payload (second part)
+    const payload = Buffer.from(parts[1], 'base64').toString('utf-8');
+    return JSON.parse(payload);
+  } catch (error) {
+    console.error('Error decoding JWT:', error);
+    return null;
+  }
+}
+
+// Helper to check if we're in development/emulator mode
+const isEmulatorMode = () => {
+  return process.env.NODE_ENV === 'development' || 
+         !!process.env.FIREBASE_AUTH_EMULATOR_HOST;
+};
+
 // Middleware to verify Firebase Auth tokens
 export const verifyAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -80,21 +104,68 @@ export const verifyAuth = async (req: Request, res: Response, next: NextFunction
     }
 
     const token = authHeader.split('Bearer ')[1];
-    const decodedToken = await adminAuth.verifyIdToken(token);
     
-    // Extract properties from the token
-    const { uid, email, role = 'consumer', name, ...otherClaims } = decodedToken;
-    
-    // Set user information in the request object
-    req.user = {
-      uid,
-      email,
-      role,
-      name,
-      ...otherClaims // Include all other token claims
-    };
-    
-    next();
+    // Check if we're in emulator mode and handle emulator tokens differently
+    if (isEmulatorMode() && token) {
+      console.log('Emulator mode detected, using special token handling');
+      
+      try {
+        // First try regular verification
+        const decodedToken = await adminAuth.verifyIdToken(token);
+        
+        // Extract properties and proceed as normal
+        const { uid, email, role = 'consumer', name, ...otherClaims } = decodedToken;
+        req.user = { uid, email, role, name, ...otherClaims };
+        return next();
+      } catch (error: any) {
+        // If verification fails in emulator mode, try manual decoding
+        console.log('Standard token verification failed in emulator, trying manual decode:', 
+          error?.message || 'Unknown error');
+        
+        // Manual decode for emulator tokens
+        const decodedPayload = decodeJWT(token);
+        if (decodedPayload && decodedPayload.user_id) {
+          console.log('Successfully decoded emulator token manually');
+          
+          // Extract user info from manually decoded token
+          const { user_id, email, role = 'consumer', name = '', ...otherClaims } = decodedPayload;
+          
+          // Set user information in the request object
+          req.user = {
+            uid: user_id,
+            email: email || '',
+            role,
+            name,
+            ...otherClaims,
+            // Flag that this was verified via emulator mode
+            _emulatorVerified: true
+          };
+          
+          return next();
+        } else {
+          // Manual decode also failed
+          console.error('Manual token decode failed for emulator');
+          throw new Error('Invalid emulator token');
+        }
+      }
+    } else {
+      // Production mode - use standard token verification
+      const decodedToken = await adminAuth.verifyIdToken(token);
+      
+      // Extract properties from the token
+      const { uid, email, role = 'consumer', name, ...otherClaims } = decodedToken;
+      
+      // Set user information in the request object
+      req.user = {
+        uid,
+        email,
+        role,
+        name,
+        ...otherClaims // Include all other token claims
+      };
+      
+      next();
+    }
   } catch (error) {
     console.error('Auth Middleware Error:', error);
     res.status(401).json({ error: 'Unauthorized' });

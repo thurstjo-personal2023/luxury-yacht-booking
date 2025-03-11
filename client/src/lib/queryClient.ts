@@ -78,11 +78,29 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Build request options
+  // Enable debug logging
+  const enableDebug = true;
+  
+  if (enableDebug) {
+    console.log(`apiRequest: Making ${method} request to ${url}`);
+    if (data) console.log('apiRequest: Request data:', JSON.stringify(data).substring(0, 100) + '...');
+  }
+
+  // Build request options with enhanced debugging
+  const headers = await createRequestHeaders(!!data);
+  
+  if (enableDebug && 'Authorization' in headers) {
+    const token = headers['Authorization'].replace('Bearer ', '');
+    const tokenPreview = token.length > 10 ? 
+      `${token.substring(0, 10)}...${token.substring(token.length - 5)}` : 
+      '[invalid token]';
+    console.log(`apiRequest: Using token: ${tokenPreview}`);
+  }
+  
   const options: RequestInit = {
     method,
     credentials: "include",
-    headers: await createRequestHeaders(!!data),
+    headers,
   };
   
   // Add body if data is provided
@@ -90,12 +108,25 @@ export async function apiRequest(
     options.body = JSON.stringify(data);
   }
   
-  // Make request
-  const res = await fetch(url, options);
-  
-  // Handle response
-  await throwIfResNotOk(res);
-  return res;
+  try {
+    // Make request
+    if (enableDebug) console.log('apiRequest: Sending fetch request...');
+    const res = await fetch(url, options);
+    
+    if (enableDebug) {
+      console.log(`apiRequest: Response status: ${res.status} ${res.statusText}`);
+      if (res.status >= 400) {
+        console.warn(`apiRequest: Error response received (${res.status})`);
+      }
+    }
+    
+    // Handle response
+    await throwIfResNotOk(res);
+    return res;
+  } catch (error) {
+    console.error('apiRequest: Error during request:', error);
+    throw error;
+  }
 }
 
 /**
