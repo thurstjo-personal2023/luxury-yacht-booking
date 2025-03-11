@@ -1,1456 +1,370 @@
 [
   {
-    "id": "EXP123",
-    "customizationOptions": [],
-    "media": [],
-    "reviews": [],
-    "_source": "experience_packages",
-    "title": "Luxury Sunset Yacht Cruise",
-    "description": "Experience a breathtaking sunset aboard a private luxury yacht...",
-    "category": "Adventure",
-    "yachtType": "",
+    "id": "yacht-001",
+    "title": "Luxury Yacht Experience",
+    "description": "Experience luxury on the water with this premium yacht.",
+    "category": "Luxury",
+    "yachtType": "Motor Yacht",
     "location": {
-      "address": "Dubai Marina, UAE",
-      "latitude": 25.2048,
-      "longitude": 55.2708,
+      "address": "Dubai Marina Berth 42",
+      "latitude": 25.2697,
+      "longitude": 55.2774,
       "region": "dubai",
-      "portMarina": ""
+      "portMarina": "Dubai Marina"
     },
-    "capacity": 10,
-    "duration": 3,
-    "pricing": 1500,
-    "pricingModel": "Fixed",
-    "isAvailable": true,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": {
-      "0": "luxury",
-      "1": "adventure",
-      "2": "sunset"
-    },
-    "createdAt": {
-      "_seconds": 1735725600,
-      "_nanoseconds": 0
-    },
-    "updatedAt": {
-      "_seconds": 1736071200,
-      "_nanoseconds": 0
-    },
-    "package_id": "EXP123",
-    "yachtId": "EXP123",
-    "name": "Luxury Sunset Yacht Cruise",
-    "availability_status": true,
-    "available": true,
-    "yacht_type": "",
-    "features": {
-      "0": "luxury",
-      "1": "adventure",
-      "2": "sunset"
-    },
-    "max_guests": 10,
-    "price": 1500,
-    "producerId": "2",
-    "providerId": "2"
-  },
-  {
-    "id": "EXP_AUH_001",
-    "reviews": [],
-    "_source": "experience_packages",
-    "title": "Yas Marina Luxury Experience",
-    "description": "Enjoy the Formula 1 atmosphere with a luxury yacht experience at Yas Marina.",
-    "category": "Premium",
-    "yachtType": "",
-    "location": {
-      "address": "Yas Island, Abu Dhabi, UAE",
-      "latitude": 24.4672,
-      "longitude": 54.6031,
-      "region": "abu-dhabi",
-      "portMarina": "Yas Marina"
-    },
-    "capacity": 20,
-    "duration": 6,
-    "pricing": 4000,
+    "capacity": 12,
+    "duration": 4,
+    "pricing": 2500,
     "pricingModel": "Fixed",
     "customizationOptions": [
       {
-        "id": "option-vduqceg",
-        "name": "F1 Circuit View Dinner",
-        "price": 1000
+        "id": "option-69mv",
+        "name": "Premium Catering",
+        "price": 500
       },
       {
-        "id": "option-f4rtu5v",
-        "name": "Water Sports Package",
-        "price": 800
+        "id": "option-dxqj",
+        "name": "Watersports Package",
+        "price": 700
       }
     ],
     "media": [
       {
         "type": "image",
         "url": "https://images.unsplash.com/photo-1577032229840-33197764440d?w=800"
+      },
+      {
+        "type": "image",
+        "url": "https://images.unsplash.com/photo-1558627044-118eb226e9d9?w=800"
       }
     ],
-    "isAvailable": true,
-    "isFeatured": false,
-    "isPublished": true,
     "tags": [
       "luxury",
-      "sports",
-      "entertainment"
+      "premium",
+      "family",
+      "fishing"
     ],
-    "createdAt": {
-      "_seconds": 1740379504,
-      "_nanoseconds": 22000000
-    },
-    "updatedAt": {
-      "_seconds": 1740379504,
-      "_nanoseconds": 22000000
-    },
-    "package_id": "EXP_AUH_001",
-    "yachtId": "EXP_AUH_001",
-    "name": "Yas Marina Luxury Experience",
-    "availability_status": true,
-    "available": true,
-    "yacht_type": "",
-    "features": [
-      "luxury",
-      "sports",
-      "entertainment"
-    ],
-    "max_guests": 20,
-    "price": 4000,
-    "producerId": "2",
-    "providerId": "2"
-  },
-  {
-    "id": "EXP_AUH_002",
     "reviews": [],
-    "_source": "experience_packages",
-    "title": "Saadiyat Island Marina Experience",
-    "description": "Experience luxury yachting from the pristine Saadiyat Island Marina.",
-    "category": "Ultra-Luxury",
-    "yachtType": "",
-    "location": {
-      "address": "Saadiyat Island, Abu Dhabi, UAE",
-      "latitude": 24.5439,
-      "longitude": 54.4275,
-      "region": "abu-dhabi",
-      "portMarina": "Saadiyat Island Marina"
-    },
-    "capacity": 10,
-    "duration": 4,
-    "pricing": 5000,
-    "pricingModel": "Fixed",
-    "customizationOptions": [
-      {
-        "id": "option-nf14aoj",
-        "name": "Private Beach Access",
-        "price": 1200
-      },
-      {
-        "id": "option-h1i5pu0",
-        "name": "Luxury Spa Treatment",
-        "price": 1500
-      }
-    ],
-    "media": [
-      {
-        "type": "image",
-        "url": "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800"
-      }
-    ],
-    "isAvailable": true,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": [
-      "ultra-luxury",
-      "beach",
-      "exclusive"
-    ],
-    "createdAt": {
-      "_seconds": 1740379504,
-      "_nanoseconds": 22000000
-    },
-    "updatedAt": {
-      "_seconds": 1740379504,
-      "_nanoseconds": 22000000
-    },
-    "package_id": "EXP_AUH_002",
-    "yachtId": "EXP_AUH_002",
-    "name": "Saadiyat Island Marina Experience",
-    "availability_status": true,
-    "available": true,
-    "yacht_type": "",
-    "features": [
-      "ultra-luxury",
-      "beach",
-      "exclusive"
-    ],
-    "max_guests": 10,
-    "price": 5000,
-    "providerId": "test-producer-123",
-    "producerId": "test-producer-123"
-  },
-  {
-    "id": "EXP_DXB_001",
-    "reviews": [],
-    "_source": "experience_packages",
-    "title": "Dubai Marina Yacht Club Experience",
-    "description": "Experience the stunning Dubai skyline aboard our luxury yacht, cruising through the iconic Dubai Marina.",
-    "category": "Luxury",
-    "yachtType": "",
-    "location": {
-      "address": "Dubai Marina, Dubai, UAE",
-      "latitude": 25.0819,
-      "longitude": 55.1367,
-      "region": "dubai",
-      "portMarina": "Dubai Marina Yacht Club"
-    },
-    "capacity": 12,
-    "duration": 4,
-    "pricing": 2500,
-    "pricingModel": "Fixed",
-    "customizationOptions": [
-      {
-        "id": "option-lx2za0j",
-        "name": "Gourmet Dining",
-        "price": 750
-      },
-      {
-        "id": "option-2l8nohl",
-        "name": "Professional Photography",
-        "price": 500
-      }
-    ],
-    "media": [
-      {
-        "type": "image",
-        "url": "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?w=800"
-      }
-    ],
-    "isAvailable": true,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": [
-      "luxury",
-      "sunset",
-      "marina"
-    ],
-    "createdAt": {
-      "_seconds": 1740379504,
-      "_nanoseconds": 22000000
-    },
-    "updatedAt": {
-      "_seconds": 1740379504,
-      "_nanoseconds": 22000000
-    },
-    "package_id": "EXP_DXB_001",
-    "yachtId": "EXP_DXB_001",
-    "name": "Dubai Marina Yacht Club Experience",
-    "availability_status": true,
-    "available": true,
-    "yacht_type": "",
-    "features": [
-      "luxury",
-      "sunset",
-      "marina"
-    ],
-    "max_guests": 12,
-    "price": 2500,
-    "providerId": "test-producer-123",
-    "producerId": "test-producer-123"
-  },
-  {
-    "id": "EXP_DXB_002",
-    "reviews": [],
-    "_source": "experience_packages",
-    "title": "Dubai Creek Luxury Experience",
-    "description": "Discover Dubai's maritime heritage from the historic Dubai Creek.",
-    "category": "Cultural",
-    "yachtType": "",
-    "location": {
-      "address": "Dubai Creek, Dubai, UAE",
-      "latitude": 25.2526,
-      "longitude": 55.28,
-      "region": "dubai",
-      "portMarina": "Dubai Creek Marina"
-    },
-    "capacity": 15,
-    "duration": 5,
-    "pricing": 3000,
-    "pricingModel": "Fixed",
-    "customizationOptions": [
-      {
-        "id": "option-igo4kqc",
-        "name": "Heritage Guide",
-        "price": 600
-      },
-      {
-        "id": "option-f47a9s2",
-        "name": "Traditional Dinner",
-        "price": 800
-      }
-    ],
-    "media": [
-      {
-        "type": "image",
-        "url": "https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?w=800"
-      }
-    ],
-    "isAvailable": true,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": [
-      "heritage",
-      "culture",
-      "history"
-    ],
-    "createdAt": {
-      "_seconds": 1740379504,
-      "_nanoseconds": 22000000
-    },
-    "updatedAt": {
-      "_seconds": 1740379504,
-      "_nanoseconds": 22000000
-    },
-    "package_id": "EXP_DXB_002",
-    "yachtId": "EXP_DXB_002",
-    "name": "Dubai Creek Luxury Experience",
-    "availability_status": true,
-    "available": true,
-    "yacht_type": "",
-    "features": [
-      "heritage",
-      "culture",
-      "history"
-    ],
-    "max_guests": 15,
-    "price": 3000,
-    "providerId": "test-producer-123",
-    "producerId": "test-producer-123"
-  },
-  {
-    "id": "EXP_YAS_001",
-    "_source": "experience_packages",
-    "title": "Yas Marina F1 Sunset Experience",
-    "description": "Experience the thrill of Formula 1 atmosphere with a luxury sunset cruise along Yas Marina Circuit. Perfect for motorsport enthusiasts and luxury seekers alike.",
-    "category": "Premium",
-    "yachtType": "",
-    "location": {
-      "address": "Yas Marina, Abu Dhabi, UAE",
-      "latitude": 24.4672,
-      "longitude": 54.6031,
-      "region": "dubai",
-      "portMarina": "Yas Marina"
-    },
-    "capacity": 12,
-    "duration": 4,
-    "pricing": 3500,
-    "pricingModel": "Fixed",
-    "customizationOptions": [
-      {
-        "id": "option-0zk3rhq",
-        "name": "F1-themed Gourmet Dining",
-        "price": 850
-      },
-      {
-        "id": "option-21ff7jr",
-        "name": "Professional Photography",
-        "price": 500
-      },
-      {
-        "id": "option-15qtf5q",
-        "name": "Circuit Tour Guide",
-        "price": 300
-      }
-    ],
-    "media": [
-      {
-        "type": "image",
-        "url": "https://images.unsplash.com/photo-1621277224630-4c70c1a24c15?w=800"
-      },
-      {
-        "type": "video",
-        "url": "https://example.com/videos/yas-f1-experience.mp4"
-      }
-    ],
-    "isAvailable": true,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": [
-      "f1",
-      "luxury",
-      "sunset",
-      "yacht"
-    ],
-    "reviews": [
-      {
-        "rating": 5,
-        "text": "",
-        "userId": ""
-      }
-    ],
-    "createdAt": {
-      "_seconds": 1740379891,
-      "_nanoseconds": 648000000
-    },
-    "updatedAt": {
-      "_seconds": 1740379891,
-      "_nanoseconds": 648000000
-    },
-    "package_id": "EXP_YAS_001",
-    "yachtId": "EXP_YAS_001",
-    "name": "Yas Marina F1 Sunset Experience",
-    "availability_status": true,
-    "available": true,
-    "yacht_type": "",
-    "features": [
-      "f1",
-      "luxury",
-      "sunset",
-      "yacht"
-    ],
-    "max_guests": 12,
-    "price": 3500,
-    "providerId": null,
-    "producerId": null
-  },
-  {
-    "id": "EXP_YAS_002",
-    "_source": "experience_packages",
-    "title": "Yas Marina Luxury Dinner Cruise",
-    "description": "Indulge in an exquisite dining experience aboard our luxury yacht at Yas Marina. Featuring a 5-star chef and breathtaking views of the Abu Dhabi skyline.",
-    "category": "Ultra-Luxury",
-    "yachtType": "",
-    "location": {
-      "address": "Yas Marina, Abu Dhabi, UAE",
-      "latitude": 24.4672,
-      "longitude": 54.6031,
-      "region": "dubai",
-      "portMarina": "Yas Marina"
-    },
-    "capacity": 15,
-    "duration": 3,
-    "pricing": 4200,
-    "pricingModel": "Fixed",
-    "customizationOptions": [
-      {
-        "id": "option-dpelpf4",
-        "name": "Private Chef Experience",
-        "price": 1200
-      },
-      {
-        "id": "option-s34wjjz",
-        "name": "Wine Pairing",
-        "price": 600
-      },
-      {
-        "id": "option-sqkqjvy",
-        "name": "Live Music",
-        "price": 800
-      }
-    ],
-    "media": [
-      {
-        "type": "image",
-        "url": "https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=800"
-      },
-      {
-        "type": "video",
-        "url": "https://example.com/videos/yas-dinner-cruise.mp4"
-      }
-    ],
-    "isAvailable": true,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": [
-      "dining",
-      "luxury",
-      "gourmet",
-      "exclusive"
-    ],
-    "reviews": [
-      {
-        "rating": 5,
-        "text": "",
-        "userId": ""
-      }
-    ],
-    "createdAt": {
-      "_seconds": 1740379891,
-      "_nanoseconds": 648000000
-    },
-    "updatedAt": {
-      "_seconds": 1740379891,
-      "_nanoseconds": 648000000
-    },
-    "package_id": "EXP_YAS_002",
-    "yachtId": "EXP_YAS_002",
-    "name": "Yas Marina Luxury Dinner Cruise",
-    "availability_status": true,
-    "available": true,
-    "yacht_type": "",
-    "features": [
-      "dining",
-      "luxury",
-      "gourmet",
-      "exclusive"
-    ],
-    "max_guests": 15,
-    "price": 4200,
-    "providerId": null,
-    "producerId": null
-  },
-  {
-    "id": "EXP_YAS_003",
-    "_source": "experience_packages",
-    "title": "Yas Marina Adventure Package",
-    "description": "Combine luxury yachting with thrilling water sports at Yas Marina. Perfect for adventure seekers looking for an adrenaline-packed day on the water.",
-    "category": "Adventure",
-    "yachtType": "",
-    "location": {
-      "address": "Yas Marina, Abu Dhabi, UAE",
-      "latitude": 24.4672,
-      "longitude": 54.6031,
-      "region": "dubai",
-      "portMarina": "Yas Marina"
-    },
-    "capacity": 20,
-    "duration": 6,
-    "pricing": 5500,
-    "pricingModel": "Fixed",
-    "customizationOptions": [
-      {
-        "id": "option-tstjc9v",
-        "name": "Jet Ski Package",
-        "price": 800
-      },
-      {
-        "id": "option-jqhd1ps",
-        "name": "Parasailing Experience",
-        "price": 400
-      },
-      {
-        "id": "option-2xqfm3b",
-        "name": "Diving Experience",
-        "price": 600
-      }
-    ],
-    "media": [
-      {
-        "type": "image",
-        "url": "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800"
-      },
-      {
-        "type": "video",
-        "url": "https://example.com/videos/yas-adventure.mp4"
-      }
-    ],
-    "isAvailable": true,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": [
-      "adventure",
-      "watersports",
-      "luxury",
-      "active"
-    ],
-    "reviews": [
-      {
-        "rating": 5,
-        "text": "",
-        "userId": ""
-      }
-    ],
-    "createdAt": {
-      "_seconds": 1740379891,
-      "_nanoseconds": 648000000
-    },
-    "updatedAt": {
-      "_seconds": 1740379891,
-      "_nanoseconds": 648000000
-    },
-    "package_id": "EXP_YAS_003",
-    "yachtId": "EXP_YAS_003",
-    "name": "Yas Marina Adventure Package",
-    "availability_status": true,
-    "available": true,
-    "yacht_type": "",
-    "features": [
-      "adventure",
-      "watersports",
-      "luxury",
-      "active"
-    ],
-    "max_guests": 20,
-    "price": 5500,
-    "providerId": null,
-    "producerId": null
-  },
-  {
-    "id": "YAC123",
-    "customizationOptions": [],
-    "media": [],
-    "reviews": [],
-    "_source": "yacht_experiences",
-    "title": "Majestic Pearl",
-    "description": "A 30-meter luxury yacht with state-of-the-art amenities, perfect for sunset cruises and private events.",
-    "category": "",
-    "yachtType": "",
-    "location": {
-      "address": "Miami Marina, FL",
-      "latitude": 25.7617,
-      "longitude": -80.1918,
-      "region": "dubai",
-      "portMarina": ""
-    },
-    "capacity": 12,
-    "duration": 0,
-    "pricing": 2500,
-    "pricingModel": "Fixed",
-    "isAvailable": true,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": [
-      "Jacuzzi",
-      "Sundeck",
-      "Premium Bar",
-      "WiFi"
-    ],
-    "createdAt": {
-      "_seconds": 1739990117,
-      "_nanoseconds": 155000000
-    },
-    "updatedAt": {
-      "_seconds": 1739990117,
-      "_nanoseconds": 155000000
-    },
-    "package_id": "YAC123",
-    "yachtId": "YAC123",
-    "name": "Majestic Pearl",
-    "availability_status": true,
-    "available": true,
-    "yacht_type": "",
-    "features": [
-      "Jacuzzi",
-      "Sundeck",
-      "Premium Bar",
-      "WiFi"
-    ],
-    "max_guests": 12,
-    "price": 2500,
-    "providerId": null,
-    "producerId": null
-  },
-  {
-    "id": "YAC124",
-    "customizationOptions": [],
-    "media": [],
-    "reviews": [],
-    "_source": "yacht_experiences",
-    "title": "Ocean Empress",
-    "description": "Luxury 35-meter yacht featuring spacious entertainment areas and professional crew service.",
-    "category": "",
-    "yachtType": "",
-    "location": {
-      "address": "Miami Marina, FL",
-      "latitude": 25.7617,
-      "longitude": -80.1918,
-      "region": "dubai",
-      "portMarina": ""
-    },
-    "capacity": 15,
-    "duration": 0,
-    "pricing": 3200,
-    "pricingModel": "Fixed",
-    "isAvailable": true,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": [
-      "Master Suite",
-      "Beach Club",
-      "Water Sports Equipment",
-      "Gourmet Kitchen"
-    ],
-    "createdAt": {
-      "_seconds": 1739990117,
-      "_nanoseconds": 155000000
-    },
-    "updatedAt": {
-      "_seconds": 1739990117,
-      "_nanoseconds": 155000000
-    },
-    "package_id": "YAC124",
-    "yachtId": "YAC124",
-    "name": "Ocean Empress",
-    "availability_status": true,
-    "available": true,
-    "yacht_type": "",
-    "features": [
-      "Master Suite",
-      "Beach Club",
-      "Water Sports Equipment",
-      "Gourmet Kitchen"
-    ],
-    "max_guests": 15,
-    "price": 3200,
-    "providerId": null,
-    "producerId": null
-  },
-  {
-    "id": "YAC125",
-    "customizationOptions": [],
-    "media": [],
-    "reviews": [],
-    "_source": "yacht_experiences",
-    "title": "Royal Navigator",
-    "description": "A 40-meter superyacht offering the ultimate luxury experience with helicopter landing pad.",
-    "category": "",
-    "yachtType": "",
-    "location": {
-      "address": "Miami Marina, FL",
-      "latitude": 25.7617,
-      "longitude": -80.1918,
-      "region": "dubai",
-      "portMarina": ""
-    },
-    "capacity": 20,
-    "duration": 0,
-    "pricing": 4500,
-    "pricingModel": "Fixed",
-    "isAvailable": true,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": [
-      "Helipad",
-      "Cinema Room",
-      "Gym",
-      "Multiple Decks"
-    ],
-    "createdAt": {
-      "_seconds": 1739990117,
-      "_nanoseconds": 155000000
-    },
-    "updatedAt": {
-      "_seconds": 1739990117,
-      "_nanoseconds": 155000000
-    },
-    "package_id": "YAC125",
-    "yachtId": "YAC125",
-    "name": "Royal Navigator",
-    "availability_status": true,
-    "available": true,
-    "yacht_type": "",
-    "features": [
-      "Helipad",
-      "Cinema Room",
-      "Gym",
-      "Multiple Decks"
-    ],
-    "max_guests": 20,
-    "price": 4500,
-    "providerId": null,
-    "producerId": null
-  },
-  {
-    "id": "YAC_YAS_001",
-    "customizationOptions": [],
-    "reviews": [],
-    "_source": "yacht_profiles",
-    "title": "Pearl of Yas",
-    "description": "A stunning 35-meter luxury yacht perfectly suited for the F1 atmosphere of Yas Marina",
-    "category": "",
-    "yachtType": "",
-    "location": {
-      "address": "",
-      "latitude": 0,
-      "longitude": 0,
-      "region": "dubai",
-      "portMarina": ""
-    },
-    "capacity": 12,
-    "duration": 0,
-    "pricing": 3500,
-    "pricingModel": "Fixed",
-    "media": [
-      {
-        "type": "image",
-        "url": "https://images.unsplash.com/photo-1621277224630-4c70c1a24c15?w=800"
-      }
-    ],
-    "isAvailable": false,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": [
-      "luxury",
-      "f1",
-      "entertainment"
-    ],
-    "createdAt": {
-      "_seconds": 1740379891,
-      "_nanoseconds": 648000000
-    },
-    "updatedAt": {
-      "_seconds": 1740379891,
-      "_nanoseconds": 648000000
-    },
-    "package_id": "YAC_YAS_001",
-    "yachtId": "YAC_YAS_001",
-    "name": "Pearl of Yas",
-    "availability_status": false,
-    "available": false,
-    "yacht_type": "",
-    "features": [
-      "Sundeck",
-      "Premium Bar",
-      "Entertainment System",
-      "WiFi",
-      "Climate Control"
-    ],
-    "max_guests": 12,
-    "price": 3500,
-    "providerId": "OWN_YAS_001",
-    "producerId": "OWN_YAS_001"
-  },
-  {
-    "id": "YAC_YAS_002",
-    "customizationOptions": [],
-    "reviews": [],
-    "_source": "yacht_profiles",
-    "title": "Yas Elegance",
-    "description": "An exquisite 40-meter yacht featuring gourmet dining facilities and panoramic views",
-    "category": "",
-    "yachtType": "",
-    "location": {
-      "address": "",
-      "latitude": 0,
-      "longitude": 0,
-      "region": "dubai",
-      "portMarina": ""
-    },
-    "capacity": 15,
-    "duration": 0,
-    "pricing": 4200,
-    "pricingModel": "Fixed",
-    "media": [
-      {
-        "type": "image",
-        "url": "https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=800"
-      }
-    ],
-    "isAvailable": false,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": [
-      "luxury",
-      "dining",
-      "gourmet"
-    ],
-    "createdAt": {
-      "_seconds": 1740379891,
-      "_nanoseconds": 648000000
-    },
-    "updatedAt": {
-      "_seconds": 1740379891,
-      "_nanoseconds": 648000000
-    },
-    "package_id": "YAC_YAS_002",
-    "yachtId": "YAC_YAS_002",
-    "name": "Yas Elegance",
-    "availability_status": false,
-    "available": false,
-    "yacht_type": "",
-    "features": [
-      "Gourmet Kitchen",
-      "Dining Salon",
-      "Master Suite",
-      "Wine Cellar",
-      "Observation Deck"
-    ],
-    "max_guests": 15,
-    "price": 4200,
-    "providerId": "OWN_YAS_002",
-    "producerId": "OWN_YAS_002"
-  },
-  {
-    "id": "YAC_YAS_003",
-    "customizationOptions": [],
-    "reviews": [],
-    "_source": "yacht_profiles",
-    "title": "Yas Adventurer",
-    "description": "A versatile 45-meter yacht equipped for water sports and adventure activities",
-    "category": "",
-    "yachtType": "",
-    "location": {
-      "address": "",
-      "latitude": 0,
-      "longitude": 0,
-      "region": "dubai",
-      "portMarina": ""
-    },
-    "capacity": 20,
-    "duration": 0,
-    "pricing": 5500,
-    "pricingModel": "Fixed",
-    "media": [
-      {
-        "type": "image",
-        "url": "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800"
-      }
-    ],
-    "isAvailable": false,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": [
-      "adventure",
-      "water sports",
-      "active"
-    ],
-    "createdAt": {
-      "_seconds": 1740379891,
-      "_nanoseconds": 648000000
-    },
-    "updatedAt": {
-      "_seconds": 1740379891,
-      "_nanoseconds": 648000000
-    },
-    "package_id": "YAC_YAS_003",
-    "yachtId": "YAC_YAS_003",
-    "name": "Yas Adventurer",
-    "availability_status": false,
-    "available": false,
-    "yacht_type": "",
-    "features": [
-      "Water Sports Equipment",
-      "Diving Gear",
-      "Speed Boats",
-      "Sun Deck",
-      "Beach Club"
-    ],
-    "max_guests": 20,
-    "price": 5500,
-    "producerId": "2",
-    "providerId": "2"
-  },
-  {
-    "id": "sH8u7Ur8k75OOaU4SiNq",
-    "customizationOptions": [],
-    "reviews": [],
-    "_source": "yacht_profiles",
-    "title": "Majestic Pearl",
-    "description": "A 30-meter luxury yacht with state-of-the-art amenities...",
-    "category": "",
-    "yachtType": "",
-    "location": {
-      "address": "",
-      "latitude": 0,
-      "longitude": 0,
-      "region": "dubai",
-      "portMarina": ""
-    },
-    "capacity": 12,
-    "duration": 0,
-    "pricing": 2500,
-    "pricingModel": "Fixed",
-    "media": [
-      {
-        "type": "image",
-        "url": "https://etoileyachts.com/media/yacht.jpg"
-      }
-    ],
-    "isAvailable": false,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": [
-      "luxury",
-      "private",
-      "jacuzzi"
-    ],
-    "createdAt": "2025-01-01T10:00:00Z",
-    "updatedAt": "2025-01-05T10:00:00Z",
-    "package_id": "sH8u7Ur8k75OOaU4SiNq",
-    "yachtId": "sH8u7Ur8k75OOaU4SiNq",
-    "name": "Majestic Pearl",
-    "availability_status": false,
-    "available": false,
-    "yacht_type": "",
-    "features": [
-      "Jacuzzi",
-      "Sundeck",
-      "Dining Area"
-    ],
-    "max_guests": 12,
-    "price": 2500,
-    "producerId": "2",
-    "providerId": "2"
-  },
-  {
-    "id": "x7Zd4ObWIoz33CqvDcJM",
-    "customizationOptions": [],
-    "reviews": [],
-    "_source": "yacht_profiles",
-    "title": "Majestic Pearl",
-    "description": "A 30-meter luxury yacht with state-of-the-art amenities...",
-    "category": "",
-    "yachtType": "",
-    "location": {
-      "address": "",
-      "latitude": 0,
-      "longitude": 0,
-      "region": "dubai",
-      "portMarina": ""
-    },
-    "capacity": 12,
-    "duration": 0,
-    "pricing": 2500,
-    "pricingModel": "Fixed",
-    "media": [
-      {
-        "type": "image",
-        "url": "https://etoileyachts.com/media/yacht.jpg"
-      }
-    ],
-    "isAvailable": false,
-    "isFeatured": false,
-    "isPublished": true,
-    "tags": [
-      "luxury",
-      "private",
-      "jacuzzi"
-    ],
-    "createdAt": "2025-01-01T10:00:00Z",
-    "updatedAt": "2025-01-05T10:00:00Z",
-    "package_id": "x7Zd4ObWIoz33CqvDcJM",
-    "yachtId": "x7Zd4ObWIoz33CqvDcJM",
-    "name": "Majestic Pearl",
-    "availability_status": false,
-    "available": false,
-    "yacht_type": "",
-    "features": [
-      "Jacuzzi",
-      "Sundeck",
-      "Dining Area"
-    ],
-    "max_guests": 12,
-    "price": 2500,
-    "producerId": "2",
-    "providerId": "2"
-  },
-  {
-    "id": "yacht-001",
-    "title": "Luxury Yacht Experience in Dubai",
-    "description": "Enjoy a luxurious yacht cruise along Dubai's coastline with stunning views.",
-    "category": "Day Cruise",
-    "yachtType": "Luxury Motor Yacht",
-    "location": {
-      "address": "Dubai Marina Yacht Club, Dubai, UAE",
-      "latitude": 25.0819,
-      "longitude": 55.1398,
-      "region": "dubai",
-      "portMarina": "Dubai Marina"
-    },
-    "capacity": 12,
-    "duration": 4,
-    "pricing": 2500,
-    "pricingModel": "Fixed",
-    "customizationOptions": [
-      {
-        "id": "option-1",
-        "name": "Premium Catering",
-        "price": 500
-      },
-      {
-        "id": "option-2",
-        "name": "Professional Photography",
-        "price": 300
-      }
-    ],
-    "media": [
-      {
-        "type": "image",
-        "url": "https://example.com/yacht1.jpg"
-      },
-      {
-        "type": "image",
-        "url": "https://example.com/yacht1-interior.jpg"
-      }
-    ],
     "isAvailable": true,
     "isFeatured": true,
     "isPublished": true,
-    "tags": [
-      "luxury",
-      "cruise",
-      "dubai",
-      "sightseeing"
-    ],
+    "providerId": null,
+    "virtualTour": {
+      "isEnabled": false,
+      "scenes": []
+    },
     "createdAt": {
-      "_seconds": 1741522391,
-      "_nanoseconds": 624000000
+      "_seconds": 1630444800,
+      "_nanoseconds": 0
     },
     "updatedAt": {
-      "_seconds": 1741522391,
-      "_nanoseconds": 624000000
+      "_seconds": 1741677000,
+      "_nanoseconds": 0
     },
-    "package_id": "yacht-001",
-    "yachtId": "yacht-001",
-    "name": "Luxury Yacht Experience in Dubai",
+    "_lastUpdated": "1741677627234",
+    "name": "Luxury Yacht Experience",
     "availability_status": true,
     "available": true,
-    "yacht_type": "Luxury Motor Yacht",
     "features": [
       "luxury",
-      "cruise",
-      "dubai",
-      "sightseeing"
+      "premium",
+      "family",
+      "fishing"
     ],
-    "max_guests": 12,
+    "yacht_type": "Motor Yacht",
     "price": 2500,
-    "producerId": "2",
-    "providerId": "2"
+    "max_guests": 12,
+    "created_date": {
+      "_seconds": 1630444800,
+      "_nanoseconds": 0
+    },
+    "last_updated_date": {
+      "_seconds": 1741677000,
+      "_nanoseconds": 0
+    },
+    "mainImage": "https://images.unsplash.com/photo-1577032229840-33197764440d?w=800",
+    "_standardized": true,
+    "_standardizedVersion": 2
   },
   {
     "id": "yacht-002",
-    "title": "Abu Dhabi Sunset Yacht Tour",
-    "description": "Experience a breathtaking sunset tour along Abu Dhabi's iconic coastline.",
-    "category": "Sunset Tour",
-    "yachtType": "Catamaran",
+    "title": "Sunset Cruise",
+    "description": "Enjoy the beautiful sunset views from the Arabian Gulf.",
+    "category": "Cruising",
+    "yachtType": "Sailing Yacht",
     "location": {
-      "address": "Yas Marina, Abu Dhabi, UAE",
+      "address": "Abu Dhabi Yas Marina",
       "latitude": 24.4672,
       "longitude": 54.6031,
       "region": "abu-dhabi",
       "portMarina": "Yas Marina"
     },
-    "capacity": 20,
+    "capacity": 8,
     "duration": 3,
     "pricing": 1800,
-    "pricingModel": "Fixed",
+    "pricingModel": "Variable",
     "customizationOptions": [
       {
-        "id": "option-3",
-        "name": "BBQ Package",
-        "price": 400
+        "id": "option-1",
+        "name": "Photography Package",
+        "price": 300
       }
     ],
     "media": [
       {
         "type": "image",
-        "url": "https://example.com/yacht2.jpg"
+        "url": "https://images.unsplash.com/photo-1565778827801-1d062e280a95?w=800"
       }
     ],
-    "isAvailable": true,
-    "isFeatured": true,
-    "isPublished": true,
     "tags": [
+      "romantic",
       "sunset",
-      "abu-dhabi",
-      "tour",
-      "catamaran"
+      "couples"
     ],
+    "reviews": [],
+    "isAvailable": true,
+    "isFeatured": false,
+    "isPublished": true,
+    "providerId": null,
+    "virtualTour": {
+      "isEnabled": false,
+      "scenes": []
+    },
     "createdAt": {
-      "_seconds": 1741522391,
-      "_nanoseconds": 624000000
+      "_seconds": 1635724800,
+      "_nanoseconds": 0
     },
     "updatedAt": {
-      "_seconds": 1741522391,
-      "_nanoseconds": 624000000
+      "_seconds": 1741677200,
+      "_nanoseconds": 0
     },
-    "package_id": "yacht-002",
-    "yachtId": "yacht-002",
-    "name": "Abu Dhabi Sunset Yacht Tour",
+    "_lastUpdated": "1741677627234",
+    "name": "Sunset Cruise",
     "availability_status": true,
     "available": true,
-    "yacht_type": "Catamaran",
     "features": [
+      "romantic",
       "sunset",
-      "abu-dhabi",
-      "tour",
-      "catamaran"
+      "couples"
     ],
-    "max_guests": 20,
+    "yacht_type": "Sailing Yacht",
     "price": 1800,
-    "producerId": "2",
-    "providerId": "2"
+    "max_guests": 8,
+    "created_date": {
+      "_seconds": 1635724800,
+      "_nanoseconds": 0
+    },
+    "last_updated_date": {
+      "_seconds": 1741677200,
+      "_nanoseconds": 0
+    },
+    "mainImage": "https://images.unsplash.com/photo-1565778827801-1d062e280a95?w=800",
+    "_standardized": true,
+    "_standardizedVersion": 2
   },
   {
     "id": "yacht-003",
     "title": "Deep Sea Fishing Adventure",
-    "description": "A thrilling deep sea fishing expedition in the Arabian Gulf.",
+    "description": "Test your fishing skills with our deep sea fishing experience.",
     "category": "Fishing",
-    "yachtType": "Sport Fishing Yacht",
+    "yachtType": "Sports Fishing Yacht",
     "location": {
-      "address": "Dubai Fishing Harbor, Dubai, UAE",
-      "latitude": 25.1246,
-      "longitude": 55.1753,
+      "address": "Dubai Fishing Harbor",
+      "latitude": 25.3157,
+      "longitude": 55.3046,
       "region": "dubai",
       "portMarina": "Fishing Harbor"
     },
-    "capacity": 8,
+    "capacity": 6,
     "duration": 6,
-    "pricing": 3000,
+    "pricing": 3200,
     "pricingModel": "Fixed",
     "customizationOptions": [
       {
-        "id": "option-4",
+        "id": "option-6dg6",
         "name": "Fishing Equipment",
         "price": 200
       },
       {
-        "id": "option-5",
-        "name": "Seafood Lunch",
-        "price": 350
+        "id": "option-5fko",
+        "name": "Professional Guide",
+        "price": 600
       }
     ],
     "media": [
       {
         "type": "image",
-        "url": "https://example.com/fishing-yacht.jpg"
+        "url": "https://images.unsplash.com/photo-1578892402677-c8d1ac0543a4?w=800"
       }
     ],
-    "isAvailable": true,
-    "isFeatured": false,
-    "isPublished": true,
     "tags": [
       "fishing",
-      "sport",
       "adventure",
-      "deep-sea"
+      "sport"
     ],
+    "reviews": [],
+    "isAvailable": false,
+    "isFeatured": true,
+    "isPublished": true,
+    "providerId": null,
+    "virtualTour": {
+      "isEnabled": true,
+      "scenes": [
+        {
+          "id": "scene-1",
+          "title": "Deck View",
+          "imageUrl": "https://images.unsplash.com/photo-1576650250697-e9de7a5827a9?w=800",
+          "thumbnailUrl": "",
+          "hotspots": [
+            {
+              "id": "hotspot-1",
+              "pitch": 0,
+              "yaw": 180,
+              "text": "Fishing area",
+              "type": "info"
+            }
+          ],
+          "initialViewParameters": {}
+        }
+      ]
+    },
     "createdAt": {
-      "_seconds": 1741522391,
-      "_nanoseconds": 624000000
+      "_seconds": 1638316800,
+      "_nanoseconds": 0
     },
     "updatedAt": {
-      "_seconds": 1741522391,
-      "_nanoseconds": 624000000
+      "_seconds": 1741677400,
+      "_nanoseconds": 0
     },
-    "package_id": "yacht-003",
-    "yachtId": "yacht-003",
+    "_lastUpdated": "1741677627234",
     "name": "Deep Sea Fishing Adventure",
-    "availability_status": true,
-    "available": true,
-    "yacht_type": "Sport Fishing Yacht",
+    "availability_status": false,
+    "available": false,
     "features": [
       "fishing",
-      "sport",
       "adventure",
-      "deep-sea"
+      "sport"
     ],
-    "max_guests": 8,
-    "price": 3000,
-    "producerId": "2",
-    "providerId": "2"
+    "yacht_type": "Sports Fishing Yacht",
+    "price": 3200,
+    "max_guests": 6,
+    "created_date": {
+      "_seconds": 1638316800,
+      "_nanoseconds": 0
+    },
+    "last_updated_date": {
+      "_seconds": 1741677400,
+      "_nanoseconds": 0
+    },
+    "mainImage": "https://images.unsplash.com/photo-1578892402677-c8d1ac0543a4?w=800",
+    "_standardized": true,
+    "_standardizedVersion": 2
   },
   {
-    "id": "yacht-1",
-    "reviews": [],
-    "_source": "yacht_experiences",
-    "title": "Luxury Yacht Experience in Dubai",
-    "description": "Enjoy a luxurious yacht cruise along Dubai's coastline with stunning views.",
-    "category": "Day Cruise",
-    "yachtType": "Luxury Motor Yacht",
+    "id": "yacht-004",
+    "title": "Party Boat Experience",
+    "description": "Perfect for celebrations and parties on the water.",
+    "category": "Entertainment",
+    "yachtType": "Party Boat",
     "location": {
-      "address": "Dubai Marina Yacht Club, Dubai, UAE",
-      "latitude": 25.0819,
-      "longitude": 55.1398,
+      "address": "Dubai Marina Walk",
+      "latitude": 25.2697,
+      "longitude": 55.2774,
       "region": "dubai",
       "portMarina": "Dubai Marina"
     },
-    "capacity": 12,
-    "duration": 4,
-    "pricing": 2500,
-    "pricingModel": "Fixed",
-    "customizationOptions": [
-      {
-        "id": "option-1",
-        "name": "Premium Catering",
-        "price": 500
-      },
-      {
-        "id": "option-2",
-        "name": "Professional Photography",
-        "price": 300
-      }
-    ],
-    "media": [
-      {
-        "type": "image",
-        "url": "https://example.com/yacht1.jpg"
-      },
-      {
-        "type": "image",
-        "url": "https://example.com/yacht1-interior.jpg"
-      }
-    ],
-    "isAvailable": true,
-    "isFeatured": true,
-    "isPublished": true,
-    "tags": [
-      "luxury",
-      "cruise",
-      "dubai",
-      "sightseeing"
-    ],
-    "createdAt": {
-      "_seconds": 1741520128,
-      "_nanoseconds": 842000000
-    },
-    "updatedAt": {
-      "_seconds": 1741520128,
-      "_nanoseconds": 842000000
-    },
-    "package_id": "yacht-1",
-    "yachtId": "yacht-1",
-    "name": "Luxury Yacht Experience in Dubai",
-    "availability_status": true,
-    "available": true,
-    "yacht_type": "Luxury Motor Yacht",
-    "features": [
-      "luxury",
-      "cruise",
-      "dubai",
-      "sightseeing"
-    ],
-    "max_guests": 12,
-    "price": 2500,
-    "producerId": "2",
-    "providerId": "2"
-  },
-  {
-    "id": "yacht-2",
-    "reviews": [],
-    "_source": "yacht_experiences",
-    "title": "Abu Dhabi Sunset Yacht Tour",
-    "description": "Experience a breathtaking sunset tour along Abu Dhabi's iconic coastline.",
-    "category": "Sunset Tour",
-    "yachtType": "Catamaran",
-    "location": {
-      "address": "Yas Marina, Abu Dhabi, UAE",
-      "latitude": 24.4672,
-      "longitude": 54.6031,
-      "region": "abu-dhabi",
-      "portMarina": "Yas Marina"
-    },
     "capacity": 20,
-    "duration": 3,
-    "pricing": 1800,
-    "pricingModel": "Fixed",
+    "duration": 5,
+    "pricing": 4000,
+    "pricingModel": "Variable",
     "customizationOptions": [
       {
-        "id": "option-3",
-        "name": "BBQ Package",
-        "price": 400
-      }
-    ],
-    "media": [
-      {
-        "type": "image",
-        "url": "https://example.com/yacht2.jpg"
-      }
-    ],
-    "isAvailable": true,
-    "isFeatured": true,
-    "isPublished": true,
-    "tags": [
-      "sunset",
-      "abu-dhabi",
-      "tour",
-      "catamaran"
-    ],
-    "createdAt": {
-      "_seconds": 1741520128,
-      "_nanoseconds": 842000000
-    },
-    "updatedAt": {
-      "_seconds": 1741520128,
-      "_nanoseconds": 842000000
-    },
-    "package_id": "yacht-2",
-    "yachtId": "yacht-2",
-    "name": "Abu Dhabi Sunset Yacht Tour",
-    "availability_status": true,
-    "available": true,
-    "yacht_type": "Catamaran",
-    "features": [
-      "sunset",
-      "abu-dhabi",
-      "tour",
-      "catamaran"
-    ],
-    "max_guests": 20,
-    "price": 1800,
-    "producerId": "2",
-    "providerId": "2"
-  },
-  {
-    "id": "yacht-3",
-    "reviews": [],
-    "_source": "yacht_experiences",
-    "title": "Deep Sea Fishing Adventure",
-    "description": "A thrilling deep sea fishing expedition in the Arabian Gulf.",
-    "category": "Fishing",
-    "yachtType": "Sport Fishing Yacht",
-    "location": {
-      "address": "Dubai Fishing Harbor, Dubai, UAE",
-      "latitude": 25.1246,
-      "longitude": 55.1753,
-      "region": "dubai",
-      "portMarina": "Fishing Harbor"
-    },
-    "capacity": 8,
-    "duration": 6,
-    "pricing": 3000,
-    "pricingModel": "Fixed",
-    "customizationOptions": [
-      {
-        "id": "option-4",
-        "name": "Fishing Equipment",
-        "price": 200
+        "id": "option-l9ih",
+        "name": "DJ Service",
+        "price": 800
       },
       {
-        "id": "option-5",
-        "name": "Seafood Lunch",
-        "price": 350
+        "id": "option-42x4",
+        "name": "Decorations",
+        "price": 300
+      },
+      {
+        "id": "option-wu62",
+        "name": "Premium Bar",
+        "price": 1200
       }
     ],
     "media": [
       {
         "type": "image",
-        "url": "https://example.com/fishing-yacht.jpg"
+        "url": "https://images.unsplash.com/photo-1576487252312-b743b3d35ef9?w=800"
+      }
+    ],
+    "tags": [
+      "party",
+      "celebration",
+      "entertainment",
+      "group"
+    ],
+    "reviews": [
+      {
+        "rating": 4.8,
+        "text": "Amazing experience for our anniversary!",
+        "userId": "user-123",
+        "createdAt": {
+          "_seconds": 1741677627,
+          "_nanoseconds": 0
+        }
+      },
+      {
+        "rating": 4.5,
+        "text": "Great staff and service!",
+        "userId": "",
+        "createdAt": {
+          "_seconds": 1741677627,
+          "_nanoseconds": 0
+        }
       }
     ],
     "isAvailable": true,
     "isFeatured": false,
     "isPublished": true,
-    "tags": [
-      "fishing",
-      "sport",
-      "adventure",
-      "deep-sea"
-    ],
+    "providerId": null,
+    "virtualTour": {
+      "isEnabled": false,
+      "scenes": []
+    },
     "createdAt": {
-      "_seconds": 1741520128,
-      "_nanoseconds": 842000000
+      "_seconds": 1640995200,
+      "_nanoseconds": 0
     },
     "updatedAt": {
-      "_seconds": 1741520128,
-      "_nanoseconds": 842000000
+      "_seconds": 1741677600,
+      "_nanoseconds": 0
     },
-    "package_id": "yacht-3",
-    "yachtId": "yacht-3",
-    "name": "Deep Sea Fishing Adventure",
+    "_lastUpdated": "1741677627234",
+    "name": "Party Boat Experience",
     "availability_status": true,
     "available": true,
-    "yacht_type": "Sport Fishing Yacht",
     "features": [
-      "fishing",
-      "sport",
-      "adventure",
-      "deep-sea"
+      "party",
+      "celebration",
+      "entertainment",
+      "group"
     ],
-    "max_guests": 8,
-    "price": 3000,
-    "producerId": "2",
-    "providerId": "2"
+    "yacht_type": "Party Boat",
+    "price": 4000,
+    "max_guests": 20,
+    "created_date": {
+      "_seconds": 1640995200,
+      "_nanoseconds": 0
+    },
+    "last_updated_date": {
+      "_seconds": 1741677600,
+      "_nanoseconds": 0
+    },
+    "mainImage": "https://images.unsplash.com/photo-1576487252312-b743b3d35ef9?w=800",
+    "_standardized": true,
+    "_standardizedVersion": 2
   }
 ]
