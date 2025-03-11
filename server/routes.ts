@@ -796,6 +796,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   */
   
+  // Test route to list all collections
+  app.get("/api/debug/collections", async (req, res) => {
+    try {
+      const collections = await adminDb.listCollections();
+      const collectionIds = collections.map(col => col.id);
+      
+      let collectionData = {};
+      for (const colId of collectionIds) {
+        const snapshot = await adminDb.collection(colId).limit(5).get();
+        const docs = snapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          data: doc.data(),
+        }));
+        collectionData[colId] = {
+          count: docs.length,
+          samples: docs
+        };
+      }
+      
+      res.json({
+        collections: collectionIds,
+        data: collectionData
+      });
+    } catch (error) {
+      console.error("Error listing collections:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
   // Register Stripe-related routes
   registerStripeRoutes(app);
 
