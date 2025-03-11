@@ -5,16 +5,26 @@
  * into the Firebase Firestore emulator.
  */
 
-const admin = require('firebase-admin');
-const fs = require('fs');
-const path = require('path');
-const serviceAccount = require('../firebase-data-connect.json');
+import admin from 'firebase-admin';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 
-// Only initialize once
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Only initialize once - connect to Firebase emulator
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: "https://yacht-rentals-dev.firebaseio.com",
+    projectId: 'yacht-rentals-dev',
+  });
+  
+  // Connect to the Firestore emulator
+  const firestore = admin.firestore();
+  firestore.settings({
+    host: "localhost:8080",
+    ssl: false
   });
 }
 
