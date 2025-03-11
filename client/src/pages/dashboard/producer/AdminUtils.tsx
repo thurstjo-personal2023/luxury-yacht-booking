@@ -22,8 +22,19 @@ export default function AdminUtils() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("data-tools");
   const [isStandardizing, setIsStandardizing] = useState(false);
+  const [isAddonStandardizing, setIsAddonStandardizing] = useState(false);
   const [lastStandardization, setLastStandardization] = useState<string | null>(null);
+  const [lastAddonStandardization, setLastAddonStandardization] = useState<string | null>(null);
   const [standardizationResult, setStandardizationResult] = useState<{
+    success: boolean;
+    message: string;
+    details?: {
+      processedCount: number;
+      updatedCount: number;
+      errors: string[];
+    };
+  } | null>(null);
+  const [addonStandardizationResult, setAddonStandardizationResult] = useState<{
     success: boolean;
     message: string;
     details?: {
