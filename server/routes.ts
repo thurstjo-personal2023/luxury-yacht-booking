@@ -5,6 +5,7 @@ import { registerStripeRoutes } from "./stripe";
 import { adminDb } from "./firebase-admin";
 import { spawn } from "child_process";
 import path from "path";
+import { FieldValue } from "firebase-admin/firestore";
 
 import { insertTestYachts } from "./create-test-data";
 
@@ -269,7 +270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Cast to boolean to ensure consistent values
         availability: !!isActive,
         // Add timestamp for cache busting
-        lastUpdatedDate: new Date(),
+        lastUpdatedDate: FieldValue.serverTimestamp(),
         _lastUpdated: timestamp || Date.now().toString()
       });
       
