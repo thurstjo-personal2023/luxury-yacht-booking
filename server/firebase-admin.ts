@@ -82,13 +82,16 @@ export const verifyAuth = async (req: Request, res: Response, next: NextFunction
     const token = authHeader.split('Bearer ')[1];
     const decodedToken = await adminAuth.verifyIdToken(token);
     
+    // Extract properties from the token
+    const { uid, email, role = 'consumer', name, ...otherClaims } = decodedToken;
+    
     // Set user information in the request object
     req.user = {
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      role: decodedToken.role || 'consumer', // Default role
-      name: decodedToken.name,
-      ...decodedToken // Include all other token claims
+      uid,
+      email,
+      role,
+      name,
+      ...otherClaims // Include all other token claims
     };
     
     next();
