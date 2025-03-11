@@ -12,6 +12,13 @@ import type {
   SupportContent,
   ServiceProviderProfile
 } from "@shared/firestore-schema";
+import type {
+  User,
+  ConsumerUser,
+  ProducerUser,
+  PartnerUser,
+  UserType
+} from "@shared/user-schema";
 
 // Connect to the external Firestore emulator
 if (process.env.NODE_ENV === "development") {
@@ -20,9 +27,15 @@ if (process.env.NODE_ENV === "development") {
 }
 
 const collections = {
+  // User collections
+  users: "users", // Harmonized users collection
+  
+  // Yacht collections
   unified_yacht_experiences: "unified_yacht_experiences", // New unified collection
   yacht_experiences: "yacht_experiences",  // Legacy collection (for backward compatibility)
-  user_profiles_tourist: "user_profiles_tourist",
+  
+  // Other collections
+  user_profiles_tourist: "user_profiles_tourist", // Legacy user collection
   articles_and_guides: "articles_and_guides",
   event_announcements: "event_announcements",
   notifications: "notifications",
@@ -30,7 +43,7 @@ const collections = {
   promotions_and_offers: "promotions_and_offers",
   reviews_and_feedback: "reviews_and_feedback",
   support_content: "support_content",
-  user_profiles_service_provider: "user_profiles_service_provider"
+  user_profiles_service_provider: "user_profiles_service_provider" // Legacy user collection
 } as const;
 
 // Function to check if a collection exists and is properly structured
@@ -65,6 +78,9 @@ export async function initializeFirestore() {
 
 // Export collection references for use in components
 export const collectionRefs = {
+  // User collections
+  users: collection(db, collections.users), // Primary user collection (harmonized)
+  
   // Yacht collections
   unifiedYachts: collection(db, collections.unified_yacht_experiences), // Primary collection to use
   yachtExperiences: collection(db, collections.yacht_experiences),      // Legacy collection

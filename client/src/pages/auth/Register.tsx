@@ -18,13 +18,14 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { registerWithEmail } from "@/lib/firebase";
-import { UserRole } from "@shared/schema";
+import { UserRole, UserRoleType, standardizeUser } from "@shared/user-schema";
 import { Link } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
+import { collectionRefs } from "@/lib/firestore-init";
 
 // Enhanced password validation
 const passwordSchema = z
@@ -82,20 +83,30 @@ export default function Register() {
       const { user } = await registerWithEmail(data.email, data.password);
 
       try {
-        console.log("Creating user profile in Firestore...");
-        const userProfile = {
+        console.log("Creating harmonized user profile in Firestore...");
+        
+        // Create base user data
+        const baseUserData = {
+          id: user.uid,
+          userId: user.uid,
           name: `${data.firstName} ${data.lastName}`,
           email: data.email,
           phone: data.phone,
-          role: data.role,
+          role: data.role.toLowerCase() as UserRoleType,
           emailVerified: false,
           points: 0,
-          createdAt: new Date().toISOString()
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          _standardized: true,
+          _standardizedVersion: 1
         };
-
-        // Create user profile in Firestore
-        await setDoc(doc(db, "users", user.uid), userProfile);
-        console.log("User profile created successfully");
+        
+        // Standardize user data based on role
+        const standardizedUser = standardizeUser(baseUserData);
+        
+        // Create user profile in Firestore using the standardized schema
+        await setDoc(doc(collectionRefs.users, user.uid), standardizedUser);
+        console.log("Harmonized user profile created successfully");
 
         toast({
           title: "Registration successful!",

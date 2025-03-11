@@ -20,19 +20,13 @@ import { useToast } from "@/hooks/use-toast";
 import { auth, db } from "@/lib/firebase";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { collectionRefs } from "@/lib/firestore-init";
+import { UserRole, UserRoleType, UserType } from "@shared/user-schema";
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
 });
-
-enum UserRole {
-  CONSUMER = "consumer",
-  PRODUCER = "producer",
-  PARTNER = "partner",
-}
-
-type UserRoleType = keyof typeof UserRole;
 
 type LoginForm = z.infer<typeof loginSchema>;
 
