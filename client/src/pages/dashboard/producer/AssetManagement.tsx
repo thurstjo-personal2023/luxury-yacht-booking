@@ -213,7 +213,7 @@ export default function AssetManagement() {
   });
   
   const { data: addOnsResponse, isLoading: addOnsLoading } = useQuery<AddOnsResponse>({
-    queryKey: ["/api/addons/producer", { page: addonPage, pageSize, timestamp: queryTimestamp }],
+    queryKey: ["/api/producer/addons", { page: addonPage, pageSize, producerId, timestamp: queryTimestamp }],
     refetchOnMount: 'always', // Always refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window gains focus
     staleTime: 0, // Consider data stale immediately
