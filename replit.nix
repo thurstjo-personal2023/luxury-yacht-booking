@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.jdk11
     pkgs.jq
     pkgs.postgresql
     pkgs.psmisc
