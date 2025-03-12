@@ -356,12 +356,11 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log('🔍 Getting producer yachts with filters:', filters);
       
-      // Validate Firestore connection status
-      const settings = adminDb.settings({}) as any;
-      console.log('📡 Firestore emulator settings:', { 
-        host: settings?.host || 'Not set',
-        ssl: settings?.ssl === false ? 'false' : settings?.ssl, 
-        ignoreUndefinedProperties: settings?.ignoreUndefinedProperties 
+      // Log Firestore connection settings (using our configured values)
+      console.log('📡 Firestore emulator connection status:', { 
+        host: '127.0.0.1:8080',
+        ssl: false, 
+        ignoreUndefinedProperties: true
       });
       
       // Use the unified yacht collection
