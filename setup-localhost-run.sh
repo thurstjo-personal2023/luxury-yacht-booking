@@ -1,88 +1,104 @@
 #!/bin/bash
+# Setup script for localhost.run tunneling
 
-# Script to set up localhost.run tunnels for Firebase emulators
-# This script creates SSH tunnels to expose your local Firebase emulators to the internet
+# Print header
+echo "=================================="
+echo "Setting up localhost.run tunnels for Firebase emulators"
+echo "=================================="
 
-# Define emulator ports
-FIRESTORE_PORT=8080
-AUTH_PORT=9099
-STORAGE_PORT=9199
+# Ensure we're in the project root directory
+cd "$(dirname "$0")"
 
-# Check if SSH is available
+# Check if SSH is installed and available
 if ! command -v ssh &> /dev/null; then
-    echo "Error: SSH is required but not found."
+    echo "Error: ssh command not found. Please make sure SSH is installed."
     exit 1
 fi
 
-# Function to create a tunnel and extract the hostname
-create_tunnel() {
-    local port=$1
-    local service_name=$2
-    
-    echo "Creating tunnel for $service_name on port $port..."
-    
-    # Start the tunnel in the background and capture output
-    ssh -R 80:localhost:$port localhost.run > "${service_name}_tunnel.log" 2>&1 &
-    
-    # Store the process ID
-    local tunnel_pid=$!
-    echo "$tunnel_pid" > "${service_name}_tunnel.pid"
-    
-    # Wait for the tunnel to be established
-    echo "Waiting for tunnel to be established..."
-    sleep 5
-    
-    # Extract the hostname from the log file
-    local hostname=$(grep -oP 'https://\K[^[:space:]]+(?=\.localhost\.run)' "${service_name}_tunnel.log")
-    
-    if [ -z "$hostname" ]; then
-        echo "Could not extract hostname for $service_name tunnel."
-        return 1
-    fi
-    
-    echo "Tunnel established for $service_name: https://${hostname}.localhost.run"
-    echo "${hostname}.localhost.run" > "${service_name}_hostname.txt"
-    
-    # If this is the Firestore tunnel, we'll use it as the main host
-    if [ "$service_name" = "firestore" ]; then
-        echo "${hostname}.localhost.run" > "localhost-run-host.txt"
-        echo "Main host set to: ${hostname}.localhost.run"
-    fi
-    
-    return 0
+# Function to show usage instructions
+show_usage() {
+    echo
+    echo "This script sets up tunnels to expose your local Firebase emulators to Replit."
+    echo
+    echo "Prerequisites:"
+    echo "1. Ensure Firebase emulators are running locally (using 'firebase emulators:start')"
+    echo "2. The emulators should be using the standard ports:"
+    echo "   - Firestore: 8080"
+    echo "   - Auth: 9099"
+    echo "   - Storage: 9199"
+    echo "   - Functions: 5001"
+    echo
+    echo "The script will set up tunnels that forward requests from the internet to your local emulators."
+    echo "This allows your Replit-hosted app to connect to your local emulators for development."
+    echo
 }
 
-# Clean up any previous tunnel logs
-rm -f *_tunnel.log *_hostname.txt localhost-run-host.txt 2>/dev/null
+# Show usage information
+show_usage
 
-# Create tunnels for each service
-create_tunnel $FIRESTORE_PORT "firestore" || exit 1
-create_tunnel $AUTH_PORT "auth" || exit 1
-create_tunnel $STORAGE_PORT "storage" || exit 1
+# Create host file to store the localhost.run host
+host_file="localhost-run-host.txt"
+touch "$host_file"
 
-echo ""
-echo "======================================="
-echo "Firebase Emulator Tunnels Setup Complete"
-echo "======================================="
-echo ""
-echo "Firestore: https://$(cat firestore_hostname.txt):$FIRESTORE_PORT"
-echo "Auth: https://$(cat auth_hostname.txt):$AUTH_PORT"
-echo "Storage: https://$(cat storage_hostname.txt):$STORAGE_PORT"
-echo ""
-echo "The host '$(cat localhost-run-host.txt)' will be used for all emulator connections"
-echo ""
-echo "To use these hostnames in your application:"
-echo "1. Update the environment variables for Firebase emulators:"
-echo "   FIRESTORE_EMULATOR_HOST=$(cat firestore_hostname.txt):$FIRESTORE_PORT"
-echo "   FIREBASE_AUTH_EMULATOR_HOST=$(cat auth_hostname.txt):$AUTH_PORT"
-echo "   FIREBASE_STORAGE_EMULATOR_HOST=$(cat storage_hostname.txt):$STORAGE_PORT"
-echo ""
-echo "2. These values have been saved to the following files:"
-echo "   - localhost-run-host.txt: Main hostname for emulator connections"
-echo "   - firestore_hostname.txt: Firestore hostname"
-echo "   - auth_hostname.txt: Auth hostname"
-echo "   - storage_hostname.txt: Storage hostname"
-echo ""
-echo "To stop the tunnels, run 'pkill -f \"ssh -R\"' or use the saved PID files"
-echo ""
-echo "NOTE: Keep this terminal window open to keep the tunnels active."
+echo "Starting localhost.run tunnel for all emulator ports..."
+echo "This process will run in the background. Press Ctrl+C to stop."
+echo
+
+# Start the tunnels and store the hostname
+# We'll use a primary tunnel for Firestore (port 8080) and grab the hostname from it
+# localhost.run gives the same subdomain for all tunnels from the same machine, so we only need to extract it once
+
+# First, clean up any existing process
+pkill -f "ssh -R 80:localhost:8080 localhost.run" || true
+
+# Start the tunnel and extract the hostname
+tunnel_log=$(mktemp)
+ssh -R 80:localhost:8080 localhost.run > "$tunnel_log" 2>&1 &
+tunnel_pid=$!
+
+echo "Waiting for tunnel to establish..."
+sleep 5
+
+# Extract the hostname from the tunnel log
+hostname=$(grep -o 'https://[a-zA-Z0-9.-]*\.localhost.run' "$tunnel_log" | head -1 | cut -d'/' -f3 | cut -d'.' -f1)
+
+if [[ -z "$hostname" ]]; then
+    echo "Failed to extract hostname from tunnel log. Please check the log file at $tunnel_log"
+    exit 1
+fi
+
+# Get just the subdomain part (before .localhost.run)
+subdomain="${hostname}"
+
+# Store the hostname in the file
+echo "$subdomain" > "$host_file"
+echo "Hostname extracted: $subdomain"
+echo "Hostname saved to $host_file"
+
+echo
+echo "Tunnel established. Your emulators are now accessible at:"
+echo "- Firestore: $subdomain:8080"
+echo "- Auth: $subdomain:9099"
+echo "- Storage: $subdomain:9199"
+echo "- Functions: $subdomain:5001"
+echo
+echo "You can now update your app configuration to use these endpoints."
+echo "The server API will automatically use this configuration."
+echo
+echo "Important: Keep this terminal window open to maintain the tunnel."
+echo "Press Ctrl+C to stop the tunnel when you're done."
+
+# Cleanup on exit
+cleanup() {
+    echo "Shutting down tunnel..."
+    kill $tunnel_pid 2>/dev/null || true
+    rm "$tunnel_log" 2>/dev/null || true
+    echo "Tunnel terminated."
+}
+
+trap cleanup EXIT
+
+# Keep the script running
+while true; do
+    sleep 1
+done

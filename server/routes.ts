@@ -66,6 +66,29 @@ async function getHarmonizedProducerIds(authUserId: string | undefined): Promise
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Add endpoint to provide emulator host information
+  app.get("/api/emulator-config", (req: Request, res: Response) => {
+    try {
+      // Build a config object with emulator host information
+      const config = {
+        hosts: {
+          firestore: process.env.FIRESTORE_EMULATOR_HOST || "localhost:8080",
+          auth: process.env.FIREBASE_AUTH_EMULATOR_HOST || "localhost:9099",
+          storage: process.env.FIREBASE_STORAGE_EMULATOR_HOST || "localhost:9199",
+          functions: "localhost:5001", // Default function emulator port
+          rtdb: "localhost:9001" // Default realtime DB emulator port
+        },
+        connected: true,
+        timestamp: Date.now()
+      };
+      
+      // Return the config as JSON
+      res.json(config);
+    } catch (error) {
+      console.error("Error providing emulator config:", error);
+      res.status(500).json({ error: "Failed to provide emulator configuration" });
+    }
+  });
   // Development route to create test data
   app.post("/api/dev/create-test-data", async (req, res) => {
     try {

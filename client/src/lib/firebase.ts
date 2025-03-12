@@ -134,51 +134,111 @@ auth.onAuthStateChanged(async (user) => {
 // Always connect to emulators in development
 console.log("Connecting to Firebase emulators...");
 
-try {
-  // Try to read emulator host settings from localhost-run-host.txt
-  let firestoreHost = "127.0.0.1";
-  let authHost = "127.0.0.1";
-  let storageHost = "127.0.0.1";
-  let functionsHost = "127.0.0.1";
-  let rtdbHost = "127.0.0.1";
-  
-  // Ports for emulators
-  const firestorePort = 8080;
-  const authPort = 9099; 
-  const storagePort = 9199;
-  const functionsPort = 5001;
-  const rtdbPort = 9001;
+// Function to connect to emulators with specified hosts
+const connectToEmulators = (hosts: { 
+  firestore: string, 
+  auth: string, 
+  storage: string, 
+  functions: string, 
+  rtdb: string 
+}) => {
+  try {
+    // Parse host and port from each setting
+    const parseHostPort = (hostString: string) => {
+      const [host, portStr] = hostString.split(':');
+      return { host, port: parseInt(portStr, 10) };
+    };
+    
+    const firestore = parseHostPort(hosts.firestore);
+    const authEmulator = parseHostPort(hosts.auth);
+    const storageEmulator = parseHostPort(hosts.storage);
+    const functionsEmulator = parseHostPort(hosts.functions);
+    const rtdbEmulator = parseHostPort(hosts.rtdb);
 
-  // Check for localhost.run hostname in window location (passed from server)
-  const localhostRunParam = new URLSearchParams(window.location.search).get('emulatorHost');
-  if (localhostRunParam) {
-    firestoreHost = authHost = storageHost = functionsHost = rtdbHost = localhostRunParam;
-    console.log(`Using emulator host from URL param: ${localhostRunParam}`);
+    // Connect to each emulator
+    // Auth Emulator
+    connectAuthEmulator(auth, `http://${authEmulator.host}:${authEmulator.port}`, { disableWarnings: true });
+    console.log(`✓ Auth emulator connected at: http://${authEmulator.host}:${authEmulator.port}`);
+
+    // Firestore Emulator
+    connectFirestoreEmulator(db, firestore.host, firestore.port);
+    console.log(`✓ Firestore emulator connected at: http://${firestore.host}:${firestore.port}`);
+
+    // Storage Emulator
+    connectStorageEmulator(storage, storageEmulator.host, storageEmulator.port);
+    console.log(`✓ Storage emulator connected at: http://${storageEmulator.host}:${storageEmulator.port}`);
+
+    // Functions Emulator
+    connectFunctionsEmulator(functions, functionsEmulator.host, functionsEmulator.port);
+    console.log(`✓ Functions emulator connected at: http://${functionsEmulator.host}:${functionsEmulator.port}`);
+
+    // Realtime Database Emulator
+    connectDatabaseEmulator(rtdb, rtdbEmulator.host, rtdbEmulator.port);
+    console.log(`✓ Realtime Database emulator connected at: http://${rtdbEmulator.host}:${rtdbEmulator.port}`);
+
+    console.log("All Firebase emulators connected successfully!");
+    return true;
+  } catch (error) {
+    console.error("Error connecting to emulators:", error);
+    return false;
   }
+};
 
-  // Auth Emulator
-  connectAuthEmulator(auth, `http://${authHost}:${authPort}`, { disableWarnings: true });
-  console.log(`✓ Auth emulator connected at: http://${authHost}:${authPort}`);
+// Default localhost settings
+const defaultHosts = {
+  firestore: "localhost:8080",
+  auth: "localhost:9099",
+  storage: "localhost:9199",
+  functions: "localhost:5001",
+  rtdb: "localhost:9001"
+};
 
-  // Firestore Emulator - Force connection regardless of environment
-  connectFirestoreEmulator(db, firestoreHost, firestorePort);
-  console.log(`✓ Firestore emulator connected at: http://${firestoreHost}:${firestorePort}`);
+// Try to get emulator config from server API
+const getEmulatorConfig = async () => {
+  try {
+    console.log("Fetching emulator configuration from server...");
+    const response = await fetch('/api/emulator-config');
+    if (response.ok) {
+      const config = await response.json();
+      console.log("Retrieved emulator configuration:", config);
+      return config.hosts;
+    } else {
+      console.warn("Failed to get emulator config from server, status:", response.status);
+      return null;
+    }
+  } catch (error) {
+    console.error("Error fetching emulator config:", error);
+    return null;
+  }
+};
 
-  // Storage Emulator
-  connectStorageEmulator(storage, storageHost, storagePort);
-  console.log(`✓ Storage emulator connected at: http://${storageHost}:${storagePort}`);
-
-  // Functions Emulator
-  connectFunctionsEmulator(functions, functionsHost, functionsPort);
-  console.log(`✓ Functions emulator connected at: http://${functionsHost}:${functionsPort}`);
-
-  // Realtime Database Emulator
-  connectDatabaseEmulator(rtdb, rtdbHost, rtdbPort);
-  console.log(`✓ Realtime Database emulator connected at: http://${rtdbHost}:${rtdbPort}`);
-
-  console.log("All Firebase emulators connected successfully!");
-} catch (error) {
-  console.error("Error connecting to emulators:", error);
+// First try to connect with host from URL parameter
+const localhostRunParam = new URLSearchParams(window.location.search).get('emulatorHost');
+if (localhostRunParam) {
+  console.log(`Using emulator host from URL param: ${localhostRunParam}`);
+  const hosts = {
+    firestore: `${localhostRunParam}:8080`,
+    auth: `${localhostRunParam}:9099`,
+    storage: `${localhostRunParam}:9199`,
+    functions: `${localhostRunParam}:5001`,
+    rtdb: `${localhostRunParam}:9001`
+  };
+  
+  connectToEmulators(hosts);
+} else {
+  // Otherwise try to get config from server, then fall back to localhost
+  getEmulatorConfig().then(hosts => {
+    if (hosts) {
+      connectToEmulators(hosts);
+    } else {
+      console.log("Falling back to default localhost emulator config");
+      connectToEmulators(defaultHosts);
+    }
+  }).catch(error => {
+    console.error("Error in emulator configuration:", error);
+    console.log("Falling back to default localhost emulator config");
+    connectToEmulators(defaultHosts);
+  });
 }
 
 // Auth helpers with improved error handling and retry logic
