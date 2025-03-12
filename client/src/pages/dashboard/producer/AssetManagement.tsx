@@ -651,38 +651,23 @@ export default function AssetManagement() {
           // Create a batch for atomic updates
           const batch = writeBatch(db);
           
-          // Reference all possible collections where the yacht might exist
+          // Reference ONLY the unified collection - we're standardizing on this one
           const unifiedRef = doc(db, "unified_yacht_experiences", docId);
-          const yachtRef = doc(db, "yacht_experiences", docId);
-          const expRef = doc(db, "experience_packages", docId);
           
-          console.log(`Adding batch updates for yacht ${docId} across all collections`);
+          console.log(`Adding batch update for yacht ${docId} to unified collection only`);
           
-          // First, verify which documents exist to avoid errors
-          const collections = [
-            { name: "unified_yacht_experiences", ref: unifiedRef },
-            { name: "yacht_experiences", ref: yachtRef },
-            { name: "experience_packages", ref: expRef }
-          ];
-          
-          // Add all update operations to the batch
+          // Add update operation to the batch
           try {
-            // Safe batch updates that won't fail if docs don't exist
-            console.log(`Adding update operations to batch for yacht ${docId}`);
+            // Safe batch update
+            console.log(`Adding update operation to batch for yacht ${docId}`);
             
-            // Add each update to the batch
-            collections.forEach(collection => {
-              try {
-                batch.update(collection.ref, updateData);
-                console.log(`Added ${collection.name} to batch update`);
-              } catch (err) {
-                console.warn(`Could not add ${collection.name} to batch:`, err);
-              }
-            });
+            // Add update to the batch
+            batch.update(unifiedRef, updateData);
+            console.log(`Added unified_yacht_experiences document to batch update`);
             
             // Commit the batch
             await batch.commit();
-            console.log(`Successfully batch updated yacht ${docId} across all collections`);
+            console.log(`Successfully updated yacht ${docId} in unified collection`);
           } catch (error) {
             const err = error as Error;
             console.error(`Failed to commit batch update: ${err.message}`);
@@ -691,12 +676,12 @@ export default function AssetManagement() {
         } catch (batchErr) {
           console.error('Batch update failed:', batchErr);
           
-          // If batch fails, try individual updates as fallback
-          console.log('Attempting individual collection updates as fallback...');
+          // If batch fails, try individual update as fallback
+          console.log('Attempting individual update as fallback...');
           
           let updateSucceeded = false;
           
-          // Try each collection individually
+          // Try only the unified collection
           try {
             const unifiedRef = doc(db, "unified_yacht_experiences", docId);
             await updateDoc(unifiedRef, { 
@@ -713,40 +698,8 @@ export default function AssetManagement() {
             console.warn(`Failed to update in unified_yacht_experiences:`, unifiedErr);
           }
           
-          try {
-            const yachtRef = doc(db, "yacht_experiences", docId);
-            await updateDoc(yachtRef, { 
-              isAvailable: newStatus,
-              availability_status: newStatus,
-              available: newStatus,
-              last_updated_date: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-              _lastUpdated: timestamp
-            });
-            console.log(`Updated yacht in yacht_experiences collection`);
-            updateSucceeded = true;
-          } catch (yachtErr) {
-            console.warn(`Failed to update in yacht_experiences:`, yachtErr);
-          }
-          
-          try {
-            const expRef = doc(db, "experience_packages", docId);
-            await updateDoc(expRef, { 
-              isAvailable: newStatus,
-              availability_status: newStatus,
-              available: newStatus,
-              last_updated_date: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-              _lastUpdated: timestamp
-            });
-            console.log(`Updated yacht in experience_packages collection`);
-            updateSucceeded = true;
-          } catch (expErr) {
-            console.warn(`Failed to update in experience_packages:`, expErr);
-          }
-          
           if (!updateSucceeded) {
-            throw new Error('Failed to update in any collection');
+            throw new Error('Failed to update in unified collection');
           }
         }
       }

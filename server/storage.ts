@@ -363,7 +363,7 @@ export class FirestoreStorage implements IStorage {
         ignoreUndefinedProperties: true
       });
       
-      // Use the unified yacht collection
+      // Use ONLY the unified yacht collection
       const yachtsRef = adminDb.collection(UNIFIED_YACHT_COLLECTION);
       console.log(`📁 Accessing collection: ${UNIFIED_YACHT_COLLECTION}`);
       
@@ -376,25 +376,13 @@ export class FirestoreStorage implements IStorage {
         if (!testQuery.empty) {
           const sampleDoc = testQuery.docs[0];
           console.log('📄 Sample yacht document fields:', Object.keys(sampleDoc.data()));
-          
-          // Check if producerId field exists in any format
-          const data = sampleDoc.data();
-          const hasProducerId = 'producerId' in data || 'providerId' in data || 'producer_id' in data;
-          console.log(`🔑 Sample document has producer ID field: ${hasProducerId}`);
-          
-          // Log the actual producer ID value if available
-          if ('producerId' in data) console.log(`🔑 producerId value: ${data.producerId}`);
-          if ('providerId' in data) console.log(`🔑 providerId value: ${data.providerId}`);
-          if ('producer_id' in data) console.log(`🔑 producer_id value: ${data.producer_id}`);
         }
       } catch (testError: any) {
         console.error('❌ Collection access test failed:', testError.message);
         console.error('💥 Full error:', testError);
       }
       
-      // Build queries based on presence of producerId
-      // Since Firestore doesn't support OR queries directly, we'll need to perform multiple queries
-      // and combine the results
+      // Get yacht documents based on producer ID
       let yachtDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
       
       if (filters?.producerId) {
