@@ -8,7 +8,6 @@
  */
 
 import { Timestamp } from "firebase/firestore";
-import { UserRole } from "./schema";
 
 /**
  * Core User Schema (harmonized_users collection)
@@ -106,33 +105,15 @@ export interface ServiceProviderProfile {
  * Normalize a tourist profile from any format
  */
 export function normalizeConsumerProfile(profile: any): TouristProfile {
-  // Ensure arrays for collection fields
-  const preferences = Array.isArray(profile.preferences) 
-    ? profile.preferences 
-    : profile.preferences ? Object.values(profile.preferences) : [];
-  
-  const wishlist = Array.isArray(profile.wishlist) 
-    ? profile.wishlist 
-    : profile.wishlist ? Object.values(profile.wishlist) : [];
-  
-  const bookingHistory = Array.isArray(profile.booking_history || profile.bookingHistory) 
-    ? (profile.booking_history || profile.bookingHistory) 
-    : (profile.booking_history || profile.bookingHistory) ? Object.values(profile.booking_history || profile.bookingHistory) : [];
-  
-  const reviewsProvided = Array.isArray(profile.reviews_provided || profile.reviewsProvided) 
-    ? (profile.reviews_provided || profile.reviewsProvided) 
-    : (profile.reviews_provided || profile.reviewsProvided) ? Object.values(profile.reviews_provided || profile.reviewsProvided) : [];
-
-  // Create normalized profile
   return {
-    id: profile.id,
-    profilePhoto: profile.profile_photo || profile.profilePhoto,
-    loyaltyTier: profile.loyalty_tier || profile.loyaltyTier,
-    preferences,
-    wishlist,
-    bookingHistory,
-    reviewsProvided,
-    lastUpdated: profile.lastUpdated || profile.updatedAt || new Timestamp(Date.now() / 1000, 0)
+    id: profile.id || profile.userId || '',
+    profilePhoto: profile.profilePhoto || '',
+    loyaltyTier: profile.loyaltyTier || 'Bronze',
+    preferences: Array.isArray(profile.preferences) ? profile.preferences : [],
+    wishlist: Array.isArray(profile.wishlist) ? profile.wishlist : [],
+    bookingHistory: Array.isArray(profile.bookingHistory) ? profile.bookingHistory : [],
+    reviewsProvided: Array.isArray(profile.reviewsProvided) ? profile.reviewsProvided : [],
+    lastUpdated: profile.lastUpdated || Timestamp.now()
   };
 }
 
@@ -140,31 +121,19 @@ export function normalizeConsumerProfile(profile: any): TouristProfile {
  * Normalize a service provider profile from any format
  */
 export function normalizeServiceProviderProfile(profile: any): ServiceProviderProfile {
-  // Ensure arrays for collection fields
-  const servicesOffered = Array.isArray(profile.services_offered || profile.servicesOffered) 
-    ? (profile.services_offered || profile.servicesOffered) 
-    : (profile.services_offered || profile.servicesOffered) ? Object.values(profile.services_offered || profile.servicesOffered) : [];
-  
-  const certifications = Array.isArray(profile.certifications) 
-    ? profile.certifications 
-    : profile.certifications ? Object.values(profile.certifications) : [];
-  
-  const tags = Array.isArray(profile.tags) 
-    ? profile.tags 
-    : profile.tags ? Object.values(profile.tags) : [];
-
-  // Create normalized profile
   return {
-    providerId: profile.id || profile.provider_id || profile.providerId,
-    businessName: profile.business_name || profile.businessName,
+    providerId: profile.providerId || profile.id || '',
+    businessName: profile.businessName || '',
     contactInformation: {
-      address: profile.contact_information?.address || profile.contactInformation?.address || ''
+      address: profile.contactInformation?.address || profile.address || ''
     },
-    profilePhoto: profile.profile_photo || profile.profilePhoto,
-    servicesOffered,
-    certifications,
+    profilePhoto: profile.profilePhoto || '',
+    servicesOffered: Array.isArray(profile.servicesOffered) ? profile.servicesOffered : [],
+    certifications: Array.isArray(profile.certifications) ? profile.certifications : [],
     ratings: typeof profile.ratings === 'number' ? profile.ratings : 0,
-    tags,
-    lastUpdated: profile.last_updated_date || profile.lastUpdated || profile.updatedAt || new Timestamp(Date.now() / 1000, 0)
+    tags: Array.isArray(profile.tags) ? profile.tags : [],
+    yearsOfExperience: typeof profile.yearsOfExperience === 'number' ? profile.yearsOfExperience : 0,
+    professionalDescription: profile.professionalDescription || '',
+    lastUpdated: profile.lastUpdated || Timestamp.now()
   };
 }
