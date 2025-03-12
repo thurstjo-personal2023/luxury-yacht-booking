@@ -109,7 +109,8 @@ export default function YachtForm() {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(false);
   const [yachtData, setYachtData] = useState<YachtExperience | null>(null);
-  const [sourceCollection, setSourceCollection] = useState<string>("yacht_experiences");
+  // Always use the unified collection for all operations
+  const sourceCollection = "unified_yacht_experiences";
   const [media, setMedia] = useState<Media[]>([]);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [tagInput, setTagInput] = useState("");
@@ -251,7 +252,8 @@ export default function YachtForm() {
         
         if (yachtDoc.exists()) {
           console.log(`Found yacht in ${collectionName} collection!`);
-          setSourceCollection(collectionName); // Store the collection name in state
+          // We've found the yacht, but we'll always use unified collection for operations
+          console.log(`Will use unified_yacht_experiences for all operations`);
           break;
         }
       }
@@ -589,17 +591,11 @@ export default function YachtForm() {
       // Log the object being saved
       console.log('Saving yacht with data:', yachtObject);
       
-      // Determine the correct collection to use
-      // If we found the yacht in a specific collection, use that collection
-      // Otherwise default to yacht_experiences collection
-      let collectionName = sourceCollection;
+      // Always use the unified collection for all operations
+      const collectionName = "unified_yacht_experiences";
       
-      // Log which collection we're using
-      if (editMode && yachtData) {
-        console.log(`Using the original collection: ${collectionName} for yacht update`);
-      } else {
-        console.log(`Using default collection: ${collectionName} for yacht creation/update`)
-      }
+      // Log that we're exclusively using the unified collection
+      console.log(`Using unified collection (${collectionName}) for all yacht operations`)
       
       // Save to Firestore
       const yachtRef = doc(db, collectionName, packageId);
