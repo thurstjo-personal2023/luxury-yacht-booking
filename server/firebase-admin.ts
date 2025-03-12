@@ -1,129 +1,72 @@
-import { initializeApp, cert, getApps } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
+import { initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 import { Request, Response, NextFunction } from "express";
 
-// Initialize Firebase Admin with service account
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT) : {
-  project_id: "etoile-yachts",
-  private_key_id: "",
-  private_key: "",
-  client_email: "",
-  client_id: "",
-  auth_uri: "https://accounts.google.com/o/oauth2/auth",
-  token_uri: "https://oauth2.googleapis.com/token",
-  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-  client_x509_cert_url: ""
-};
+// We are always in development mode
+process.env.NODE_ENV = "development";
 
-// Initialize Firebase Admin
+// Configure for connecting to emulators via ngrok
+const ngrokHost = "e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app";
+
+// IMPORTANT: Set environment variables BEFORE initializing Firebase
+process.env.FIRESTORE_EMULATOR_HOST = `${ngrokHost}:8080`;
+process.env.FIREBASE_AUTH_EMULATOR_HOST = `${ngrokHost}:9099`;
+process.env.FIREBASE_STORAGE_EMULATOR_HOST = `${ngrokHost}:9199`;
+
+console.log("Setting up Firebase Admin with emulator environment:");
+console.log(`Firestore: ${process.env.FIRESTORE_EMULATOR_HOST}`);
+console.log(`Auth: ${process.env.FIREBASE_AUTH_EMULATOR_HOST}`);
+console.log(`Storage: ${process.env.FIREBASE_STORAGE_EMULATOR_HOST}`);
+
+// Initialize Firebase Admin for emulator
+// When using emulators, we only need a projectId
 const app = initializeApp({
-  credential: cert(serviceAccount as any),
-  projectId: "etoile-yachts",
-  storageBucket: "etoile-yachts.appspot.com",
+  projectId: "etoile-yachts-emulator"
 });
 
-// Initialize services
+// Get service instances
 const adminAuth = getAuth(app);
 const adminDb = getFirestore(app);
 const adminStorage = getStorage(app);
 
-// We are always in development mode and always using emulators
-process.env.NODE_ENV = "development"; 
+// Configure Firestore with explicit settings
+adminDb.settings({
+  host: ngrokHost,
+  ssl: true,
+  ignoreUndefinedProperties: true
+});
 
-// Use Firebase emulators for development
-// Note: In Replit, emulators must be running externally and accessible
-const useEmulators = true;
-if (useEmulators) {
-  // For connecting to emulators via ngrok tunnels
-  // These are the actual tunnel URLs from your local ngrok setup
-  const firestoreNgrokUrl = "e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app";
-  const authNgrokUrl = "e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app";
-  const storageNgrokUrl = "e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app";
-  
-  // Use ngrok URLs without 'https://' prefix for most environment variables
-  process.env.FIRESTORE_EMULATOR_HOST = `${firestoreNgrokUrl}`;
-  process.env.FIREBASE_AUTH_EMULATOR_HOST = `${authNgrokUrl}`;
-  process.env.FIREBASE_STORAGE_EMULATOR_HOST = `${storageNgrokUrl}`;
-  
-  // Configure Firestore to use the ngrok tunnel
-  adminDb.settings({
-    host: `${firestoreNgrokUrl}`,
-    ssl: true, // Set to true for ngrok https URLs
-    ignoreUndefinedProperties: true
-  });
-  
-  console.log("Firebase Admin configured to connect via ngrok tunnels:");
-  console.log(` - Firestore: ${firestoreNgrokUrl}`);
-  console.log(` - Auth: ${authNgrokUrl}`);
-  console.log(` - Storage: ${storageNgrokUrl}`);
-  console.log("Environment variables set:");
-  console.log(" - FIRESTORE_EMULATOR_HOST:", process.env.FIRESTORE_EMULATOR_HOST);
-  console.log(" - FIREBASE_AUTH_EMULATOR_HOST:", process.env.FIREBASE_AUTH_EMULATOR_HOST);
-  console.log(" - FIREBASE_STORAGE_EMULATOR_HOST:", process.env.FIREBASE_STORAGE_EMULATOR_HOST);
-} else {
-  // Configure for direct Firestore access without emulators
-  adminDb.settings({
-    ignoreUndefinedProperties: true
-  });
-  
-  console.log("Firebase Admin configured for direct access (emulators disabled)");
-}
+console.log("Firebase Admin configured for emulator via ngrok tunnel");
 
-// Debug connection to Firebase Emulator
+// Connection test (runs after 3 seconds)
 setTimeout(async () => {
   try {
     console.log("Testing connection to Firestore emulator...");
-    // Log connection settings
-    console.log("Current Firestore emulator connection settings:", {
-      host: process.env.FIRESTORE_EMULATOR_HOST,
-      ssl: true, // Should be true for ngrok https URLs
-      ignoreUndefinedProperties: true
-    });
     
-    // Test query to verify emulator connection
+    // Test query
     const testDoc = await adminDb.collection('test').doc('test-connection').set({
       timestamp: Date.now(),
-      message: 'Testing Firestore emulator connection'
+      message: 'Testing connection'
     });
-    console.log("✓ Successfully connected to Firestore emulator");
+    console.log("✓ Successfully connected to Firestore");
     
-    // Try unified_yacht_experiences
-    console.log("Testing read from unified_yacht_experiences collection...");
+    // Check unified_yacht_experiences collection
     const yachtSnapshot = await adminDb.collection('unified_yacht_experiences').limit(1).get();
-    console.log(`✓ Read from unified_yacht_experiences, found ${yachtSnapshot.size} documents`);
-    if (yachtSnapshot.size > 0) {
-      const sampleDoc = yachtSnapshot.docs[0];
-      console.log("Sample yacht document fields:", Object.keys(sampleDoc.data()));
-      console.log("Producer ID field:", sampleDoc.data().producerId || "Not found");
-      console.log("Provider ID field:", sampleDoc.data().providerId || "Not found");
-    }
+    console.log(`Found ${yachtSnapshot.size} yachts`);
     
-    // Try harmonized_users collection
-    console.log("Testing read from harmonized_users collection...");
-    const usersSnapshot = await adminDb.collection('harmonized_users').limit(1).get();
-    console.log(`✓ Read from harmonized_users, found ${usersSnapshot.size} documents`);
-    
-    // Additional diagnostic info
-    console.log("\nEnvironment information:");
-    console.log("- NODE_ENV:", process.env.NODE_ENV);
-    console.log("- FIREBASE_AUTH_EMULATOR_HOST:", process.env.FIREBASE_AUTH_EMULATOR_HOST || "Not set");
-    console.log("- FIRESTORE_EMULATOR_HOST:", process.env.FIRESTORE_EMULATOR_HOST || "Not set");
-    console.log("- isEmulatorMode():", isEmulatorMode());
   } catch (error: any) {
-    console.error("❌ Error during Firebase emulator connection test:", error.message);
-    if (error && typeof error === 'object') {
-      console.error("Error code:", error.code);
-      console.error("Error details:", error.details || "No details available");
-    }
+    console.error("❌ Error during connection test:", error.message);
+    console.error("Error code:", error.code);
+    console.error("Error details:", error.details || "No details");
   }
 }, 3000);
 
 // Export the initialized services
 export { adminAuth, adminDb, adminStorage };
 
-// Augment Express Request type to include user property
+// Declare global type for Express Request
 declare global {
   namespace Express {
     interface Request {
@@ -141,13 +84,11 @@ declare global {
 // Helper function to decode a JWT token
 function decodeJWT(token: string): any {
   try {
-    // Split the token into its parts
     const parts = token.split('.');
     if (parts.length !== 3) {
       throw new Error('Invalid JWT format');
     }
     
-    // Decode the payload (second part)
     const payload = Buffer.from(parts[1], 'base64').toString('utf-8');
     return JSON.parse(payload);
   } catch (error) {
@@ -155,12 +96,6 @@ function decodeJWT(token: string): any {
     return null;
   }
 }
-
-// Helper to check if we're in development/emulator mode
-const isEmulatorMode = () => {
-  return process.env.NODE_ENV === 'development' || 
-         !!process.env.FIREBASE_AUTH_EMULATOR_HOST;
-};
 
 // Middleware to verify Firebase Auth tokens
 export const verifyAuth = async (req: Request, res: Response, next: NextFunction) => {
@@ -172,69 +107,44 @@ export const verifyAuth = async (req: Request, res: Response, next: NextFunction
 
     const token = authHeader.split('Bearer ')[1];
     
-    // Check if we're in emulator mode and handle emulator tokens differently
-    if (isEmulatorMode() && token) {
-      console.log('Emulator mode detected, using special token handling');
-      
-      try {
-        // First try regular verification
-        const decodedToken = await adminAuth.verifyIdToken(token);
-        
-        // Extract properties and proceed as normal
-        const { uid, email, role = 'consumer', name, ...otherClaims } = decodedToken;
-        req.user = { uid, email, role, name, ...otherClaims };
-        return next();
-      } catch (error: any) {
-        // If verification fails in emulator mode, try manual decoding
-        console.log('Standard token verification failed in emulator, trying manual decode:', 
-          error?.message || 'Unknown error');
-        
-        // Manual decode for emulator tokens
-        const decodedPayload = decodeJWT(token);
-        if (decodedPayload && decodedPayload.user_id) {
-          console.log('Successfully decoded emulator token manually');
-          
-          // Extract user info from manually decoded token
-          const { user_id, email, role = 'consumer', name = '', ...otherClaims } = decodedPayload;
-          
-          // Set user information in the request object
-          req.user = {
-            uid: user_id,
-            email: email || '',
-            role,
-            name,
-            ...otherClaims,
-            // Flag that this was verified via emulator mode
-            _emulatorVerified: true
-          };
-          
-          return next();
-        } else {
-          // Manual decode also failed
-          console.error('Manual token decode failed for emulator');
-          throw new Error('Invalid emulator token');
-        }
-      }
-    } else {
-      // Production mode - use standard token verification
+    try {
+      // Try to verify with Firebase Auth
       const decodedToken = await adminAuth.verifyIdToken(token);
       
-      // Extract properties from the token
+      // Extract user info
       const { uid, email, role = 'consumer', name, ...otherClaims } = decodedToken;
+      req.user = { uid, email, role, name, ...otherClaims };
       
-      // Set user information in the request object
-      req.user = {
-        uid,
-        email,
-        role,
-        name,
-        ...otherClaims // Include all other token claims
-      };
+      return next();
+    } catch (error) {
+      // If regular verification fails, try manual decode for emulator tokens
+      console.log('Standard token verification failed, trying manual decode');
       
-      next();
+      const decodedPayload = decodeJWT(token);
+      if (decodedPayload && decodedPayload.user_id) {
+        console.log('Successfully decoded emulator token manually');
+        
+        // Extract user info
+        const { user_id, email, role = 'consumer', name = '', ...otherClaims } = decodedPayload;
+        
+        req.user = {
+          uid: user_id,
+          email: email || '',
+          role,
+          name,
+          ...otherClaims,
+          _emulatorVerified: true
+        };
+        
+        return next();
+      }
+      
+      // Both verification methods failed
+      console.error('Auth verification failed');
+      return res.status(401).json({ error: 'Invalid token' });
     }
   } catch (error) {
-    console.error('Auth Middleware Error:', error);
-    res.status(401).json({ error: 'Unauthorized' });
+    console.error('Auth middleware error:', error);
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 };
