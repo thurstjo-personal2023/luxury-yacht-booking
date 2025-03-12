@@ -235,11 +235,12 @@ export default function YachtForm() {
   const fetchYachtDetails = async (yachtId: string) => {
     setInitialLoading(true);
     try {
-      // Collections to search in the preferred order
+      // Search in all collections but always operate on the unified collection
+      // Order matters - we want to prioritize unified collection first
       const collectionsToSearch = [
+        "unified_yacht_experiences",
         "yacht_experiences",
-        "experience_packages",
-        "unified_yacht_experiences"
+        "experience_packages"
       ];
       
       let yachtDoc;
@@ -669,27 +670,9 @@ export default function YachtForm() {
           newYachtData._lastUpdated = Date.now();
           console.log('Update data:', newYachtData);
           
-          // Attempt to update the document
+          // Update the document in the unified collection
           await updateDoc(yachtRef, newYachtData);
-          
-          // Now, always ensure the unified collection is updated as well
-          try {
-            const unifiedRef = doc(db, "unified_yacht_experiences", packageId);
-            console.log(`Also updating unified collection for yacht ID ${packageId}`);
-            
-            // For unified collection, use the same data with a fresh timestamp
-            const unifiedData = {
-              ...newYachtData,
-              _lastUpdated: Date.now() // Special field to force updates
-            };
-            
-            // Use setDoc with merge: true to ensure all fields are updated
-            await setDoc(unifiedRef, unifiedData, { merge: true });
-            console.log('Unified collection update successful');
-          } catch (unifiedError) {
-            console.warn('Error updating unified collection:', unifiedError);
-            // Continue even if unified update fails
-          }
+          console.log('Update successful to unified collection');
           
           console.log('Update successful');
           toast({
@@ -733,26 +716,9 @@ export default function YachtForm() {
           newYachtData._lastUpdated = Date.now();
           console.log('Create data:', newYachtData);
           
-          // Create document in main collection
+          // Create document in the unified collection
           await setDoc(yachtRef, newYachtData);
-          
-          // Now, always ensure the unified collection is updated as well
-          try {
-            const unifiedRef = doc(db, "unified_yacht_experiences", packageId);
-            console.log(`Also creating in unified collection for yacht ID ${packageId}`);
-            
-            // For unified collection, make sure to include a timestamp to help with cache busting
-            const unifiedData = {
-              ...newYachtData,
-              _lastUpdated: Date.now() // Special field to force updates
-            };
-            
-            await setDoc(unifiedRef, unifiedData);
-            console.log('Unified collection update successful');
-          } catch (unifiedError) {
-            console.warn('Error updating unified collection:', unifiedError);
-            // Continue even if unified update fails
-          }
+          console.log('Successfully created yacht in unified collection');
           
           toast({
             title: "Yacht Created",
