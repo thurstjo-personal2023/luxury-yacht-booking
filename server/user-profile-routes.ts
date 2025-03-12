@@ -220,7 +220,7 @@ export function registerUserProfileRoutes(app: Express) {
           address: businessAddress
         },
         servicesOffered,
-        lastUpdated: Timestamp.now()
+        lastUpdated: FieldValue.serverTimestamp()
       };
 
       // Only set fields if they're provided
@@ -297,19 +297,19 @@ export function registerUserProfileRoutes(app: Express) {
           wishlist: action === 'add' ? [yachtId] : [],
           bookingHistory: [],
           reviewsProvided: [],
-          lastUpdated: Timestamp.now()
+          lastUpdated: FieldValue.serverTimestamp()
         });
       } else {
         // Update wishlist based on action
         if (action === 'add') {
           await touristProfileRef.update({
             wishlist: FieldValue.arrayUnion(yachtId),
-            lastUpdated: Timestamp.now()
+            lastUpdated: FieldValue.serverTimestamp()
           });
         } else {
           await touristProfileRef.update({
             wishlist: FieldValue.arrayRemove(yachtId),
-            lastUpdated: Timestamp.now()
+            lastUpdated: FieldValue.serverTimestamp()
           });
         }
       }

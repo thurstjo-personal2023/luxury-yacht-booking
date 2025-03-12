@@ -9,6 +9,9 @@
 
 import { Timestamp } from "firebase/firestore";
 
+// For server-side code compatibility
+export type ServerTimestamp = Timestamp | FirebaseFirestore.FieldValue;
+
 /**
  * Core User Schema (harmonized_users collection)
  * Contains essential user information applicable to all user types
@@ -29,8 +32,8 @@ export interface HarmonizedUser {
   points: number;                // Loyalty/reward points
   
   // Timestamps
-  createdAt: Timestamp;          // Account creation date
-  updatedAt: Timestamp;          // Last account update
+  createdAt: Timestamp | ServerTimestamp;          // Account creation date
+  updatedAt: Timestamp | ServerTimestamp;          // Last account update
   
   // Standardization tracking
   _standardized?: boolean;
@@ -56,7 +59,7 @@ export interface TouristProfile {
   reviewsProvided?: string[];    // IDs of reviews submitted
   
   // Timestamps
-  lastUpdated?: Timestamp;       // Last profile update
+  lastUpdated?: Timestamp | ServerTimestamp;       // Last profile update
 }
 
 /**
