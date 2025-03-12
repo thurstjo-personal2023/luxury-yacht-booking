@@ -179,14 +179,31 @@ const connectToEmulators = (hosts: {
 
     // Firestore Emulator
     try {
-      // Using settings instead of connectFirestoreEmulator to avoid the warning
-      connectFirestoreEmulator(db, firestore.host, firestore.port);
-      console.log(`✓ Firestore emulator connected at: http://${firestore.host}:${firestore.port}`);
-    } catch (firestoreError) {
-      if (firestoreError instanceof Error && firestoreError.message.includes('already')) {
-        console.log('Firestore emulator already connected');
+      // Check if Firestore is already connected to an emulator
+      // @ts-ignore - Access internal property to check emulator connection
+      const isFirestoreAlreadyConnected = typeof db._delegate?._settings?.host === 'string' && 
+                                         db._delegate?._settings?.host.includes(firestore.host);
+      
+      if (!isFirestoreAlreadyConnected) {
+        console.log(`Connecting to Firestore emulator at http://${firestore.host}:${firestore.port}...`);
+        // Use try-catch within the if block for more precise error handling
+        try {
+          connectFirestoreEmulator(db, firestore.host, firestore.port);
+          console.log(`✓ Firestore emulator connected at: http://${firestore.host}:${firestore.port}`);
+        } catch (innerError) {
+          console.warn(`Failed to connect to Firestore emulator:`, innerError);
+          throw innerError; // Rethrow to outer catch block
+        }
       } else {
-        console.warn(`Failed to connect to Firestore emulator: ${firestoreError}`);
+        console.log('Firestore emulator already connected, skipping connection');
+      }
+    } catch (firestoreError) {
+      if (firestoreError instanceof Error && 
+          (firestoreError.message.includes('already') || 
+           firestoreError.message.includes('has already been started'))) {
+        console.log('Firestore emulator connection skipped due to prior initialization');
+      } else {
+        console.error(`Failed to connect to Firestore emulator: ${firestoreError}`);
         // Add to global error collection
         (window as any).__FIREBASE_ERRORS = [
           ...(window as any).__FIREBASE_ERRORS || [],
@@ -221,22 +238,53 @@ const connectToEmulators = (hosts: {
 
     // Realtime Database Emulator - connect only if not already initialized
     try {
-      // We need to approach RTDB differently due to its initialization behavior
-      // @ts-ignore - Access internal property to check if emulator is already connected
-      const isRtdbAlreadyConnected = rtdb._delegate?._repo?.repoInfo?.namespace?.includes('emulator');
+      // Check if connection is already established to avoid "already initialized" errors
+      // We need to be very careful when connecting to RTDB emulator
+      let isRtdbAlreadyConnected = false;
+      
+      try {
+        // Check several possible internal properties that might indicate a connection
+        // @ts-ignore - Access internal property to check emulator connection
+        isRtdbAlreadyConnected = (
+          // Check if namespace contains 'emulator'
+          (rtdb._delegate?._repo?.repoInfo?.namespace?.includes?.('emulator')) ||
+          // Check if host matches our emulator host 
+          (rtdb._delegate?._repo?.repoInfo?.host === rtdbEmulator.host) ||
+          // Check if internal initialized flag is set
+          (rtdb._delegate?._initialized === true)
+        );
+      } catch (checkError) {
+        // If we can't check properly, assume not connected and handle potential error in the catch below
+        console.warn('Could not check RTDB emulator connection status:', checkError);
+      }
       
       if (!isRtdbAlreadyConnected) {
-        connectDatabaseEmulator(rtdb, rtdbEmulator.host, rtdbEmulator.port);
-        console.log(`✓ Realtime Database emulator connected at: http://${rtdbEmulator.host}:${rtdbEmulator.port}`);
+        console.log(`Connecting to RTDB emulator at http://${rtdbEmulator.host}:${rtdbEmulator.port}...`);
+        try {
+          connectDatabaseEmulator(rtdb, rtdbEmulator.host, rtdbEmulator.port);
+          console.log(`✓ Realtime Database emulator connected at: http://${rtdbEmulator.host}:${rtdbEmulator.port}`);
+        } catch (innerError: any) {
+          // Check specifically for the "Cannot call useEmulator()" error
+          if (innerError instanceof Error && 
+              (innerError.message.includes('Cannot call useEmulator()') || 
+               innerError.message.includes('already been initialized'))) {
+            console.log('RTDB already initialized - continuing without reconnecting');
+          } else {
+            throw innerError; // Rethrow if it's a different error
+          }
+        }
       } else {
-        console.log('Realtime Database emulator already connected');
+        console.log('Realtime Database emulator already connected, skipping connection');
       }
     } catch (rtdbError) {
-      if (rtdbError instanceof Error && rtdbError.message.includes('already')) {
-        console.log('Realtime Database emulator already connected');
+      if (rtdbError instanceof Error && 
+          (rtdbError.message.includes('already') || 
+           rtdbError.message.includes('Cannot call useEmulator()') ||
+           rtdbError.message.includes('been initialized'))) {
+        console.log('RTDB emulator connection skipped due to prior initialization');
       } else {
         console.warn(`Failed to connect to RTDB emulator: ${rtdbError}`);
-        // Add to global error collection
+        // Add to global error collection but don't treat as fatal
         (window as any).__FIREBASE_ERRORS = [
           ...(window as any).__FIREBASE_ERRORS || [],
           rtdbError

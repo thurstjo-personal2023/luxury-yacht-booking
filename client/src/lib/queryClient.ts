@@ -184,20 +184,58 @@ export const getQueryFn: <T>(options: {
       // Check for errors
       await throwIfResNotOk(res);
       
-      // First check if the response is HTML (usually an error page)
+      // Check content type and handle non-JSON responses
       const contentType = res.headers.get('content-type');
+      
+      // If we received HTML instead of JSON, this usually indicates a routing error on the server
       if (contentType && contentType.includes('text/html')) {
         console.error('QueryFn: Received HTML response instead of JSON');
         
         try {
           const htmlContent = await res.text();
+          
+          // Try to extract useful information from the HTML
           const titleMatch = htmlContent.match(/<title>(.*?)<\/title>/);
           const errorTitle = titleMatch ? titleMatch[1] : 'Unknown error';
           
           console.error(`QueryFn: HTML error page title: ${errorTitle}`);
+          console.error('QueryFn: First 200 characters of HTML:', htmlContent.substring(0, 200));
           
-          throw new Error(`Received HTML page instead of JSON: ${errorTitle}`);
+          // Log URL path for debugging
+          console.error(`QueryFn: URL path that returned HTML: ${queryKey[0]}`);
+          
+          // For producer API endpoints, try fallback URL pattern if needed
+          if (queryKey[0].toString().includes('/api/producer/')) {
+            console.log('QueryFn: Detected producer API endpoint, will retry with corrected path');
+            
+            // Create a corrected version of the URL by removing any double slashes
+            // This typically happens with route confusion in the Express server
+            const correctedUrl = queryKey[0].toString()
+              .replace(/\/\/+/g, '/') // Replace multiple consecutive slashes with a single slash
+              .replace('http:/', 'http://') // Fix protocol if affected
+              .replace('https:/', 'https://'); // Fix protocol if affected
+              
+            if (correctedUrl !== queryKey[0]) {
+              console.log(`QueryFn: Retrying with corrected URL: ${correctedUrl}`);
+              
+              // Make a new request with the corrected URL
+              const retryRes = await fetch(correctedUrl, {
+                credentials: "include",
+                headers
+              });
+              
+              if (retryRes.ok) {
+                console.log('QueryFn: Retry with corrected URL succeeded!');
+                return await retryRes.json();
+              } else {
+                console.error('QueryFn: Retry with corrected URL also failed');
+              }
+            }
+          }
+          
+          throw new Error(`API returned HTML instead of JSON: ${errorTitle}`);
         } catch (htmlError) {
+          console.error('QueryFn: Error processing HTML response:', htmlError);
           throw new Error('Received HTML response instead of JSON data');
         }
       }
