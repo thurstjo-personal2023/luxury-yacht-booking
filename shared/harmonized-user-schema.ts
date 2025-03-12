@@ -8,6 +8,7 @@
  */
 
 import { Timestamp } from "firebase/firestore";
+import { UserRole } from "./schema";
 
 /**
  * Core User Schema (harmonized_users collection)
