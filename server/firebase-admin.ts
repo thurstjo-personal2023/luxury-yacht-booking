@@ -29,11 +29,11 @@ const adminAuth = getAuth(app);
 const adminDb = getFirestore(app);
 const adminStorage = getStorage(app);
 
-// Set development mode
+// Always connect to emulators in development mode
 process.env.NODE_ENV = "development"; 
 
-// Try to use emulators, but provide a fallback for direct Firestore access
-const useEmulators = false; // Set to false to bypass emulator connection and use direct Firebase access
+// Always use emulators as they are running in the external terminal
+const useEmulators = true; // Set to true to use the running emulators
 if (useEmulators) {
   // Set environment variables for Firebase emulators
   process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -59,22 +59,22 @@ if (useEmulators) {
   console.log("Firebase Admin configured for direct access (emulators disabled)");
 }
 
-// Debug connection
+// Debug connection to Firebase emulators
 setTimeout(async () => {
   try {
-    console.log("Testing connection to Firestore...");
-    // Log Firestore connection settings
-    console.log("Firestore connection settings:", {
-      useEmulators: useEmulators,
+    console.log("Testing connection to Firestore emulator...");
+    console.log("Firestore emulator connection settings:", {
+      host: "127.0.0.1:8080", 
+      ssl: false,
       ignoreUndefinedProperties: true
     });
     
-    // Test query to verify connection
+    // Test query to verify emulator connection
     const testDoc = await adminDb.collection('test').doc('test-connection').set({
       timestamp: Date.now(),
-      message: 'Testing Firestore connection from Replit'
+      message: 'Testing Firestore emulator connection from Replit'
     });
-    console.log("✓ Successfully connected to Firestore");
+    console.log("✓ Successfully connected to Firestore emulator");
     
     // Now try to read from collections
     try {
@@ -83,7 +83,7 @@ setTimeout(async () => {
       const yachtSnapshot = await adminDb.collection('unified_yacht_experiences').limit(1).get();
       console.log(`✓ Read from unified_yacht_experiences, found ${yachtSnapshot.size} documents`);
       
-      // Try users collection or harmonized_users
+      // Try harmonized_users collection
       console.log("Testing read from harmonized_users collection...");
       const usersSnapshot = await adminDb.collection('harmonized_users').limit(1).get();
       console.log(`✓ Read from harmonized_users, found ${usersSnapshot.size} documents`);
@@ -91,34 +91,14 @@ setTimeout(async () => {
       // Additional diagnostic info
       console.log("Environment variables:");
       console.log("- NODE_ENV:", process.env.NODE_ENV);
+      console.log("- FIREBASE_AUTH_EMULATOR_HOST:", process.env.FIREBASE_AUTH_EMULATOR_HOST);
+      console.log("- FIREBASE_STORAGE_EMULATOR_HOST:", process.env.FIREBASE_STORAGE_EMULATOR_HOST);
       console.log("- isEmulatorMode():", isEmulatorMode());
     } catch (readError: any) {
       console.error("❌ Failed to read from collections:", readError.message);
-      // See if we can create some test data for this run
-      try {
-        console.log("Creating test user data...");
-        const testUserId = "test-user-" + Date.now();
-        await adminDb.collection('harmonized_users').doc(testUserId).set({
-          id: testUserId,
-          userId: testUserId,
-          name: "Test User",
-          email: "test@example.com",
-          phone: "555-1234",
-          role: "consumer",
-          emailVerified: false,
-          points: 0,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          _standardized: true,
-          _standardizedVersion: 1
-        });
-        console.log("✓ Successfully created test user data");
-      } catch (createError: any) {
-        console.error("❌ Failed to create test data:", createError.message);
-      }
     }
   } catch (error: any) {
-    console.error("❌ Failed to connect to Firestore:", error.message);
+    console.error("❌ Failed to connect to Firestore emulator:", error.message);
     // Safe error logging
     if (error && typeof error === 'object') {
       console.error("Error code:", error.code);
