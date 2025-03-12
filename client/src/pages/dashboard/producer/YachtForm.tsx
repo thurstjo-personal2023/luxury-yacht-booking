@@ -235,28 +235,12 @@ export default function YachtForm() {
   const fetchYachtDetails = async (yachtId: string) => {
     setInitialLoading(true);
     try {
-      // Search in all collections but always operate on the unified collection
-      // Order matters - we want to prioritize unified collection first
-      // Only search in the unified collection
-      const collectionsToSearch = [
-        "unified_yacht_experiences"
-      ];
+      // Only use the unified collection - no legacy collections
+      const collectionName = "unified_yacht_experiences";
+      console.log(`Searching for yacht ID ${yachtId} in ${collectionName} collection...`);
       
-      let yachtDoc;
-      
-      // Try each collection until we find the yacht
-      for (const collectionName of collectionsToSearch) {
-        console.log(`Searching for yacht ID ${yachtId} in ${collectionName} collection...`);
-        const yachtRef = doc(db, collectionName, yachtId);
-        yachtDoc = await getDoc(yachtRef);
-        
-        if (yachtDoc.exists()) {
-          console.log(`Found yacht in ${collectionName} collection!`);
-          // We've found the yacht, but we'll always use unified collection for operations
-          console.log(`Will use unified_yacht_experiences for all operations`);
-          break;
-        }
-      }
+      const yachtRef = doc(db, collectionName, yachtId);
+      const yachtDoc = await getDoc(yachtRef);
       
       if (yachtDoc && yachtDoc.exists()) {
         const data = yachtDoc.data() as YachtExperience;
