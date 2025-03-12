@@ -736,7 +736,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get producer yachts with pagination and ordering by availability status
   // Move this route before the "Get yacht by ID" route to avoid confusion with the :id parameter
   app.get("/api/producer/yachts", verifyAuth, async (req: Request, res: Response) => {
+    // Set content type explicitly to ensure JSON response
+    res.setHeader('Content-Type', 'application/json');
+    
     try {
+      console.log('Producer Yachts API: Request received');
+      
       // Set cache control headers to prevent caching
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
@@ -745,11 +750,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse pagination parameters from query string
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = parseInt(req.query.pageSize as string) || 10;
+      console.log(`Producer Yachts API: Pagination params - page: ${page}, pageSize: ${pageSize}`);
+      
+      // Log user info from auth
+      console.log('Producer Yachts API: User info from auth:', {
+        uid: req.user?.uid,
+        role: req.user?.role,
+        email: req.user?.email,
+      });
       
       // Get producerId directly from verified auth token (req.user is set by verifyAuth middleware)
       const producerId = req.user?.uid;
       if (!producerId) {
-        return res.status(401).json({ error: "Unauthorized. Valid producer authentication required." });
+        console.warn('Producer Yachts API: No producer ID found in authenticated user');
+        return res.status(401).json({ 
+          error: "Unauthorized", 
+          message: "Valid producer authentication required",
+          details: "No producer ID found in authentication data"
+        });
       }
       console.log(`Using authenticated user ID as producer ID: ${producerId}`);
       
@@ -774,7 +792,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Get producer add-ons with pagination and ordering by availability
   app.get("/api/producer/addons", verifyAuth, async (req: Request, res: Response) => {
+    // Set content type explicitly to ensure JSON response
+    res.setHeader('Content-Type', 'application/json');
+    
     try {
+      console.log('Producer Add-ons API: Request received');
+      
       // Set cache control headers to prevent caching
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
@@ -783,11 +806,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse pagination parameters from query string
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = parseInt(req.query.pageSize as string) || 10;
+      console.log(`Producer Add-ons API: Pagination params - page: ${page}, pageSize: ${pageSize}`);
+      
+      // Log user info from auth
+      console.log('Producer Add-ons API: User info from auth:', {
+        uid: req.user?.uid,
+        role: req.user?.role,
+        email: req.user?.email,
+      });
       
       // Get producerId directly from verified auth token (req.user is set by verifyAuth middleware)
       const producerId = req.user?.uid;
       if (!producerId) {
-        return res.status(401).json({ error: "Unauthorized. Valid producer authentication required." });
+        console.warn('Producer Add-ons API: No producer ID found in authenticated user');
+        return res.status(401).json({ 
+          error: "Unauthorized", 
+          message: "Valid producer authentication required",
+          details: "No producer ID found in authentication data"
+        });
       }
       console.log(`Using authenticated user ID as producer ID: ${producerId}`);
       
@@ -795,32 +831,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const forceRefresh = Date.now();
       console.log(`Fetching add-ons for producer ID: ${producerId || 'all'} (refresh: ${forceRefresh})`);
       
-      // Get add-ons with pagination and sorting
-      const addonsResponse = await storage.getAllProductAddOns({
-        partnerId: producerId,  // Use partnerId for filtering if provided
-        page,
-        pageSize,
-        sortByStatus: true
-      });
-      
-      // Transform response to match the expected format
-      res.json({
-        addons: addonsResponse.data,
-        pagination: addonsResponse.pagination
-      });
+      try {
+        // Get add-ons with pagination and sorting
+        const addonsResponse = await storage.getAllProductAddOns({
+          partnerId: producerId,  // Use partnerId for filtering if provided
+          page,
+          pageSize,
+          sortByStatus: true
+        });
+        
+        console.log(`Producer Add-ons API: Retrieved ${addonsResponse.data.length} add-ons`);
+        
+        // Transform response to match the expected format
+        res.json({
+          addons: addonsResponse.data,
+          pagination: addonsResponse.pagination
+        });
+      } catch (storageError) {
+        console.error('Producer Add-ons API: Error in storage.getAllProductAddOns:', storageError);
+        
+        // Return a more detailed error for debugging
+        return res.status(500).json({
+          error: "Database operation failed",
+          message: "Failed to retrieve add-ons from database",
+          details: String(storageError),
+          code: typeof storageError === 'object' && storageError !== null ? (storageError as any).code : undefined
+        });
+      }
     } catch (error) {
       console.error("Error fetching producer add-ons:", error);
-      res.status(500).json({ error: "Failed to fetch add-ons" });
+      res.status(500).json({ 
+        error: "Failed to fetch add-ons",
+        message: String(error)
+      });
     }
   });
   
   // Create a new add-on for a producer
   app.post("/api/producer/addons/create", verifyAuth, async (req: Request, res: Response) => {
+    // Set content type explicitly to ensure JSON response
+    res.setHeader('Content-Type', 'application/json');
+    
     try {
+      console.log('Create Add-on API: Request received');
+      
+      // Log request body for debugging
+      console.log('Create Add-on API: Request body:', req.body);
+      
       const addonData = req.body;
+      
+      // If there's no request body, return an error
+      if (!addonData || Object.keys(addonData).length === 0) {
+        console.warn('Create Add-on API: Empty request body');
+        return res.status(400).json({
+          error: "Invalid request",
+          message: "Request body is empty",
+          details: "Provide add-on data in the request body"
+        });
+      }
       
       // Get the authenticated user ID from the auth token (set by verifyAuth middleware)
       const authUserId = req.user?.uid;
+      
+      if (!authUserId) {
+        console.warn('Create Add-on API: No user ID in authentication data');
+        return res.status(401).json({
+          error: "Unauthorized",
+          message: "Valid producer authentication required",
+          details: "No user ID found in authentication data"
+        });
+      }
       
       // Use our helper function to get harmonized IDs
       const { producerId, partnerId } = await getHarmonizedProducerIds(authUserId);
@@ -837,7 +917,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!addonData.name || !addonData.producerId || !addonData.partnerId) {
         return res.status(400).json({ 
           error: "Missing required fields", 
-          message: "Name, producerId, and partnerId are required fields" 
+          message: "Name, producerId, and partnerId are required fields",
+          providedFields: Object.keys(addonData)
         });
       }
       
@@ -845,99 +926,330 @@ export async function registerRoutes(app: Express): Promise<Server> {
       addonData.productId = addonData.productId || `ADD-${Date.now()}`;
       addonData.availability = addonData.availability !== undefined ? addonData.availability : true;
       addonData.isAvailable = addonData.availability;
+      
+      // Set timestamps in multiple formats for compatibility
+      const now = new Date();
       addonData.createdDate = addonData.createdDate || FieldValue.serverTimestamp();
       addonData.lastUpdatedDate = FieldValue.serverTimestamp();
       addonData.updatedAt = FieldValue.serverTimestamp();
+      addonData.timestamp = FieldValue.serverTimestamp(); // Additional timestamp field
+      
+      // Handle media field
+      if (!addonData.media || !Array.isArray(addonData.media)) {
+        addonData.media = [];
+      }
+      
+      // Add standardization tracking
       addonData._standardized = true;
       addonData._standardizedVersion = 1;
+      addonData.category = addonData.category || 'Other';
+      addonData.pricing = addonData.pricing || addonData.price || 0;
+      addonData.tags = addonData.tags || [];
       
-      // Add to Firestore
-      const addonRef = adminDb.collection('products_add_ons').doc(addonData.productId);
-      await addonRef.set(addonData);
-      
-      res.json({ 
-        success: true, 
-        message: "Add-on created successfully",
-        productId: addonData.productId
-      });
+      try {
+        // Add to Firestore
+        console.log(`Create Add-on API: Adding document to 'products_add_ons' collection with ID: ${addonData.productId}`);
+        const addonRef = adminDb.collection('products_add_ons').doc(addonData.productId);
+        await addonRef.set(addonData);
+        
+        console.log(`Create Add-on API: Successfully created add-on with ID: ${addonData.productId}`);
+        
+        // Return success response
+        res.json({ 
+          success: true, 
+          message: "Add-on created successfully",
+          productId: addonData.productId,
+          addon: {
+            id: addonData.productId,
+            name: addonData.name,
+            pricing: addonData.pricing,
+            availability: addonData.availability
+          }
+        });
+      } catch (dbError) {
+        console.error("Create Add-on API: Database error:", dbError);
+        
+        // Return detailed error
+        res.status(500).json({ 
+          error: "Database operation failed", 
+          message: "Failed to save add-on data to database",
+          details: String(dbError),
+          code: typeof dbError === 'object' && dbError !== null ? (dbError as any).code : undefined
+        });
+      }
     } catch (error) {
       console.error("Error creating add-on:", error);
-      res.status(500).json({ error: "Failed to create add-on", message: String(error) });
+      res.status(500).json({ 
+        error: "Failed to create add-on", 
+        message: String(error),
+        stack: process.env.NODE_ENV === 'development' ? (error as Error).stack : undefined
+      });
     }
   });
   
   // Get producer reviews
   app.get("/api/producer/reviews", verifyAuth, async (req: Request, res: Response) => {
+    // Set content type explicitly to ensure JSON response
+    res.setHeader('Content-Type', 'application/json');
+    
     try {
+      console.log('Producer Reviews API: Request received');
+      
+      // Log user info from auth
+      console.log('Producer Reviews API: User info from auth:', {
+        uid: req.user?.uid,
+        role: req.user?.role,
+        email: req.user?.email,
+      });
+      
       // Get auth user ID from verified auth token
       const authUserId = req.user?.uid;
       
-      // Use our helper function to get harmonized producer ID
-      const { producerId } = await getHarmonizedProducerIds(authUserId);
-      
-      console.log(`Fetching reviews for producer ID: ${producerId} (auth user: ${authUserId})`);
-      
-      // Return reviews where the relatedContentId matches any yacht owned by this producer
-      // First, get all of this producer's yachts
-      const yachtsSnapshot = await adminDb.collection('unified_yacht_experiences')
-        .where('producerId', '==', producerId)
-        .get();
-      
-      if (yachtsSnapshot.empty) {
-        return res.json([]);
+      if (!authUserId) {
+        console.warn('Producer Reviews API: No user ID found in authentication data');
+        return res.status(401).json({
+          error: "Unauthorized",
+          message: "Valid producer authentication required",
+          details: "No user ID found in authentication data"
+        });
       }
       
-      // Get the IDs of all yachts owned by this producer
-      const yachtIds = yachtsSnapshot.docs.map(doc => doc.id);
-      
-      // Now fetch reviews for these yachts
-      const reviewsSnapshot = await adminDb.collection('reviews_and_feedback')
-        .where('relatedContentId', 'in', yachtIds)
-        .get();
-      
-      const reviews = reviewsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      res.json(reviews);
+      try {
+        // Use our helper function to get harmonized producer ID
+        const { producerId } = await getHarmonizedProducerIds(authUserId);
+        
+        console.log(`Fetching reviews for producer ID: ${producerId} (auth user: ${authUserId})`);
+        
+        try {
+          // Return reviews where the relatedContentId matches any yacht owned by this producer
+          // First, get all of this producer's yachts
+          console.log(`Producer Reviews API: Querying yachts owned by producer: ${producerId}`);
+          const yachtsSnapshot = await adminDb.collection('unified_yacht_experiences')
+            .where('producerId', '==', producerId)
+            .get();
+          
+          console.log(`Producer Reviews API: Found ${yachtsSnapshot.size} yachts for producer`);
+          
+          if (yachtsSnapshot.empty) {
+            console.log('Producer Reviews API: No yachts found for this producer, returning empty array');
+            return res.json([]);
+          }
+          
+          // Get the IDs of all yachts owned by this producer
+          const yachtIds = yachtsSnapshot.docs.map(doc => doc.id);
+          console.log(`Producer Reviews API: Yacht IDs for reviews query: ${yachtIds.join(', ')}`);
+          
+          // Now fetch reviews for these yachts
+          try {
+            console.log('Producer Reviews API: Querying reviews for yacht IDs');
+            
+            if (yachtIds.length > 10) {
+              // Firestore 'in' queries are limited to 10 values, so we need to batch
+              console.log('Producer Reviews API: More than 10 yacht IDs, using batched queries');
+              
+              const allReviews = [];
+              for (let i = 0; i < yachtIds.length; i += 10) {
+                const batchIds = yachtIds.slice(i, i + 10);
+                const batchSnapshot = await adminDb.collection('reviews_and_feedback')
+                  .where('relatedContentId', 'in', batchIds)
+                  .get();
+                
+                const batchReviews = batchSnapshot.docs.map(doc => ({
+                  id: doc.id,
+                  ...doc.data()
+                }));
+                
+                allReviews.push(...batchReviews);
+              }
+              
+              console.log(`Producer Reviews API: Found ${allReviews.length} total reviews across batches`);
+              res.json(allReviews);
+            } else {
+              // If 10 or fewer yacht IDs, we can use a single query
+              const reviewsSnapshot = await adminDb.collection('reviews_and_feedback')
+                .where('relatedContentId', 'in', yachtIds)
+                .get();
+              
+              const reviews = reviewsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+              }));
+              
+              console.log(`Producer Reviews API: Found ${reviews.length} reviews`);
+              res.json(reviews);
+            }
+          } catch (reviewsError) {
+            console.error('Producer Reviews API: Error querying reviews collection:', reviewsError);
+            
+            // Fallback to empty array on error rather than failing
+            console.log('Producer Reviews API: Returning empty array due to reviews query error');
+            return res.json([]);
+          }
+        } catch (yachtsError) {
+          console.error('Producer Reviews API: Error querying yachts collection:', yachtsError);
+          return res.status(500).json({
+            error: "Database query failed",
+            message: "Failed to query yachts collection",
+            details: String(yachtsError)
+          });
+        }
+      } catch (producerIdError) {
+        console.error('Producer Reviews API: Error getting producer ID:', producerIdError);
+        return res.status(500).json({
+          error: "Producer ID error",
+          message: "Failed to retrieve producer ID",
+          details: String(producerIdError)
+        });
+      }
     } catch (error) {
       console.error("Error fetching producer reviews:", error);
-      res.status(500).json({ error: "Failed to fetch reviews" });
+      res.status(500).json({ 
+        error: "Failed to fetch reviews",
+        message: String(error)
+      });
     }
   });
   
   // Get producer bookings
   app.get("/api/producer/bookings", verifyAuth, async (req: Request, res: Response) => {
+    // Set content type explicitly to ensure JSON response
+    res.setHeader('Content-Type', 'application/json');
+    
     try {
+      console.log('Producer Bookings API: Request received');
+      
+      // Log user info from auth
+      console.log('Producer Bookings API: User info from auth:', {
+        uid: req.user?.uid,
+        role: req.user?.role,
+        email: req.user?.email,
+      });
+      
       // Get auth user ID from verified auth token
       const authUserId = req.user?.uid;
       
-      // Use our helper function to get harmonized producer ID
-      const { producerId } = await getHarmonizedProducerIds(authUserId);
-      
-      console.log(`Fetching bookings for producer ID: ${producerId} (auth user: ${authUserId})`);
-      
-      // Query bookings related to yachts owned by this producer
-      // First, get all yacht IDs owned by this producer
-      const yachtsSnapshot = await adminDb.collection('unified_yacht_experiences')
-        .where('producerId', '==', producerId)
-        .get();
-      
-      if (yachtsSnapshot.empty) {
-        return res.json([]);
+      if (!authUserId) {
+        console.warn('Producer Bookings API: No user ID found in authentication data');
+        return res.status(401).json({
+          error: "Unauthorized",
+          message: "Valid producer authentication required",
+          details: "No user ID found in authentication data"
+        });
       }
       
-      // Get the IDs of all yachts owned by this producer
-      const yachtIds = yachtsSnapshot.docs.map(doc => doc.id);
-      
-      // Fetch bookings for these yacht IDs
-      // Note: This is a placeholder. In a real implementation, you'd query a bookings collection
-      // For now, return an empty array
-      res.json([]);
+      try {
+        // Use our helper function to get harmonized producer ID
+        const { producerId } = await getHarmonizedProducerIds(authUserId);
+        
+        console.log(`Producer Bookings API: Fetching bookings for producer ID: ${producerId} (auth user: ${authUserId})`);
+        
+        try {
+          // Query bookings related to yachts owned by this producer
+          // First, get all yacht IDs owned by this producer
+          console.log(`Producer Bookings API: Querying yachts owned by producer: ${producerId}`);
+          const yachtsSnapshot = await adminDb.collection('unified_yacht_experiences')
+            .where('producerId', '==', producerId)
+            .get();
+          
+          console.log(`Producer Bookings API: Found ${yachtsSnapshot.size} yachts for producer`);
+          
+          if (yachtsSnapshot.empty) {
+            console.log('Producer Bookings API: No yachts found for this producer, returning empty array');
+            return res.json([]);
+          }
+          
+          // Get the IDs of all yachts owned by this producer
+          const yachtIds = yachtsSnapshot.docs.map(doc => doc.id);
+          console.log(`Producer Bookings API: Yacht IDs for bookings query: ${yachtIds.join(', ')}`);
+          
+          // Check if we have a bookings collection
+          try {
+            // First check if bookings collection exists
+            console.log('Producer Bookings API: Checking for bookings collection');
+            const collections = await adminDb.listCollections();
+            const collectionIds = collections.map(col => col.id);
+            
+            if (collectionIds.includes('bookings')) {
+              console.log('Producer Bookings API: Bookings collection found, querying bookings');
+              
+              // We have a bookings collection, query it
+              try {
+                // If there are more than 10 yacht IDs, we need to batch queries
+                if (yachtIds.length > 10) {
+                  console.log('Producer Bookings API: More than 10 yacht IDs, using batched queries');
+                  
+                  const allBookings = [];
+                  for (let i = 0; i < yachtIds.length; i += 10) {
+                    const batchIds = yachtIds.slice(i, i + 10);
+                    const batchSnapshot = await adminDb.collection('bookings')
+                      .where('yachtId', 'in', batchIds)
+                      .get();
+                    
+                    const batchBookings = batchSnapshot.docs.map(doc => ({
+                      id: doc.id,
+                      ...doc.data()
+                    }));
+                    
+                    allBookings.push(...batchBookings);
+                  }
+                  
+                  console.log(`Producer Bookings API: Found ${allBookings.length} total bookings across batches`);
+                  res.json(allBookings);
+                } else {
+                  // If 10 or fewer yacht IDs, we can use a single query
+                  const bookingsSnapshot = await adminDb.collection('bookings')
+                    .where('yachtId', 'in', yachtIds)
+                    .get();
+                  
+                  const bookings = bookingsSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                  }));
+                  
+                  console.log(`Producer Bookings API: Found ${bookings.length} bookings`);
+                  res.json(bookings);
+                }
+              } catch (bookingsQueryError) {
+                console.error('Producer Bookings API: Error querying bookings collection:', bookingsQueryError);
+                
+                // Fallback to empty array
+                console.log('Producer Bookings API: Returning empty array due to bookings query error');
+                return res.json([]);
+              }
+            } else {
+              // No bookings collection, return empty array
+              console.log('Producer Bookings API: No bookings collection found, returning empty array');
+              return res.json([]);
+            }
+          } catch (collectionsError) {
+            console.error('Producer Bookings API: Error listing collections:', collectionsError);
+            
+            // Return empty array
+            console.log('Producer Bookings API: Returning empty array due to collections error');
+            return res.json([]);
+          }
+        } catch (yachtsError) {
+          console.error('Producer Bookings API: Error querying yachts collection:', yachtsError);
+          return res.status(500).json({
+            error: "Database query failed",
+            message: "Failed to query yachts collection",
+            details: String(yachtsError)
+          });
+        }
+      } catch (producerIdError) {
+        console.error('Producer Bookings API: Error getting producer ID:', producerIdError);
+        return res.status(500).json({
+          error: "Producer ID error",
+          message: "Failed to retrieve producer ID",
+          details: String(producerIdError)
+        });
+      }
     } catch (error) {
       console.error("Error fetching producer bookings:", error);
-      res.status(500).json({ error: "Failed to fetch bookings" });
+      res.status(500).json({ 
+        error: "Failed to fetch bookings",
+        message: String(error)
+      });
     }
   });
   
