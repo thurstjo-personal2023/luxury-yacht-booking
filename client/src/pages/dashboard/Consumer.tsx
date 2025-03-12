@@ -45,7 +45,7 @@ interface Booking {
 
 // Collection references
 const collectionRefs = {
-  experiencePackages: collection(db, "experience_packages"),
+  yachts: collection(db, "unified_yacht_experiences"), // Only use unified collection
   touristProfiles: collection(db, "user_profiles_tourist"),
   bookings: collection(db, "bookings")
 };
@@ -106,9 +106,9 @@ export default function ConsumerDashboard() {
         console.log("=== Recommended Yachts Query Start ===");
         console.log("Firestore DB instance:", db);
 
-        const experiencesRef = collection(db, "experience_packages");
+        const experiencesRef = collection(db, "unified_yacht_experiences");
         // Query for featured packages or those with high ratings
-        const q = query(experiencesRef, where("published_status", "==", true), limit(6));
+        const q = query(experiencesRef, where("isPublished", "==", true), limit(6));
         console.log("Query:", q);
 
         const snapshot = await getDocs(q);
@@ -158,10 +158,10 @@ export default function ConsumerDashboard() {
           duration
         });
 
-        const experiencesRef = collection(db, "experience_packages");
-        console.log("Collection reference:", experiencesRef);
+        const experiencesRef = collection(db, "unified_yacht_experiences");
+        console.log("Collection reference (unified):", experiencesRef);
 
-        let q = query(experiencesRef, where("published_status", "==", true));
+        let q = query(experiencesRef, where("isPublished", "==", true));
 
         // Apply additional filters as needed
         if (location && selectedLocation) {

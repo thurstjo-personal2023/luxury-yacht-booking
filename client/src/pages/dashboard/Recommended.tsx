@@ -17,8 +17,8 @@ export function Recommended() {
         console.log("Starting to fetch recommended packages...");
         console.log("Firestore instance:", db); // Log the Firestore instance
 
-        const experiencesRef = collection(db, "experience_packages");
-        console.log("Collection reference:", experiencesRef);
+        const experiencesRef = collection(db, "unified_yacht_experiences");
+        console.log("Collection reference (unified):", experiencesRef);
 
         const snapshot = await getDocs(experiencesRef);
         console.log("Query snapshot:", snapshot);
