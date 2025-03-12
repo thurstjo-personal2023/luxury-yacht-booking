@@ -6,9 +6,8 @@
 
 import { Express, Request, Response } from "express";
 import { adminDb, verifyAuth } from "./firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { HarmonizedUser, TouristProfile, ServiceProviderProfile } from "../shared/harmonized-user-schema";
-import { Timestamp } from "firebase-admin/firestore";
 
 /**
  * Register user profile routes
@@ -95,7 +94,7 @@ export function registerUserProfileRoutes(app: Express) {
       await adminDb.collection('harmonized_users').doc(userId).update({
         name,
         phone,
-        updatedAt: Timestamp.now()
+        updatedAt: FieldValue.serverTimestamp()
       });
 
       res.json({ success: true, message: 'Core profile updated successfully' });
@@ -137,7 +136,7 @@ export function registerUserProfileRoutes(app: Express) {
       const { preferences, profilePhoto } = req.body;
       
       const profileData: Partial<TouristProfile> = {
-        lastUpdated: Timestamp.now()
+        lastUpdated: FieldValue.serverTimestamp()
       };
 
       // Only set fields if they're provided
@@ -427,7 +426,7 @@ export function registerUserProfileRoutes(app: Express) {
 
       await userRef.update({
         role,
-        updatedAt: Timestamp.now()
+        updatedAt: FieldValue.serverTimestamp()
       });
 
       res.json({ success: true, message: 'User role updated successfully' });
