@@ -609,8 +609,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Export normalized yacht schema
   app.get("/api/export/yacht-schema", async (req, res) => {
     try {
-      // Get yacht data from yacht_experiences collection
-      const snapshot = await adminDb.collection('yacht_experiences').get();
+      // Get yacht data from unified_yacht_experiences collection
+      const snapshot = await adminDb.collection('unified_yacht_experiences').get();
       
       if (snapshot.empty) {
         return res.json({ 
