@@ -3,24 +3,57 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { Request, Response, NextFunction } from "express";
+import * as fs from 'fs';
+import * as path from 'path';
 
 // We are always in development mode
 process.env.NODE_ENV = "development";
 
-// Configure ngrok for emulator access
-// This is the domain provided by ngrok when you expose your local emulators
-const ngrokHost = "e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app";
+// Check if emulator environment variables are already set (from environment or local file)
+let firestoreEmulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
+let authEmulatorHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+let storageEmulatorHost = process.env.FIREBASE_STORAGE_EMULATOR_HOST;
 
-// Don't set env variables since we're using explicit host settings
-// Instead, we'll configure the host settings directly
+// Try to read emulator host from local file if not set in environment
+if (!firestoreEmulatorHost) {
+  try {
+    const localHostFilePath = path.join(process.cwd(), 'localhost-run-host.txt');
+    if (fs.existsSync(localHostFilePath)) {
+      const host = fs.readFileSync(localHostFilePath, 'utf8').trim();
+      if (host) {
+        firestoreEmulatorHost = `${host}:8080`;
+        authEmulatorHost = `${host}:9099`;
+        storageEmulatorHost = `${host}:9199`;
+        
+        // Set the environment variables
+        process.env.FIRESTORE_EMULATOR_HOST = firestoreEmulatorHost;
+        process.env.FIREBASE_AUTH_EMULATOR_HOST = authEmulatorHost;
+        process.env.FIREBASE_STORAGE_EMULATOR_HOST = storageEmulatorHost;
+      }
+    }
+  } catch (error) {
+    console.warn("Could not read localhost.run host from file:", error);
+  }
+}
+
+// Fall back to default localhost if still not set
+if (!firestoreEmulatorHost) {
+  firestoreEmulatorHost = "localhost:8080";
+  authEmulatorHost = "localhost:9099";
+  storageEmulatorHost = "localhost:9199";
+  
+  // Set environment variables
+  process.env.FIRESTORE_EMULATOR_HOST = firestoreEmulatorHost;
+  process.env.FIREBASE_AUTH_EMULATOR_HOST = authEmulatorHost;
+  process.env.FIREBASE_STORAGE_EMULATOR_HOST = storageEmulatorHost;
+}
 
 console.log("=== Firebase Admin SDK Emulator Configuration ===");
-console.log(`Using ngrok host: ${ngrokHost}`);
-console.log(`Firestore: https://${ngrokHost}:8080`);
-console.log(`Auth: https://${ngrokHost}:9099`);
-console.log(`Storage: https://${ngrokHost}:9199`);
+console.log(`Firestore: ${firestoreEmulatorHost}`);
+console.log(`Auth: ${authEmulatorHost}`);
+console.log(`Storage: ${storageEmulatorHost}`);
 
-// Initialize Firebase Admin for emulator
+// Initialize Firebase Admin with minimal configuration
 // When using emulators, we only need a projectId
 const app = initializeApp({
   projectId: "etoile-yachts-emulator"
@@ -31,43 +64,48 @@ const adminAuth = getAuth(app);
 const adminDb = getFirestore(app);
 const adminStorage = getStorage(app);
 
-// Configure Auth service for emulator
-// This happens automatically through the FIREBASE_AUTH_EMULATOR_HOST env var
-// We'll set this programmatically 
-process.env.FIREBASE_AUTH_EMULATOR_HOST = `${ngrokHost}:9099`;
-process.env.FIREBASE_STORAGE_EMULATOR_HOST = `${ngrokHost}:9199`;
-
-// Configure Firestore with explicit settings
-// Force IPv4 connection by using a specific format with the hostname
+// Extra settings for Firestore
 adminDb.settings({
-  host: `${ngrokHost}:8080`,
-  ssl: true,
-  ignoreUndefinedProperties: true,
-  preferRest: true // Try using REST API instead of gRPC
+  ignoreUndefinedProperties: true
 });
 
-console.log("Firebase Admin configured for ngrok-tunneled emulator connection");
+console.log("Firebase Admin SDK initialized for emulator connection");
 
 // Connection test (runs after 3 seconds)
 setTimeout(async () => {
   try {
-    console.log("Testing connection to Firestore emulator...");
+    console.log("\n======= EMULATOR CONNECTION TEST =======");
     
-    // Test query
-    const testDoc = await adminDb.collection('test').doc('test-connection').set({
-      timestamp: Date.now(),
-      message: 'Testing connection'
-    });
-    console.log("✓ Successfully connected to Firestore");
+    // Test creating a document
+    try {
+      console.log("1. Creating test document...");
+      await adminDb.collection('test').doc('test-connection').set({
+        timestamp: Date.now(),
+        message: 'Testing emulator connection'
+      });
+      console.log("✓ Successfully created test document");
+    } catch (err: any) {
+      console.error("❌ Error creating test document:", err.message);
+    }
     
     // Check unified_yacht_experiences collection
-    const yachtSnapshot = await adminDb.collection('unified_yacht_experiences').limit(1).get();
-    console.log(`Found ${yachtSnapshot.size} yachts`);
+    try {
+      console.log("2. Checking unified_yacht_experiences collection...");
+      const yachtSnapshot = await adminDb.collection('unified_yacht_experiences').limit(5).get();
+      console.log(`✓ Found ${yachtSnapshot.size} yachts in collection`);
+      if (yachtSnapshot.size > 0) {
+        yachtSnapshot.forEach((doc: any) => {
+          const data = doc.data();
+          console.log(`  - Yacht ID: ${doc.id}, Title: ${data.title || data.name || 'Unnamed'}`);
+        });
+      }
+    } catch (err: any) {
+      console.error("❌ Error querying unified_yacht_experiences:", err.message);
+    }
     
+    console.log("======= END OF CONNECTION TEST =======\n");
   } catch (error: any) {
     console.error("❌ Error during connection test:", error.message);
-    console.error("Error code:", error.code);
-    console.error("Error details:", error.details || "No details");
   }
 }, 3000);
 
