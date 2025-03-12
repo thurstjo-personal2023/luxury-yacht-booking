@@ -13,6 +13,7 @@ import {
 import { auth } from "@/lib/firebase";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
+import { ConnectionStatus } from "../ui/connection-status";
 
 export function Sidebar() {
   const [location, setLocation] = useLocation();
@@ -73,6 +74,11 @@ export function Sidebar() {
           )}
         </div>
       </ScrollArea>
+      
+      {/* Footer with connection status */}
+      <div className="p-4 border-t flex justify-center">
+        <ConnectionStatus />
+      </div>
     </div>
   );
 }
