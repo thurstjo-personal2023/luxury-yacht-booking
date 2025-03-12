@@ -1,33 +1,27 @@
-import { useState, useEffect } from 'react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
-  DialogTitle, 
+/**
+ * Emulator Status Dialog Component
+ * 
+ * Displays a comprehensive overview of Firebase Emulator connection status
+ * with additional configuration details that can be shown in a dialog.
+ */
+
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   DialogTrigger,
-  DialogFooter 
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ConnectionStatus } from "@/components/ui/connection-status";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, InfoIcon } from 'lucide-react';
 
-// Define the Firebase emulator ports for development
-const DEVELOPMENT_PORTS = {
-  firestore: 8080,
-  auth: 9099,
-  functions: 5001,
-  database: 9001,
-  storage: 9199,
-  pubsub: 8085,
-  eventarc: 9299,
-  dataconnect: 9399,
-  cloudtasks: 9499,
-  hub: 4400,
-  extensions: 5001, // Uses the same port as Functions
-  ui: 4000         // Emulator UI port
-};
+// Import development configuration
+import { FIREBASE_EMULATOR, isDevelopment } from '@/lib/env-config';
 
 interface EmulatorConfig {
   hosts: {
@@ -174,18 +168,18 @@ export function EmulatorStatusDialog() {
               <div className="text-xs text-muted-foreground">
                 <p>Currently using Firebase Emulator Suite with the following ports:</p>
                 <ul className="mt-1 ml-4 list-disc space-y-1">
-                  <li>Authentication: {DEVELOPMENT_PORTS.auth}</li>
-                  <li>Firestore: {DEVELOPMENT_PORTS.firestore}</li>
-                  <li>Functions: {DEVELOPMENT_PORTS.functions}</li>
-                  <li>Database: {DEVELOPMENT_PORTS.database}</li>
-                  <li>Storage: {DEVELOPMENT_PORTS.storage}</li>
-                  <li>Pub/Sub: {DEVELOPMENT_PORTS.pubsub}</li>
-                  <li>Eventarc: {DEVELOPMENT_PORTS.eventarc}</li>
-                  <li>Data Connect: {DEVELOPMENT_PORTS.dataconnect}</li>
-                  <li>Cloud Tasks: {DEVELOPMENT_PORTS.cloudtasks}</li>
-                  <li>Emulator Hub: {DEVELOPMENT_PORTS.hub}</li>
+                  <li>Authentication: {FIREBASE_EMULATOR.auth.port}</li>
+                  <li>Firestore: {FIREBASE_EMULATOR.firestore.port}</li>
+                  <li>Functions: {FIREBASE_EMULATOR.functions.port}</li>
+                  <li>Database: {FIREBASE_EMULATOR.database.port}</li>
+                  <li>Storage: {FIREBASE_EMULATOR.storage.port}</li>
+                  <li>Pub/Sub: {FIREBASE_EMULATOR.pubsub.port}</li>
+                  <li>Eventarc: {FIREBASE_EMULATOR.eventarc.port}</li>
+                  <li>Data Connect: {FIREBASE_EMULATOR.dataconnect.port}</li>
+                  <li>Cloud Tasks: {FIREBASE_EMULATOR.cloudtasks.port}</li>
+                  <li>Emulator Hub: {FIREBASE_EMULATOR.hub.port}</li>
                 </ul>
-                <p className="mt-2">Emulator UI available at port {DEVELOPMENT_PORTS.ui}</p>
+                <p className="mt-2">Emulator UI available at port {FIREBASE_EMULATOR.ui.port}</p>
               </div>
             </div>
             
