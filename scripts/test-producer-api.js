@@ -5,12 +5,12 @@
  * by making direct HTTP requests and checking responses.
  */
 
-const { initializeApp } = require('firebase-admin/app');
-const { getAuth } = require('firebase-admin/auth');
-const { getFirestore } = require('firebase-admin/firestore');
-const fetch = require('node-fetch');
-const fs = require('fs');
-const path = require('path');
+import { initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+import fetch from 'node-fetch';
+import fs from 'fs';
+import path from 'path';
 
 // Initialize Firebase Admin with minimal config for emulators
 process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
@@ -21,7 +21,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // Constants for API testing
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = 'http://0.0.0.0:5000';
 const TEST_EMAIL = 'producer@example.com';
 const TEST_PASSWORD = 'testpass123';
 const PRODUCER_ROLE = 'producer';
