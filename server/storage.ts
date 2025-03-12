@@ -354,10 +354,44 @@ export class FirestoreStorage implements IStorage {
     sortByStatus?: boolean;
   }): Promise<PaginatedYachtsResponse> {
     try {
-      console.log('Getting producer yachts with filters:', filters);
+      console.log('🔍 Getting producer yachts with filters:', filters);
+      
+      // Validate Firestore connection status
+      const settings = adminDb.settings({}) as any;
+      console.log('📡 Firestore emulator settings:', { 
+        host: settings?.host || 'Not set',
+        ssl: settings?.ssl === false ? 'false' : settings?.ssl, 
+        ignoreUndefinedProperties: settings?.ignoreUndefinedProperties 
+      });
       
       // Use the unified yacht collection
       const yachtsRef = adminDb.collection(UNIFIED_YACHT_COLLECTION);
+      console.log(`📁 Accessing collection: ${UNIFIED_YACHT_COLLECTION}`);
+      
+      // First, do a simple read test to confirm we can access the collection
+      try {
+        console.log('🧪 Testing basic collection access...');
+        const testQuery = await yachtsRef.limit(1).get();
+        console.log(`✅ Collection access test successful, total yacht documents: ${testQuery.size}`);
+        
+        if (!testQuery.empty) {
+          const sampleDoc = testQuery.docs[0];
+          console.log('📄 Sample yacht document fields:', Object.keys(sampleDoc.data()));
+          
+          // Check if producerId field exists in any format
+          const data = sampleDoc.data();
+          const hasProducerId = 'producerId' in data || 'providerId' in data || 'producer_id' in data;
+          console.log(`🔑 Sample document has producer ID field: ${hasProducerId}`);
+          
+          // Log the actual producer ID value if available
+          if ('producerId' in data) console.log(`🔑 producerId value: ${data.producerId}`);
+          if ('providerId' in data) console.log(`🔑 providerId value: ${data.providerId}`);
+          if ('producer_id' in data) console.log(`🔑 producer_id value: ${data.producer_id}`);
+        }
+      } catch (testError: any) {
+        console.error('❌ Collection access test failed:', testError.message);
+        console.error('💥 Full error:', testError);
+      }
       
       // Build queries based on presence of producerId
       // Since Firestore doesn't support OR queries directly, we'll need to perform multiple queries
@@ -365,46 +399,69 @@ export class FirestoreStorage implements IStorage {
       let yachtDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
       
       if (filters?.producerId) {
-        console.log(`Filtering by producer ID: ${filters.producerId}`);
+        console.log(`🔍 Filtering by producer ID: ${filters.producerId}`);
         
         // Try all possible variations of producer ID fields to ensure we catch everything
-        // 1. Query with providerId field
-        const providerIdSnapshot = await yachtsRef
-          .where('providerId', '==', filters.producerId)
-          .get();
-        
-        if (!providerIdSnapshot.empty) {
-          console.log(`Found ${providerIdSnapshot.size} yachts with providerId field`);
-          yachtDocs = [...yachtDocs, ...providerIdSnapshot.docs];
+        try {
+          // 1. Query with providerId field
+          console.log('🔍 Querying with providerId field...');
+          const providerIdSnapshot = await yachtsRef
+            .where('providerId', '==', filters.producerId)
+            .get();
+          
+          if (!providerIdSnapshot.empty) {
+            console.log(`✅ Found ${providerIdSnapshot.size} yachts with providerId field`);
+            yachtDocs = [...yachtDocs, ...providerIdSnapshot.docs];
+          } else {
+            console.log('ℹ️ No yachts found with matching providerId field');
+          }
+        } catch (error: any) {
+          console.error('❌ Error querying providerId:', error.message);
         }
         
-        // 2. Query with producerId field
-        const producerIdSnapshot = await yachtsRef
-          .where('producerId', '==', filters.producerId)
-          .get();
-        
-        if (!producerIdSnapshot.empty) {
-          console.log(`Found ${producerIdSnapshot.size} yachts with producerId field`);
-          // Add docs that aren't already in the yachtDocs array (based on ID)
-          const existingIds = new Set(yachtDocs.map(doc => doc.id));
-          const newDocs = producerIdSnapshot.docs.filter(doc => !existingIds.has(doc.id));
-          yachtDocs = [...yachtDocs, ...newDocs];
+        try {
+          // 2. Query with producerId field
+          console.log('🔍 Querying with producerId field...');
+          const producerIdSnapshot = await yachtsRef
+            .where('producerId', '==', filters.producerId)
+            .get();
+          
+          if (!producerIdSnapshot.empty) {
+            console.log(`✅ Found ${producerIdSnapshot.size} yachts with producerId field`);
+            // Add docs that aren't already in the yachtDocs array (based on ID)
+            const existingIds = new Set(yachtDocs.map(doc => doc.id));
+            const newDocs = producerIdSnapshot.docs.filter(doc => !existingIds.has(doc.id));
+            console.log(`➕ Adding ${newDocs.length} unique documents with producerId field`);
+            yachtDocs = [...yachtDocs, ...newDocs];
+          } else {
+            console.log('ℹ️ No yachts found with matching producerId field');
+          }
+        } catch (error: any) {
+          console.error('❌ Error querying producerId:', error.message);
         }
         
-        // 3. Query with producer_id field (legacy format)
-        const producerUnderscoreIdSnapshot = await yachtsRef
-          .where('producer_id', '==', filters.producerId)
-          .get();
-        
-        if (!producerUnderscoreIdSnapshot.empty) {
-          console.log(`Found ${producerUnderscoreIdSnapshot.size} yachts with producer_id field`);
-          // Add docs that aren't already in the yachtDocs array
-          const existingIds = new Set(yachtDocs.map(doc => doc.id));
-          const newDocs = producerUnderscoreIdSnapshot.docs.filter(doc => !existingIds.has(doc.id));
-          yachtDocs = [...yachtDocs, ...newDocs];
+        try {
+          // 3. Query with producer_id field (legacy format)
+          console.log('🔍 Querying with producer_id field...');
+          const producerUnderscoreIdSnapshot = await yachtsRef
+            .where('producer_id', '==', filters.producerId)
+            .get();
+          
+          if (!producerUnderscoreIdSnapshot.empty) {
+            console.log(`✅ Found ${producerUnderscoreIdSnapshot.size} yachts with producer_id field`);
+            // Add docs that aren't already in the yachtDocs array
+            const existingIds = new Set(yachtDocs.map(doc => doc.id));
+            const newDocs = producerUnderscoreIdSnapshot.docs.filter(doc => !existingIds.has(doc.id));
+            console.log(`➕ Adding ${newDocs.length} unique documents with producer_id field`);
+            yachtDocs = [...yachtDocs, ...newDocs];
+          } else {
+            console.log('ℹ️ No yachts found with matching producer_id field');
+          }
+        } catch (error: any) {
+          console.error('❌ Error querying producer_id:', error.message);
         }
         
-        console.log(`Total unique yachts found for producer: ${yachtDocs.length}`);
+        console.log(`📊 Total unique yachts found for producer: ${yachtDocs.length}`);
       } else {
         console.log('No producer ID provided, getting all yachts');
         const snapshot = await yachtsRef.get();
