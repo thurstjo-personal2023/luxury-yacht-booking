@@ -32,25 +32,33 @@ const adminStorage = getStorage(app);
 // We are always in development mode and always using emulators
 process.env.NODE_ENV = "development"; 
 
-// For Replit, use direct connection to Firebase instead of emulators
-// since we can't reach localhost emulators from Replit's servers
-const useEmulators = false;
+// Use Firebase emulators for development
+// Note: In Replit, emulators must be running externally and accessible
+const useEmulators = true;
 if (useEmulators) {
   // Set environment variables for Firebase emulators
-  process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
-  process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
+  // Use the user's actual external IP to connect to their local emulators
+  const emulatorIP = "[2001:8f8:1163:5b77:39c7:7461:9eac:f645]"; // IPv6 address needs to be enclosed in brackets
   
-  // Configure Firestore to use emulator
+  process.env.FIREBASE_AUTH_EMULATOR_HOST = `${emulatorIP}:9099`;
+  process.env.FIREBASE_STORAGE_EMULATOR_HOST = `${emulatorIP}:9199`;
+  process.env.FIRESTORE_EMULATOR_HOST = `${emulatorIP}:8080`;
+  
+  // Configure Firestore to use emulator with the external IP
   adminDb.settings({
-    host: "127.0.0.1:8080",
+    host: `${emulatorIP}:8080`,
     ssl: false,
     ignoreUndefinedProperties: true
   });
   
-  console.log("Firebase Admin configured to use emulators:");
-  console.log(" - Firestore: 127.0.0.1:8080");
-  console.log(" - Auth: 127.0.0.1:9099");
-  console.log(" - Storage: 127.0.0.1:9199");
+  console.log("Firebase Admin configured to connect to external emulators:");
+  console.log(` - Firestore: ${emulatorIP}:8080`);
+  console.log(` - Auth: ${emulatorIP}:9099`);
+  console.log(` - Storage: ${emulatorIP}:9199`);
+  console.log("Environment variables set:");
+  console.log(" - FIRESTORE_EMULATOR_HOST:", process.env.FIRESTORE_EMULATOR_HOST);
+  console.log(" - FIREBASE_AUTH_EMULATOR_HOST:", process.env.FIREBASE_AUTH_EMULATOR_HOST);
+  console.log(" - FIREBASE_STORAGE_EMULATOR_HOST:", process.env.FIREBASE_STORAGE_EMULATOR_HOST);
 } else {
   // Configure for direct Firestore access without emulators
   adminDb.settings({
@@ -60,22 +68,34 @@ if (useEmulators) {
   console.log("Firebase Admin configured for direct access (emulators disabled)");
 }
 
-// Debug connection to Firebase production service
+// Debug connection to Firebase Emulator
 setTimeout(async () => {
   try {
-    console.log("Testing connection to Firebase Firestore...");
+    console.log("Testing connection to Firestore emulator...");
+    // Log connection settings
+    console.log("Current Firestore emulator connection settings:", {
+      host: process.env.FIRESTORE_EMULATOR_HOST,
+      ssl: false,
+      ignoreUndefinedProperties: true
+    });
     
-    // Test query to verify connection
+    // Test query to verify emulator connection
     const testDoc = await adminDb.collection('test').doc('test-connection').set({
       timestamp: Date.now(),
-      message: 'Testing Firebase Firestore connection'
+      message: 'Testing Firestore emulator connection'
     });
-    console.log("✓ Successfully connected to Firebase Firestore");
+    console.log("✓ Successfully connected to Firestore emulator");
     
     // Try unified_yacht_experiences
     console.log("Testing read from unified_yacht_experiences collection...");
     const yachtSnapshot = await adminDb.collection('unified_yacht_experiences').limit(1).get();
     console.log(`✓ Read from unified_yacht_experiences, found ${yachtSnapshot.size} documents`);
+    if (yachtSnapshot.size > 0) {
+      const sampleDoc = yachtSnapshot.docs[0];
+      console.log("Sample yacht document fields:", Object.keys(sampleDoc.data()));
+      console.log("Producer ID field:", sampleDoc.data().producerId || "Not found");
+      console.log("Provider ID field:", sampleDoc.data().providerId || "Not found");
+    }
     
     // Try harmonized_users collection
     console.log("Testing read from harmonized_users collection...");
@@ -86,9 +106,10 @@ setTimeout(async () => {
     console.log("\nEnvironment information:");
     console.log("- NODE_ENV:", process.env.NODE_ENV);
     console.log("- FIREBASE_AUTH_EMULATOR_HOST:", process.env.FIREBASE_AUTH_EMULATOR_HOST || "Not set");
+    console.log("- FIRESTORE_EMULATOR_HOST:", process.env.FIRESTORE_EMULATOR_HOST || "Not set");
     console.log("- isEmulatorMode():", isEmulatorMode());
   } catch (error: any) {
-    console.error("❌ Error during Firebase connection test:", error.message);
+    console.error("❌ Error during Firebase emulator connection test:", error.message);
     if (error && typeof error === 'object') {
       console.error("Error code:", error.code);
       console.error("Error details:", error.details || "No details available");
