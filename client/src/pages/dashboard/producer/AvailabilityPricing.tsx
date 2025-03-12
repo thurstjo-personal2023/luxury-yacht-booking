@@ -103,9 +103,9 @@ export default function AvailabilityPricing() {
           return;
         }
         
-        // Fetch producer's yachts
-        const yachtsRef = collection(db, "yacht_experiences");
-        const q = query(yachtsRef, where("providerId", "==", user.uid));
+        // Fetch producer's yachts from unified collection
+        const yachtsRef = collection(db, "unified_yacht_experiences");
+        const q = query(yachtsRef, where("producerId", "==", user.uid));
         const yachtSnapshots = await getDocs(q);
         
         if (yachtSnapshots.empty) {
