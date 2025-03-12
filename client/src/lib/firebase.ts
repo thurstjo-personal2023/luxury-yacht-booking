@@ -135,25 +135,46 @@ auth.onAuthStateChanged(async (user) => {
 console.log("Connecting to Firebase emulators...");
 
 try {
+  // Try to read emulator host settings from localhost-run-host.txt
+  let firestoreHost = "127.0.0.1";
+  let authHost = "127.0.0.1";
+  let storageHost = "127.0.0.1";
+  let functionsHost = "127.0.0.1";
+  let rtdbHost = "127.0.0.1";
+  
+  // Ports for emulators
+  const firestorePort = 8080;
+  const authPort = 9099; 
+  const storagePort = 9199;
+  const functionsPort = 5001;
+  const rtdbPort = 9001;
+
+  // Check for localhost.run hostname in window location (passed from server)
+  const localhostRunParam = new URLSearchParams(window.location.search).get('emulatorHost');
+  if (localhostRunParam) {
+    firestoreHost = authHost = storageHost = functionsHost = rtdbHost = localhostRunParam;
+    console.log(`Using emulator host from URL param: ${localhostRunParam}`);
+  }
+
   // Auth Emulator
-  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-  console.log("✓ Auth emulator connected at: http://127.0.0.1:9099");
+  connectAuthEmulator(auth, `http://${authHost}:${authPort}`, { disableWarnings: true });
+  console.log(`✓ Auth emulator connected at: http://${authHost}:${authPort}`);
 
   // Firestore Emulator - Force connection regardless of environment
-  connectFirestoreEmulator(db, "127.0.0.1", 8080);
-  console.log("✓ Firestore emulator connected at: http://127.0.0.1:8080");
+  connectFirestoreEmulator(db, firestoreHost, firestorePort);
+  console.log(`✓ Firestore emulator connected at: http://${firestoreHost}:${firestorePort}`);
 
   // Storage Emulator
-  connectStorageEmulator(storage, "127.0.0.1", 9199);
-  console.log("✓ Storage emulator connected at: http://127.0.0.1:9199");
+  connectStorageEmulator(storage, storageHost, storagePort);
+  console.log(`✓ Storage emulator connected at: http://${storageHost}:${storagePort}`);
 
   // Functions Emulator
-  connectFunctionsEmulator(functions, "127.0.0.1", 5001);
-  console.log("✓ Functions emulator connected at: http://127.0.0.1:5001");
+  connectFunctionsEmulator(functions, functionsHost, functionsPort);
+  console.log(`✓ Functions emulator connected at: http://${functionsHost}:${functionsPort}`);
 
   // Realtime Database Emulator
-  connectDatabaseEmulator(rtdb, "127.0.0.1", 9001);
-  console.log("✓ Realtime Database emulator connected at: http://127.0.0.1:9001");
+  connectDatabaseEmulator(rtdb, rtdbHost, rtdbPort);
+  console.log(`✓ Realtime Database emulator connected at: http://${rtdbHost}:${rtdbPort}`);
 
   console.log("All Firebase emulators connected successfully!");
 } catch (error) {
