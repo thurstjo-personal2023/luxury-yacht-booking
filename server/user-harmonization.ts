@@ -119,7 +119,7 @@ export async function createOrUpdateHarmonizedUser(
         {
           ...profileData.touristProfile,
           id: userId, // Ensure ID is set correctly
-          lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+          lastUpdated: FieldValue.serverTimestamp()
         }, 
         { merge: true }
       );
@@ -128,7 +128,7 @@ export async function createOrUpdateHarmonizedUser(
         {
           ...profileData.serviceProviderProfile,
           providerId: userId, // Ensure provider ID is set correctly
-          lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+          lastUpdated: FieldValue.serverTimestamp()
         }, 
         { merge: true }
       );
@@ -214,8 +214,8 @@ export async function migrateLegacyUser(legacyUser: any): Promise<string> {
       role: legacyUser.role || 'consumer',
       emailVerified: legacyUser.emailVerified || false,
       points: legacyUser.points || 0,
-      createdAt: legacyUser.createdAt || admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp,
+      createdAt: legacyUser.createdAt || FieldValue.serverTimestamp() as ServerTimestamp,
+      updatedAt: FieldValue.serverTimestamp() as ServerTimestamp,
       _standardized: true,
       _standardizedVersion: 1
     };
@@ -229,7 +229,7 @@ export async function migrateLegacyUser(legacyUser: any): Promise<string> {
         preferences: legacyUser.preferences || [],
         wishlist: legacyUser.wishlist || [],
         bookingHistory: legacyUser.bookingHistory || [],
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp
+        lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
       };
       
       await createOrUpdateHarmonizedUser(harmonizedUser, { touristProfile });
@@ -243,7 +243,7 @@ export async function migrateLegacyUser(legacyUser: any): Promise<string> {
         },
         servicesOffered: legacyUser.servicesOffered || [],
         certifications: legacyUser.certifications || [],
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp
+        lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
       };
       
       await createOrUpdateHarmonizedUser(harmonizedUser, { serviceProviderProfile });
