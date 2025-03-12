@@ -94,7 +94,7 @@ export function registerUserProfileRoutes(app: Express) {
       await adminDb.collection('harmonized_users').doc(userId).update({
         name,
         phone,
-        updatedAt: FieldValue.serverTimestamp()
+        updatedAt: FieldValue.serverTimestamp() as ServerTimestamp
       });
 
       res.json({ success: true, message: 'Core profile updated successfully' });
@@ -220,7 +220,7 @@ export function registerUserProfileRoutes(app: Express) {
           address: businessAddress
         },
         servicesOffered,
-        lastUpdated: FieldValue.serverTimestamp()
+        lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
       };
 
       // Only set fields if they're provided
@@ -297,19 +297,19 @@ export function registerUserProfileRoutes(app: Express) {
           wishlist: action === 'add' ? [yachtId] : [],
           bookingHistory: [],
           reviewsProvided: [],
-          lastUpdated: FieldValue.serverTimestamp()
+          lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
         });
       } else {
         // Update wishlist based on action
         if (action === 'add') {
           await touristProfileRef.update({
             wishlist: FieldValue.arrayUnion(yachtId),
-            lastUpdated: FieldValue.serverTimestamp()
+            lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
           });
         } else {
           await touristProfileRef.update({
             wishlist: FieldValue.arrayRemove(yachtId),
-            lastUpdated: FieldValue.serverTimestamp()
+            lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
           });
         }
       }
@@ -426,7 +426,7 @@ export function registerUserProfileRoutes(app: Express) {
 
       await userRef.update({
         role,
-        updatedAt: FieldValue.serverTimestamp()
+        updatedAt: FieldValue.serverTimestamp() as ServerTimestamp
       });
 
       res.json({ success: true, message: 'User role updated successfully' });
