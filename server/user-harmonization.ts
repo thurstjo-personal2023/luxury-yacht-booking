@@ -6,7 +6,7 @@
  */
 
 import { adminDb } from './firebase-admin';
-import * as admin from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { 
   HarmonizedUser, 
   TouristProfile, 
@@ -55,7 +55,7 @@ async function syncConsumerProfile(userId: string, userData: HarmonizedUser): Pr
       // Create profile if it doesn't exist
       await adminDb.collection('user_profiles_tourist').doc(userId).set({
         id: userId,
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        lastUpdated: FieldValue.serverTimestamp(),
         preferences: [],
         wishlist: [],
         bookingHistory: []
@@ -83,7 +83,7 @@ async function syncProducerProfile(userId: string, userData: HarmonizedUser): Pr
           address: ''
         },
         servicesOffered: [],
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+        lastUpdated: FieldValue.serverTimestamp()
       });
     }
   } catch (error) {
