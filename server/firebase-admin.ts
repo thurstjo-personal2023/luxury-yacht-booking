@@ -29,11 +29,13 @@ const adminAuth = getAuth(app);
 const adminDb = getFirestore(app);
 const adminStorage = getStorage(app);
 
-// Always connect to emulators in development mode
+// Set development mode
 process.env.NODE_ENV = "development"; 
 
-// Always use emulators as they are running in the external terminal
-const useEmulators = true; // Set to true to use the running emulators
+// When running in Replit, we can't connect to local emulators
+// We need to use production Firebase services instead
+const isReplitEnvironment = process.env.REPL_ID !== undefined;
+const useEmulators = !isReplitEnvironment && process.env.USE_EMULATORS !== 'false';
 if (useEmulators) {
   // Set environment variables for Firebase emulators
   process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -59,22 +61,36 @@ if (useEmulators) {
   console.log("Firebase Admin configured for direct access (emulators disabled)");
 }
 
-// Debug connection to Firebase emulators
+// Debug connection to Firebase
 setTimeout(async () => {
   try {
-    console.log("Testing connection to Firestore emulator...");
-    console.log("Firestore emulator connection settings:", {
-      host: "127.0.0.1:8080", 
-      ssl: false,
-      ignoreUndefinedProperties: true
-    });
-    
-    // Test query to verify emulator connection
-    const testDoc = await adminDb.collection('test').doc('test-connection').set({
-      timestamp: Date.now(),
-      message: 'Testing Firestore emulator connection from Replit'
-    });
-    console.log("✓ Successfully connected to Firestore emulator");
+    if (useEmulators) {
+      console.log("Testing connection to Firestore emulator...");
+      console.log("Firestore emulator connection settings:", {
+        host: "127.0.0.1:8080", 
+        ssl: false,
+        ignoreUndefinedProperties: true
+      });
+      
+      // Test query to verify emulator connection
+      const testDoc = await adminDb.collection('test').doc('test-connection').set({
+        timestamp: Date.now(),
+        message: 'Testing Firestore emulator connection from Replit'
+      });
+      console.log("✓ Successfully connected to Firestore emulator");
+    } else {
+      console.log("Testing connection to Firebase production...");
+      console.log("Firestore production settings:", {
+        ignoreUndefinedProperties: true
+      });
+      
+      // Test query to verify production connection
+      const testDoc = await adminDb.collection('test').doc('test-connection').set({
+        timestamp: Date.now(),
+        message: 'Testing Firestore production connection from Replit'
+      });
+      console.log("✓ Successfully connected to Firestore production");
+    }
     
     // Now try to read from collections
     try {
@@ -91,14 +107,13 @@ setTimeout(async () => {
       // Additional diagnostic info
       console.log("Environment variables:");
       console.log("- NODE_ENV:", process.env.NODE_ENV);
-      console.log("- FIREBASE_AUTH_EMULATOR_HOST:", process.env.FIREBASE_AUTH_EMULATOR_HOST);
-      console.log("- FIREBASE_STORAGE_EMULATOR_HOST:", process.env.FIREBASE_STORAGE_EMULATOR_HOST);
+      console.log("- REPL_ID:", process.env.REPL_ID ? "Replit environment detected" : "Not running in Replit");
       console.log("- isEmulatorMode():", isEmulatorMode());
     } catch (readError: any) {
       console.error("❌ Failed to read from collections:", readError.message);
     }
   } catch (error: any) {
-    console.error("❌ Failed to connect to Firestore emulator:", error.message);
+    console.error("❌ Failed to connect to Firestore:", error.message);
     // Safe error logging
     if (error && typeof error === 'object') {
       console.error("Error code:", error.code);
