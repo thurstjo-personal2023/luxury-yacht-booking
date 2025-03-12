@@ -237,10 +237,9 @@ export default function YachtForm() {
     try {
       // Search in all collections but always operate on the unified collection
       // Order matters - we want to prioritize unified collection first
+      // Only search in the unified collection
       const collectionsToSearch = [
-        "unified_yacht_experiences",
-        "yacht_experiences",
-        "experience_packages"
+        "unified_yacht_experiences"
       ];
       
       let yachtDoc;
