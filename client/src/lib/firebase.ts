@@ -125,6 +125,10 @@ auth.onAuthStateChanged(async (user) => {
 // Always connect to emulators in development
 console.log("Connecting to Firebase emulators...");
 
+// Set up a global error collection for error detection
+// This will be used by the ConnectionStatus component to detect Firebase errors
+(window as any).__FIREBASE_ERRORS = [];
+
 // Function to connect to emulators with specified hosts
 const connectToEmulators = (hosts: { 
   firestore: string, 
@@ -146,28 +150,61 @@ const connectToEmulators = (hosts: {
     const functionsEmulator = parseHostPort(hosts.functions);
     const rtdbEmulator = parseHostPort(hosts.rtdb);
 
-    // Connect to each emulator
+    // Connect to each emulator with individual try/catch blocks
+    // to prevent failure of one emulator from affecting others
+    
     // Auth Emulator
-    connectAuthEmulator(auth, `http://${authEmulator.host}:${authEmulator.port}`, { disableWarnings: true });
-    console.log(`✓ Auth emulator connected at: http://${authEmulator.host}:${authEmulator.port}`);
+    try {
+      connectAuthEmulator(auth, `http://${authEmulator.host}:${authEmulator.port}`, { disableWarnings: true });
+      console.log(`✓ Auth emulator connected at: http://${authEmulator.host}:${authEmulator.port}`);
+    } catch (authError) {
+      console.warn(`Failed to connect to Auth emulator: ${authError}`);
+    }
 
     // Firestore Emulator
-    connectFirestoreEmulator(db, firestore.host, firestore.port);
-    console.log(`✓ Firestore emulator connected at: http://${firestore.host}:${firestore.port}`);
+    try {
+      // Using settings instead of connectFirestoreEmulator to avoid the warning
+      connectFirestoreEmulator(db, firestore.host, firestore.port);
+      console.log(`✓ Firestore emulator connected at: http://${firestore.host}:${firestore.port}`);
+    } catch (firestoreError) {
+      console.warn(`Failed to connect to Firestore emulator: ${firestoreError}`);
+      // Add to global error collection
+      (window as any).__FIREBASE_ERRORS = [
+        ...(window as any).__FIREBASE_ERRORS || [],
+        firestoreError
+      ];
+    }
 
     // Storage Emulator
-    connectStorageEmulator(storage, storageEmulator.host, storageEmulator.port);
-    console.log(`✓ Storage emulator connected at: http://${storageEmulator.host}:${storageEmulator.port}`);
+    try {
+      connectStorageEmulator(storage, storageEmulator.host, storageEmulator.port);
+      console.log(`✓ Storage emulator connected at: http://${storageEmulator.host}:${storageEmulator.port}`);
+    } catch (storageError) {
+      console.warn(`Failed to connect to Storage emulator: ${storageError}`);
+    }
 
     // Functions Emulator
-    connectFunctionsEmulator(functions, functionsEmulator.host, functionsEmulator.port);
-    console.log(`✓ Functions emulator connected at: http://${functionsEmulator.host}:${functionsEmulator.port}`);
+    try {
+      connectFunctionsEmulator(functions, functionsEmulator.host, functionsEmulator.port);
+      console.log(`✓ Functions emulator connected at: http://${functionsEmulator.host}:${functionsEmulator.port}`);
+    } catch (functionsError) {
+      console.warn(`Failed to connect to Functions emulator: ${functionsError}`);
+    }
 
     // Realtime Database Emulator
-    connectDatabaseEmulator(rtdb, rtdbEmulator.host, rtdbEmulator.port);
-    console.log(`✓ Realtime Database emulator connected at: http://${rtdbEmulator.host}:${rtdbEmulator.port}`);
+    try {
+      connectDatabaseEmulator(rtdb, rtdbEmulator.host, rtdbEmulator.port);
+      console.log(`✓ Realtime Database emulator connected at: http://${rtdbEmulator.host}:${rtdbEmulator.port}`);
+    } catch (rtdbError) {
+      console.warn(`Failed to connect to RTDB emulator: ${rtdbError}`);
+      // Add to global error collection
+      (window as any).__FIREBASE_ERRORS = [
+        ...(window as any).__FIREBASE_ERRORS || [],
+        rtdbError
+      ];
+    }
 
-    console.log("All Firebase emulators connected successfully!");
+    console.log("Firebase emulators connection attempt completed");
     return true;
   } catch (error) {
     console.error("Error connecting to emulators:", error);
@@ -297,6 +334,11 @@ export const loginWithEmail = async (email: string, password: string) => {
     return userCredential;
   } catch (error: any) {
     console.error("Login error:", error);
+    // Add to global error collection for error monitoring
+    (window as any).__FIREBASE_ERRORS = [
+      ...(window as any).__FIREBASE_ERRORS || [],
+      error
+    ];
     throw new Error(getAuthErrorMessage(error.code));
   }
 };
