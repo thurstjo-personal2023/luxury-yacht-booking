@@ -36,12 +36,11 @@ process.env.NODE_ENV = "development";
 // Note: In Replit, emulators must be running externally and accessible
 const useEmulators = true;
 if (useEmulators) {
-  // For connecting to emulators via ngrok tunnels - PLACEHOLDER CONFIGURATION
-  // You'll need to update these with the actual URLs from running setup-local-ngrok.sh on your machine
-  // The URLs should be just the hostname without 'https://' prefix or port numbers
-  const firestoreNgrokUrl = "0.tcp.ngrok.io:15344";      // EXAMPLE only - Update with your actual URL
-  const authNgrokUrl = "0.tcp.ngrok.io:15344";           // EXAMPLE only - Update with your actual URL
-  const storageNgrokUrl = "0.tcp.ngrok.io:15344";        // EXAMPLE only - Update with your actual URL
+  // For connecting to emulators via ngrok tunnels
+  // These are the actual tunnel URLs from your local ngrok setup
+  const firestoreNgrokUrl = "e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app";
+  const authNgrokUrl = "e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app";
+  const storageNgrokUrl = "e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app";
   
   // Use ngrok URLs without 'https://' prefix for most environment variables
   process.env.FIRESTORE_EMULATOR_HOST = `${firestoreNgrokUrl}`;

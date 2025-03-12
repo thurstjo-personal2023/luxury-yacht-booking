@@ -13,14 +13,14 @@
  *    node scripts/test-ngrok-connection.js
  */
 
-const admin = require('firebase-admin');
-const https = require('https');
-const { spawn } = require('child_process');
+import * as admin from 'firebase-admin';
+import https from 'https';
+import { spawn } from 'child_process';
 
-// Update these with your actual ngrok tunnel URLs (without https:// prefix)
-const FIRESTORE_NGROK_URL = 'REPLACE_WITH_YOUR_FIRESTORE_NGROK_URL';  // e.g. "abc123.ngrok-free.app"
-const AUTH_NGROK_URL = 'REPLACE_WITH_YOUR_AUTH_NGROK_URL';            // e.g. "def456.ngrok-free.app"
-const STORAGE_NGROK_URL = 'REPLACE_WITH_YOUR_STORAGE_NGROK_URL';      // e.g. "ghi789.ngrok-free.app"
+// These are the actual ngrok tunnel URLs from your setup
+const FIRESTORE_NGROK_URL = 'e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app';
+const AUTH_NGROK_URL = 'e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app';
+const STORAGE_NGROK_URL = 'e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app';
 
 // Set environment variables for the emulators
 process.env.FIRESTORE_EMULATOR_HOST = FIRESTORE_NGROK_URL;
