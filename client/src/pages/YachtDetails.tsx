@@ -72,21 +72,30 @@ export default function YachtDetails() {
 
       setLoading(true);
       try {
-        // Try to fetch from multiple collections to support the transition
+        // Try to fetch from the unified collection
         let yachtDoc;
         
-        // First try yacht_experiences collection
-        let yachtRef = doc(db, "yacht_experiences", yachtId);
+        // First try unified_yacht_experiences collection (preferred)
+        let yachtRef = doc(db, "unified_yacht_experiences", yachtId);
         yachtDoc = await getDoc(yachtRef);
         
-        // If not found, try experience_packages collection
+        // Legacy fallback: only if not found in unified collection
         if (!yachtDoc.exists()) {
-          console.log(`Yacht not found in yacht_experiences, trying experience_packages...`);
-          yachtRef = doc(db, "experience_packages", yachtId);
+          console.log(`Yacht not found in unified_yacht_experiences, trying legacy collections as fallback...`);
+          
+          // Try legacy yacht_experiences collection as fallback
+          yachtRef = doc(db, "yacht_experiences", yachtId);
           yachtDoc = await getDoc(yachtRef);
+          
+          // If still not found, try legacy experience_packages collection as final fallback
+          if (!yachtDoc.exists()) {
+            console.log(`Yacht not found in yacht_experiences either, trying experience_packages as final fallback...`);
+            yachtRef = doc(db, "experience_packages", yachtId);
+            yachtDoc = await getDoc(yachtRef);
+          }
         }
         
-        // If still not found, try unified_yacht_experiences collection
+        // After trying all collections
         if (!yachtDoc.exists()) {
           console.log(`Yacht not found in experience_packages, trying unified_yacht_experiences...`);
           yachtRef = doc(db, "unified_yacht_experiences", yachtId);

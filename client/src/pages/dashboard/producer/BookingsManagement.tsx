@@ -106,9 +106,9 @@ export default function BookingsManagement() {
           return;
         }
         
-        // First fetch all producer's yachts to use as a reference
-        const yachtsRef = collection(db, "yacht_experiences");
-        const yachtsQuery = query(yachtsRef, where("providerId", "==", user.uid));
+        // First fetch all producer's yachts from unified collection
+        const yachtsRef = collection(db, "unified_yacht_experiences");
+        const yachtsQuery = query(yachtsRef, where("producerId", "==", user.uid));
         const yachtSnapshots = await getDocs(yachtsQuery);
         
         const yachtMap: Record<string, YachtExperience> = {};

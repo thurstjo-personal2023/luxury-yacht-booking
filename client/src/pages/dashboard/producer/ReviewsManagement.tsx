@@ -95,9 +95,9 @@ export default function ReviewsManagement() {
           return;
         }
         
-        // First, fetch all producer's yachts/experiences
-        const yachtsRef = collection(db, "yacht_experiences");
-        const q = query(yachtsRef, where("providerId", "==", user.uid));
+        // First, fetch all producer's yachts from unified collection
+        const yachtsRef = collection(db, "unified_yacht_experiences");
+        const q = query(yachtsRef, where("producerId", "==", user.uid));
         const yachtSnapshots = await getDocs(q);
         
         const yachtsById: {[key: string]: YachtExperience} = {};
