@@ -24,8 +24,8 @@ export function SearchAndBook() {
   useEffect(() => {
     const fetchPackages = async () => {
       try {
-        console.log("Fetching all yacht experiences...");
-        const querySnapshot = await getDocs(collection(db, "experience_packages"));
+        console.log("Fetching all yacht experiences from unified collection...");
+        const querySnapshot = await getDocs(collection(db, "unified_yacht_experiences"));
         // Updated type assertion with proper document ID handling
         const allPackages = querySnapshot.docs.map(doc => ({
           id: doc.id,
