@@ -32,8 +32,9 @@ const adminStorage = getStorage(app);
 // We are always in development mode and always using emulators
 process.env.NODE_ENV = "development"; 
 
-// ALWAYS use emulators for development, regardless of environment
-const useEmulators = true;
+// For Replit, use direct connection to Firebase instead of emulators
+// since we can't reach localhost emulators from Replit's servers
+const useEmulators = false;
 if (useEmulators) {
   // Set environment variables for Firebase emulators
   process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -59,22 +60,17 @@ if (useEmulators) {
   console.log("Firebase Admin configured for direct access (emulators disabled)");
 }
 
-// Debug connection to Firebase emulators
+// Debug connection to Firebase production service
 setTimeout(async () => {
   try {
-    console.log("Testing connection to Firestore emulator...");
-    console.log("Firestore emulator connection settings:", {
-      host: "127.0.0.1:8080", 
-      ssl: false,
-      ignoreUndefinedProperties: true
-    });
+    console.log("Testing connection to Firebase Firestore...");
     
-    // Test query to verify emulator connection
+    // Test query to verify connection
     const testDoc = await adminDb.collection('test').doc('test-connection').set({
       timestamp: Date.now(),
-      message: 'Testing Firestore emulator connection'
+      message: 'Testing Firebase Firestore connection'
     });
-    console.log("✓ Successfully connected to Firestore emulator");
+    console.log("✓ Successfully connected to Firebase Firestore");
     
     // Try unified_yacht_experiences
     console.log("Testing read from unified_yacht_experiences collection...");
@@ -92,7 +88,7 @@ setTimeout(async () => {
     console.log("- FIREBASE_AUTH_EMULATOR_HOST:", process.env.FIREBASE_AUTH_EMULATOR_HOST || "Not set");
     console.log("- isEmulatorMode():", isEmulatorMode());
   } catch (error: any) {
-    console.error("❌ Error during Firebase emulator connection test:", error.message);
+    console.error("❌ Error during Firebase connection test:", error.message);
     if (error && typeof error === 'object') {
       console.error("Error code:", error.code);
       console.error("Error details:", error.details || "No details available");
