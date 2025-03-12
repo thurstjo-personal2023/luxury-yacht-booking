@@ -24,6 +24,7 @@ const BookingSummary = lazy(() => import("@/pages/BookingSummary"));
 const PaymentPage = lazy(() => import("@/pages/PaymentPage"));
 const SearchAndBook = lazy(() => import("@/pages/explore/SearchAndBook"));
 const GuestDashboard = lazy(() => import("@/pages/explore/GuestDashboard"));
+const ProfilePage = lazy(() => import("@/pages/profile/ProfilePage"));
 
 // Producer Dashboard Pages
 const ProducerProfile = lazy(() => import("@/pages/dashboard/producer/ProducerProfile"));
@@ -103,6 +104,9 @@ function App() {
               </Route>
               <Route path="/dashboard/partner">
                 <PrivateRoute component={PartnerDashboard} />
+              </Route>
+              <Route path="/profile">
+                <PrivateRoute component={ProfilePage} />
               </Route>
               
               {/* Producer Dashboard Routes */}

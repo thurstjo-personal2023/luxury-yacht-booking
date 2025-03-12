@@ -17,7 +17,7 @@ import {
   ServiceProviderProfile,
   ServerTimestamp
 } from '@shared/harmonized-user-schema';
-import * as admin from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * Register user profile routes
@@ -66,7 +66,7 @@ export function registerUserProfileRoutes(app: Express) {
       
       // Update user data
       const updates: Partial<HarmonizedUser> = {
-        updatedAt: admin.FieldValue.serverTimestamp() as ServerTimestamp
+        updatedAt: FieldValue.serverTimestamp() as ServerTimestamp
       };
       
       if (name) updates.name = name;
@@ -111,7 +111,7 @@ export function registerUserProfileRoutes(app: Express) {
       
       // Update tourist profile
       const updates: Partial<TouristProfile> = {
-        lastUpdated: admin.FieldValue.serverTimestamp() as ServerTimestamp
+        lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
       };
       
       if (profilePhoto !== undefined) updates.profilePhoto = profilePhoto;
