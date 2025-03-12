@@ -52,13 +52,11 @@ console.log(" - Storage: 127.0.0.1:9199");
 setTimeout(async () => {
   try {
     console.log("Testing connection to Firestore emulator...");
-    // Get Firestore settings in a type-safe way
-    // The settings() method only returns the current settings object when called with no args
-    const currentSettings = adminDb.settings({}) as any;
-    console.log("Firestore emulator settings:", {
-      host: currentSettings?.host || "Not set",
-      ssl: currentSettings?.ssl,
-      ignoreUndefinedProperties: currentSettings?.ignoreUndefinedProperties
+    // Log Firestore connection settings without calling settings() again
+    console.log("Firestore emulator connection:", {
+      host: "127.0.0.1:8080", // Using our configured values 
+      ssl: false,
+      ignoreUndefinedProperties: true
     });
     
     // Test query to verify connection
