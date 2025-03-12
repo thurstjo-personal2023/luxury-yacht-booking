@@ -74,7 +74,7 @@ const mockExperiences: Partial<YachtExperience>[] = [
 
 // Clean up function to reset the test database
 export async function cleanupDatabase() {
-  const collections = ['experience_packages'];
+  const collections = ['unified_yacht_experiences'];
 
   for (const collectionName of collections) {
     const snapshot = await getDocs(collection(db, collectionName));
@@ -85,11 +85,11 @@ export async function cleanupDatabase() {
 
 // Set up function to initialize test data
 export async function setupTestData() {
-  const experiencesRef = collection(db, 'experience_packages');
+  const experiencesRef = collection(db, 'unified_yacht_experiences');
   for (const exp of mockExperiences) {
     await addDoc(experiencesRef, exp);
   }
-  console.log('Test data initialized');
+  console.log('Test data initialized with unified collection');
 }
 
 beforeEach(async () => {

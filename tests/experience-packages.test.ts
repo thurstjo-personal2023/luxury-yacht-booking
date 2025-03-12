@@ -77,10 +77,10 @@ const mockExperiences: YachtExperience[] = [
 describe('Experience Packages Queries', () => {
   beforeEach(async () => {
     // Clear and populate test data
-    const experiencesRef = collection(db, 'experience_packages');
+    const experiencesRef = collection(db, 'unified_yacht_experiences');
 
     // Clear existing data
-    const snapshot = await getDocs(collection(db, 'experience_packages'));
+    const snapshot = await getDocs(collection(db, 'unified_yacht_experiences'));
     for (const doc of snapshot.docs) {
       await deleteDoc(doc.ref);
     }
@@ -89,19 +89,19 @@ describe('Experience Packages Queries', () => {
     for (const exp of mockExperiences) {
       await addDoc(experiencesRef, exp);
     }
-    console.log('Test data initialized');
+    console.log('Test data initialized with unified collection');
   });
 
   afterEach(async () => {
     // Clean up test data
-    const snapshot = await getDocs(collection(db, 'experience_packages'));
+    const snapshot = await getDocs(collection(db, 'unified_yacht_experiences'));
     for (const doc of snapshot.docs) {
       await deleteDoc(doc.ref);
     }
   });
 
   test('fetchAllPackages returns all experiences', async () => {
-    const snapshot = await getDocs(collection(db, 'experience_packages'));
+    const snapshot = await getDocs(collection(db, 'unified_yacht_experiences'));
     const experiences = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     expect(experiences.length).toBe(mockExperiences.length);
@@ -114,7 +114,7 @@ describe('Experience Packages Queries', () => {
   test('filterByCategory returns only yacht experiences', async () => {
     const filtered = await getDocs(
       query(
-        collection(db, 'experience_packages'),
+        collection(db, 'unified_yacht_experiences'),
         where('tags', 'array-contains', 'yacht')
       )
     );
@@ -128,7 +128,7 @@ describe('Experience Packages Queries', () => {
 
   test('filterByRegion returns experiences from specified region', async () => {
     const region = 'Dubai';
-    const snapshot = await getDocs(collection(db, 'experience_packages'));
+    const snapshot = await getDocs(collection(db, 'unified_yacht_experiences'));
     const experiences = snapshot.docs
       .map(doc => doc.data())
       .filter(exp => exp.location.address.includes(region));
@@ -140,7 +140,7 @@ describe('Experience Packages Queries', () => {
   });
 
   test('fetchRecommended returns featured or highly rated experiences', async () => {
-    const snapshot = await getDocs(collection(db, 'experience_packages'));
+    const snapshot = await getDocs(collection(db, 'unified_yacht_experiences'));
     const experiences = snapshot.docs
       .map(doc => doc.data())
       .filter(exp => exp.featured || exp.reviews?.some((r: Review) => r.rating >= 4.5));
@@ -154,12 +154,12 @@ describe('Experience Packages Queries', () => {
 
   test('handles empty results gracefully', async () => {
     // Clear all data
-    const snapshot = await getDocs(collection(db, 'experience_packages'));
+    const snapshot = await getDocs(collection(db, 'unified_yacht_experiences'));
     for (const doc of snapshot.docs) {
       await deleteDoc(doc.ref);
     }
 
-    const emptySnapshot = await getDocs(collection(db, 'experience_packages'));
+    const emptySnapshot = await getDocs(collection(db, 'unified_yacht_experiences'));
     expect(emptySnapshot.empty).toBe(true);
   });
 });

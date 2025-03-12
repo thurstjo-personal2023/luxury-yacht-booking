@@ -1,15 +1,83 @@
 [
   {
-    "user_id": "USR123",
-    "name": "John Doe",
-    "email": "john.doe@example.com",
-    "phone_number": "+971500000000",
-    "profile_photo": "https://etoileyachts.com/media/profile.jpg",
-    "loyalty_tier": "Gold",
-    "preferences": ["adventure", "dining"],
-    "wishlist": ["EXP123", "EXP456"],
-    "booking_history": ["BKG123", "BKG456"],
-    "reviews_provided": ["REV123", "REV456"],
-    "created_date": "2025-01-01T10:00:00Z"
+    "id" : "USR123",
+    "user_id" : "USR123",
+    "name" : "John Doe",
+    "email" : "john.doe@example.com",
+    "phone_number" : "+971500000000",
+    "profile_photo" : "https://etoileyachts.com/media/profile.jpg",
+    "loyalty_tier" : "Gold",
+    "preferences" : {
+      "0" : "adventure",
+      "1" : "dining"
+    },
+    "wishlist" : {
+      "0" : "EXP123",
+      "1" : "EXP456"
+    },
+    "booking_history" : {
+      "0" : "BKG123",
+      "1" : "BKG456"
+    },
+    "reviews_provided" : {
+      "0" : "REV123",
+      "1" : "REV456"
+    },
+    "created_date" : {
+      "_seconds" : 1735725600,
+      "_nanoseconds" : 0
+    }
+  },
+  {
+    "id" : "XWcyGeYhHKAFhvTXiyOZ",
+    "user_id" : "USR123",
+    "name" : "John Doe",
+    "email" : "john.doe@example.com",
+    "phone_number" : "+971500000000",
+    "profile_photo" : "https://etoileyachts.com/media/profile.jpg",
+    "loyalty_tier" : "Gold",
+    "preferences" : [
+      "adventure",
+      "dining"
+    ],
+    "wishlist" : [
+      "EXP123",
+      "EXP456"
+    ],
+    "booking_history" : [
+      "BKG123",
+      "BKG456"
+    ],
+    "reviews_provided" : [
+      "REV123",
+      "REV456"
+    ],
+    "created_date" : "2025-01-01T10:00:00Z"
+  },
+  {
+    "id" : "pf7QvmXXeWaKYbHX5Ehl",
+    "user_id" : "USR123",
+    "name" : "John Doe",
+    "email" : "john.doe@example.com",
+    "phone_number" : "+971500000000",
+    "profile_photo" : "https://etoileyachts.com/media/profile.jpg",
+    "loyalty_tier" : "Gold",
+    "preferences" : [
+      "adventure",
+      "dining"
+    ],
+    "wishlist" : [
+      "EXP123",
+      "EXP456"
+    ],
+    "booking_history" : [
+      "BKG123",
+      "BKG456"
+    ],
+    "reviews_provided" : [
+      "REV123",
+      "REV456"
+    ],
+    "created_date" : "2025-01-01T10:00:00Z"
   }
 ]

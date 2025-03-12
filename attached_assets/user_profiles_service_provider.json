@@ -1,5 +1,6 @@
 [
   {
+    "id": "PRO123",
     "provider_id": "PRO123",
     "business_name": "Luxury Yacht Rentals",
     "contact_information": {
@@ -8,10 +9,77 @@
       "address": "Dubai Marina, UAE"
     },
     "profile_photo": "https://etoileyachts.com/media/logo.jpg",
-    "services_offered": ["Yacht Charter", "Private Dining"],
-    "certifications": ["ISO 9001", "Luxury Certified"],
+    "services_offered": {
+      "0": "Yacht Charter",
+      "1": "Private Dining"
+    },
+    "certifications": {
+      "0": "ISO 9001",
+      "1": "Luxury Certified"
+    },
     "ratings": 4.8,
-    "tags": ["luxury", "yacht"],
+    "tags": {
+      "0": "luxury",
+      "1": "yacht"
+    },
+    "created_date": {
+      "_seconds": 1735725600,
+      "_nanoseconds": 0
+    },
+    "last_updated_date": {
+      "_seconds": 1736071200,
+      "_nanoseconds": 0
+    }
+  },
+  {
+    "id": "QMHSE7sb93HM9jFzIbRY",
+    "provider_id": "PRO123",
+    "business_name": "Luxury Yacht Rentals",
+    "contact_information": {
+      "email": "info@luxuryyachts.com",
+      "phone": "+971400000000",
+      "address": "Dubai Marina, UAE"
+    },
+    "profile_photo": "https://etoileyachts.com/media/logo.jpg",
+    "services_offered": [
+      "Yacht Charter",
+      "Private Dining"
+    ],
+    "certifications": [
+      "ISO 9001",
+      "Luxury Certified"
+    ],
+    "ratings": 4.8,
+    "tags": [
+      "luxury",
+      "yacht"
+    ],
+    "created_date": "2025-01-01T10:00:00Z",
+    "last_updated_date": "2025-01-05T10:00:00Z"
+  },
+  {
+    "id": "ZAZYdkIakKkV6Pn6UzHD",
+    "provider_id": "PRO123",
+    "business_name": "Luxury Yacht Rentals",
+    "contact_information": {
+      "email": "info@luxuryyachts.com",
+      "phone": "+971400000000",
+      "address": "Dubai Marina, UAE"
+    },
+    "profile_photo": "https://etoileyachts.com/media/logo.jpg",
+    "services_offered": [
+      "Yacht Charter",
+      "Private Dining"
+    ],
+    "certifications": [
+      "ISO 9001",
+      "Luxury Certified"
+    ],
+    "ratings": 4.8,
+    "tags": [
+      "luxury",
+      "yacht"
+    ],
     "created_date": "2025-01-01T10:00:00Z",
     "last_updated_date": "2025-01-05T10:00:00Z"
   }

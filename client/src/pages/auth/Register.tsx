@@ -18,14 +18,25 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { registerWithEmail } from "@/lib/firebase";
-import { UserRole, UserRoleType, standardizeUser } from "@shared/user-schema";
 import { Link } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, Timestamp } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 import { collectionRefs } from "@/lib/firestore-init";
+
+/**
+ * User role enum for registration
+ */
+enum UserRole {
+  CONSUMER = "consumer",
+  PRODUCER = "producer",
+  PARTNER = "partner"
+}
+
+// Type for user roles
+type UserRoleType = 'consumer' | 'producer' | 'partner';
 
 // Enhanced password validation
 const passwordSchema = z
@@ -85,8 +96,10 @@ export default function Register() {
       try {
         console.log("Creating harmonized user profile in Firestore...");
         
-        // Create base user data
-        const baseUserData = {
+        const timestamp = Timestamp.now();
+        
+        // Create harmonized user data (core user data)
+        const harmonizedUserData = {
           id: user.uid,
           userId: user.uid,
           name: `${data.firstName} ${data.lastName}`,
@@ -95,18 +108,53 @@ export default function Register() {
           role: data.role.toLowerCase() as UserRoleType,
           emailVerified: false,
           points: 0,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+          createdAt: timestamp,
+          updatedAt: timestamp,
           _standardized: true,
           _standardizedVersion: 1
         };
         
-        // Standardize user data based on role
-        const standardizedUser = standardizeUser(baseUserData);
-        
-        // Create user profile in Firestore using the standardized schema
-        await setDoc(doc(collectionRefs.users, user.uid), standardizedUser);
-        console.log("Harmonized user profile created successfully");
+        // Create profile based on the selected role
+        if (data.role === UserRole.CONSUMER) {
+          // Create a tourist profile
+          const touristProfile = {
+            id: user.uid,
+            profilePhoto: '',
+            loyaltyTier: 'Bronze',
+            preferences: [],
+            wishlist: [],
+            bookingHistory: [],
+            reviewsProvided: [],
+            lastUpdated: timestamp
+          };
+          
+          // Create records in both collections
+          await setDoc(doc(db, 'harmonized_users', user.uid), harmonizedUserData);
+          await setDoc(doc(db, 'user_profiles_tourist', user.uid), touristProfile);
+          
+          console.log("Consumer user created with tourist profile");
+        } else {
+          // Create a service provider profile for producer or partner
+          const serviceProviderProfile = {
+            providerId: user.uid,
+            businessName: `${data.firstName} ${data.lastName}'s Business`, // Default business name
+            contactInformation: {
+              address: ''
+            },
+            profilePhoto: '',
+            servicesOffered: [],
+            certifications: [],
+            ratings: 0,
+            tags: [],
+            lastUpdated: timestamp
+          };
+          
+          // Create records in both collections
+          await setDoc(doc(db, 'harmonized_users', user.uid), harmonizedUserData);
+          await setDoc(doc(db, 'user_profiles_service_provider', user.uid), serviceProviderProfile);
+          
+          console.log(`${data.role} user created with service provider profile`);
+        }
 
         toast({
           title: "Registration successful!",
