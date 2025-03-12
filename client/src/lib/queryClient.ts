@@ -184,17 +184,50 @@ export const getQueryFn: <T>(options: {
       // Check for errors
       await throwIfResNotOk(res);
       
-      // Parse and return JSON response
-      const data = await res.json();
-      
-      if (enableDebug) {
-        console.log(`QueryFn: Successfully parsed JSON response with ${Object.keys(data).length} keys`);
-        if (Array.isArray(data)) {
-          console.log(`QueryFn: Array response with ${data.length} items`);
+      // First check if the response is HTML (usually an error page)
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('text/html')) {
+        console.error('QueryFn: Received HTML response instead of JSON');
+        
+        try {
+          const htmlContent = await res.text();
+          const titleMatch = htmlContent.match(/<title>(.*?)<\/title>/);
+          const errorTitle = titleMatch ? titleMatch[1] : 'Unknown error';
+          
+          console.error(`QueryFn: HTML error page title: ${errorTitle}`);
+          
+          throw new Error(`Received HTML page instead of JSON: ${errorTitle}`);
+        } catch (htmlError) {
+          throw new Error('Received HTML response instead of JSON data');
         }
       }
       
-      return data;
+      // Parse and return JSON response
+      try {
+        const data = await res.json();
+        
+        if (enableDebug) {
+          console.log(`QueryFn: Successfully parsed JSON response with ${Object.keys(data).length} keys`);
+          if (Array.isArray(data)) {
+            console.log(`QueryFn: Array response with ${data.length} items`);
+          }
+        }
+        
+        return data;
+      } catch (jsonError) {
+        console.error('QueryFn: Error parsing JSON response:', jsonError);
+        console.error('QueryFn: Response content-type:', contentType);
+        
+        // Try to get the response text for debugging
+        try {
+          const text = await res.clone().text();
+          console.error('QueryFn: Raw response:', text.substring(0, 500) + (text.length > 500 ? '...' : ''));
+        } catch (textError) {
+          console.error('QueryFn: Could not read response text');
+        }
+        
+        throw new Error('Failed to parse JSON response');
+      }
     } catch (error) {
       console.error('QueryFn: Error fetching data:', error);
       throw error;
