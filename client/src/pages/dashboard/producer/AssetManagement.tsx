@@ -428,8 +428,8 @@ export default function AssetManagement() {
     
     try {
       if (type === 'yacht') {
-        // Delete from Firestore
-        const yachtRef = doc(db, "yacht_experiences", id);
+        // Delete from Firestore (unified collection)
+        const yachtRef = doc(db, "unified_yacht_experiences", id);
         await deleteDoc(yachtRef);
         
         // Use a more aggressive cache invalidation approach
