@@ -7,6 +7,7 @@ import { spawn } from "child_process";
 import path from "path";
 import { FieldValue } from "firebase-admin/firestore";
 import { standardizeUser, UserType } from "../shared/user-schema";
+import { registerUserProfileRoutes } from "./user-profile-routes";
 
 import { insertTestYachts } from "./create-test-data";
 
@@ -982,6 +983,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Register User Profile routes
+  registerUserProfileRoutes(app);
+
   // Register Stripe-related routes
   registerStripeRoutes(app);
 
