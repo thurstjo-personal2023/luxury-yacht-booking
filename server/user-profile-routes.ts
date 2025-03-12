@@ -177,7 +177,7 @@ export function registerUserProfileRoutes(app: Express) {
       
       // Update service provider profile
       const updates: Partial<ServiceProviderProfile> = {
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp
+        lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
       };
       
       if (businessName !== undefined) updates.businessName = businessName;
@@ -250,7 +250,7 @@ export function registerUserProfileRoutes(app: Express) {
         profile = {
           id: req.user.uid,
           wishlist: [],
-          lastUpdated: admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp
+          lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
         };
       }
       
@@ -266,7 +266,7 @@ export function registerUserProfileRoutes(app: Express) {
       // Update profile
       const updates: Partial<TouristProfile> = {
         wishlist,
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp
+        lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
       };
       
       if (profileDoc.exists) {
@@ -339,8 +339,8 @@ export function registerUserProfileRoutes(app: Express) {
         role: role as 'consumer' | 'producer' | 'partner',
         emailVerified: req.user.email_verified || false,
         points: 0,
-        createdAt: admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp,
+        createdAt: FieldValue.serverTimestamp() as ServerTimestamp,
+        updatedAt: FieldValue.serverTimestamp() as ServerTimestamp,
         _standardized: true,
         _standardizedVersion: 1
       };
@@ -353,7 +353,7 @@ export function registerUserProfileRoutes(app: Express) {
           preferences: [],
           wishlist: [],
           bookingHistory: [],
-          lastUpdated: admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp
+          lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
         };
         
         await createOrUpdateHarmonizedUser(userData, { touristProfile });
@@ -366,7 +366,7 @@ export function registerUserProfileRoutes(app: Express) {
             address: '',
           },
           servicesOffered: [],
-          lastUpdated: admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp
+          lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
         };
         
         await createOrUpdateHarmonizedUser(userData, { serviceProviderProfile });
@@ -411,7 +411,7 @@ export function registerUserProfileRoutes(app: Express) {
       // Update role
       await db.collection('harmonized_users').doc(userId).update({
         role,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        updatedAt: FieldValue.serverTimestamp()
       });
       
       // If changing from consumer to producer/partner, create service provider profile
@@ -426,7 +426,7 @@ export function registerUserProfileRoutes(app: Express) {
               address: '',
             },
             servicesOffered: [],
-            lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+            lastUpdated: FieldValue.serverTimestamp()
           });
         }
       }
@@ -441,7 +441,7 @@ export function registerUserProfileRoutes(app: Express) {
             preferences: [],
             wishlist: [],
             bookingHistory: [],
-            lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+            lastUpdated: FieldValue.serverTimestamp()
           });
         }
       }
