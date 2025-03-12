@@ -6,12 +6,8 @@ import {
   connectAuthEmulator,
 } from "firebase/auth";
 import {
-  getFirestore,
-  connectFirestoreEmulator,
-  initializeFirestore,
-  CACHE_SIZE_UNLIMITED,
-  persistentLocalCache,
-  persistentSingleTabManager
+  getFirestore, 
+  connectFirestoreEmulator
 } from "firebase/firestore";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 import { getDatabase, connectDatabaseEmulator } from "firebase/database";
@@ -30,13 +26,8 @@ const firebaseConfig = {
 // Initialize Firebase and export the app instance
 export const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with settings for better offline support
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    cacheSizeBytes: CACHE_SIZE_UNLIMITED,
-    tabManager: persistentSingleTabManager({ forceOwnership: true })
-  })
-});
+// Initialize Firestore
+export const db = getFirestore(app);
 
 // Initialize other services
 export const auth = getAuth(app);
