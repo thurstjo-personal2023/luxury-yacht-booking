@@ -1,0 +1,39 @@
+🔥 Setting up ngrok tunnels for Firebase Emulators...
+Make sure your Firebase emulators are running!
+🚀 Starting ngrok tunnel for firestore on port 8080...
+✅ firestore tunnel established: https://e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app
+🚀 Starting ngrok tunnel for auth on port 9099...
+ERROR:  authentication failed: Your account is limited to 1 simultaneous ngrok agent sessions.
+ERROR:  You can run multiple simultaneous tunnels from a single agent session by defining the tunnels in your agent configuration file and starting them with the command `ngrok start --all`.
+ERROR:  Read more about the agent configuration file: https://ngrok.com/docs/secure-tunnels/ngrok-agent/reference/config
+ERROR:  You can view your current agent sessions in the dashboard:
+ERROR:  https://dashboard.ngrok.com/agents
+ERROR:  
+ERROR:  ERR_NGROK_108
+ERROR:  https://ngrok.com/docs/errors/err_ngrok_108
+ERROR:  
+✅ auth tunnel established: https://e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app
+🚀 Starting ngrok tunnel for storage on port 9199...
+ERROR:  authentication failed: Your account is limited to 1 simultaneous ngrok agent sessions.
+ERROR:  You can run multiple simultaneous tunnels from a single agent session by defining the tunnels in your agent configuration file and starting them with the command `ngrok start --all`.
+ERROR:  Read more about the agent configuration file: https://ngrok.com/docs/secure-tunnels/ngrok-agent/reference/config
+ERROR:  You can view your current agent sessions in the dashboard:
+ERROR:  https://dashboard.ngrok.com/agents
+ERROR:  
+ERROR:  ERR_NGROK_108
+ERROR:  https://ngrok.com/docs/errors/err_ngrok_108
+ERROR:  
+✅ storage tunnel established: https://e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app
+
+📝 Tunnel URLs for Replit Configuration:
+----------------------------------------
+Firestore: e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app
+Auth: e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app
+Storage: e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app
+
+Update these URLs in the server/firebase-admin.ts file in Replit
+Then restart the Replit server
+
+🔍 Monitoring tunnels...
+Check individual logs at ngrok-firestore.log, ngrok-auth.log, ngrok-storage.log
+Press Ctrl+C to stop all tunnels
