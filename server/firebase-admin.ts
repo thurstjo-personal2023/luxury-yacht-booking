@@ -32,29 +32,33 @@ const adminStorage = getStorage(app);
 // Always connect to emulators in development mode
 process.env.NODE_ENV = "development"; 
 
-// Configure Firestore to use emulator
+// Set environment variables for Firebase emulators with exact values provided
+process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
+process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
+
+// Configure Firestore to use emulator with exact host:port specification
 adminDb.settings({
-  host: "localhost:8080",
+  host: "127.0.0.1:8080",
   ssl: false,
-  ignoreUndefinedProperties: true // Handle undefined values gracefully
+  ignoreUndefinedProperties: true
 });
 
-// Set environment variables for other Firebase emulators
-process.env.FIREBASE_AUTH_EMULATOR_HOST = "localhost:9099";
-process.env.FIREBASE_STORAGE_EMULATOR_HOST = "localhost:9199";
-
-console.log("Connected to Firebase Admin emulators");
+console.log("Firebase Admin configured to use external emulators:")
+console.log(" - Firestore: 127.0.0.1:8080")
+console.log(" - Auth: 127.0.0.1:9099")
+console.log(" - Storage: 127.0.0.1:9199");
 
 // Debug connection
 setTimeout(async () => {
   try {
     console.log("Testing connection to Firestore emulator...");
     // Get Firestore settings in a type-safe way
-    const settings = adminDb.settings();
+    // The settings() method only returns the current settings object when called with no args
+    const currentSettings = adminDb.settings({}) as any;
     console.log("Firestore emulator settings:", {
-      host: settings.host || "Not set",
-      ssl: settings.ssl,
-      ignoreUndefinedProperties: settings.ignoreUndefinedProperties
+      host: currentSettings?.host || "Not set",
+      ssl: currentSettings?.ssl,
+      ignoreUndefinedProperties: currentSettings?.ignoreUndefinedProperties
     });
     
     // Test query to verify connection
