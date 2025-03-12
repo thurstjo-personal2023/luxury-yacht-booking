@@ -29,13 +29,11 @@ const adminAuth = getAuth(app);
 const adminDb = getFirestore(app);
 const adminStorage = getStorage(app);
 
-// Set development mode
+// We are always in development mode and always using emulators
 process.env.NODE_ENV = "development"; 
 
-// When running in Replit, we can't connect to local emulators
-// We need to use production Firebase services instead
-const isReplitEnvironment = process.env.REPL_ID !== undefined;
-const useEmulators = !isReplitEnvironment && process.env.USE_EMULATORS !== 'false';
+// ALWAYS use emulators for development, regardless of environment
+const useEmulators = true;
 if (useEmulators) {
   // Set environment variables for Firebase emulators
   process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -61,60 +59,40 @@ if (useEmulators) {
   console.log("Firebase Admin configured for direct access (emulators disabled)");
 }
 
-// Debug connection to Firebase
+// Debug connection to Firebase emulators
 setTimeout(async () => {
   try {
-    if (useEmulators) {
-      console.log("Testing connection to Firestore emulator...");
-      console.log("Firestore emulator connection settings:", {
-        host: "127.0.0.1:8080", 
-        ssl: false,
-        ignoreUndefinedProperties: true
-      });
-      
-      // Test query to verify emulator connection
-      const testDoc = await adminDb.collection('test').doc('test-connection').set({
-        timestamp: Date.now(),
-        message: 'Testing Firestore emulator connection from Replit'
-      });
-      console.log("✓ Successfully connected to Firestore emulator");
-    } else {
-      console.log("Testing connection to Firebase production...");
-      console.log("Firestore production settings:", {
-        ignoreUndefinedProperties: true
-      });
-      
-      // Test query to verify production connection
-      const testDoc = await adminDb.collection('test').doc('test-connection').set({
-        timestamp: Date.now(),
-        message: 'Testing Firestore production connection from Replit'
-      });
-      console.log("✓ Successfully connected to Firestore production");
-    }
+    console.log("Testing connection to Firestore emulator...");
+    console.log("Firestore emulator connection settings:", {
+      host: "127.0.0.1:8080", 
+      ssl: false,
+      ignoreUndefinedProperties: true
+    });
     
-    // Now try to read from collections
-    try {
-      // Try unified_yacht_experiences
-      console.log("Testing read from unified_yacht_experiences collection...");
-      const yachtSnapshot = await adminDb.collection('unified_yacht_experiences').limit(1).get();
-      console.log(`✓ Read from unified_yacht_experiences, found ${yachtSnapshot.size} documents`);
-      
-      // Try harmonized_users collection
-      console.log("Testing read from harmonized_users collection...");
-      const usersSnapshot = await adminDb.collection('harmonized_users').limit(1).get();
-      console.log(`✓ Read from harmonized_users, found ${usersSnapshot.size} documents`);
-      
-      // Additional diagnostic info
-      console.log("Environment variables:");
-      console.log("- NODE_ENV:", process.env.NODE_ENV);
-      console.log("- REPL_ID:", process.env.REPL_ID ? "Replit environment detected" : "Not running in Replit");
-      console.log("- isEmulatorMode():", isEmulatorMode());
-    } catch (readError: any) {
-      console.error("❌ Failed to read from collections:", readError.message);
-    }
+    // Test query to verify emulator connection
+    const testDoc = await adminDb.collection('test').doc('test-connection').set({
+      timestamp: Date.now(),
+      message: 'Testing Firestore emulator connection'
+    });
+    console.log("✓ Successfully connected to Firestore emulator");
+    
+    // Try unified_yacht_experiences
+    console.log("Testing read from unified_yacht_experiences collection...");
+    const yachtSnapshot = await adminDb.collection('unified_yacht_experiences').limit(1).get();
+    console.log(`✓ Read from unified_yacht_experiences, found ${yachtSnapshot.size} documents`);
+    
+    // Try harmonized_users collection
+    console.log("Testing read from harmonized_users collection...");
+    const usersSnapshot = await adminDb.collection('harmonized_users').limit(1).get();
+    console.log(`✓ Read from harmonized_users, found ${usersSnapshot.size} documents`);
+    
+    // Additional diagnostic info
+    console.log("\nEnvironment information:");
+    console.log("- NODE_ENV:", process.env.NODE_ENV);
+    console.log("- FIREBASE_AUTH_EMULATOR_HOST:", process.env.FIREBASE_AUTH_EMULATOR_HOST || "Not set");
+    console.log("- isEmulatorMode():", isEmulatorMode());
   } catch (error: any) {
-    console.error("❌ Failed to connect to Firestore:", error.message);
-    // Safe error logging
+    console.error("❌ Error during Firebase emulator connection test:", error.message);
     if (error && typeof error === 'object') {
       console.error("Error code:", error.code);
       console.error("Error details:", error.details || "No details available");
