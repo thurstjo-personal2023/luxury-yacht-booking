@@ -75,12 +75,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firestore: process.env.FIRESTORE_EMULATOR_HOST || "localhost:8080",
           auth: process.env.FIREBASE_AUTH_EMULATOR_HOST || "localhost:9099",
           storage: process.env.FIREBASE_STORAGE_EMULATOR_HOST || "localhost:9199",
-          functions: "localhost:5001", // Default function emulator port
-          rtdb: "localhost:9001" // Default realtime DB emulator port
+          functions: process.env.FUNCTIONS_EMULATOR_HOST || "localhost:5001",
+          rtdb: process.env.FIREBASE_DATABASE_EMULATOR_HOST || "localhost:9001",
+          pubsub: process.env.PUBSUB_EMULATOR_HOST || "localhost:8085",
+          eventarc: process.env.EVENTARC_EMULATOR_HOST || "localhost:9299",
+          dataconnect: process.env.DATA_CONNECT_EMULATOR_HOST || "localhost:9399",
+          tasks: process.env.CLOUD_TASKS_EMULATOR_HOST || "localhost:9499",
+          hub: process.env.FIREBASE_EMULATOR_HUB || "localhost:4400"
         },
         connected: true,
         timestamp: Date.now()
       };
+      
+      // Test Firestore connection by making a simple query
+      try {
+        // Quick check to see if we can successfully connect to Firestore
+        adminDb.collection('connection_test').doc('status').set({
+          lastCheck: FieldValue.serverTimestamp(),
+          status: 'ok'
+        }, { merge: true }).catch(err => {
+          console.warn('Emulator connection test failed:', err.code);
+          // Don't throw, just continue - UI will display limited connection status
+        });
+      } catch (connErr) {
+        console.warn('Emulator connection test failed:', connErr);
+        // Don't modify the response, let the client handle connection issues
+      }
       
       // Return the config as JSON
       res.json(config);
