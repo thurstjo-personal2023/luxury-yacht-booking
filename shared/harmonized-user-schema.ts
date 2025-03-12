@@ -7,10 +7,10 @@
  * - user_profiles_service_provider: Producer/Partner-specific profile data
  */
 
-import { Timestamp } from "firebase/firestore";
+import { Timestamp } from 'firebase/firestore';
 
-// For server-side code compatibility
-export type ServerTimestamp = Timestamp | FirebaseFirestore.FieldValue;
+// Define a type for server timestamps that can be either a Timestamp or FieldValue
+export type ServerTimestamp = Timestamp | { _seconds: number; _nanoseconds: number } | any;
 
 /**
  * Core User Schema (harmonized_users collection)
@@ -111,12 +111,12 @@ export function normalizeConsumerProfile(profile: any): TouristProfile {
   return {
     id: profile.id || profile.userId || '',
     profilePhoto: profile.profilePhoto || '',
-    loyaltyTier: profile.loyaltyTier || 'Bronze',
+    loyaltyTier: profile.loyaltyTier || 'Standard',
     preferences: Array.isArray(profile.preferences) ? profile.preferences : [],
     wishlist: Array.isArray(profile.wishlist) ? profile.wishlist : [],
     bookingHistory: Array.isArray(profile.bookingHistory) ? profile.bookingHistory : [],
     reviewsProvided: Array.isArray(profile.reviewsProvided) ? profile.reviewsProvided : [],
-    lastUpdated: profile.lastUpdated || Timestamp.now()
+    lastUpdated: profile.lastUpdated || null
   };
 }
 
@@ -134,9 +134,7 @@ export function normalizeServiceProviderProfile(profile: any): ServiceProviderPr
     servicesOffered: Array.isArray(profile.servicesOffered) ? profile.servicesOffered : [],
     certifications: Array.isArray(profile.certifications) ? profile.certifications : [],
     ratings: typeof profile.ratings === 'number' ? profile.ratings : 0,
-    tags: Array.isArray(profile.tags) ? profile.tags : [],
-    yearsOfExperience: typeof profile.yearsOfExperience === 'number' ? profile.yearsOfExperience : 0,
-    professionalDescription: profile.professionalDescription || '',
-    lastUpdated: profile.lastUpdated || Timestamp.now()
+    yearsOfExperience: typeof profile.yearsOfExperience === 'number' ? profile.yearsOfExperience : undefined,
+    lastUpdated: profile.lastUpdated || null
   };
 }

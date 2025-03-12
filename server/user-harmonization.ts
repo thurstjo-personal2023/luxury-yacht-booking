@@ -5,16 +5,14 @@
  * and the role-specific profile collections (user_profiles_tourist and user_profiles_service_provider).
  */
 
-import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from './firebase-admin';
+import * as admin from 'firebase-admin/firestore';
 import { 
   HarmonizedUser, 
   TouristProfile, 
   ServiceProviderProfile,
-  ServerTimestamp,
-  normalizeConsumerProfile,
-  normalizeServiceProviderProfile
-} from '../shared/harmonized-user-schema';
+  ServerTimestamp
+} from '@shared/harmonized-user-schema';
 
 /**
  * Sync a user's core data with their role-specific profile
@@ -25,16 +23,14 @@ import {
  */
 export async function syncUserData(userId: string): Promise<void> {
   try {
-    // Get the user document from harmonized_users
-    const userRef = adminDb.collection('harmonized_users').doc(userId);
-    const userSnapshot = await userRef.get();
+    const userDoc = await adminDb.collection('harmonized_users').doc(userId).get();
     
-    if (!userSnapshot.exists) {
+    if (!userDoc.exists) {
       console.error(`Cannot sync user data: User ${userId} not found in harmonized_users`);
       return;
     }
     
-    const userData = userSnapshot.data() as HarmonizedUser;
+    const userData = userDoc.data() as HarmonizedUser;
     
     // Sync based on user role
     if (userData.role === 'consumer') {
@@ -42,17 +38,8 @@ export async function syncUserData(userId: string): Promise<void> {
     } else if (userData.role === 'producer' || userData.role === 'partner') {
       await syncProducerProfile(userId, userData);
     }
-    
-    // Mark as synchronized in harmonized_users
-    await userRef.update({
-      _standardized: true,
-      _standardizedVersion: 1,
-      updatedAt: FieldValue.serverTimestamp() as ServerTimestamp
-    });
-    
-    console.log(`Successfully synchronized user data for ${userId}`);
   } catch (error) {
-    console.error('Error synchronizing user data:', error);
+    console.error('Error syncing user data:', error);
     throw error;
   }
 }
@@ -61,33 +48,22 @@ export async function syncUserData(userId: string): Promise<void> {
  * Sync consumer-specific profile data
  */
 async function syncConsumerProfile(userId: string, userData: HarmonizedUser): Promise<void> {
-  const touristProfileRef = adminDb.collection('user_profiles_tourist').doc(userId);
-  const profileSnapshot = await touristProfileRef.get();
-  
-  // If profile exists, update it with core data
-  if (profileSnapshot.exists) {
-    const profileData = profileSnapshot.data() as TouristProfile;
+  try {
+    const touristDoc = await adminDb.collection('user_profiles_tourist').doc(userId).get();
     
-    await touristProfileRef.update({
-      id: userId, // Ensure ID matches
-      lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
-    });
-    
-    console.log(`Updated existing tourist profile for ${userId}`);
-  } else {
-    // Create new profile if it doesn't exist
-    await touristProfileRef.set({
-      id: userId,
-      profilePhoto: '',
-      loyaltyTier: 'Bronze',
-      preferences: [],
-      wishlist: [],
-      bookingHistory: [],
-      reviewsProvided: [],
-      lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
-    });
-    
-    console.log(`Created new tourist profile for ${userId}`);
+    if (!touristDoc.exists) {
+      // Create profile if it doesn't exist
+      await adminDb.collection('user_profiles_tourist').doc(userId).set({
+        id: userId,
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        preferences: [],
+        wishlist: [],
+        bookingHistory: []
+      });
+    }
+  } catch (error) {
+    console.error('Error syncing consumer profile:', error);
+    throw error;
   }
 }
 
@@ -95,34 +71,24 @@ async function syncConsumerProfile(userId: string, userData: HarmonizedUser): Pr
  * Sync producer/partner-specific profile data
  */
 async function syncProducerProfile(userId: string, userData: HarmonizedUser): Promise<void> {
-  const providerProfileRef = adminDb.collection('user_profiles_service_provider').doc(userId);
-  const profileSnapshot = await providerProfileRef.get();
-  
-  // If profile exists, update it with core data
-  if (profileSnapshot.exists) {
-    const profileData = profileSnapshot.data() as ServiceProviderProfile;
+  try {
+    const providerDoc = await adminDb.collection('user_profiles_service_provider').doc(userId).get();
     
-    await providerProfileRef.update({
-      providerId: userId, // Ensure ID matches
-      lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
-    });
-    
-    console.log(`Updated existing service provider profile for ${userId}`);
-  } else {
-    // Create new profile if it doesn't exist
-    await providerProfileRef.set({
-      providerId: userId,
-      businessName: userData.name || '',
-      contactInformation: {
-        address: ''
-      },
-      servicesOffered: [],
-      profilePhoto: '',
-      ratings: 0,
-      lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
-    });
-    
-    console.log(`Created new service provider profile for ${userId}`);
+    if (!providerDoc.exists) {
+      // Create profile if it doesn't exist
+      await adminDb.collection('user_profiles_service_provider').doc(userId).set({
+        providerId: userId,
+        businessName: userData.name,
+        contactInformation: {
+          address: ''
+        },
+        servicesOffered: [],
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+  } catch (error) {
+    console.error('Error syncing producer profile:', error);
+    throw error;
   }
 }
 
@@ -136,75 +102,41 @@ async function syncProducerProfile(userId: string, userData: HarmonizedUser): Pr
  */
 export async function createOrUpdateHarmonizedUser(
   userData: HarmonizedUser,
-  profileData?: TouristProfile | ServiceProviderProfile
+  profileData?: {
+    touristProfile?: TouristProfile;
+    serviceProviderProfile?: ServiceProviderProfile;
+  }
 ): Promise<string> {
   try {
     const userId = userData.id;
     
-    // Ensure required fields
-    userData.userId = userId; // Ensure userId is always set
+    // Create/update core user data in harmonized_users
+    await adminDb.collection('harmonized_users').doc(userId).set(userData, { merge: true });
     
-    // Set timestamps if creating new user
-    if (!userData.createdAt) {
-      userData.createdAt = FieldValue.serverTimestamp() as ServerTimestamp;
-    }
-    
-    // Always update the updatedAt timestamp
-    userData.updatedAt = FieldValue.serverTimestamp() as ServerTimestamp;
-    
-    // Set standardization flags
-    userData._standardized = true;
-    userData._standardizedVersion = 1;
-    
-    // Update or create the core user document
-    const userRef = adminDb.collection('harmonized_users').doc(userId);
-    const userDoc = await userRef.get();
-    
-    if (userDoc.exists) {
-      // Update existing user
-      await userRef.update(userData);
-    } else {
-      // Create new user
-      await userRef.set(userData);
-    }
-    
-    // Handle role-specific profile if provided
-    if (profileData) {
-      if (userData.role === 'consumer' && 'id' in profileData) {
-        const touristProfile = profileData as TouristProfile;
-        const touristProfileRef = adminDb.collection('user_profiles_tourist').doc(userId);
-        
-        // Ensure ID matches
-        touristProfile.id = userId;
-        touristProfile.lastUpdated = FieldValue.serverTimestamp() as ServerTimestamp;
-        
-        if ((await touristProfileRef.get()).exists) {
-          await touristProfileRef.update(touristProfile);
-        } else {
-          await touristProfileRef.set(touristProfile);
-        }
-      } else if ((userData.role === 'producer' || userData.role === 'partner') && 'providerId' in profileData) {
-        const providerProfile = profileData as ServiceProviderProfile;
-        const providerProfileRef = adminDb.collection('user_profiles_service_provider').doc(userId);
-        
-        // Ensure providerId matches
-        providerProfile.providerId = userId;
-        providerProfile.lastUpdated = FieldValue.serverTimestamp() as ServerTimestamp;
-        
-        if ((await providerProfileRef.get()).exists) {
-          await providerProfileRef.update(providerProfile);
-        } else {
-          await providerProfileRef.set(providerProfile);
-        }
-      }
-    } else {
-      // If profile not provided, sync to ensure consistency
-      await syncUserData(userId);
+    // Create/update role-specific profile
+    if (userData.role === 'consumer' && profileData?.touristProfile) {
+      await adminDb.collection('user_profiles_tourist').doc(userId).set(
+        {
+          ...profileData.touristProfile,
+          id: userId, // Ensure ID is set correctly
+          lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+        }, 
+        { merge: true }
+      );
+    } else if ((userData.role === 'producer' || userData.role === 'partner') && profileData?.serviceProviderProfile) {
+      await adminDb.collection('user_profiles_service_provider').doc(userId).set(
+        {
+          ...profileData.serviceProviderProfile,
+          providerId: userId, // Ensure provider ID is set correctly
+          lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+        }, 
+        { merge: true }
+      );
     }
     
     return userId;
   } catch (error) {
-    console.error('Error creating or updating harmonized user:', error);
+    console.error('Error creating/updating harmonized user:', error);
     throw error;
   }
 }
@@ -217,43 +149,45 @@ export async function createOrUpdateHarmonizedUser(
  */
 export async function getCompleteUserProfile(userId: string): Promise<{
   core: HarmonizedUser;
-  profile: TouristProfile | ServiceProviderProfile | null;
+  touristProfile?: TouristProfile;
+  serviceProviderProfile?: ServiceProviderProfile;
 } | null> {
   try {
     // Get core user data
-    const userRef = adminDb.collection('harmonized_users').doc(userId);
-    const userDoc = await userRef.get();
+    const userDoc = await adminDb.collection('harmonized_users').doc(userId).get();
     
     if (!userDoc.exists) {
+      console.error(`User ${userId} not found in harmonized_users`);
       return null;
     }
     
     const userData = userDoc.data() as HarmonizedUser;
-    let profileData: TouristProfile | ServiceProviderProfile | null = null;
+    const result: {
+      core: HarmonizedUser;
+      touristProfile?: TouristProfile;
+      serviceProviderProfile?: ServiceProviderProfile;
+    } = {
+      core: userData
+    };
     
-    // Get role-specific profile
+    // Get role-specific profile data
     if (userData.role === 'consumer') {
-      const touristRef = adminDb.collection('user_profiles_tourist').doc(userId);
-      const touristDoc = await touristRef.get();
+      const touristDoc = await adminDb.collection('user_profiles_tourist').doc(userId).get();
       
       if (touristDoc.exists) {
-        profileData = touristDoc.data() as TouristProfile;
+        result.touristProfile = touristDoc.data() as TouristProfile;
       }
     } else if (userData.role === 'producer' || userData.role === 'partner') {
-      const providerRef = adminDb.collection('user_profiles_service_provider').doc(userId);
-      const providerDoc = await providerRef.get();
+      const providerDoc = await adminDb.collection('user_profiles_service_provider').doc(userId).get();
       
       if (providerDoc.exists) {
-        profileData = providerDoc.data() as ServiceProviderProfile;
+        result.serviceProviderProfile = providerDoc.data() as ServiceProviderProfile;
       }
     }
     
-    return {
-      core: userData,
-      profile: profileData
-    };
+    return result;
   } catch (error) {
-    console.error('Error retrieving complete user profile:', error);
+    console.error('Error getting complete user profile:', error);
     throw error;
   }
 }
@@ -266,55 +200,56 @@ export async function getCompleteUserProfile(userId: string): Promise<{
  */
 export async function migrateLegacyUser(legacyUser: any): Promise<string> {
   try {
+    if (!legacyUser.id) {
+      throw new Error('Legacy user data must have an ID');
+    }
+    
     // Extract core user data
-    const userId = legacyUser.id || legacyUser.userId || legacyUser.uid;
-    
-    if (!userId) {
-      throw new Error('Legacy user data missing ID field');
-    }
-    
-    // Determine user role
-    let role: 'consumer' | 'producer' | 'partner' = 'consumer';
-    
-    if (legacyUser.role) {
-      if (typeof legacyUser.role === 'string') {
-        role = legacyUser.role as any;
-      } else if (legacyUser.role.toLowerCase) {
-        role = legacyUser.role.toLowerCase() as any;
-      }
-    } else if (legacyUser.isProducer || legacyUser.isServiceProvider) {
-      role = 'producer';
-    } else if (legacyUser.isPartner) {
-      role = 'partner';
-    }
-    
-    // Create harmonized user
     const harmonizedUser: HarmonizedUser = {
-      id: userId,
-      userId: userId,
-      name: legacyUser.name || legacyUser.displayName || '',
+      id: legacyUser.id,
+      userId: legacyUser.id,
+      name: legacyUser.name || '',
       email: legacyUser.email || '',
-      phone: legacyUser.phoneNumber || legacyUser.phone || '',
-      role: role,
+      phone: legacyUser.phone || '',
+      role: legacyUser.role || 'consumer',
       emailVerified: legacyUser.emailVerified || false,
       points: legacyUser.points || 0,
-      createdAt: legacyUser.createdAt || legacyUser.createdDate || Timestamp.now(),
-      updatedAt: FieldValue.serverTimestamp() as ServerTimestamp,
+      createdAt: legacyUser.createdAt || admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp,
       _standardized: true,
       _standardizedVersion: 1
     };
     
-    // Create appropriate profile
-    let profileData: TouristProfile | ServiceProviderProfile | null = null;
-    
-    if (role === 'consumer') {
-      profileData = normalizeConsumerProfile(legacyUser);
+    // Create role-specific profile
+    if (harmonizedUser.role === 'consumer') {
+      // Extract tourist profile data
+      const touristProfile: TouristProfile = {
+        id: legacyUser.id,
+        profilePhoto: legacyUser.profilePhoto || '',
+        preferences: legacyUser.preferences || [],
+        wishlist: legacyUser.wishlist || [],
+        bookingHistory: legacyUser.bookingHistory || [],
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp
+      };
+      
+      await createOrUpdateHarmonizedUser(harmonizedUser, { touristProfile });
     } else {
-      profileData = normalizeServiceProviderProfile(legacyUser);
+      // Extract service provider profile data
+      const serviceProviderProfile: ServiceProviderProfile = {
+        providerId: legacyUser.id,
+        businessName: legacyUser.businessName || legacyUser.name || '',
+        contactInformation: {
+          address: legacyUser.address || '',
+        },
+        servicesOffered: legacyUser.servicesOffered || [],
+        certifications: legacyUser.certifications || [],
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp() as ServerTimestamp
+      };
+      
+      await createOrUpdateHarmonizedUser(harmonizedUser, { serviceProviderProfile });
     }
     
-    // Save both documents
-    return createOrUpdateHarmonizedUser(harmonizedUser, profileData);
+    return legacyUser.id;
   } catch (error) {
     console.error('Error migrating legacy user:', error);
     throw error;
@@ -328,18 +263,19 @@ export async function migrateLegacyUser(legacyUser: any): Promise<string> {
  */
 export async function batchSyncAllUsers(): Promise<number> {
   try {
-    const usersSnapshot = await adminDb.collection('harmonized_users').get();
+    const snapshot = await adminDb.collection('harmonized_users').get();
     let count = 0;
     
-    for (const doc of usersSnapshot.docs) {
-      await syncUserData(doc.id);
+    for (const doc of snapshot.docs) {
+      const userData = doc.data() as HarmonizedUser;
+      await syncUserData(userData.id);
       count++;
     }
     
-    console.log(`Batch synchronized ${count} users`);
+    console.log(`Successfully synchronized ${count} users`);
     return count;
   } catch (error) {
-    console.error('Error in batch user synchronization:', error);
+    console.error('Error batch synchronizing users:', error);
     throw error;
   }
 }
