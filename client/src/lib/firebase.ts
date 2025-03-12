@@ -129,6 +129,9 @@ console.log("Connecting to Firebase emulators...");
 // This will be used by the ConnectionStatus component to detect Firebase errors
 (window as any).__FIREBASE_ERRORS = [];
 
+// Store connection state to prevent duplicate connections
+let emulatorConnectionAttempted = false;
+
 // Function to connect to emulators with specified hosts
 const connectToEmulators = (hosts: { 
   firestore: string, 
@@ -137,6 +140,15 @@ const connectToEmulators = (hosts: {
   functions: string, 
   rtdb: string 
 }) => {
+  // Skip if connections were already attempted
+  if (emulatorConnectionAttempted) {
+    console.log("Emulator connections already attempted, skipping duplicate connection");
+    return true;
+  }
+
+  // Set flag to prevent future connection attempts
+  emulatorConnectionAttempted = true;
+  
   try {
     // Parse host and port from each setting
     const parseHostPort = (hostString: string) => {
@@ -158,7 +170,11 @@ const connectToEmulators = (hosts: {
       connectAuthEmulator(auth, `http://${authEmulator.host}:${authEmulator.port}`, { disableWarnings: true });
       console.log(`✓ Auth emulator connected at: http://${authEmulator.host}:${authEmulator.port}`);
     } catch (authError) {
-      console.warn(`Failed to connect to Auth emulator: ${authError}`);
+      if (authError instanceof Error && authError.message.includes('already')) {
+        console.log('Auth emulator already connected');
+      } else {
+        console.warn(`Failed to connect to Auth emulator: ${authError}`);
+      }
     }
 
     // Firestore Emulator
@@ -167,12 +183,16 @@ const connectToEmulators = (hosts: {
       connectFirestoreEmulator(db, firestore.host, firestore.port);
       console.log(`✓ Firestore emulator connected at: http://${firestore.host}:${firestore.port}`);
     } catch (firestoreError) {
-      console.warn(`Failed to connect to Firestore emulator: ${firestoreError}`);
-      // Add to global error collection
-      (window as any).__FIREBASE_ERRORS = [
-        ...(window as any).__FIREBASE_ERRORS || [],
-        firestoreError
-      ];
+      if (firestoreError instanceof Error && firestoreError.message.includes('already')) {
+        console.log('Firestore emulator already connected');
+      } else {
+        console.warn(`Failed to connect to Firestore emulator: ${firestoreError}`);
+        // Add to global error collection
+        (window as any).__FIREBASE_ERRORS = [
+          ...(window as any).__FIREBASE_ERRORS || [],
+          firestoreError
+        ];
+      }
     }
 
     // Storage Emulator
@@ -180,7 +200,11 @@ const connectToEmulators = (hosts: {
       connectStorageEmulator(storage, storageEmulator.host, storageEmulator.port);
       console.log(`✓ Storage emulator connected at: http://${storageEmulator.host}:${storageEmulator.port}`);
     } catch (storageError) {
-      console.warn(`Failed to connect to Storage emulator: ${storageError}`);
+      if (storageError instanceof Error && storageError.message.includes('already')) {
+        console.log('Storage emulator already connected');
+      } else {
+        console.warn(`Failed to connect to Storage emulator: ${storageError}`);
+      }
     }
 
     // Functions Emulator
@@ -188,20 +212,36 @@ const connectToEmulators = (hosts: {
       connectFunctionsEmulator(functions, functionsEmulator.host, functionsEmulator.port);
       console.log(`✓ Functions emulator connected at: http://${functionsEmulator.host}:${functionsEmulator.port}`);
     } catch (functionsError) {
-      console.warn(`Failed to connect to Functions emulator: ${functionsError}`);
+      if (functionsError instanceof Error && functionsError.message.includes('already')) {
+        console.log('Functions emulator already connected');
+      } else {
+        console.warn(`Failed to connect to Functions emulator: ${functionsError}`);
+      }
     }
 
-    // Realtime Database Emulator
+    // Realtime Database Emulator - connect only if not already initialized
     try {
-      connectDatabaseEmulator(rtdb, rtdbEmulator.host, rtdbEmulator.port);
-      console.log(`✓ Realtime Database emulator connected at: http://${rtdbEmulator.host}:${rtdbEmulator.port}`);
+      // We need to approach RTDB differently due to its initialization behavior
+      // @ts-ignore - Access internal property to check if emulator is already connected
+      const isRtdbAlreadyConnected = rtdb._delegate?._repo?.repoInfo?.namespace?.includes('emulator');
+      
+      if (!isRtdbAlreadyConnected) {
+        connectDatabaseEmulator(rtdb, rtdbEmulator.host, rtdbEmulator.port);
+        console.log(`✓ Realtime Database emulator connected at: http://${rtdbEmulator.host}:${rtdbEmulator.port}`);
+      } else {
+        console.log('Realtime Database emulator already connected');
+      }
     } catch (rtdbError) {
-      console.warn(`Failed to connect to RTDB emulator: ${rtdbError}`);
-      // Add to global error collection
-      (window as any).__FIREBASE_ERRORS = [
-        ...(window as any).__FIREBASE_ERRORS || [],
-        rtdbError
-      ];
+      if (rtdbError instanceof Error && rtdbError.message.includes('already')) {
+        console.log('Realtime Database emulator already connected');
+      } else {
+        console.warn(`Failed to connect to RTDB emulator: ${rtdbError}`);
+        // Add to global error collection
+        (window as any).__FIREBASE_ERRORS = [
+          ...(window as any).__FIREBASE_ERRORS || [],
+          rtdbError
+        ];
+      }
     }
 
     console.log("Firebase emulators connection attempt completed");

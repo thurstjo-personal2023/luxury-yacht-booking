@@ -147,13 +147,56 @@ function decodeJWT(token: string): any {
 export const verifyAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Unauthorized' });
+    console.log(`verifyAuth - Checking auth header for ${req.path}`);
+    
+    // Check for Authorization header
+    if (!authHeader) {
+      console.warn(`verifyAuth - No Authorization header found for ${req.path}`);
+      return res.status(401).json({ 
+        error: 'Unauthorized', 
+        details: 'Missing Authorization header',
+        path: req.path,
+        method: req.method
+      });
+    }
+    
+    // Check Bearer format
+    if (!authHeader.startsWith('Bearer ')) {
+      console.warn(`verifyAuth - Invalid Authorization format for ${req.path}: ${authHeader.substring(0, 15)}...`);
+      return res.status(401).json({ 
+        error: 'Unauthorized', 
+        details: 'Invalid Authorization format, expected: Bearer token',
+        path: req.path,
+        method: req.method
+      });
     }
 
     const token = authHeader.split('Bearer ')[1];
     
+    // Basic token validation check
+    if (!token || token.trim() === '') {
+      console.warn(`verifyAuth - Empty token for ${req.path}`);
+      return res.status(401).json({ 
+        error: 'Unauthorized', 
+        details: 'Empty token provided',
+        path: req.path,
+        method: req.method
+      });
+    }
+    
+    // Verify token length and format
+    if (token.length < 20 || token.split('.').length !== 3) {
+      console.warn(`verifyAuth - Invalid token format for ${req.path}: ${token.substring(0, 15)}...`);
+      return res.status(401).json({ 
+        error: 'Unauthorized', 
+        details: 'Invalid token format',
+        path: req.path,
+        method: req.method
+      });
+    }
+    
     try {
+      console.log(`verifyAuth - Verifying token for ${req.path} using Firebase Auth`);
       // Try to verify with Firebase Auth
       const decodedToken = await adminAuth.verifyIdToken(token);
       
@@ -161,36 +204,65 @@ export const verifyAuth = async (req: Request, res: Response, next: NextFunction
       const { uid, email, role = 'consumer', name, ...otherClaims } = decodedToken;
       req.user = { uid, email, role, name, ...otherClaims };
       
+      console.log(`verifyAuth - Successfully verified token for user ${uid} with role ${role}`);
       return next();
-    } catch (error) {
+    } catch (verifyError: any) {
       // If regular verification fails, try manual decode for emulator tokens
-      console.log('Standard token verification failed, trying manual decode');
+      console.warn(`verifyAuth - Standard verification failed for ${req.path}: ${verifyError.message}`);
       
-      const decodedPayload = decodeJWT(token);
-      if (decodedPayload && decodedPayload.user_id) {
-        console.log('Successfully decoded emulator token manually');
+      // Try manual decode as fallback for emulator tokens
+      try {
+        console.log(`verifyAuth - Attempting manual token decode for ${req.path}`);
+        const decodedPayload = decodeJWT(token);
         
-        // Extract user info
-        const { user_id, email, role = 'consumer', name = '', ...otherClaims } = decodedPayload;
+        if (decodedPayload && decodedPayload.user_id) {
+          console.log(`verifyAuth - Successfully decoded emulator token manually for ${req.path}`);
+          
+          // Extract user info
+          const { user_id, email, role = 'consumer', name = '', ...otherClaims } = decodedPayload;
+          
+          req.user = {
+            uid: user_id,
+            email: email || '',
+            role,
+            name,
+            ...otherClaims,
+            _emulatorVerified: true
+          };
+          
+          console.log(`verifyAuth - Manual verification successful for user ${user_id} with role ${role}`);
+          return next();
+        }
         
-        req.user = {
-          uid: user_id,
-          email: email || '',
-          role,
-          name,
-          ...otherClaims,
-          _emulatorVerified: true
-        };
-        
-        return next();
+        // Manual decode didn't have expected fields
+        console.error(`verifyAuth - Manual decode failed to extract user_id for ${req.path}`);
+        return res.status(401).json({ 
+          error: 'Invalid token', 
+          details: 'Token could not be verified and manual decode failed',
+          path: req.path,
+          method: req.method
+        });
+      } catch (decodeError) {
+        // Both verification methods failed
+        console.error(`verifyAuth - Both verification methods failed for ${req.path}`);
+        return res.status(401).json({ 
+          error: 'Invalid token', 
+          details: 'Token verification failed with both methods',
+          path: req.path,
+          method: req.method,
+          verifyError: verifyError.message,
+          decodeError: String(decodeError)
+        });
       }
-      
-      // Both verification methods failed
-      console.error('Auth verification failed');
-      return res.status(401).json({ error: 'Invalid token' });
     }
   } catch (error) {
-    console.error('Auth middleware error:', error);
-    return res.status(401).json({ error: 'Unauthorized' });
+    // Unexpected error in middleware
+    console.error(`verifyAuth - Unexpected error in auth middleware for ${req.path}:`, error);
+    return res.status(401).json({ 
+      error: 'Unauthorized', 
+      details: 'Unexpected error in auth verification',
+      path: req.path,
+      method: req.method
+    });
   }
 };
