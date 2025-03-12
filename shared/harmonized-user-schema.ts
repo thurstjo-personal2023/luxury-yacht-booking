@@ -97,7 +97,7 @@ export interface ServiceProviderProfile {
   verificationStatus?: 'verified' | 'pending' | 'unverified';
   
   // Timestamps
-  lastUpdated: Timestamp;        // Last profile update
+  lastUpdated: Timestamp | ServerTimestamp;        // Last profile update
 }
 
 /**

@@ -7,7 +7,7 @@
 import { Express, Request, Response } from "express";
 import { adminDb, verifyAuth } from "./firebase-admin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
-import { HarmonizedUser, TouristProfile, ServiceProviderProfile } from "../shared/harmonized-user-schema";
+import { HarmonizedUser, TouristProfile, ServiceProviderProfile, ServerTimestamp } from "../shared/harmonized-user-schema";
 
 /**
  * Register user profile routes
@@ -136,7 +136,7 @@ export function registerUserProfileRoutes(app: Express) {
       const { preferences, profilePhoto } = req.body;
       
       const profileData: Partial<TouristProfile> = {
-        lastUpdated: FieldValue.serverTimestamp()
+        lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
       };
 
       // Only set fields if they're provided
