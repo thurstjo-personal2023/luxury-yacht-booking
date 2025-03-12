@@ -31,8 +31,7 @@ const collections = {
   users: "harmonized_users", // Harmonized users collection
   
   // Yacht collections
-  unified_yacht_experiences: "unified_yacht_experiences", // New unified collection
-  yacht_experiences: "yacht_experiences",  // Legacy collection (for backward compatibility)
+  unified_yacht_experiences: "unified_yacht_experiences", // Only collection for yacht data
   
   // Other collections
   user_profiles_tourist: "user_profiles_tourist", // Legacy user collection
@@ -82,8 +81,7 @@ export const collectionRefs = {
   users: collection(db, collections.users), // Primary user collection (harmonized)
   
   // Yacht collections
-  unifiedYachts: collection(db, collections.unified_yacht_experiences), // Primary collection to use
-  yachtExperiences: collection(db, collections.yacht_experiences),      // Legacy collection
+  unifiedYachts: collection(db, collections.unified_yacht_experiences), // Only collection for yacht data
   
   // Other collections
   touristProfiles: collection(db, collections.user_profiles_tourist),
