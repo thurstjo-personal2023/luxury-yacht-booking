@@ -72,35 +72,9 @@ export default function YachtDetails() {
 
       setLoading(true);
       try {
-        // Try to fetch from the unified collection
-        let yachtDoc;
-        
-        // First try unified_yacht_experiences collection (preferred)
-        let yachtRef = doc(db, "unified_yacht_experiences", yachtId);
-        yachtDoc = await getDoc(yachtRef);
-        
-        // Legacy fallback: only if not found in unified collection
-        if (!yachtDoc.exists()) {
-          console.log(`Yacht not found in unified_yacht_experiences, trying legacy collections as fallback...`);
-          
-          // Try legacy yacht_experiences collection as fallback
-          yachtRef = doc(db, "yacht_experiences", yachtId);
-          yachtDoc = await getDoc(yachtRef);
-          
-          // If still not found, try legacy experience_packages collection as final fallback
-          if (!yachtDoc.exists()) {
-            console.log(`Yacht not found in yacht_experiences either, trying experience_packages as final fallback...`);
-            yachtRef = doc(db, "experience_packages", yachtId);
-            yachtDoc = await getDoc(yachtRef);
-          }
-        }
-        
-        // After trying all collections
-        if (!yachtDoc.exists()) {
-          console.log(`Yacht not found in experience_packages, trying unified_yacht_experiences...`);
-          yachtRef = doc(db, "unified_yacht_experiences", yachtId);
-          yachtDoc = await getDoc(yachtRef);
-        }
+        // Only use the unified collection
+        const yachtRef = doc(db, "unified_yacht_experiences", yachtId);
+        const yachtDoc = await getDoc(yachtRef);
 
         if (yachtDoc.exists()) {
           const yachtData = { id: yachtDoc.id, ...yachtDoc.data() } as YachtExperience;
@@ -135,16 +109,10 @@ export default function YachtDetails() {
 
           // Fetch related yachts
           try {
-            // Try to fetch related yachts from multiple collections to support the transition period
-            const collectionsToSearch = ["yacht_experiences", "experience_packages", "unified_yacht_experiences"];
+            // Only search for related yachts in the unified collection
             let foundRelatedYachts = false;
-            
-            // Try each collection until we find related yachts
-            for (const collectionName of collectionsToSearch) {
-              if (foundRelatedYachts) break; // Stop if we already found yachts
-              
-              console.log(`Searching for related yachts in ${collectionName} collection...`);
-              const experiencesRef = collection(db, collectionName);
+            console.log("Searching for related yachts in unified_yacht_experiences collection...");
+            const experiencesRef = collection(db, "unified_yacht_experiences");
               let relatedQuery;
 
               // First try to find yachts in the same category
@@ -186,7 +154,7 @@ export default function YachtDetails() {
                   })) as YachtExperience[];
                   setRelatedYachts(relatedYachtData);
                   foundRelatedYachts = true;
-                  console.log(`Found ${relatedYachtData.length} related yachts in ${collectionName}`);
+                  console.log(`Found ${relatedYachtData.length} related yachts in unified_yacht_experiences collection`);
                 }
               }
 
@@ -207,7 +175,7 @@ export default function YachtDetails() {
                   })) as YachtExperience[];
                   setRelatedYachts(randomYachtData);
                   foundRelatedYachts = true;
-                  console.log(`Found ${randomYachtData.length} random yachts in ${collectionName}`);
+                  console.log(`Found ${randomYachtData.length} random yachts in unified_yacht_experiences collection`);
                 }
               }
             }
