@@ -36,25 +36,29 @@ process.env.NODE_ENV = "development";
 // Note: In Replit, emulators must be running externally and accessible
 const useEmulators = true;
 if (useEmulators) {
-  // Set environment variables for Firebase emulators
-  // Use the user's actual external IP to connect to their local emulators
-  const emulatorIP = "[2001:8f8:1163:5b77:39c7:7461:9eac:f645]"; // IPv6 address needs to be enclosed in brackets
+  // For connecting to emulators via ngrok tunnels - PLACEHOLDER CONFIGURATION
+  // You'll need to update these with the actual URLs from running setup-local-ngrok.sh on your machine
+  // The URLs should be just the hostname without 'https://' prefix or port numbers
+  const firestoreNgrokUrl = "0.tcp.ngrok.io:15344";      // EXAMPLE only - Update with your actual URL
+  const authNgrokUrl = "0.tcp.ngrok.io:15344";           // EXAMPLE only - Update with your actual URL
+  const storageNgrokUrl = "0.tcp.ngrok.io:15344";        // EXAMPLE only - Update with your actual URL
   
-  process.env.FIREBASE_AUTH_EMULATOR_HOST = `${emulatorIP}:9099`;
-  process.env.FIREBASE_STORAGE_EMULATOR_HOST = `${emulatorIP}:9199`;
-  process.env.FIRESTORE_EMULATOR_HOST = `${emulatorIP}:8080`;
+  // Use ngrok URLs without 'https://' prefix for most environment variables
+  process.env.FIRESTORE_EMULATOR_HOST = `${firestoreNgrokUrl}`;
+  process.env.FIREBASE_AUTH_EMULATOR_HOST = `${authNgrokUrl}`;
+  process.env.FIREBASE_STORAGE_EMULATOR_HOST = `${storageNgrokUrl}`;
   
-  // Configure Firestore to use emulator with the external IP
+  // Configure Firestore to use the ngrok tunnel
   adminDb.settings({
-    host: `${emulatorIP}:8080`,
-    ssl: false,
+    host: `${firestoreNgrokUrl}`,
+    ssl: true, // Set to true for ngrok https URLs
     ignoreUndefinedProperties: true
   });
   
-  console.log("Firebase Admin configured to connect to external emulators:");
-  console.log(` - Firestore: ${emulatorIP}:8080`);
-  console.log(` - Auth: ${emulatorIP}:9099`);
-  console.log(` - Storage: ${emulatorIP}:9199`);
+  console.log("Firebase Admin configured to connect via ngrok tunnels:");
+  console.log(` - Firestore: ${firestoreNgrokUrl}`);
+  console.log(` - Auth: ${authNgrokUrl}`);
+  console.log(` - Storage: ${storageNgrokUrl}`);
   console.log("Environment variables set:");
   console.log(" - FIRESTORE_EMULATOR_HOST:", process.env.FIRESTORE_EMULATOR_HOST);
   console.log(" - FIREBASE_AUTH_EMULATOR_HOST:", process.env.FIREBASE_AUTH_EMULATOR_HOST);
@@ -75,7 +79,7 @@ setTimeout(async () => {
     // Log connection settings
     console.log("Current Firestore emulator connection settings:", {
       host: process.env.FIRESTORE_EMULATOR_HOST,
-      ssl: false,
+      ssl: true, // Should be true for ngrok https URLs
       ignoreUndefinedProperties: true
     });
     
