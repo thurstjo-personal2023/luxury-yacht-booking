@@ -5,7 +5,7 @@ import { Menu } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
-import { ConnectionStatus } from "@/components/ui/connection-status";
+import { EmulatorStatusDialog } from "@/components/ui/emulator-status-dialog";
 
 export function Navbar() {
   const { toast } = useToast();
@@ -57,7 +57,7 @@ export function Navbar() {
         {/* Desktop menu */}
         <div className="hidden lg:flex items-center gap-4">
           {/* Connection status indicator */}
-          <ConnectionStatus />
+          <EmulatorStatusDialog />
           
           {auth.currentUser ? (
             <>

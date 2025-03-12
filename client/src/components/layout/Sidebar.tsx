@@ -13,7 +13,7 @@ import {
 import { auth } from "@/lib/firebase";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
-import { ConnectionStatus } from "../ui/connection-status";
+import { EmulatorStatusDialog } from "../ui/emulator-status-dialog";
 
 export function Sidebar() {
   const [location, setLocation] = useLocation();
@@ -77,7 +77,7 @@ export function Sidebar() {
       
       {/* Footer with connection status */}
       <div className="p-4 border-t flex justify-center">
-        <ConnectionStatus />
+        <EmulatorStatusDialog />
       </div>
     </div>
   );
