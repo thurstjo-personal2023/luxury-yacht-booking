@@ -38,12 +38,12 @@ process.env.FIREBASE_AUTH_EMULATOR_HOST = `${ngrokHost}:9099`;
 process.env.FIREBASE_STORAGE_EMULATOR_HOST = `${ngrokHost}:9199`;
 
 // Configure Firestore with explicit settings
-// Use the ngrok URL with SSL since it's an HTTPS connection
+// Force IPv4 connection by using a specific format with the hostname
 adminDb.settings({
-  host: ngrokHost,
-  port: 8080,
+  host: `${ngrokHost}:8080`,
   ssl: true,
-  ignoreUndefinedProperties: true
+  ignoreUndefinedProperties: true,
+  preferRest: true // Try using REST API instead of gRPC
 });
 
 console.log("Firebase Admin configured for ngrok-tunneled emulator connection");
