@@ -7,16 +7,18 @@ import { Request, Response, NextFunction } from "express";
 // We are always in development mode
 process.env.NODE_ENV = "development";
 
-// IMPORTANT: Set environment variables BEFORE initializing Firebase
-// Use localhost for emulator connection, not ngrok (ngrok is for external clients)
-process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
-process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
-process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
+// Configure ngrok for emulator access
+// This is the domain provided by ngrok when you expose your local emulators
+const ngrokHost = "e5b9-2001-8f8-1163-5b77-39c7-7461-9eac-f645.ngrok-free.app";
 
-console.log("Setting up Firebase Admin with emulator environment:");
-console.log(`Firestore: ${process.env.FIRESTORE_EMULATOR_HOST}`);
-console.log(`Auth: ${process.env.FIREBASE_AUTH_EMULATOR_HOST}`);
-console.log(`Storage: ${process.env.FIREBASE_STORAGE_EMULATOR_HOST}`);
+// Don't set env variables since we're using explicit host settings
+// Instead, we'll configure the host settings directly
+
+console.log("=== Firebase Admin SDK Emulator Configuration ===");
+console.log(`Using ngrok host: ${ngrokHost}`);
+console.log(`Firestore: https://${ngrokHost}:8080`);
+console.log(`Auth: https://${ngrokHost}:9099`);
+console.log(`Storage: https://${ngrokHost}:9199`);
 
 // Initialize Firebase Admin for emulator
 // When using emulators, we only need a projectId
@@ -29,14 +31,22 @@ const adminAuth = getAuth(app);
 const adminDb = getFirestore(app);
 const adminStorage = getStorage(app);
 
+// Configure Auth service for emulator
+// This happens automatically through the FIREBASE_AUTH_EMULATOR_HOST env var
+// We'll set this programmatically 
+process.env.FIREBASE_AUTH_EMULATOR_HOST = `${ngrokHost}:9099`;
+process.env.FIREBASE_STORAGE_EMULATOR_HOST = `${ngrokHost}:9199`;
+
 // Configure Firestore with explicit settings
+// Use the ngrok URL with SSL since it's an HTTPS connection
 adminDb.settings({
-  host: process.env.FIRESTORE_EMULATOR_HOST,
-  ssl: false, // Important: no SSL for localhost
+  host: ngrokHost,
+  port: 8080,
+  ssl: true,
   ignoreUndefinedProperties: true
 });
 
-console.log("Firebase Admin configured for local emulator connection");
+console.log("Firebase Admin configured for ngrok-tunneled emulator connection");
 
 // Connection test (runs after 3 seconds)
 setTimeout(async () => {
