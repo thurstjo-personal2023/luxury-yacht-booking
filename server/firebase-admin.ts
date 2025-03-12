@@ -1,4 +1,4 @@
-import { initializeApp, cert } from "firebase-admin/app";
+import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
@@ -29,64 +29,100 @@ const adminAuth = getAuth(app);
 const adminDb = getFirestore(app);
 const adminStorage = getStorage(app);
 
-// Always connect to emulators in development mode
+// Set development mode
 process.env.NODE_ENV = "development"; 
 
-// Set environment variables for Firebase emulators with exact values provided
-process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
-process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
-
-// Configure Firestore to use emulator with exact host:port specification
-adminDb.settings({
-  host: "127.0.0.1:8080",
-  ssl: false,
-  ignoreUndefinedProperties: true
-});
-
-console.log("Firebase Admin configured to use external emulators:")
-console.log(" - Firestore: 127.0.0.1:8080")
-console.log(" - Auth: 127.0.0.1:9099")
-console.log(" - Storage: 127.0.0.1:9199");
+// Try to use emulators, but provide a fallback for direct Firestore access
+const useEmulators = false; // Set to false to bypass emulator connection and use direct Firebase access
+if (useEmulators) {
+  // Set environment variables for Firebase emulators
+  process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
+  process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
+  
+  // Configure Firestore to use emulator
+  adminDb.settings({
+    host: "127.0.0.1:8080",
+    ssl: false,
+    ignoreUndefinedProperties: true
+  });
+  
+  console.log("Firebase Admin configured to use emulators:");
+  console.log(" - Firestore: 127.0.0.1:8080");
+  console.log(" - Auth: 127.0.0.1:9099");
+  console.log(" - Storage: 127.0.0.1:9199");
+} else {
+  // Configure for direct Firestore access without emulators
+  adminDb.settings({
+    ignoreUndefinedProperties: true
+  });
+  
+  console.log("Firebase Admin configured for direct access (emulators disabled)");
+}
 
 // Debug connection
 setTimeout(async () => {
   try {
-    console.log("Testing connection to Firestore emulator...");
-    // Log Firestore connection settings without calling settings() again
-    console.log("Firestore emulator connection:", {
-      host: "127.0.0.1:8080", // Using our configured values 
-      ssl: false,
+    console.log("Testing connection to Firestore...");
+    // Log Firestore connection settings
+    console.log("Firestore connection settings:", {
+      useEmulators: useEmulators,
       ignoreUndefinedProperties: true
     });
     
     // Test query to verify connection
     const testDoc = await adminDb.collection('test').doc('test-connection').set({
       timestamp: Date.now(),
-      message: 'Testing Firestore emulator connection from Replit'
+      message: 'Testing Firestore connection from Replit'
     });
-    console.log("✓ Successfully connected to Firestore emulator");
+    console.log("✓ Successfully connected to Firestore");
     
-    // Now try to read from the unified_yacht_experiences collection
+    // Now try to read from collections
     try {
+      // Try unified_yacht_experiences
       console.log("Testing read from unified_yacht_experiences collection...");
-      const snapshot = await adminDb.collection('unified_yacht_experiences').limit(1).get();
-      console.log(`✓ Successfully read from unified_yacht_experiences, found ${snapshot.size} documents`);
+      const yachtSnapshot = await adminDb.collection('unified_yacht_experiences').limit(1).get();
+      console.log(`✓ Read from unified_yacht_experiences, found ${yachtSnapshot.size} documents`);
+      
+      // Try users collection or harmonized_users
+      console.log("Testing read from harmonized_users collection...");
+      const usersSnapshot = await adminDb.collection('harmonized_users').limit(1).get();
+      console.log(`✓ Read from harmonized_users, found ${usersSnapshot.size} documents`);
       
       // Additional diagnostic info
       console.log("Environment variables:");
       console.log("- NODE_ENV:", process.env.NODE_ENV);
-      console.log("- FIREBASE_AUTH_EMULATOR_HOST:", process.env.FIREBASE_AUTH_EMULATOR_HOST);
-      console.log("- FIREBASE_STORAGE_EMULATOR_HOST:", process.env.FIREBASE_STORAGE_EMULATOR_HOST);
-      console.log("isEmulatorMode():", isEmulatorMode());
+      console.log("- isEmulatorMode():", isEmulatorMode());
     } catch (readError: any) {
-      console.error("❌ Failed to read from unified_yacht_experiences:", readError.message);
+      console.error("❌ Failed to read from collections:", readError.message);
+      // See if we can create some test data for this run
+      try {
+        console.log("Creating test user data...");
+        const testUserId = "test-user-" + Date.now();
+        await adminDb.collection('harmonized_users').doc(testUserId).set({
+          id: testUserId,
+          userId: testUserId,
+          name: "Test User",
+          email: "test@example.com",
+          phone: "555-1234",
+          role: "consumer",
+          emailVerified: false,
+          points: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          _standardized: true,
+          _standardizedVersion: 1
+        });
+        console.log("✓ Successfully created test user data");
+      } catch (createError: any) {
+        console.error("❌ Failed to create test data:", createError.message);
+      }
     }
   } catch (error: any) {
-    console.error("❌ Failed to connect to Firestore emulator:", error.message);
+    console.error("❌ Failed to connect to Firestore:", error.message);
     // Safe error logging
     if (error && typeof error === 'object') {
       console.error("Error code:", error.code);
-      console.error("Error message:", error.message);
+      console.error("Error details:", error.details || "No details available");
     }
   }
 }, 3000);
