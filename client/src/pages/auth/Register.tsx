@@ -82,7 +82,13 @@ export default function Register() {
   });
 
   // Get user authentication context
-  const { register, login, signOut } = useAuth();
+  const auth = useAuth();
+  
+  // Log the auth context to check if it's properly loaded
+  console.log("Auth context in Register component:", auth);
+  
+  // Destructure methods from auth context
+  const { register, login, signOut } = auth;
 
   const onSubmit = async (data: RegisterForm) => {
     try {
