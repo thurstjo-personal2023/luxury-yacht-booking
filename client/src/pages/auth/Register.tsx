@@ -19,8 +19,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Loader2 } from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
+import { AlertCircle } from "lucide-react";
+import { auth } from "@/lib/firebase";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 
 /**
  * User role enum for registration
@@ -30,9 +31,6 @@ enum UserRole {
   PRODUCER = "producer",
   PARTNER = "partner"
 }
-
-// Type for user roles
-type UserRoleType = 'consumer' | 'producer' | 'partner';
 
 // Enhanced password validation
 const passwordSchema = z
@@ -81,14 +79,50 @@ export default function Register() {
     },
   });
 
-  // Get user authentication context
-  const auth = useAuth();
-  
-  // Log the auth context to check if it's properly loaded
-  console.log("Auth context in Register component:", auth);
-  
-  // Destructure methods from auth context
-  const { register, login, signOut } = auth;
+  // Function to update profile data once user is created
+  const updateProfileDetails = async (token: string, data: RegisterForm, roleValue: string) => {
+    try {
+      const updateEndpoint = data.role === UserRole.CONSUMER
+        ? '/api/user/update-tourist-profile'
+        : '/api/user/update-provider-profile';
+      
+      const phoneNumber = data.phone;
+      
+      const updateData = data.role === UserRole.CONSUMER
+        ? {
+            preferences: [],
+            loyaltyTier: 'Bronze',
+            phoneNumber: phoneNumber
+          }
+        : {
+            businessName: `${data.firstName} ${data.lastName}'s Business`,
+            servicesOffered: [],
+            contactInformation: {
+              address: '',
+              phone: phoneNumber
+            }
+          };
+      
+      const updateResponse = await fetch(updateEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updateData)
+      });
+      
+      if (!updateResponse.ok) {
+        console.warn(`Profile update warning: ${updateResponse.status} ${updateResponse.statusText}`);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating profile details:', error);
+      return false;
+    }
+  };
 
   const onSubmit = async (data: RegisterForm) => {
     try {
@@ -97,124 +131,86 @@ export default function Register() {
 
       console.log("Registering user with Firebase Auth and creating profile in Production Firestore...");
       
-      // Use the register function from auth context which creates user in Production
-      console.log(`Registering with role: ${data.role}`);
-      
       // Convert role enum to string value to match what the server expects
       const roleValue = data.role === UserRole.CONSUMER ? 'consumer' :
                         data.role === UserRole.PRODUCER ? 'producer' : 
                         'partner';
-                        
-      // Register the user with Firebase Auth
-      console.log('Registering user with Firebase Auth');
-      await register(
+      
+      const fullName = `${data.firstName} ${data.lastName}`;
+                    
+      // Register the user with Firebase Auth directly (no context dependency)
+      console.log('Registering user with Firebase Auth directly');
+      
+      // Step 1: Create the user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
         data.email, 
-        data.password, 
-        `${data.firstName} ${data.lastName}`, 
-        roleValue
+        data.password
       );
       
-      // After registration, ensure profile is created properly in Production Firestore
-      console.log('Ensuring user profile is properly saved to Production Firestore');
+      const user = userCredential.user;
+      console.log('User created successfully in Firebase Auth');
       
-      // Store phone number for later profile update
-      localStorage.setItem('registrationPhone', data.phone);
+      // Step 2: Update the user's display name
+      await updateProfile(user, { displayName: fullName });
+      console.log('User profile display name updated');
       
-      // Wait for auth state change and token to be available before proceeding
-      console.log("Waiting for auth token to be available...");
+      // Step 3: Get a fresh auth token for API requests
+      const token = await user.getIdToken(true);
+      localStorage.setItem('authToken', token);
+      console.log('Fresh auth token obtained and stored');
       
-      // Wait for up to 5 seconds for the token to become available
-      const tokenWaitStart = Date.now();
-      let tokenFromStorage = null;
+      // Step 4: Create the user profile in Firestore via the API
+      console.log('Creating user profile in Firestore via API');
       
-      while (Date.now() - tokenWaitStart < 5000) {
-        tokenFromStorage = localStorage.getItem('authToken');
-        if (tokenFromStorage) break;
-        // Short delay to prevent tight loop
-        await new Promise(r => setTimeout(r, 200));
+      const createProfileResponse = await fetch('/api/user/create-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: fullName,
+          email: data.email,
+          role: roleValue,
+          phone: data.phone
+        })
+      });
+      
+      if (!createProfileResponse.ok) {
+        throw new Error(`Failed to create user profile: ${createProfileResponse.status} ${createProfileResponse.statusText}`);
       }
       
-      if (!tokenFromStorage) {
-        console.warn("No auth token found after registration, continuing with API calls anyway");
-      } else {
-        console.log("Auth token found, proceeding with profile updates");
-      }
+      console.log('User profile created successfully in Firestore');
       
-      // Additional profile data update
-      try {
-        console.log("Updating additional profile fields...");
-        
-        // Make an API call to update additional profile data
-        // This ensures all data is saved through the server to Production
-        const updateEndpoint = data.role === UserRole.CONSUMER
-          ? '/api/user/update-tourist-profile'
-          : '/api/user/update-provider-profile';
-          
-        // Get phone from form
-        const phoneNumber = data.phone;
-        
-        const updateData = data.role === UserRole.CONSUMER
-          ? {
-              // Tourist profile additional fields
-              preferences: [],
-              loyaltyTier: 'Bronze',
-              phoneNumber: phoneNumber
-            }
-          : {
-              // Producer/Partner profile additional fields
-              businessName: `${data.firstName} ${data.lastName}'s Business`,
-              servicesOffered: [],
-              contactInformation: {
-                address: '',
-                phone: phoneNumber
-              }
-            };
-        
-        const updateResponse = await fetch(updateEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${tokenFromStorage}`
-          },
-          body: JSON.stringify(updateData)
-        });
-        
-        if (!updateResponse.ok) {
-          console.warn(`Profile update warning: ${updateResponse.status} ${updateResponse.statusText}`);
-          // Continue even if this fails - core profile is already created
-        }
-        
-        toast({
-          title: "Registration successful!",
-          description: "Welcome to Etoile Yachts. Your profile has been saved to our secure database.",
-          duration: 5000,
-        });
-
-        // Role-based redirection
-        const dashboardRoutes = {
-          [UserRole.CONSUMER]: "/dashboard/consumer",
-          [UserRole.PRODUCER]: "/dashboard/producer",
-          [UserRole.PARTNER]: "/dashboard/partner",
-        };
-        setLocation(dashboardRoutes[data.role]);
-      } catch (updateError) {
-        console.error("Error updating additional profile fields:", updateError);
-        // Continue even if this fails - core profile is already created
+      // Update additional profile details
+      const profileUpdateSuccess = await updateProfileDetails(token, data, roleValue);
+      
+      if (!profileUpdateSuccess) {
+        console.warn("Failed to update additional profile details, but user account was created");
         
         toast({
           title: "Registration successful!",
           description: "Your account was created, but we couldn't update all profile details. You can update them later.",
           duration: 5000,
         });
+      } else {
+        console.log("Successfully updated profile details");
         
-        // Role-based redirection despite error
-        const dashboardRoutes = {
-          [UserRole.CONSUMER]: "/dashboard/consumer",
-          [UserRole.PRODUCER]: "/dashboard/producer",
-          [UserRole.PARTNER]: "/dashboard/partner",
-        };
-        setLocation(dashboardRoutes[data.role]);
+        toast({
+          title: "Registration successful!",
+          description: "Welcome to Etoile Yachts. Your profile has been saved to our secure database.",
+          duration: 5000,
+        });
       }
+
+      // Role-based redirection
+      const dashboardRoutes = {
+        [UserRole.CONSUMER]: "/dashboard/consumer",
+        [UserRole.PRODUCER]: "/dashboard/producer",
+        [UserRole.PARTNER]: "/dashboard/partner",
+      };
+      setLocation(dashboardRoutes[data.role]);
     } catch (error: any) {
       setError(error.message);
       toast({
