@@ -17,14 +17,10 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { registerWithEmail } from "@/lib/firebase";
 import { Link } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
-import { db } from "@/lib/firebase";
-import { doc, setDoc, Timestamp } from "firebase/firestore";
-import { Loader2 } from "lucide-react";
-import { collectionRefs } from "@/lib/firestore-init";
+import { AlertCircle, Loader2 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 /**
  * User role enum for registration
@@ -85,80 +81,72 @@ export default function Register() {
     },
   });
 
+  const { register } = useAuth();
+
   const onSubmit = async (data: RegisterForm) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Register with Firebase Auth
-      const { user } = await registerWithEmail(data.email, data.password);
-
+      console.log("Registering user with Firebase Auth and creating profile in Production Firestore...");
+      
+      // Use the register function from auth context which creates user in Production
+      await register(
+        data.email, 
+        data.password, 
+        `${data.firstName} ${data.lastName}`, 
+        data.role.toLowerCase()
+      );
+      
+      // Get fresh ID token for subsequent API requests
+      const tokenFromStorage = localStorage.getItem('authToken');
+      
+      if (!tokenFromStorage) {
+        console.warn("No auth token found after registration");
+      }
+      
+      // Additional profile data update
       try {
-        console.log("Creating harmonized user profile in Firestore...");
+        console.log("Updating additional profile fields...");
         
-        const timestamp = Timestamp.now();
+        // Make an API call to update additional profile data
+        // This ensures all data is saved through the server to Production
+        const updateEndpoint = data.role === UserRole.CONSUMER
+          ? '/api/user/update-tourist-profile'
+          : '/api/user/update-provider-profile';
+          
+        const updateData = data.role === UserRole.CONSUMER
+          ? {
+              // Tourist profile additional fields
+              preferences: [],
+              loyaltyTier: 'Bronze'
+            }
+          : {
+              // Producer/Partner profile additional fields
+              businessName: `${data.firstName} ${data.lastName}'s Business`,
+              servicesOffered: [],
+              contactInformation: {
+                address: ''
+              }
+            };
         
-        // Create harmonized user data (core user data)
-        const harmonizedUserData = {
-          id: user.uid,
-          userId: user.uid,
-          name: `${data.firstName} ${data.lastName}`,
-          email: data.email,
-          phone: data.phone,
-          role: data.role.toLowerCase() as UserRoleType,
-          emailVerified: false,
-          points: 0,
-          createdAt: timestamp,
-          updatedAt: timestamp,
-          _standardized: true,
-          _standardizedVersion: 1
-        };
+        const updateResponse = await fetch(updateEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${tokenFromStorage}`
+          },
+          body: JSON.stringify(updateData)
+        });
         
-        // Create profile based on the selected role
-        if (data.role === UserRole.CONSUMER) {
-          // Create a tourist profile
-          const touristProfile = {
-            id: user.uid,
-            profilePhoto: '',
-            loyaltyTier: 'Bronze',
-            preferences: [],
-            wishlist: [],
-            bookingHistory: [],
-            reviewsProvided: [],
-            lastUpdated: timestamp
-          };
-          
-          // Create records in both collections
-          await setDoc(doc(db, 'harmonized_users', user.uid), harmonizedUserData);
-          await setDoc(doc(db, 'user_profiles_tourist', user.uid), touristProfile);
-          
-          console.log("Consumer user created with tourist profile");
-        } else {
-          // Create a service provider profile for producer or partner
-          const serviceProviderProfile = {
-            providerId: user.uid,
-            businessName: `${data.firstName} ${data.lastName}'s Business`, // Default business name
-            contactInformation: {
-              address: ''
-            },
-            profilePhoto: '',
-            servicesOffered: [],
-            certifications: [],
-            ratings: 0,
-            tags: [],
-            lastUpdated: timestamp
-          };
-          
-          // Create records in both collections
-          await setDoc(doc(db, 'harmonized_users', user.uid), harmonizedUserData);
-          await setDoc(doc(db, 'user_profiles_service_provider', user.uid), serviceProviderProfile);
-          
-          console.log(`${data.role} user created with service provider profile`);
+        if (!updateResponse.ok) {
+          console.warn(`Profile update warning: ${updateResponse.status} ${updateResponse.statusText}`);
+          // Continue even if this fails - core profile is already created
         }
-
+        
         toast({
           title: "Registration successful!",
-          description: "Welcome to Etoile Yachts. Please check your email for verification instructions.",
+          description: "Welcome to Etoile Yachts. Your profile has been saved to our secure database.",
           duration: 5000,
         });
 
@@ -169,22 +157,29 @@ export default function Register() {
           [UserRole.PARTNER]: "/dashboard/partner",
         };
         setLocation(dashboardRoutes[data.role]);
-      } catch (firestoreError: any) {
-        console.error("Firestore Error:", firestoreError);
-        console.error("Error code:", firestoreError.code);
-        console.error("Error message:", firestoreError.message);
-
-        // If Firestore fails, delete the auth user to maintain consistency
-        await user.delete();
-        throw new Error(
-          `Failed to create user profile: ${firestoreError.message}. Please try again.`
-        );
+      } catch (updateError) {
+        console.error("Error updating additional profile fields:", updateError);
+        // Continue even if this fails - core profile is already created
+        
+        toast({
+          title: "Registration successful!",
+          description: "Your account was created, but we couldn't update all profile details. You can update them later.",
+          duration: 5000,
+        });
+        
+        // Role-based redirection despite error
+        const dashboardRoutes = {
+          [UserRole.CONSUMER]: "/dashboard/consumer",
+          [UserRole.PRODUCER]: "/dashboard/producer",
+          [UserRole.PARTNER]: "/dashboard/partner",
+        };
+        setLocation(dashboardRoutes[data.role]);
       }
     } catch (error: any) {
       setError(error.message);
       toast({
         title: "Registration failed",
-        description: error.message,
+        description: error.message || "Failed to create account. Please try again.",
         variant: "destructive",
         duration: 4000,
       });
