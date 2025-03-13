@@ -92,21 +92,41 @@ export default function Register() {
       console.log("Registering user with Firebase Auth and creating profile in Production Firestore...");
       
       // Use the register function from auth context which creates user in Production
+      console.log(`Registering with role: ${data.role}`);
+      
+      // Convert role enum to string value to match what the server expects
+      const roleValue = data.role === UserRole.CONSUMER ? 'consumer' :
+                        data.role === UserRole.PRODUCER ? 'producer' : 
+                        'partner';
+                        
       await auth.register(
         data.email, 
         data.password, 
         `${data.firstName} ${data.lastName}`, 
-        data.role.toLowerCase()
+        roleValue
       );
       
       // Store phone number for later profile update
       localStorage.setItem('registrationPhone', data.phone);
       
-      // Get fresh ID token for subsequent API requests
-      const tokenFromStorage = localStorage.getItem('authToken');
+      // Wait for auth state change and token to be available before proceeding
+      console.log("Waiting for auth token to be available...");
+      
+      // Wait for up to 5 seconds for the token to become available
+      const tokenWaitStart = Date.now();
+      let tokenFromStorage = null;
+      
+      while (Date.now() - tokenWaitStart < 5000) {
+        tokenFromStorage = localStorage.getItem('authToken');
+        if (tokenFromStorage) break;
+        // Short delay to prevent tight loop
+        await new Promise(r => setTimeout(r, 200));
+      }
       
       if (!tokenFromStorage) {
-        console.warn("No auth token found after registration");
+        console.warn("No auth token found after registration, continuing with API calls anyway");
+      } else {
+        console.log("Auth token found, proceeding with profile updates");
       }
       
       // Additional profile data update
