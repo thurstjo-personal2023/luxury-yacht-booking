@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase-admin/app';
+import { initializeApp, cert, ServiceAccount, App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
@@ -6,58 +6,104 @@ import { Request, Response, NextFunction } from "express";
 import * as fs from 'fs';
 import * as path from 'path';
 
-// We are always in development mode
-process.env.NODE_ENV = "development";
+// Import environment configuration
+import { USE_FIREBASE_EMULATORS, FIREBASE_PROJECT_ID, EMULATOR_HOSTS } from './env-config';
 
-// Check if emulator environment variables are already set (from environment or local file)
-let firestoreEmulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
-let authEmulatorHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
-let storageEmulatorHost = process.env.FIREBASE_STORAGE_EMULATOR_HOST;
+// Initialize app variable at module scope so it can be used throughout the file
+let app: App;
 
-// Try to read emulator host from local file if not set in environment
-if (!firestoreEmulatorHost) {
-  try {
-    const localHostFilePath = path.join(process.cwd(), 'localhost-run-host.txt');
-    if (fs.existsSync(localHostFilePath)) {
-      const host = fs.readFileSync(localHostFilePath, 'utf8').trim();
-      if (host) {
-        firestoreEmulatorHost = `${host}:8080`;
-        authEmulatorHost = `${host}:9099`;
-        storageEmulatorHost = `${host}:9199`;
-        
-        // Set the environment variables
-        process.env.FIRESTORE_EMULATOR_HOST = firestoreEmulatorHost;
-        process.env.FIREBASE_AUTH_EMULATOR_HOST = authEmulatorHost;
-        process.env.FIREBASE_STORAGE_EMULATOR_HOST = storageEmulatorHost;
+let firestoreEmulatorHost: string | undefined;
+let authEmulatorHost: string | undefined;
+let storageEmulatorHost: string | undefined;
+
+// Determine if we should use emulators or production Firebase
+if (USE_FIREBASE_EMULATORS) {
+  console.log("=== DEVELOPMENT MODE: Using Firebase Emulators ===");
+  
+  // Check if emulator environment variables are already set (from environment or local file)
+  firestoreEmulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
+  authEmulatorHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+  storageEmulatorHost = process.env.FIREBASE_STORAGE_EMULATOR_HOST;
+
+  // Try to read emulator host from local file if not set in environment
+  if (!firestoreEmulatorHost) {
+    try {
+      const localHostFilePath = path.join(process.cwd(), 'localhost-run-host.txt');
+      if (fs.existsSync(localHostFilePath)) {
+        const host = fs.readFileSync(localHostFilePath, 'utf8').trim();
+        if (host) {
+          firestoreEmulatorHost = `${host}:8080`;
+          authEmulatorHost = `${host}:9099`;
+          storageEmulatorHost = `${host}:9199`;
+          
+          // Set the environment variables
+          process.env.FIRESTORE_EMULATOR_HOST = firestoreEmulatorHost;
+          process.env.FIREBASE_AUTH_EMULATOR_HOST = authEmulatorHost;
+          process.env.FIREBASE_STORAGE_EMULATOR_HOST = storageEmulatorHost;
+        }
       }
+    } catch (error) {
+      console.warn("Could not read localhost.run host from file:", error);
     }
+  }
+
+  // Fall back to default localhost if still not set
+  if (!firestoreEmulatorHost) {
+    firestoreEmulatorHost = EMULATOR_HOSTS.firestore;
+    authEmulatorHost = EMULATOR_HOSTS.auth;
+    storageEmulatorHost = EMULATOR_HOSTS.storage;
+    
+    // Set environment variables
+    process.env.FIRESTORE_EMULATOR_HOST = firestoreEmulatorHost;
+    process.env.FIREBASE_AUTH_EMULATOR_HOST = authEmulatorHost;
+    process.env.FIREBASE_STORAGE_EMULATOR_HOST = storageEmulatorHost;
+  }
+
+  console.log("=== Firebase Admin SDK Emulator Configuration ===");
+  console.log(`Firestore: ${firestoreEmulatorHost}`);
+  console.log(`Auth: ${authEmulatorHost}`);
+  console.log(`Storage: ${storageEmulatorHost}`);
+  
+  // Initialize with minimal configuration for emulators
+  app = initializeApp({
+    projectId: FIREBASE_PROJECT_ID || "etoile-yachts-emulator"
+  });
+  
+  console.log("Firebase Admin SDK initialized for emulator connection");
+} else {
+  console.log("=== PRODUCTION MODE: Using Firebase Production Services ===");
+  
+  // Clear any emulator environment variables
+  delete process.env.FIRESTORE_EMULATOR_HOST;
+  delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
+  delete process.env.FIREBASE_STORAGE_EMULATOR_HOST;
+
+  // Check for Firebase service account from environment variable
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+    console.error("FIREBASE_SERVICE_ACCOUNT environment variable is required for production mode");
+    console.error("Please set this environment variable with your Firebase service account key JSON");
+    throw new Error("Missing FIREBASE_SERVICE_ACCOUNT environment variable");
+  }
+  
+  try {
+    // Parse the service account JSON from environment variable
+    const serviceAccount = JSON.parse(
+      process.env.FIREBASE_SERVICE_ACCOUNT
+    ) as ServiceAccount;
+    
+    // Initialize Firebase Admin with service account credentials
+    app = initializeApp({
+      credential: cert(serviceAccount),
+      projectId: FIREBASE_PROJECT_ID || serviceAccount.projectId,
+      storageBucket: `${FIREBASE_PROJECT_ID || serviceAccount.projectId}.appspot.com`
+    });
+    
+    console.log(`Firebase Admin SDK initialized for project: ${FIREBASE_PROJECT_ID || serviceAccount.projectId}`);
   } catch (error) {
-    console.warn("Could not read localhost.run host from file:", error);
+    console.error("Error initializing Firebase Admin with service account:", error);
+    throw new Error("Failed to initialize Firebase Admin SDK with production credentials");
   }
 }
-
-// Fall back to default localhost if still not set
-if (!firestoreEmulatorHost) {
-  firestoreEmulatorHost = "localhost:8080";
-  authEmulatorHost = "localhost:9099";
-  storageEmulatorHost = "localhost:9199";
-  
-  // Set environment variables
-  process.env.FIRESTORE_EMULATOR_HOST = firestoreEmulatorHost;
-  process.env.FIREBASE_AUTH_EMULATOR_HOST = authEmulatorHost;
-  process.env.FIREBASE_STORAGE_EMULATOR_HOST = storageEmulatorHost;
-}
-
-console.log("=== Firebase Admin SDK Emulator Configuration ===");
-console.log(`Firestore: ${firestoreEmulatorHost}`);
-console.log(`Auth: ${authEmulatorHost}`);
-console.log(`Storage: ${storageEmulatorHost}`);
-
-// Initialize Firebase Admin with minimal configuration
-// When using emulators, we only need a projectId
-const app = initializeApp({
-  projectId: "etoile-yachts-emulator"
-});
 
 // Get service instances
 const adminAuth = getAuth(app);
@@ -69,19 +115,19 @@ adminDb.settings({
   ignoreUndefinedProperties: true
 });
 
-console.log("Firebase Admin SDK initialized for emulator connection");
-
 // Connection test (runs after 3 seconds)
 setTimeout(async () => {
   try {
-    console.log("\n======= EMULATOR CONNECTION TEST =======");
+    const mode = USE_FIREBASE_EMULATORS ? "EMULATOR" : "PRODUCTION";
+    console.log(`\n======= FIREBASE ${mode} CONNECTION TEST =======`);
     
     // Test creating a document
     try {
       console.log("1. Creating test document...");
       await adminDb.collection('test').doc('test-connection').set({
         timestamp: Date.now(),
-        message: 'Testing emulator connection'
+        message: `Testing ${mode.toLowerCase()} connection`,
+        mode: mode.toLowerCase()
       });
       console.log("✓ Successfully created test document");
     } catch (err: any) {
@@ -98,12 +144,14 @@ setTimeout(async () => {
           const data = doc.data();
           console.log(`  - Yacht ID: ${doc.id}, Title: ${data.title || data.name || 'Unnamed'}`);
         });
+      } else {
+        console.log("No yacht documents found. Collection may be empty in this environment.");
       }
     } catch (err: any) {
       console.error("❌ Error querying unified_yacht_experiences:", err.message);
     }
     
-    console.log("======= END OF CONNECTION TEST =======\n");
+    console.log(`======= END OF ${mode} CONNECTION TEST =======\n`);
   } catch (error: any) {
     console.error("❌ Error during connection test:", error.message);
   }
