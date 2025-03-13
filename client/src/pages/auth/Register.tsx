@@ -21,6 +21,8 @@ import { Link } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { auth as firebaseAuth } from "@/lib/firebase";
 
 /**
  * User role enum for registration
@@ -82,7 +84,7 @@ export default function Register() {
   });
 
   // Get user authentication context
-  const auth = useAuth();
+  const { register: registerUser, login, signOut } = useAuth();
 
   const onSubmit = async (data: RegisterForm) => {
     try {
@@ -99,12 +101,49 @@ export default function Register() {
                         data.role === UserRole.PRODUCER ? 'producer' : 
                         'partner';
                         
-      await auth.register(
-        data.email, 
-        data.password, 
-        `${data.firstName} ${data.lastName}`, 
-        roleValue
-      );
+      try {
+        // Try to use the extracted registerUser function first
+        console.log('Attempting to register using useAuth.register function');
+        await registerUser(
+          data.email, 
+          data.password, 
+          `${data.firstName} ${data.lastName}`, 
+          roleValue
+        );
+      } catch (registerErr) {
+        console.error("Registration context function failed:", registerErr);
+        
+        // Fallback to direct Firebase registration if context method fails
+        console.log('Falling back to direct Firebase registration');
+        const userCredential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
+        
+        // Update profile with name
+        await updateProfile(userCredential.user, {
+          displayName: `${data.firstName} ${data.lastName}`
+        });
+        
+        // Create profile in Production using server API
+        const createProfileResponse = await fetch('/api/user/create-profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${await userCredential.user.getIdToken()}`
+          },
+          body: JSON.stringify({
+            name: `${data.firstName} ${data.lastName}`,
+            email: data.email,
+            phone: data.phone,
+            role: roleValue,
+          })
+        });
+        
+        if (!createProfileResponse.ok) {
+          throw new Error(`Failed to create user profile: ${createProfileResponse.statusText}`);
+        }
+        
+        // Store the token for subsequent requests
+        localStorage.setItem('authToken', await userCredential.user.getIdToken());
+      }
       
       // Store phone number for later profile update
       localStorage.setItem('registrationPhone', data.phone);
