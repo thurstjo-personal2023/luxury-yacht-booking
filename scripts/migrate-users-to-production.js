@@ -6,9 +6,15 @@
  */
 
 // Use the provided service account for authentication with Firebase Admin
-const admin = require('firebase-admin');
-const fs = require('fs');
-const path = require('path');
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Read the service account key from environment variable
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
@@ -29,13 +35,13 @@ try {
 }
 
 // Initialize Firebase Admin with production credentials
-const app = admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+const app = initializeApp({
+  credential: cert(serviceAccount),
   storageBucket: storageBucket
 });
 
 // Get Firestore instance
-const db = admin.firestore();
+const db = getFirestore();
 
 // User collection paths
 const USER_COLLECTIONS = [
@@ -62,11 +68,11 @@ function convertTimestampFields(data) {
   return Object.entries(data).reduce((obj, [key, value]) => {
     // Check if value has _seconds and _nanoseconds (serialized Timestamp)
     if (value && typeof value === 'object' && '_seconds' in value) {
-      obj[key] = admin.firestore.Timestamp.fromMillis(value._seconds * 1000);
+      obj[key] = Timestamp.fromMillis(value._seconds * 1000);
     } 
     // Check if value is a stringified date pattern
     else if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
-      obj[key] = admin.firestore.Timestamp.fromDate(new Date(value));
+      obj[key] = Timestamp.fromDate(new Date(value));
     }
     // Handle nested objects recursively
     else if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -86,7 +92,7 @@ function transformUserData(userData) {
   const transformed = {
     ...userData,
     _migrated: true,
-    _migratedTimestamp: admin.firestore.FieldValue.serverTimestamp()
+    _migratedTimestamp: FieldValue.serverTimestamp()
   };
   
   // Standardize timestamp fields
@@ -115,7 +121,7 @@ function transformTouristProfile(profileData) {
     bookingHistory: ensureArray(profileData.bookingHistory),
     reviewsProvided: ensureArray(profileData.reviewsProvided),
     _migrated: true,
-    _migratedTimestamp: admin.firestore.FieldValue.serverTimestamp()
+    _migratedTimestamp: FieldValue.serverTimestamp()
   };
   
   // Standardize timestamp fields
@@ -143,7 +149,7 @@ function transformServiceProviderProfile(profileData) {
     certifications: ensureArray(profileData.certifications),
     tags: ensureArray(profileData.tags),
     _migrated: true,
-    _migratedTimestamp: admin.firestore.FieldValue.serverTimestamp()
+    _migratedTimestamp: FieldValue.serverTimestamp()
   };
   
   // Standardize timestamp fields
