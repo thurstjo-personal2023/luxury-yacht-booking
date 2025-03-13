@@ -13,18 +13,14 @@ import { getStorage, connectStorageEmulator } from "firebase/storage";
 import { getDatabase, connectDatabaseEmulator } from "firebase/database";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
-// Firebase configuration with real values
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.appspot.com`,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
-};
+// Import environment configuration
+import { FIREBASE_CONFIG, USE_FIREBASE_EMULATORS } from "./env-config";
 
 // Initialize Firebase and export the app instance
-export const app = initializeApp(firebaseConfig);
+export const app = initializeApp(FIREBASE_CONFIG);
+
+// Log initialization mode
+console.log(`Firebase initialized in ${USE_FIREBASE_EMULATORS ? 'EMULATOR' : 'PRODUCTION'} mode`);
 
 // Initialize Firestore
 export const db = getFirestore(app);
@@ -122,15 +118,20 @@ auth.onAuthStateChanged(async (user) => {
   }
 });
 
-// Always connect to emulators in development
-console.log("Connecting to Firebase emulators...");
-
 // Set up a global error collection for error detection
 // This will be used by the ConnectionStatus component to detect Firebase errors
 (window as any).__FIREBASE_ERRORS = [];
 
 // Store connection state to prevent duplicate connections
 let emulatorConnectionAttempted = false;
+
+// Only attempt to connect to emulators if flag is enabled
+if (USE_FIREBASE_EMULATORS) {
+  console.log("Connecting to Firebase emulators...");
+} else {
+  console.log("Using PRODUCTION Firebase services - skipping emulator connection");
+  emulatorConnectionAttempted = true; // Prevent future connection attempts
+}
 
 // Function to connect to emulators with specified hosts
 const connectToEmulators = (hosts: { 
@@ -328,33 +329,38 @@ const getEmulatorConfig = async () => {
   }
 };
 
-// First try to connect with host from URL parameter
-const localhostRunParam = new URLSearchParams(window.location.search).get('emulatorHost');
-if (localhostRunParam) {
-  console.log(`Using emulator host from URL param: ${localhostRunParam}`);
-  const hosts = {
-    firestore: `${localhostRunParam}:8080`,
-    auth: `${localhostRunParam}:9099`,
-    storage: `${localhostRunParam}:9199`,
-    functions: `${localhostRunParam}:5001`,
-    rtdb: `${localhostRunParam}:9001`
-  };
-  
-  connectToEmulators(hosts);
-} else {
-  // Otherwise try to get config from server, then fall back to localhost
-  getEmulatorConfig().then(hosts => {
-    if (hosts) {
-      connectToEmulators(hosts);
-    } else {
+// Only try to connect to emulators if the flag is enabled
+if (USE_FIREBASE_EMULATORS) {
+  // First try to connect with host from URL parameter
+  const localhostRunParam = new URLSearchParams(window.location.search).get('emulatorHost');
+  if (localhostRunParam) {
+    console.log(`Using emulator host from URL param: ${localhostRunParam}`);
+    const hosts = {
+      firestore: `${localhostRunParam}:8080`,
+      auth: `${localhostRunParam}:9099`,
+      storage: `${localhostRunParam}:9199`,
+      functions: `${localhostRunParam}:5001`,
+      rtdb: `${localhostRunParam}:9001`
+    };
+    
+    connectToEmulators(hosts);
+  } else {
+    // Otherwise try to get config from server, then fall back to localhost
+    getEmulatorConfig().then(hosts => {
+      if (hosts) {
+        connectToEmulators(hosts);
+      } else {
+        console.log("Falling back to default localhost emulator config");
+        connectToEmulators(defaultHosts);
+      }
+    }).catch(error => {
+      console.error("Error in emulator configuration:", error);
       console.log("Falling back to default localhost emulator config");
       connectToEmulators(defaultHosts);
-    }
-  }).catch(error => {
-    console.error("Error in emulator configuration:", error);
-    console.log("Falling back to default localhost emulator config");
-    connectToEmulators(defaultHosts);
-  });
+    });
+  }
+} else {
+  console.log("Using production Firebase services - emulator connection disabled");
 }
 
 // Auth helpers with improved error handling and retry logic

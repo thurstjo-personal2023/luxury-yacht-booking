@@ -6,6 +6,7 @@ import { Sidebar } from "./Sidebar";
 import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { EmulatorStatusDialog } from "@/components/ui/emulator-status-dialog";
+import { EnvironmentToggle } from "@/components/ui/environment-toggle";
 
 export function Navbar() {
   const { toast } = useToast();
@@ -56,8 +57,11 @@ export function Navbar() {
 
         {/* Desktop menu */}
         <div className="hidden lg:flex items-center gap-4">
-          {/* Connection status indicator */}
-          <EmulatorStatusDialog />
+          {/* Environment Controls */}
+          <div className="flex items-center gap-2">
+            <EmulatorStatusDialog />
+            <EnvironmentToggle />
+          </div>
           
           {auth.currentUser ? (
             <>
