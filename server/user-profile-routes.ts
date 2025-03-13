@@ -5,7 +5,7 @@
  */
 
 import { Express, Request, Response } from 'express';
-import { verifyAuth, adminDb as db } from './firebase-admin';
+import { verifyAuth, adminDb } from './firebase-admin';
 import { 
   syncUserData, 
   getCompleteUserProfile,
@@ -58,7 +58,7 @@ export function registerUserProfileRoutes(app: Express) {
       const { name, phone } = req.body;
       
       // Get current user data
-      const userDoc = await db.collection('harmonized_users').doc(req.user.uid).get();
+      const userDoc = await adminDb.collection('harmonized_users').doc(req.user.uid).get();
       
       if (!userDoc.exists) {
         return res.status(404).json({ error: 'User not found' });
@@ -72,7 +72,7 @@ export function registerUserProfileRoutes(app: Express) {
       if (name) updates.name = name;
       if (phone) updates.phone = phone;
       
-      await db.collection('harmonized_users').doc(req.user.uid).update(updates);
+      await adminDb.collection('harmonized_users').doc(req.user.uid).update(updates);
       
       // Sync with role-specific collections
       await syncUserData(req.user.uid);
@@ -94,7 +94,7 @@ export function registerUserProfileRoutes(app: Express) {
       }
       
       // Check if user role is consumer
-      const userDoc = await db.collection('harmonized_users').doc(req.user.uid).get();
+      const userDoc = await adminDb.collection('harmonized_users').doc(req.user.uid).get();
       
       if (!userDoc.exists) {
         return res.status(404).json({ error: 'User not found' });
@@ -119,14 +119,14 @@ export function registerUserProfileRoutes(app: Express) {
       if (wishlist !== undefined) updates.wishlist = wishlist;
       
       // Check if profile exists
-      const profileDoc = await db.collection('user_profiles_tourist').doc(req.user.uid).get();
+      const profileDoc = await adminDb.collection('user_profiles_tourist').doc(req.user.uid).get();
       
       if (profileDoc.exists) {
         // Update existing profile
-        await db.collection('user_profiles_tourist').doc(req.user.uid).update(updates);
+        await adminDb.collection('user_profiles_tourist').doc(req.user.uid).update(updates);
       } else {
         // Create new profile
-        await db.collection('user_profiles_tourist').doc(req.user.uid).set({
+        await adminDb.collection('user_profiles_tourist').doc(req.user.uid).set({
           id: req.user.uid,
           ...updates
         });
@@ -149,7 +149,7 @@ export function registerUserProfileRoutes(app: Express) {
       }
       
       // Check if user role is producer or partner
-      const userDoc = await db.collection('harmonized_users').doc(req.user.uid).get();
+      const userDoc = await adminDb.collection('harmonized_users').doc(req.user.uid).get();
       
       if (!userDoc.exists) {
         return res.status(404).json({ error: 'User not found' });
@@ -192,14 +192,14 @@ export function registerUserProfileRoutes(app: Express) {
       if (profileVisibility !== undefined) updates.profileVisibility = profileVisibility;
       
       // Check if profile exists
-      const profileDoc = await db.collection('user_profiles_service_provider').doc(req.user.uid).get();
+      const profileDoc = await adminDb.collection('user_profiles_service_provider').doc(req.user.uid).get();
       
       if (profileDoc.exists) {
         // Update existing profile
-        await db.collection('user_profiles_service_provider').doc(req.user.uid).update(updates);
+        await adminDb.collection('user_profiles_service_provider').doc(req.user.uid).update(updates);
       } else {
         // Create new profile
-        await db.collection('user_profiles_service_provider').doc(req.user.uid).set({
+        await adminDb.collection('user_profiles_service_provider').doc(req.user.uid).set({
           providerId: req.user.uid,
           ...updates
         });
@@ -222,7 +222,7 @@ export function registerUserProfileRoutes(app: Express) {
       }
       
       // Check if user role is consumer
-      const userDoc = await db.collection('harmonized_users').doc(req.user.uid).get();
+      const userDoc = await adminDb.collection('harmonized_users').doc(req.user.uid).get();
       
       if (!userDoc.exists) {
         return res.status(404).json({ error: 'User not found' });
@@ -241,7 +241,7 @@ export function registerUserProfileRoutes(app: Express) {
       }
       
       // Get current profile
-      const profileDoc = await db.collection('user_profiles_tourist').doc(req.user.uid).get();
+      const profileDoc = await adminDb.collection('user_profiles_tourist').doc(req.user.uid).get();
       let profile: TouristProfile;
       
       if (profileDoc.exists) {
@@ -270,9 +270,9 @@ export function registerUserProfileRoutes(app: Express) {
       };
       
       if (profileDoc.exists) {
-        await db.collection('user_profiles_tourist').doc(req.user.uid).update(updates);
+        await adminDb.collection('user_profiles_tourist').doc(req.user.uid).update(updates);
       } else {
-        await db.collection('user_profiles_tourist').doc(req.user.uid).set({
+        await adminDb.collection('user_profiles_tourist').doc(req.user.uid).set({
           id: req.user.uid,
           ...updates
         });
@@ -399,7 +399,7 @@ export function registerUserProfileRoutes(app: Express) {
       }
       
       // Get current user data
-      const userDoc = await db.collection('harmonized_users').doc(userId).get();
+      const userDoc = await adminDb.collection('harmonized_users').doc(userId).get();
       
       if (!userDoc.exists) {
         return res.status(404).json({ error: 'User not found' });
@@ -409,17 +409,17 @@ export function registerUserProfileRoutes(app: Express) {
       const oldRole = userData.role;
       
       // Update role
-      await db.collection('harmonized_users').doc(userId).update({
+      await adminDb.collection('harmonized_users').doc(userId).update({
         role,
         updatedAt: FieldValue.serverTimestamp()
       });
       
       // If changing from consumer to producer/partner, create service provider profile
       if (oldRole === 'consumer' && (role === 'producer' || role === 'partner')) {
-        const serviceProviderDoc = await db.collection('user_profiles_service_provider').doc(userId).get();
+        const serviceProviderDoc = await adminDb.collection('user_profiles_service_provider').doc(userId).get();
         
         if (!serviceProviderDoc.exists) {
-          await db.collection('user_profiles_service_provider').doc(userId).set({
+          await adminDb.collection('user_profiles_service_provider').doc(userId).set({
             providerId: userId,
             businessName: userData.name,
             contactInformation: {
@@ -433,10 +433,10 @@ export function registerUserProfileRoutes(app: Express) {
       
       // If changing from producer/partner to consumer, create tourist profile
       if ((oldRole === 'producer' || oldRole === 'partner') && role === 'consumer') {
-        const touristDoc = await db.collection('user_profiles_tourist').doc(userId).get();
+        const touristDoc = await adminDb.collection('user_profiles_tourist').doc(userId).get();
         
         if (!touristDoc.exists) {
-          await db.collection('user_profiles_tourist').doc(userId).set({
+          await adminDb.collection('user_profiles_tourist').doc(userId).set({
             id: userId,
             preferences: [],
             wishlist: [],

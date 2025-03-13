@@ -95,7 +95,9 @@ if (USE_FIREBASE_EMULATORS) {
     app = initializeApp({
       credential: cert(serviceAccount),
       projectId: FIREBASE_PROJECT_ID || serviceAccount.projectId,
-      storageBucket: `${FIREBASE_PROJECT_ID || serviceAccount.projectId}.appspot.com`
+      // Use Storage bucket name from service account project ID if not explicitly specified
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 
+                     `gs://${FIREBASE_PROJECT_ID || serviceAccount.projectId}.appspot.com`
     });
     
     console.log(`Firebase Admin SDK initialized for project: ${FIREBASE_PROJECT_ID || serviceAccount.projectId}`);
@@ -149,6 +151,29 @@ setTimeout(async () => {
       }
     } catch (err: any) {
       console.error("❌ Error querying unified_yacht_experiences:", err.message);
+    }
+    
+    // Check user collections
+    try {
+      console.log("3. Checking user collections...");
+      
+      // Check harmonized_users collection
+      console.log("  Checking harmonized_users collection...");
+      const usersSnapshot = await adminDb.collection('harmonized_users').limit(5).get();
+      console.log(`  ✓ Found ${usersSnapshot.size} users in harmonized_users collection`);
+      
+      // Check tourist profiles collection
+      console.log("  Checking user_profiles_tourist collection...");
+      const touristSnapshot = await adminDb.collection('user_profiles_tourist').limit(5).get();
+      console.log(`  ✓ Found ${touristSnapshot.size} profiles in user_profiles_tourist collection`);
+      
+      // Check service provider profiles collection
+      console.log("  Checking user_profiles_service_provider collection...");
+      const providerSnapshot = await adminDb.collection('user_profiles_service_provider').limit(5).get();
+      console.log(`  ✓ Found ${providerSnapshot.size} profiles in user_profiles_service_provider collection`);
+      
+    } catch (err: any) {
+      console.error("❌ Error querying user collections:", err.message);
     }
     
     console.log(`======= END OF ${mode} CONNECTION TEST =======\n`);

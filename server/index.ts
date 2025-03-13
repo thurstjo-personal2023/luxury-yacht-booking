@@ -1,6 +1,9 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { registerUserProfileRoutes } from "./user-profile-routes";
+import { testProductionStorage, runStorageTest } from "./test-storage";
+import { USE_FIREBASE_EMULATORS } from "./env-config";
 
 const app = express();
 app.use(express.json());
@@ -41,6 +44,23 @@ app.use((req, res, next) => {
   try {
     log("Starting server initialization...");
     const server = await registerRoutes(app);
+    
+    // Register user profile routes
+    registerUserProfileRoutes(app);
+    
+    // Test Firebase Storage in production
+    if (!USE_FIREBASE_EMULATORS) {
+      log("Testing Firebase Storage in production...");
+      setTimeout(async () => {
+        try {
+          await runStorageTest();
+        } catch (error) {
+          console.error("Error testing storage:", error);
+        }
+      }, 5000);
+    } else {
+      log("Using Firebase emulators - skipping production storage test");
+    }
 
     // Error handling middleware
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
