@@ -81,7 +81,8 @@ export default function Register() {
     },
   });
 
-  const { register } = useAuth();
+  // Get user authentication context
+  const auth = useAuth();
 
   const onSubmit = async (data: RegisterForm) => {
     try {
@@ -91,12 +92,15 @@ export default function Register() {
       console.log("Registering user with Firebase Auth and creating profile in Production Firestore...");
       
       // Use the register function from auth context which creates user in Production
-      await register(
+      await auth.register(
         data.email, 
         data.password, 
         `${data.firstName} ${data.lastName}`, 
         data.role.toLowerCase()
       );
+      
+      // Store phone number for later profile update
+      localStorage.setItem('registrationPhone', data.phone);
       
       // Get fresh ID token for subsequent API requests
       const tokenFromStorage = localStorage.getItem('authToken');
@@ -115,18 +119,23 @@ export default function Register() {
           ? '/api/user/update-tourist-profile'
           : '/api/user/update-provider-profile';
           
+        // Get phone from form
+        const phoneNumber = data.phone;
+        
         const updateData = data.role === UserRole.CONSUMER
           ? {
               // Tourist profile additional fields
               preferences: [],
-              loyaltyTier: 'Bronze'
+              loyaltyTier: 'Bronze',
+              phoneNumber: phoneNumber
             }
           : {
               // Producer/Partner profile additional fields
               businessName: `${data.firstName} ${data.lastName}'s Business`,
               servicesOffered: [],
               contactInformation: {
-                address: ''
+                address: '',
+                phone: phoneNumber
               }
             };
         
