@@ -82,7 +82,7 @@ export default function Register() {
   });
 
   // Get user authentication context
-  const { register: registerUser, login, signOut } = useAuth();
+  const { register, login, signOut } = useAuth();
 
   const onSubmit = async (data: RegisterForm) => {
     try {
@@ -101,7 +101,7 @@ export default function Register() {
                         
       // Register the user with Firebase Auth
       console.log('Registering user with Firebase Auth');
-      await registerUser(
+      await register(
         data.email, 
         data.password, 
         `${data.firstName} ${data.lastName}`, 
