@@ -72,6 +72,55 @@ export default function ProfilePage() {
     );
   }
   
+  // Function to handle role synchronization
+  const [syncingRole, setSyncingRole] = useState(false);
+  
+  const handleSyncRole = async () => {
+    if (syncingRole) return;
+    
+    setSyncingRole(true);
+    try {
+      const result = await syncAuthClaims();
+      
+      if (result.success) {
+        toast({
+          title: "Role synchronized",
+          description: result.message || "Your role has been synchronized successfully.",
+          variant: "default",
+        });
+        
+        // If roles were different, show more detailed information
+        if (result.currentRole !== result.newRole) {
+          toast({
+            title: "Role updated",
+            description: `Your role has been updated from ${result.currentRole || 'unknown'} to ${result.newRole || 'unknown'}.`,
+            variant: "default",
+          });
+          
+          // Force page reload to apply new permissions
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+      } else {
+        toast({
+          title: "Synchronization failed",
+          description: result.message || "Failed to synchronize your role. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Role sync error:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred during role synchronization.",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingRole(false);
+    }
+  };
+  
   return (
     <div className="container mx-auto py-10">
       <div className="mb-6 flex items-center">
@@ -83,12 +132,41 @@ export default function ProfilePage() {
         </Button>
         
         {!isEditing && (
-          <Button onClick={() => setIsEditing(true)}>
-            <Edit className="h-4 w-4 mr-2" />
-            Edit Profile
-          </Button>
+          <>
+            <Button 
+              variant="outline" 
+              className="mr-2"
+              onClick={handleSyncRole}
+              disabled={syncingRole}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncingRole ? 'animate-spin' : ''}`} />
+              {syncingRole ? 'Syncing...' : 'Sync Role'}
+            </Button>
+            
+            <Button onClick={() => setIsEditing(true)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Profile
+            </Button>
+          </>
         )}
       </div>
+      
+      {/* Role information alert */}
+      {harmonizedUser?.role && (
+        <Alert className="mb-6 max-w-4xl">
+          <Shield className="h-4 w-4" />
+          <AlertTitle>Current Role: {harmonizedUser.role}</AlertTitle>
+          <AlertDescription>
+            {harmonizedUser.role === 'producer' || harmonizedUser.role === 'partner' ? (
+              'You have producer access to manage assets and listings.'
+            ) : (
+              'You have consumer access to browse and book experiences.'
+            )}
+            {' '}
+            If you're experiencing permission issues, try the "Sync Role" button to synchronize your permissions.
+          </AlertDescription>
+        </Alert>
+      )}
       
       {isEditing ? (
         <UserProfileForm 
