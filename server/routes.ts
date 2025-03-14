@@ -987,6 +987,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Create a new yacht endpoint
+  app.post("/api/producer/yacht/create", verifyAuth, async (req: Request, res: Response) => {
+    // Set content type explicitly to ensure JSON response
+    res.setHeader('Content-Type', 'application/json');
+    
+    try {
+      console.log('Create Yacht API: Request received');
+      
+      // Log request body for debugging
+      console.log('Create Yacht API: Request body:', req.body);
+      
+      const yachtData = req.body;
+      
+      // If there's no request body, return an error
+      if (!yachtData || Object.keys(yachtData).length === 0) {
+        console.warn('Create Yacht API: Empty request body');
+        return res.status(400).json({
+          error: "Invalid request",
+          message: "Request body is empty",
+          details: "Provide yacht data in the request body"
+        });
+      }
+      
+      // Get the authenticated user ID from the auth token (set by verifyAuth middleware)
+      const authUserId = req.user?.uid;
+      
+      if (!authUserId) {
+        console.warn('Create Yacht API: No user ID in authentication data');
+        return res.status(401).json({
+          error: "Unauthorized",
+          message: "Valid producer authentication required",
+          details: "No user ID found in authentication data"
+        });
+      }
+      
+      // Verify this user is a producer in Firestore
+      try {
+        const userDoc = await adminDb.collection('harmonized_users').doc(authUserId).get();
+        
+        if (!userDoc.exists) {
+          console.warn(`Create Yacht API: User ${authUserId} not found in harmonized_users collection`);
+          return res.status(403).json({
+            error: "Access denied",
+            message: "User not found in database"
+          });
+        }
+        
+        const userData = userDoc.data();
+        const userRole = userData?.role;
+        
+        console.log(`Create Yacht API: User ${authUserId} has role "${userRole}" in Firestore`);
+        
+        // Check if the user's Firestore role is producer
+        if (userRole !== 'producer') {
+          console.warn(`Create Yacht API: User ${authUserId} with role "${userRole}" attempted to create a yacht`);
+          return res.status(403).json({
+            error: "Access denied",
+            message: "User is not registered as a producer",
+            details: `Current role: ${userRole}`
+          });
+        }
+      } catch (verifyError) {
+        console.error("Create Yacht API: Error verifying user role:", verifyError);
+        return res.status(500).json({
+          error: "Authentication verification failed",
+          message: "Could not verify user role",
+          details: String(verifyError)
+        });
+      }
+      
+      // Use our helper function to get harmonized IDs
+      const { producerId, partnerId } = await getHarmonizedProducerIds(authUserId);
+      
+      console.log(`Using producer ID: ${producerId} and partner ID: ${partnerId} for yacht creation`);
+      
+      // Update the yacht data with the producer/partner IDs
+      yachtData.producerId = producerId;
+      yachtData.providerId = producerId;
+      
+      console.log("Creating new yacht:", yachtData);
+      
+      // Validate required fields
+      if (!yachtData.title || !yachtData.description) {
+        return res.status(400).json({ 
+          error: "Missing required fields", 
+          message: "Title and description are required fields",
+          providedFields: Object.keys(yachtData)
+        });
+      }
+      
+      // Ensure consistent field naming
+      yachtData.package_id = yachtData.package_id || `yacht-${producerId}-${Date.now()}`;
+      yachtData.availability_status = yachtData.availability_status !== undefined ? yachtData.availability_status : true;
+      yachtData.isAvailable = yachtData.availability_status;
+      
+      // Set timestamps in multiple formats for compatibility
+      const now = new Date();
+      yachtData.created_date = yachtData.created_date || FieldValue.serverTimestamp();
+      yachtData.last_updated_date = FieldValue.serverTimestamp();
+      yachtData.createdAt = yachtData.createdAt || FieldValue.serverTimestamp();
+      yachtData.updatedAt = FieldValue.serverTimestamp();
+      
+      // Handle media field
+      if (!yachtData.media || !Array.isArray(yachtData.media)) {
+        yachtData.media = [];
+      }
+      
+      // Add standardization tracking
+      yachtData._standardized = true;
+      yachtData._standardizedVersion = 1;
+      yachtData.category = yachtData.category || 'Standard';
+      yachtData.pricing = yachtData.pricing || yachtData.price || 0;
+      yachtData.tags = yachtData.tags || [];
+      
+      try {
+        // Add to Firestore
+        console.log(`Create Yacht API: Adding document to 'unified_yacht_experiences' collection with ID: ${yachtData.package_id}`);
+        const yachtRef = adminDb.collection('unified_yacht_experiences').doc(yachtData.package_id);
+        await yachtRef.set(yachtData);
+        
+        console.log(`Create Yacht API: Successfully created yacht with ID: ${yachtData.package_id}`);
+        
+        // Return success response
+        res.status(201).json({ 
+          success: true, 
+          message: "Yacht created successfully",
+          id: yachtData.package_id,
+          yacht: {
+            id: yachtData.package_id,
+            title: yachtData.title,
+            pricing: yachtData.pricing,
+            isAvailable: yachtData.isAvailable
+          }
+        });
+      } catch (dbError) {
+        console.error("Create Yacht API: Database error:", dbError);
+        
+        // Return detailed error
+        res.status(500).json({ 
+          error: "Database operation failed", 
+          message: "Failed to save yacht data to database",
+          details: String(dbError),
+          code: typeof dbError === 'object' && dbError !== null ? (dbError as any).code : undefined
+        });
+      }
+    } catch (error) {
+      console.error("Error creating yacht:", error);
+      res.status(500).json({ 
+        error: "Failed to create yacht", 
+        message: String(error),
+        stack: process.env.NODE_ENV === 'development' ? (error as Error).stack : undefined
+      });
+    }
+  });
+  
   // Get producer reviews
   app.get("/api/producer/reviews", verifyAuth, async (req: Request, res: Response) => {
     // Set content type explicitly to ensure JSON response
