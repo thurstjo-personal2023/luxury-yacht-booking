@@ -130,13 +130,155 @@ interface AddOnsResponse {
   pagination: PaginationData;
 }
 
+// Role Debug Component to help diagnose auth and role issues
+function RoleDebugSection({ user, authHeader }: { user: any, authHeader: string | null }) {
+  const [expanded, setExpanded] = useState(false);
+  const [tokenData, setTokenData] = useState<any>(null);
+  const [syncingRole, setSyncingRole] = useState(false);
+  const { toast } = useToast();
+  
+  const decodeJwt = (token: string) => {
+    try {
+      // Get the payload part of the JWT (second part)
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      console.error('Failed to decode JWT token:', e);
+      return { error: 'Invalid token format' };
+    }
+  };
+  
+  useEffect(() => {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const decoded = decodeJwt(token);
+      setTokenData(decoded);
+    }
+  }, [authHeader]);
+  
+  const handleSyncRole = async () => {
+    if (syncingRole) return;
+    
+    setSyncingRole(true);
+    try {
+      const result = await syncAuthClaims();
+      
+      if (result.success) {
+        toast({
+          title: "Role synchronized",
+          description: result.message || "Your role has been synchronized successfully.",
+          variant: "default",
+        });
+        
+        // Force page reload to apply new permissions
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        toast({
+          title: "Synchronization failed",
+          description: result.message || "Failed to synchronize your role. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Role sync error:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred during role synchronization.",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingRole(false);
+    }
+  };
+  
+  if (!user) return null;
+  
+  return (
+    <div className="mb-6 p-4 border border-gray-200 rounded-lg">
+      <div className="flex items-center justify-between cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <h3 className="text-lg font-semibold">Role Debug Information</h3>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={(e) => { 
+            e.stopPropagation(); 
+            setExpanded(!expanded); 
+          }}
+        >
+          {expanded ? 'Hide' : 'Show'} Details
+        </Button>
+      </div>
+      
+      {expanded && (
+        <div className="mt-4 space-y-2">
+          <div className="flex justify-end mb-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSyncRole();
+              }}
+              disabled={syncingRole}
+              className="mr-2"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncingRole ? 'animate-spin' : ''}`} />
+              {syncingRole ? 'Syncing...' : 'Sync Role with Firestore'}
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <h4 className="font-medium">User Information</h4>
+              <div className="text-sm rounded bg-gray-50 p-2">
+                <p><strong>User ID:</strong> {user.uid}</p>
+                <p><strong>Email:</strong> {user.email}</p>
+                <p><strong>Email Verified:</strong> {user.emailVerified ? 'Yes' : 'No'}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <h4 className="font-medium">JWT Token Claims</h4>
+              <div className="text-sm rounded bg-gray-50 p-2">
+                {tokenData ? (
+                  <>
+                    <p><strong>Role Claim:</strong> {tokenData.role || 'Not set'}</p>
+                    <p><strong>Admin:</strong> {tokenData.admin ? 'Yes' : 'No'}</p>
+                    <p><strong>Issued At:</strong> {new Date(tokenData.iat * 1000).toLocaleString()}</p>
+                    <p><strong>Expires:</strong> {new Date(tokenData.exp * 1000).toLocaleString()}</p>
+                  </>
+                ) : (
+                  <p>No token data available</p>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-2 text-sm text-gray-500">
+            <p>If you're experiencing permission issues, try using the "Sync Role" button to synchronize your Firebase Auth claims with your Firestore role.</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AssetManagement() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user: authUser } = useAuth(); // Get user from auth context
   const [activeTab, setActiveTab] = useState("yachts");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [authHeader, setAuthHeader] = useState<string | null>(null);
   
   // Dialog state for delete confirmation
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -148,7 +290,23 @@ export default function AssetManagement() {
   const pageSize = 10; // Items per page
   
   // Get current user to determine producer ID
-  const [user] = useAuthState(auth);
+  const [firebaseUser] = useAuthState(auth);
+  
+  // Get fresh auth token for role debugging
+  useEffect(() => {
+    const getAuthToken = async () => {
+      if (auth.currentUser) {
+        try {
+          const token = await auth.currentUser.getIdToken(true);
+          setAuthHeader(`Bearer ${token}`);
+        } catch (error) {
+          console.error('Failed to get auth token:', error);
+        }
+      }
+    };
+    
+    getAuthToken();
+  }, []);
   const [producerData, setProducerData] = useState<{
     producerId: string;
     providerId: string;
@@ -213,7 +371,7 @@ export default function AssetManagement() {
   // Fetch producer data when user is available
   useEffect(() => {
     const initializeProducerData = async () => {
-      if (user) {
+      if (firebaseUser) {
         try {
           // First ensure we have a fresh token
           if (auth.currentUser) {
@@ -222,7 +380,7 @@ export default function AssetManagement() {
           }
           
           // Then fetch producer data
-          await fetchProducerData(user.uid);
+          await fetchProducerData(firebaseUser.uid);
         } catch (error) {
           console.error("Error initializing producer data:", error);
           toast({
@@ -235,7 +393,7 @@ export default function AssetManagement() {
     };
     
     initializeProducerData();
-  }, [user]);
+  }, [firebaseUser]);
   
   // Update timestamp when tab changes to force data refresh
   useEffect(() => {
@@ -309,7 +467,7 @@ export default function AssetManagement() {
     queryKey: ["/api/producer/yachts", { 
       page: yachtPage, 
       pageSize, 
-      producerId: producerData?.producerId || user?.uid, 
+      producerId: producerData?.producerId || firebaseUser?.uid, 
       timestamp: queryTimestamp 
     }],
     refetchOnMount: 'always', // Always refetch when component mounts
@@ -321,7 +479,7 @@ export default function AssetManagement() {
     queryKey: ["/api/producer/addons", { 
       page: addonPage, 
       pageSize, 
-      producerId: producerData?.producerId || user?.uid, 
+      producerId: producerData?.producerId || firebaseUser?.uid, 
       timestamp: queryTimestamp 
     }],
     refetchOnMount: 'always', // Always refetch when component mounts
