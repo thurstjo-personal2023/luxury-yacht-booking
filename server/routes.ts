@@ -1670,6 +1670,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Endpoint to add producer ID to all yachts
+  // Test endpoint for yacht operations (DEVELOPMENT ONLY)
+  app.post("/api/test/yacht-operations", async (req: Request, res: Response) => {
+    // Only allow this endpoint in development mode
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({
+        error: "Forbidden",
+        message: "Test endpoints are not available in production mode"
+      });
+    }
+    
+    try {
+      console.log('Test Yacht Operations API: Request received');
+      
+      // Extract operation type and data from request
+      const { operation, yachtData, yachtId } = req.body;
+      
+      if (!operation) {
+        return res.status(400).json({
+          error: "Missing operation",
+          message: "Please specify an operation (create, update, delete)"
+        });
+      }
+      
+      // Create a test producer ID
+      const testProducerId = 'test-producer-123';
+      
+      // Execute the requested operation
+      let result;
+      
+      switch (operation) {
+        case 'create':
+          if (!yachtData) {
+            return res.status(400).json({
+              error: "Missing yacht data",
+              message: "Please provide yacht data for creation"
+            });
+          }
+          
+          // Set producer ID and timestamps
+          yachtData.producerId = testProducerId;
+          yachtData.providerId = testProducerId;
+          yachtData.package_id = yachtData.package_id || `test-yacht-${Date.now()}`;
+          yachtData.availability_status = yachtData.availability_status !== undefined ? yachtData.availability_status : true;
+          yachtData.isAvailable = yachtData.availability_status;
+          yachtData.created_date = FieldValue.serverTimestamp();
+          yachtData.last_updated_date = FieldValue.serverTimestamp();
+          yachtData.createdAt = FieldValue.serverTimestamp();
+          yachtData.updatedAt = FieldValue.serverTimestamp();
+          
+          // Add standardization tracking
+          yachtData._standardized = true;
+          yachtData._standardizedVersion = 1;
+          
+          // Ensure required fields
+          if (!yachtData.title || !yachtData.description) {
+            return res.status(400).json({
+              error: "Missing required fields",
+              message: "Title and description are required"
+            });
+          }
+          
+          // Create the yacht
+          console.log(`Test API: Creating yacht with ID: ${yachtData.package_id}`);
+          await adminDb.collection('unified_yacht_experiences').doc(yachtData.package_id).set(yachtData);
+          
+          result = {
+            success: true,
+            operation: 'create',
+            message: "Test yacht created successfully",
+            id: yachtData.package_id,
+            yacht: {
+              id: yachtData.package_id,
+              title: yachtData.title
+            }
+          };
+          break;
+          
+        case 'update':
+          if (!yachtId) {
+            return res.status(400).json({
+              error: "Missing yacht ID",
+              message: "Please provide a yacht ID to update"
+            });
+          }
+          
+          if (!yachtData) {
+            return res.status(400).json({
+              error: "Missing yacht data",
+              message: "Please provide yacht data for update"
+            });
+          }
+          
+          // Check if yacht exists
+          const yachtDoc = await adminDb.collection('unified_yacht_experiences').doc(yachtId).get();
+          
+          if (!yachtDoc.exists) {
+            return res.status(404).json({
+              error: "Yacht not found",
+              message: `No yacht exists with ID: ${yachtId}`
+            });
+          }
+          
+          // Update timestamp fields
+          yachtData.last_updated_date = FieldValue.serverTimestamp();
+          yachtData.updatedAt = FieldValue.serverTimestamp();
+          
+          // Update the yacht
+          console.log(`Test API: Updating yacht ${yachtId}`);
+          await adminDb.collection('unified_yacht_experiences').doc(yachtId).update(yachtData);
+          
+          result = {
+            success: true,
+            operation: 'update',
+            message: "Test yacht updated successfully",
+            id: yachtId
+          };
+          break;
+          
+        case 'delete':
+          if (!yachtId) {
+            return res.status(400).json({
+              error: "Missing yacht ID",
+              message: "Please provide a yacht ID to delete"
+            });
+          }
+          
+          // Check if yacht exists
+          const yachtToDelete = await adminDb.collection('unified_yacht_experiences').doc(yachtId).get();
+          
+          if (!yachtToDelete.exists) {
+            return res.status(404).json({
+              error: "Yacht not found",
+              message: `No yacht exists with ID: ${yachtId}`
+            });
+          }
+          
+          // Delete the yacht
+          console.log(`Test API: Deleting yacht ${yachtId}`);
+          await adminDb.collection('unified_yacht_experiences').doc(yachtId).delete();
+          
+          result = {
+            success: true,
+            operation: 'delete',
+            message: "Test yacht deleted successfully",
+            id: yachtId
+          };
+          break;
+          
+        default:
+          return res.status(400).json({
+            error: "Invalid operation",
+            message: "Operation must be one of: create, update, delete"
+          });
+      }
+      
+      return res.json(result);
+    } catch (error) {
+      console.error("Error in test yacht operations:", error);
+      return res.status(500).json({
+        error: "Test operation failed",
+        message: String(error),
+        stack: process.env.NODE_ENV === 'development' ? (error as Error).stack : undefined
+      });
+    }
+  });
+
   app.post("/api/producer/set-producer-id", async (req: Request, res: Response) => {
     try {
       // Get producer ID from request body or use a default
