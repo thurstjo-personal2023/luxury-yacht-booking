@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { 
   AlertCircle,
+  AlertTriangle,
   ArrowLeft, 
   ChevronLeft,
   ChevronRight,
@@ -242,6 +243,7 @@ function RoleDebugSection({ user, authHeader }: { user: any, authHeader: string 
                 <p><strong>User ID:</strong> {user.uid}</p>
                 <p><strong>Email:</strong> {user.email}</p>
                 <p><strong>Email Verified:</strong> {user.emailVerified ? 'Yes' : 'No'}</p>
+                <p><strong>Firestore Role:</strong> {harmonizedUser?.role || 'Not found in Firestore'}</p>
               </div>
             </div>
             
@@ -260,6 +262,21 @@ function RoleDebugSection({ user, authHeader }: { user: any, authHeader: string 
                 )}
               </div>
             </div>
+          </div>
+          
+          <div className="mt-4 p-3 bg-amber-50 border border-amber-100 rounded text-amber-800">
+            {harmonizedUser?.role !== tokenData?.role ? (
+              <div className="flex items-center">
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                <p><strong>Role Mismatch Detected:</strong> Your Firebase Auth role ({tokenData?.role || 'none'}) 
+                does not match your Firestore role ({harmonizedUser?.role || 'none'}). Click "Sync Role" to fix this issue.</p>
+              </div>
+            ) : (
+              <div className="flex items-center">
+                <CheckCircle className="h-4 w-4 mr-2" />
+                <p><strong>Roles Match:</strong> Your Firebase Auth and Firestore roles are in sync.</p>
+              </div>
+            )}
           </div>
           
           <div className="mt-2 text-sm text-gray-500">
