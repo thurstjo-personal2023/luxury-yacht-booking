@@ -45,6 +45,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { auth, db, storage } from "@/lib/firebase";
 import { getYachtImageProps, handleYachtImageError } from "@/lib/image-utils";
+import axios from "axios";
 import { 
   doc, 
   collection, 
@@ -59,8 +60,6 @@ import {
 } from "firebase/firestore";
 import { 
   ref, 
-  uploadBytes, 
-  getDownloadURL, 
   deleteObject
 } from "firebase/storage";
 import { YachtExperience as BaseYachtExperience, Media, Location } from "@shared/firestore-schema";
@@ -333,26 +332,34 @@ export default function YachtForm() {
     const uploadedMedia: Media[] = [];
     
     try {
+      // Get auth token for the API request
+      const authToken = await auth.currentUser.getIdToken();
+      
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const isVideo = file.type.startsWith('video/');
         
-        // Create a unique file path with timestamp for cache busting
-        const timestamp = Date.now();
-        const storagePath = `yacht_media/${auth.currentUser.uid}/${timestamp}_${file.name}`;
-        const storageRef = ref(storage, storagePath);
+        // Create FormData for the file upload
+        const formData = new FormData();
+        formData.append('file', file);
         
-        // Upload the file
-        await uploadBytes(storageRef, file);
-        
-        // Get download URL
-        const downloadURL = await getDownloadURL(storageRef);
-        
-        // Add to uploaded media array
-        uploadedMedia.push({
-          type: isVideo ? 'video' : 'image',
-          url: downloadURL
+        // Upload the file through the server proxy
+        const uploadResponse = await axios.post('/api/upload/media', formData, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'multipart/form-data'
+          }
         });
+        
+        if (uploadResponse.data.success) {
+          // Add to uploaded media array using the response data
+          uploadedMedia.push({
+            type: uploadResponse.data.file.type,
+            url: uploadResponse.data.file.url
+          });
+        } else {
+          throw new Error(`Failed to upload file: ${uploadResponse.data.error}`);
+        }
       }
       
       // Determine if this is the first upload (no existing media)
