@@ -216,7 +216,7 @@ function decodeJWT(token: string): any {
   }
 }
 
-// Middleware to verify Firebase Auth tokens
+// Middleware to verify Firebase Auth tokens with automatic role synchronization
 export const verifyAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
@@ -278,6 +278,46 @@ export const verifyAuth = async (req: Request, res: Response, next: NextFunction
       req.user = { uid, email, role, name, ...otherClaims };
       
       console.log(`verifyAuth - Successfully verified token for user ${uid} with role ${role}`);
+      
+      // Automatic role synchronization check
+      // Skip this check for the sync-auth-claims endpoint to avoid infinite loop
+      if (!req.path.includes('/api/user/sync-auth-claims')) {
+        try {
+          // Get the user's role from Firestore (source of truth)
+          const userDoc = await adminDb.collection('harmonized_users').doc(uid).get();
+          
+          if (userDoc.exists) {
+            const userData = userDoc.data();
+            const firestoreRole = userData?.role;
+            
+            // If there's a mismatch between Auth role and Firestore role
+            if (firestoreRole && firestoreRole !== role) {
+              console.log(`verifyAuth - Role mismatch detected for user ${uid}`);
+              console.log(`Auth role: ${role}, Firestore role: ${firestoreRole}`);
+              console.log(`Automatically synchronizing roles...`);
+              
+              // Update Firebase Auth custom claims with the role from Firestore
+              await adminAuth.setCustomUserClaims(uid, { role: firestoreRole });
+              
+              console.log(`verifyAuth - Auth claims updated for user ${uid} with role=${firestoreRole}`);
+              
+              // Update the user object for this request to use the correct role
+              req.user.role = firestoreRole;
+              req.user._roleSynchronized = true;
+              
+              // Note: We don't force a token refresh here as that would require
+              // returning a response to the client. Instead, the client-side
+              // code will detect and refresh the token on its own.
+            } else {
+              console.log(`verifyAuth - Roles are in sync: ${role}`);
+            }
+          }
+        } catch (syncError) {
+          // Don't fail the request if role sync fails, just log it
+          console.error(`verifyAuth - Role sync check error:`, syncError);
+        }
+      }
+      
       return next();
     } catch (verifyError: any) {
       // If regular verification fails, try manual decode for emulator tokens
@@ -304,6 +344,35 @@ export const verifyAuth = async (req: Request, res: Response, next: NextFunction
           };
           
           console.log(`verifyAuth - Manual verification successful for user ${user_id} with role ${role}`);
+          
+          // For emulator, try to sync roles if possible
+          if (!req.path.includes('/api/user/sync-auth-claims')) {
+            try {
+              // Get the user's role from Firestore (source of truth)
+              const userDoc = await adminDb.collection('harmonized_users').doc(user_id).get();
+              
+              if (userDoc.exists) {
+                const userData = userDoc.data();
+                const firestoreRole = userData?.role;
+                
+                // If there's a mismatch between emulator role and Firestore role
+                if (firestoreRole && firestoreRole !== role) {
+                  console.log(`verifyAuth - Emulator role mismatch detected for user ${user_id}`);
+                  console.log(`Emulator role: ${role}, Firestore role: ${firestoreRole}`);
+                  
+                  // Update the user object for this request
+                  req.user.role = firestoreRole;
+                  req.user._roleSynchronized = true;
+                } else {
+                  console.log(`verifyAuth - Emulator roles are in sync: ${role}`);
+                }
+              }
+            } catch (syncError) {
+              // Don't fail the request if role sync fails, just log it
+              console.error(`verifyAuth - Emulator role sync check error:`, syncError);
+            }
+          }
+          
           return next();
         }
         
