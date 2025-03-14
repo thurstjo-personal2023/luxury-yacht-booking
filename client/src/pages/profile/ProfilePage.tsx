@@ -121,6 +121,9 @@ export default function ProfilePage() {
     }
   };
   
+  // Get the role directly from user object or from harmonized user
+  const userRole = user?.customClaims?.role || harmonizedUser?.role || 'unknown';
+  
   return (
     <div className="container mx-auto py-10">
       <div className="mb-6 flex items-center">
@@ -152,21 +155,19 @@ export default function ProfilePage() {
       </div>
       
       {/* Role information alert */}
-      {harmonizedUser?.role && (
-        <Alert className="mb-6 max-w-4xl">
-          <Shield className="h-4 w-4" />
-          <AlertTitle>Current Role: {harmonizedUser.role}</AlertTitle>
-          <AlertDescription>
-            {harmonizedUser.role === 'producer' || harmonizedUser.role === 'partner' ? (
-              'You have producer access to manage assets and listings.'
-            ) : (
-              'You have consumer access to browse and book experiences.'
-            )}
-            {' '}
-            If you're experiencing permission issues, try the "Sync Role" button to synchronize your permissions.
-          </AlertDescription>
-        </Alert>
-      )}
+      <Alert className="mb-6 max-w-4xl">
+        <Shield className="h-4 w-4" />
+        <AlertTitle>Current Role: {userRole}</AlertTitle>
+        <AlertDescription>
+          {userRole === 'producer' || userRole === 'partner' ? (
+            'You have producer access to manage assets and listings.'
+          ) : (
+            'You have consumer access to browse and book experiences.'
+          )}
+          {' '}
+          If you're experiencing permission issues, try the "Sync Role" button to synchronize your permissions.
+        </AlertDescription>
+      </Alert>
       
       {isEditing ? (
         <UserProfileForm 
