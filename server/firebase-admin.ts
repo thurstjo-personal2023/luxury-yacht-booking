@@ -361,8 +361,10 @@ export const verifyAuth = async (req: Request, res: Response, next: NextFunction
                   console.log(`Emulator role: ${role}, Firestore role: ${firestoreRole}`);
                   
                   // Update the user object for this request
-                  req.user.role = firestoreRole;
-                  req.user._roleSynchronized = true;
+                  if (req.user) {
+                    req.user.role = firestoreRole;
+                    req.user._roleSynchronized = true;
+                  }
                 } else {
                   console.log(`verifyAuth - Emulator roles are in sync: ${role}`);
                 }

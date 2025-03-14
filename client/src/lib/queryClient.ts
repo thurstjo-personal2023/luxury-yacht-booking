@@ -1,5 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { auth } from "./firebase";
+import { toast } from "@/hooks/use-toast";
+import { syncAuthClaims } from "./user-profile-utils";
 
 /**
  * Helper function to check if a response is ok and throw an error if not
@@ -17,6 +19,26 @@ async function throwIfResNotOk(res: Response) {
     
     // Throw formatted error
     throw new Error(`${res.status}: ${errorMessage}`);
+  }
+}
+
+/**
+ * Get the current user's role from the auth token
+ * This helps in checking permission before making API calls
+ */
+async function getUserRoleFromToken(): Promise<string | null> {
+  if (!auth.currentUser) {
+    console.log('No current user in auth - cannot determine role');
+    return null;
+  }
+  
+  try {
+    const tokenResult = await auth.currentUser.getIdTokenResult();
+    const role = tokenResult.claims.role as string;
+    return role || null;
+  } catch (error) {
+    console.error('Error obtaining user role from token:', error);
+    return null;
   }
 }
 
@@ -71,12 +93,20 @@ async function createRequestHeaders(includeContentType: boolean = false): Promis
 }
 
 /**
- * Make API request with proper authentication
+ * Make API request with proper authentication and automatic role validation
+ * 
+ * For producer/partner-specific operations, this function will check if the user 
+ * has the correct role before making the request, and attempt to synchronize roles
+ * if there's a mismatch.
  */
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  options: {
+    requireRole?: 'producer' | 'partner' | 'consumer';
+    skipRoleCheck?: boolean;
+  } = {}
 ): Promise<Response> {
   // Enable debug logging
   const enableDebug = true;
@@ -84,6 +114,93 @@ export async function apiRequest(
   if (enableDebug) {
     console.log(`apiRequest: Making ${method} request to ${url}`);
     if (data) console.log('apiRequest: Request data:', JSON.stringify(data).substring(0, 100) + '...');
+  }
+  
+  // Check if this is a role-protected endpoint
+  const isProducerEndpoint = url.includes('/api/producer/');
+  const isPartnerEndpoint = url.includes('/api/partner/');
+  
+  // Determine required role based on URL pattern if not explicitly specified
+  const requiredRole = options.requireRole || 
+    (isProducerEndpoint ? 'producer' : 
+     isPartnerEndpoint ? 'partner' : undefined);
+  
+  // Skip role check if specified or if no required role
+  const shouldCheckRole = !options.skipRoleCheck && !!requiredRole;
+  
+  // If this is a role-protected endpoint and role checking is enabled,
+  // verify the user has the correct role before making the request
+  if (shouldCheckRole) {
+    console.log(`apiRequest: Checking user role for ${requiredRole}-protected endpoint`);
+    
+    const userRole = await getUserRoleFromToken();
+    console.log(`apiRequest: User role from token: ${userRole || 'none'}`);
+    
+    // If the roles don't match, try to synchronize them
+    if (userRole !== requiredRole) {
+      console.warn(`apiRequest: Role mismatch detected! Token has ${userRole}, but ${requiredRole} is required`);
+      console.log('apiRequest: Attempting to synchronize roles before proceeding...');
+      
+      try {
+        // Attempt to sync the roles
+        const syncResult = await syncAuthClaims();
+        
+        if (syncResult.success) {
+          console.log('apiRequest: Role sync successful:', syncResult);
+          
+          // If current user exists, force a token refresh
+          if (auth.currentUser) {
+            console.log('apiRequest: Forcing token refresh to apply new claims');
+            await auth.currentUser.getIdToken(true);
+            
+            // Check if role is now correct
+            const newTokenResult = await auth.currentUser.getIdTokenResult();
+            const newRole = newTokenResult.claims.role as string;
+            
+            console.log(`apiRequest: After sync, token has role: ${newRole}`);
+            
+            if (newRole !== requiredRole) {
+              // Still not the right role, alert the user
+              toast({
+                title: 'Permission Error',
+                description: `You need ${requiredRole} permissions for this action. Please contact support if you believe this is an error.`,
+                variant: 'destructive',
+              });
+              
+              throw new Error(`Permission denied: ${requiredRole} role required`);
+            } else {
+              toast({
+                title: 'Permissions Updated',
+                description: `Your ${requiredRole} role permissions have been restored.`,
+                variant: 'default',
+              });
+            }
+          }
+        } else {
+          console.error('apiRequest: Role sync failed:', syncResult);
+          
+          // Alert the user about the permission issue
+          toast({
+            title: 'Permission Error',
+            description: `You need ${requiredRole} permissions for this action. (Sync failed: ${syncResult.message})`,
+            variant: 'destructive',
+          });
+          
+          throw new Error(`Permission denied: ${requiredRole} role required`);
+        }
+      } catch (syncError) {
+        console.error('apiRequest: Error during role synchronization:', syncError);
+        
+        // Alert the user about the permission issue
+        toast({
+          title: 'Permission Error',
+          description: `You need ${requiredRole} permissions for this action.`,
+          variant: 'destructive',
+        });
+        
+        throw new Error(`Permission denied: ${requiredRole} role required`);
+      }
+    }
   }
 
   // Build request options with enhanced debugging
@@ -97,7 +214,7 @@ export async function apiRequest(
     console.log(`apiRequest: Using token: ${tokenPreview}`);
   }
   
-  const options: RequestInit = {
+  const requestOptions: RequestInit = {
     method,
     credentials: "include",
     headers,
@@ -105,13 +222,13 @@ export async function apiRequest(
   
   // Add body if data is provided
   if (data) {
-    options.body = JSON.stringify(data);
+    requestOptions.body = JSON.stringify(data);
   }
   
   try {
     // Make request
     if (enableDebug) console.log('apiRequest: Sending fetch request...');
-    const res = await fetch(url, options);
+    const res = await fetch(url, requestOptions);
     
     if (enableDebug) {
       console.log(`apiRequest: Response status: ${res.status} ${res.statusText}`);
@@ -130,7 +247,7 @@ export async function apiRequest(
 }
 
 /**
- * TanStack Query fetcher function with auth support
+ * TanStack Query fetcher function with auth support and role detection
  */
 type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn: <T>(options: {
@@ -143,6 +260,51 @@ export const getQueryFn: <T>(options: {
     
     if (enableDebug) {
       console.log(`QueryFn: Fetching data from ${queryKey[0]}`);
+    }
+    
+    const url = queryKey[0] as string;
+    
+    // Check if this is a role-protected endpoint
+    const isProducerEndpoint = url.includes('/api/producer/');
+    const isPartnerEndpoint = url.includes('/api/partner/');
+    
+    // Determine required role based on URL pattern
+    const requiredRole = isProducerEndpoint ? 'producer' : 
+                         isPartnerEndpoint ? 'partner' : undefined;
+    
+    // If this is a role-protected endpoint, verify the user has the correct role
+    if (requiredRole) {
+      console.log(`QueryFn: Endpoint requires '${requiredRole}' role`);
+      
+      const userRole = await getUserRoleFromToken();
+      console.log(`QueryFn: User role from token: ${userRole || 'none'}`);
+      
+      // If the roles don't match, trigger a synchronization and show a message
+      if (userRole !== requiredRole) {
+        console.warn(`QueryFn: Role mismatch detected! Token has ${userRole}, but ${requiredRole} is required`);
+        
+        // Attempt role synchronization in background, don't block the request
+        // This will help fix subsequent requests if possible
+        syncAuthClaims()
+          .then(result => {
+            if (result.success) {
+              console.log('QueryFn: Background role sync successful:', result);
+              // Force token refresh in background
+              if (auth.currentUser) {
+                auth.currentUser.getIdToken(true)
+                  .then(() => console.log('QueryFn: Token refreshed after background sync'))
+                  .catch(err => console.error('QueryFn: Error refreshing token after sync:', err));
+              }
+            } else {
+              console.warn('QueryFn: Background role sync failed:', result);
+            }
+          })
+          .catch(err => console.error('QueryFn: Error in background role sync:', err));
+        
+        // For queries, we don't block - we'll let the server decide on authorization
+        // This prevents UI disruption but server will still enforce proper permissions
+        console.log('QueryFn: Proceeding with request despite role mismatch - server will enforce authorization');
+      }
     }
     
     // Get standardized request headers with auth
@@ -162,7 +324,7 @@ export const getQueryFn: <T>(options: {
       // Make API request
       if (enableDebug) console.log('QueryFn: Sending fetch request...');
       
-      const res = await fetch(queryKey[0] as string, {
+      const res = await fetch(url, {
         credentials: "include",
         headers
       });
@@ -174,6 +336,24 @@ export const getQueryFn: <T>(options: {
       // Handle 401 according to specified behavior
       if (res.status === 401) {
         if (enableDebug) console.warn('QueryFn: Received 401 Unauthorized response');
+        
+        // Automatically try to sync roles if it's an unauthorized error
+        // This handles cases where token has the wrong role
+        if (requiredRole) {
+          console.log('QueryFn: Attempting automatic role sync after 401...');
+          
+          syncAuthClaims()
+            .then(result => {
+              if (result.success) {
+                console.log('QueryFn: Role sync after 401 successful:', result);
+                // Refresh the page to get fresh tokens
+                window.location.reload();
+              } else {
+                console.error('QueryFn: Role sync after 401 failed:', result);
+              }
+            })
+            .catch(err => console.error('QueryFn: Error in role sync after 401:', err));
+        }
         
         if (unauthorizedBehavior === "returnNull") {
           console.log('QueryFn: Returning null for 401 as configured');
