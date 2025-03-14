@@ -136,6 +136,7 @@ function RoleDebugSection({ user, authHeader }: { user: any, authHeader: string 
   const [tokenData, setTokenData] = useState<any>(null);
   const [syncingRole, setSyncingRole] = useState(false);
   const { toast } = useToast();
+  const { harmonizedUser } = useAuth();
   
   const decodeJwt = (token: string) => {
     try {
