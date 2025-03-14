@@ -397,11 +397,80 @@ export default function YachtForm() {
   };
   
   // Handle media deletion
-  const handleDeleteMedia = (index: number) => {
-    const newMedia = [...media];
-    // Note: We're not actually deleting from storage here, that would be another step
-    newMedia.splice(index, 1);
-    setMedia(newMedia);
+  const handleDeleteMedia = async (index: number) => {
+    if (index < 0 || index >= media.length || !auth.currentUser) return;
+    
+    try {
+      const mediaItem = media[index];
+      const fileUrl = mediaItem.url;
+      
+      // Extract the path from the URL
+      // Sample URL: https://storage.googleapis.com/etoile-yachts.appspot.com/yacht_media/user123/12345_image.jpg
+      const urlParts = fileUrl.split('/');
+      const bucketIndex = urlParts.findIndex(part => part.includes('.appspot.com') || part.includes('.firebasestorage.app'));
+      
+      if (bucketIndex === -1) {
+        console.warn("Could not determine file path from URL:", fileUrl);
+        // Continue with UI removal even if server deletion fails
+        const newMedia = [...media];
+        newMedia.splice(index, 1);
+        setMedia(newMedia);
+        return;
+      }
+      
+      // Reconstruct the path starting after the bucket name
+      const filePath = urlParts.slice(bucketIndex + 1).join('/');
+      
+      if (!filePath) {
+        console.warn("Empty file path from URL:", fileUrl);
+        // Continue with UI removal even if server deletion fails
+        const newMedia = [...media];
+        newMedia.splice(index, 1);
+        setMedia(newMedia);
+        return;
+      }
+      
+      // Get auth token for the API request
+      const authToken = await auth.currentUser.getIdToken();
+      
+      // Call server-side endpoint to delete the file
+      const deleteResponse = await axios.delete('/api/upload/media', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        data: {
+          filePath: filePath
+        }
+      });
+      
+      if (deleteResponse.data.success) {
+        // Remove the media item from the UI array
+        const newMedia = [...media];
+        newMedia.splice(index, 1);
+        setMedia(newMedia);
+        
+        toast({
+          title: "Media Deleted",
+          description: "The media file has been successfully deleted."
+        });
+      } else {
+        throw new Error(`Failed to delete file: ${deleteResponse.data.error}`);
+      }
+    } catch (error) {
+      console.error("Error deleting media:", error);
+      
+      // Continue with UI removal even if server deletion fails
+      const newMedia = [...media];
+      newMedia.splice(index, 1);
+      setMedia(newMedia);
+      
+      toast({
+        title: "Warning",
+        description: "Media removed from list, but there was an issue deleting the file from storage.",
+        variant: "destructive"
+      });
+    }
   };
   
   // Set an image as cover image (move to first position in array)
