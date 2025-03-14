@@ -121,8 +121,8 @@ export default function ProfilePage() {
     }
   };
   
-  // Get the role directly from user object or from harmonized user
-  const userRole = user?.customClaims?.role || harmonizedUser?.role || 'unknown';
+  // Get the role from harmonized user data
+  const userRole = harmonizedUser?.role || 'unknown';
   
   return (
     <div className="container mx-auto py-10">
