@@ -657,9 +657,6 @@ export default function YachtForm() {
       // Log that we're exclusively using the unified collection
       console.log(`Using unified collection (${collectionName}) for all yacht operations`)
       
-      // Save to Firestore
-      const yachtRef = doc(db, collectionName, packageId);
-      
       // Create a comprehensive data object with all field naming conventions
       const newYachtData: Record<string, any> = {
         // Core unified schema fields
@@ -707,84 +704,75 @@ export default function YachtForm() {
         max_guests: values.capacity,
       };
       
-      // Add updated timestamp fields - ensuring we don't duplicate them
-      const now = Timestamp.now();
-      newYachtData.last_updated_date = now;
-      newYachtData.updatedAt = now;
-      
-      // Add creation date fields - either from existing doc or new
-      if (editMode && yachtData?.created_date) {
-        newYachtData.created_date = yachtData.created_date;
-        newYachtData.createdAt = yachtData.created_date; // legacy field
-      } else {
-        newYachtData.created_date = now;
-        newYachtData.createdAt = now; // legacy field
-      }
+      // Add timestamp fields for client submission
+      const now = new Date().toISOString();
+      newYachtData._lastUpdated = Date.now(); // Cache busting timestamp
       
       if (editMode) {
         try {
-          console.log(`Attempting to update yacht with ID ${packageId} in collection ${collectionName}`);
-          
-          // Add a cache-busting timestamp to force updates to be seen
-          newYachtData._lastUpdated = Date.now();
+          console.log(`Attempting to update yacht with ID ${packageId} via server API`);
           console.log('Update data:', newYachtData);
           
-          // Update the document in the unified collection
-          await updateDoc(yachtRef, newYachtData);
-          console.log('Update successful to unified collection');
+          // Use the server-side API endpoint for yacht updates
+          const response = await fetch(`/api/producer/yacht/update/${packageId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${await auth.currentUser?.getIdToken()}`
+            },
+            body: JSON.stringify(newYachtData)
+          });
           
-          console.log('Update successful');
+          // Check if the request was successful
+          if (!response.ok) {
+            // Try to get the error message from the response
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `Server returned ${response.status}: ${response.statusText}`);
+          }
+          
+          const responseData = await response.json();
+          console.log('Update successful via server API:', responseData);
+          
           toast({
             title: "Yacht Updated",
             description: "Your yacht has been successfully updated.",
           });
         } catch (error) {
-          console.error('Error updating yacht:', error);
-          
-          // Try creating a new document if update fails
-          try {
-            console.log('Update failed, trying to create new document instead');
-            
-            // Use the same newYachtData object, but reset a few fields that might be causing issues
-            newYachtData.created_date = Timestamp.now();
-            newYachtData.createdAt = Timestamp.now();
-            newYachtData.last_updated_date = Timestamp.now();
-            newYachtData.updatedAt = Timestamp.now();
-            newYachtData._lastUpdated = Date.now(); // Force cache update
-            newYachtData.virtual_tour = {
-              enabled: values.virtual_tour_enabled,
-              scenes: []
-            };
-            
-            // Use setDoc instead of updateDoc to create the document if it doesn't exist
-            await setDoc(yachtRef, newYachtData);
-            console.log('Create successful as fallback to update');
-            toast({
-              title: "Yacht Updated",
-              description: "Your yacht has been successfully updated.",
-            });
-          } catch (setDocError) {
-            console.error('Error creating yacht document as fallback:', setDocError);
-            throw error; // re-throw the original error to trigger the error handling below
-          }
+          console.error('Error updating yacht via API:', error);
+          throw error; // re-throw to trigger the error handling below
         }
       } else {
-        // For new yachts, create with both field naming conventions
+        // For new yachts, use the create API endpoint
         try {
-          // Add cache-busting timestamp
-          newYachtData._lastUpdated = Date.now();
+          console.log('Creating new yacht via server API');
           console.log('Create data:', newYachtData);
           
-          // Create document in the unified collection
-          await setDoc(yachtRef, newYachtData);
-          console.log('Successfully created yacht in unified collection');
+          // Use the server-side API endpoint for yacht creation
+          const response = await fetch('/api/producer/yacht/create', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${await auth.currentUser?.getIdToken()}`
+            },
+            body: JSON.stringify(newYachtData)
+          });
+          
+          // Check if the request was successful
+          if (!response.ok) {
+            // Try to get the error message from the response
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `Server returned ${response.status}: ${response.statusText}`);
+          }
+          
+          const responseData = await response.json();
+          console.log('Successfully created yacht via server API:', responseData);
           
           toast({
             title: "Yacht Created",
             description: "Your yacht has been successfully created.",
           });
         } catch (error) {
-          console.error('Error creating new yacht:', error);
+          console.error('Error creating new yacht via API:', error);
           throw error; // re-throw to trigger the error handling below
         }
       }
