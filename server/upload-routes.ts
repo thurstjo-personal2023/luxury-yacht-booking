@@ -89,12 +89,12 @@ export function registerUploadRoutes(app: Express) {
             path: storagePath,
           },
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error uploading file:", error);
         res.status(500).json({
           success: false,
           error: "Failed to upload file",
-          details: error.message,
+          details: error.message || "Unknown error",
         });
       }
     }
@@ -137,12 +137,12 @@ export function registerUploadRoutes(app: Express) {
           success: true,
           message: "File deleted successfully",
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error deleting file:", error);
         res.status(500).json({
           success: false,
           error: "Failed to delete file",
-          details: error.message,
+          details: error.message || "Unknown error",
         });
       }
     }
