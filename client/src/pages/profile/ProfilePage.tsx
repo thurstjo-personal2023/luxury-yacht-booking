@@ -12,8 +12,10 @@ import { UserProfileForm } from '@/components/profile/UserProfileForm';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, ArrowLeft, Edit, User } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Edit, User, RefreshCw, Shield } from 'lucide-react';
 import { Link } from 'wouter';
+import { syncAuthClaims } from '@/lib/user-profile-utils';
+import { toast } from '@/hooks/use-toast';
 
 export default function ProfilePage() {
   const { user, loading, harmonizedUser } = useAuth();
