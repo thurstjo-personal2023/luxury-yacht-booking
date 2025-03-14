@@ -1338,6 +1338,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Reverse geocoding proxy endpoint
+  app.get("/api/geocode/reverse", async (req: Request, res: Response) => {
+    try {
+      const { lat, lng } = req.query;
+      
+      if (!lat || !lng) {
+        return res.status(400).json({ 
+          error: "Missing required parameters. Both 'lat' and 'lng' are required." 
+        });
+      }
+      
+      // Verify the parameters are valid numbers
+      const latitude = parseFloat(lat as string);
+      const longitude = parseFloat(lng as string);
+      
+      if (isNaN(latitude) || isNaN(longitude)) {
+        return res.status(400).json({ 
+          error: "Invalid coordinates. Latitude and longitude must be valid numbers." 
+        });
+      }
+      
+      // Using node-fetch to make the request
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${process.env.GOOGLE_MAPS_API_KEY}`
+      );
+      
+      if (!response.ok) {
+        console.error(`Google Maps API error: ${response.status} ${response.statusText}`);
+        return res.status(response.status).json({ 
+          error: "Error from Google Maps API", 
+          details: response.statusText 
+        });
+      }
+      
+      const data = await response.json();
+      
+      // Return the results to the client
+      res.json(data);
+    } catch (error) {
+      console.error("Error in reverse geocoding proxy:", error);
+      res.status(500).json({ 
+        error: "Failed to perform reverse geocoding", 
+        details: String(error)
+      });
+    }
+  });
+  
   // Register User Profile routes
   registerUserProfileRoutes(app);
 

@@ -1,8 +1,9 @@
-import { httpsCallable, getFunctions } from "firebase/functions";
-import { app } from "@/lib/firebase";
+import axios from 'axios';
 
 /**
- * Performs reverse geocoding using the Firebase Cloud Function
+ * Performs reverse geocoding using the server-side proxy to Google Maps API
+ * This server-side proxy helps prevent CORS issues and securely manages the API key
+ * 
  * @param latitude Latitude coordinate
  * @param longitude Longitude coordinate
  * @returns Promise with address information or null
@@ -22,24 +23,30 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
     const formattedLat = Number(latitude.toFixed(6));
     const formattedLng = Number(longitude.toFixed(6));
     
-    // Get the functions instance
-    const functions = getFunctions(app);
-    const reverseGeocodeFn = httpsCallable<
-      { latitude: number; longitude: number }, 
-      { address: string | null }
-    >(functions, 'reverseGeocode');
+    console.log("Calling reverse geocode proxy with coordinates:", { formattedLat, formattedLng });
     
-    // Call the function with properly formatted coordinates
-    const result = await reverseGeocodeFn({ 
-      latitude: formattedLat, 
-      longitude: formattedLng 
+    // Use our server-side proxy endpoint instead of calling Firebase Function directly
+    const response = await axios.get(`/api/geocode/reverse`, {
+      params: {
+        lat: formattedLat,
+        lng: formattedLng
+      }
     });
     
-    return result.data;
+    // Extract address from Google Maps API response
+    if (response.data && response.data.results && response.data.results.length > 0) {
+      const formattedAddress = response.data.results[0].formatted_address;
+      console.log("Successfully retrieved address:", formattedAddress);
+      return { address: formattedAddress };
+    } else {
+      console.warn("No address results found in Google Maps API response:", response.data);
+      return { address: null };
+    }
   } catch (error) {
-    console.error("Error in reverseGeocode:", error);
+    console.error("Error in reverseGeocode proxy call:", error);
+    
     // Return a fallback for UAE coordinates
-    // This is a workaround for when the cloud function fails
+    // This is a workaround for when the geocoding service fails
     if (latitude >= 22.0 && latitude <= 27.0 && longitude >= 51.0 && longitude <= 56.5) {
       return { address: "United Arab Emirates" };
     }
