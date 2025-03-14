@@ -1319,6 +1319,12 @@ export default function AssetManagement() {
               Back to Dashboard
             </Button>
             
+            {/* Role debug section for troubleshooting */}
+            <RoleDebugSection 
+              user={firebaseUser} 
+              authHeader={authHeader}
+            />
+            
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <h1 className="text-3xl font-bold">Asset Management</h1>
