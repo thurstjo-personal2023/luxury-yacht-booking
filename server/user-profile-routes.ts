@@ -5,7 +5,7 @@
  */
 
 import { Express, Request, Response } from 'express';
-import { verifyAuth, adminDb } from './firebase-admin';
+import { verifyAuth, adminDb, adminAuth } from './firebase-admin';
 import { 
   syncUserData, 
   getCompleteUserProfile,
@@ -329,6 +329,8 @@ export function registerUserProfileRoutes(app: Express) {
         return res.status(400).json({ error: 'Invalid role. Must be consumer, producer, or partner' });
       }
       
+      console.log(`Creating new user profile for ${req.user.uid} with role ${role}`);
+      
       // Create harmonized user
       const userData: HarmonizedUser = {
         id: req.user.uid,
@@ -372,13 +374,67 @@ export function registerUserProfileRoutes(app: Express) {
         await createOrUpdateHarmonizedUser(userData, { serviceProviderProfile });
       }
       
-      return res.json({ success: true });
+      // Update Firebase Auth custom claims to match the selected role
+      console.log(`Setting custom claims for user ${req.user.uid} with role=${role}`);
+      await adminAuth.setCustomUserClaims(req.user.uid, { role });
+      
+      console.log(`Custom claims set successfully for user ${req.user.uid}`);
+      
+      return res.json({ 
+        success: true, 
+        message: 'User profile created successfully',
+        refreshToken: true // Signal client to refresh token
+      });
     } catch (error) {
       console.error('Error creating user profile:', error);
       return res.status(500).json({ error: 'Failed to create user profile' });
     }
   });
   
+  /**
+   * Synchronize Firebase Auth custom claims with Firestore user role
+   * This endpoint is used to resolve mismatches between Auth claims and Firestore data
+   */
+  app.post('/api/user/sync-auth-claims', verifyAuth, async (req: Request, res: Response) => {
+    try {
+      if (!req.user?.uid) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      
+      // 1. Get the current role from harmonized_users in Firestore
+      const userDoc = await adminDb.collection('harmonized_users').doc(req.user.uid).get();
+      
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: 'User profile not found in Firestore' });
+      }
+      
+      const userData = userDoc.data() as HarmonizedUser;
+      const firestoreRole = userData?.role || 'consumer';
+      
+      // 2. Log the current role and the requested role for debugging
+      console.log(`Synchronizing auth claims for user ${req.user.uid}`);
+      console.log(`Current Auth role: ${req.user.role || 'not set'}`);
+      console.log(`Firestore role: ${firestoreRole}`);
+      
+      // 3. Update Firebase Auth custom claims with the role from Firestore
+      await adminAuth.setCustomUserClaims(req.user.uid, { role: firestoreRole });
+      
+      console.log(`Auth claims updated for user ${req.user.uid} with role=${firestoreRole}`);
+      
+      // 4. Force token refresh on client side
+      return res.status(200).json({
+        success: true,
+        message: `Role synchronized successfully to ${firestoreRole}`,
+        currentRole: req.user.role,
+        newRole: firestoreRole,
+        refreshToken: true
+      });
+    } catch (error) {
+      console.error('Error synchronizing auth claims:', error);
+      return res.status(500).json({ error: 'Failed to synchronize auth claims' });
+    }
+  });
+
   /**
    * Update user role 
    * This endpoint should be restricted to administrators in production
@@ -449,7 +505,13 @@ export function registerUserProfileRoutes(app: Express) {
       // Sync with role-specific collections
       await syncUserData(userId);
       
-      return res.json({ success: true });
+      // Update Firebase Auth custom claims to match
+      await adminAuth.setCustomUserClaims(userId, { role });
+      
+      return res.json({ 
+        success: true,
+        message: 'User role updated in both Firestore and Auth claims'
+      });
     } catch (error) {
       console.error('Error updating user role:', error);
       return res.status(500).json({ error: 'Failed to update user role' });
