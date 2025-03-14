@@ -1142,6 +1142,267 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Update an existing yacht endpoint
+  app.post("/api/producer/yacht/update/:id", verifyAuth, async (req: Request, res: Response) => {
+    // Set content type explicitly to ensure JSON response
+    res.setHeader('Content-Type', 'application/json');
+    
+    try {
+      const yachtId = req.params.id;
+      console.log(`Update Yacht API: Request received for yacht ID: ${yachtId}`);
+      
+      // Log request body for debugging
+      console.log('Update Yacht API: Request body:', req.body);
+      
+      const updateData = req.body;
+      
+      // If there's no request body, return an error
+      if (!updateData || Object.keys(updateData).length === 0) {
+        console.warn('Update Yacht API: Empty request body');
+        return res.status(400).json({
+          error: "Invalid request",
+          message: "Request body is empty",
+          details: "Provide yacht data to update"
+        });
+      }
+      
+      // Get the authenticated user ID from the auth token (set by verifyAuth middleware)
+      const authUserId = req.user?.uid;
+      
+      if (!authUserId) {
+        console.warn('Update Yacht API: No user ID in authentication data');
+        return res.status(401).json({
+          error: "Unauthorized",
+          message: "Valid producer authentication required",
+          details: "No user ID found in authentication data"
+        });
+      }
+      
+      // Verify this user is a producer in Firestore
+      try {
+        const userDoc = await adminDb.collection('harmonized_users').doc(authUserId).get();
+        
+        if (!userDoc.exists) {
+          console.warn(`Update Yacht API: User ${authUserId} not found in harmonized_users collection`);
+          return res.status(403).json({
+            error: "Access denied",
+            message: "User not found in database"
+          });
+        }
+        
+        const userData = userDoc.data();
+        const userRole = userData?.role;
+        
+        console.log(`Update Yacht API: User ${authUserId} has role "${userRole}" in Firestore`);
+        
+        // Check if the user's Firestore role is producer
+        if (userRole !== 'producer') {
+          console.warn(`Update Yacht API: User ${authUserId} with role "${userRole}" attempted to update a yacht`);
+          return res.status(403).json({
+            error: "Access denied",
+            message: "User is not registered as a producer",
+            details: `Current role: ${userRole}`
+          });
+        }
+      } catch (verifyError) {
+        console.error("Update Yacht API: Error verifying user role:", verifyError);
+        return res.status(500).json({
+          error: "Authentication verification failed",
+          message: "Could not verify user role",
+          details: String(verifyError)
+        });
+      }
+      
+      // Use our helper function to get harmonized IDs
+      const { producerId } = await getHarmonizedProducerIds(authUserId);
+      
+      console.log(`Update Yacht API: Verifying yacht ownership for producer ID: ${producerId}`);
+      
+      // First, check if the yacht exists and belongs to this producer
+      try {
+        const yachtDoc = await adminDb.collection('unified_yacht_experiences').doc(yachtId).get();
+        
+        if (!yachtDoc.exists) {
+          console.warn(`Update Yacht API: Yacht with ID ${yachtId} not found`);
+          return res.status(404).json({
+            error: "Yacht not found",
+            message: `No yacht exists with ID: ${yachtId}`
+          });
+        }
+        
+        const yachtData = yachtDoc.data();
+        const yachtProducerId = yachtData?.producerId || yachtData?.providerId;
+        
+        // Verify the yacht belongs to this producer
+        if (yachtProducerId !== producerId) {
+          console.warn(`Update Yacht API: Yacht ${yachtId} belongs to producer ${yachtProducerId}, not ${producerId}`);
+          return res.status(403).json({
+            error: "Access denied",
+            message: "You do not have permission to update this yacht",
+            details: "Yacht belongs to a different producer"
+          });
+        }
+        
+        console.log(`Update Yacht API: Yacht ${yachtId} ownership verified for producer ${producerId}`);
+        
+        // Update timestamp fields
+        updateData.last_updated_date = FieldValue.serverTimestamp();
+        updateData.updatedAt = FieldValue.serverTimestamp();
+        
+        // Update the yacht document
+        console.log(`Update Yacht API: Updating yacht ${yachtId} with data:`, updateData);
+        await adminDb.collection('unified_yacht_experiences').doc(yachtId).update(updateData);
+        
+        console.log(`Update Yacht API: Successfully updated yacht with ID: ${yachtId}`);
+        
+        // Return success response
+        return res.json({ 
+          success: true, 
+          message: "Yacht updated successfully",
+          id: yachtId
+        });
+      } catch (dbError) {
+        console.error("Update Yacht API: Database error:", dbError);
+        
+        // Return detailed error
+        return res.status(500).json({ 
+          error: "Database operation failed", 
+          message: "Failed to update yacht data in database",
+          details: String(dbError),
+          code: typeof dbError === 'object' && dbError !== null ? (dbError as any).code : undefined
+        });
+      }
+    } catch (error) {
+      console.error("Error updating yacht:", error);
+      res.status(500).json({ 
+        error: "Failed to update yacht", 
+        message: String(error),
+        stack: process.env.NODE_ENV === 'development' ? (error as Error).stack : undefined
+      });
+    }
+  });
+  
+  // Delete a yacht endpoint
+  app.delete("/api/producer/yacht/:id", verifyAuth, async (req: Request, res: Response) => {
+    // Set content type explicitly to ensure JSON response
+    res.setHeader('Content-Type', 'application/json');
+    
+    try {
+      const yachtId = req.params.id;
+      console.log(`Delete Yacht API: Request received for yacht ID: ${yachtId}`);
+      
+      // Get the authenticated user ID from the auth token (set by verifyAuth middleware)
+      const authUserId = req.user?.uid;
+      
+      if (!authUserId) {
+        console.warn('Delete Yacht API: No user ID in authentication data');
+        return res.status(401).json({
+          error: "Unauthorized",
+          message: "Valid producer authentication required",
+          details: "No user ID found in authentication data"
+        });
+      }
+      
+      // Verify this user is a producer in Firestore
+      try {
+        const userDoc = await adminDb.collection('harmonized_users').doc(authUserId).get();
+        
+        if (!userDoc.exists) {
+          console.warn(`Delete Yacht API: User ${authUserId} not found in harmonized_users collection`);
+          return res.status(403).json({
+            error: "Access denied",
+            message: "User not found in database"
+          });
+        }
+        
+        const userData = userDoc.data();
+        const userRole = userData?.role;
+        
+        console.log(`Delete Yacht API: User ${authUserId} has role "${userRole}" in Firestore`);
+        
+        // Check if the user's Firestore role is producer
+        if (userRole !== 'producer') {
+          console.warn(`Delete Yacht API: User ${authUserId} with role "${userRole}" attempted to delete a yacht`);
+          return res.status(403).json({
+            error: "Access denied",
+            message: "User is not registered as a producer",
+            details: `Current role: ${userRole}`
+          });
+        }
+      } catch (verifyError) {
+        console.error("Delete Yacht API: Error verifying user role:", verifyError);
+        return res.status(500).json({
+          error: "Authentication verification failed",
+          message: "Could not verify user role",
+          details: String(verifyError)
+        });
+      }
+      
+      // Use our helper function to get harmonized IDs
+      const { producerId } = await getHarmonizedProducerIds(authUserId);
+      
+      console.log(`Delete Yacht API: Verifying yacht ownership for producer ID: ${producerId}`);
+      
+      // First, check if the yacht exists and belongs to this producer
+      try {
+        const yachtDoc = await adminDb.collection('unified_yacht_experiences').doc(yachtId).get();
+        
+        if (!yachtDoc.exists) {
+          console.warn(`Delete Yacht API: Yacht with ID ${yachtId} not found`);
+          return res.status(404).json({
+            error: "Yacht not found",
+            message: `No yacht exists with ID: ${yachtId}`
+          });
+        }
+        
+        const yachtData = yachtDoc.data();
+        const yachtProducerId = yachtData?.producerId || yachtData?.providerId;
+        
+        // Verify the yacht belongs to this producer
+        if (yachtProducerId !== producerId) {
+          console.warn(`Delete Yacht API: Yacht ${yachtId} belongs to producer ${yachtProducerId}, not ${producerId}`);
+          return res.status(403).json({
+            error: "Access denied",
+            message: "You do not have permission to delete this yacht",
+            details: "Yacht belongs to a different producer"
+          });
+        }
+        
+        console.log(`Delete Yacht API: Yacht ${yachtId} ownership verified for producer ${producerId}`);
+        
+        // Delete the yacht document
+        console.log(`Delete Yacht API: Deleting yacht ${yachtId}`);
+        await adminDb.collection('unified_yacht_experiences').doc(yachtId).delete();
+        
+        console.log(`Delete Yacht API: Successfully deleted yacht with ID: ${yachtId}`);
+        
+        // Return success response
+        return res.json({ 
+          success: true, 
+          message: "Yacht deleted successfully",
+          id: yachtId
+        });
+      } catch (dbError) {
+        console.error("Delete Yacht API: Database error:", dbError);
+        
+        // Return detailed error
+        return res.status(500).json({ 
+          error: "Database operation failed", 
+          message: "Failed to delete yacht from database",
+          details: String(dbError),
+          code: typeof dbError === 'object' && dbError !== null ? (dbError as any).code : undefined
+        });
+      }
+    } catch (error) {
+      console.error("Error deleting yacht:", error);
+      res.status(500).json({ 
+        error: "Failed to delete yacht", 
+        message: String(error),
+        stack: process.env.NODE_ENV === 'development' ? (error as Error).stack : undefined
+      });
+    }
+  });
+  
   // Get producer reviews
   app.get("/api/producer/reviews", verifyAuth, async (req: Request, res: Response) => {
     // Set content type explicitly to ensure JSON response
