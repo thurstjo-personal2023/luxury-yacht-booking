@@ -1,4 +1,4 @@
-import { Express, Request, Response } from "express";
+import { Express, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import { verifyAuth } from "./firebase-admin";
 import { adminStorage } from "./firebase-admin";
@@ -7,12 +7,37 @@ import * as crypto from "crypto";
 
 // Configure multer storage
 const storage = multer.memoryStorage();
+
+// File size constants
+const MB = 1024 * 1024;
+const MAX_FILE_SIZE = 50 * MB; // 50MB limit
+
+// Configure multer with increased limits
 const upload = multer({
   storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: MAX_FILE_SIZE,
   },
 });
+
+// Custom error handler for multer errors
+const handleMulterError = (err: any, req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({
+        success: false,
+        error: 'File too large',
+        details: `Maximum file size is ${MAX_FILE_SIZE / MB}MB`,
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      error: 'File upload error',
+      details: err.message,
+    });
+  }
+  next(err);
+};
 
 /**
  * Register upload-related routes
@@ -22,7 +47,14 @@ export function registerUploadRoutes(app: Express) {
   app.post(
     "/api/upload/media",
     verifyAuth,
-    upload.single("file"),
+    (req: Request, res: Response, next: NextFunction) => {
+      upload.single("file")(req, res, (err) => {
+        if (err) {
+          return handleMulterError(err, req, res, next);
+        }
+        next();
+      });
+    },
     async (req: Request, res: Response) => {
       try {
         if (!req.file) {
