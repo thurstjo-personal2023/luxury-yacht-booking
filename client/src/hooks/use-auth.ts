@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 
+// User model with Firebase authentication properties
 interface AuthUser {
   uid: string;
   email: string | null;
@@ -18,6 +19,7 @@ interface AuthUser {
   photoURL?: string | null;
 }
 
+// Context type definition
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
@@ -26,12 +28,15 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
+// Create the auth context with undefined default value
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Props for the AuthProvider component
 interface AuthProviderProps {
   children: ReactNode;
 }
 
+// Authentication provider component
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
