@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { registerUserProfileRoutes } from "./user-profile-routes";
 import { registerUploadRoutes } from "./upload-routes";
+import { registerEmailRoutes } from "./email-routes";
 import { testProductionStorage, runStorageTest } from "./test-storage";
 import { USE_FIREBASE_EMULATORS } from "./env-config";
 
@@ -51,6 +52,9 @@ app.use((req, res, next) => {
     
     // Register file upload routes
     registerUploadRoutes(app);
+    
+    // Register email notification routes
+    registerEmailRoutes(app);
     
     // Test Firebase Storage in production
     if (!USE_FIREBASE_EMULATORS) {
