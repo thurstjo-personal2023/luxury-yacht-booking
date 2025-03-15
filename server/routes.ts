@@ -472,6 +472,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get user bookings
+  app.get("/api/user/bookings", verifyAuth, async (req: Request, res: Response) => {
+    try {
+      const { user } = req;
+      
+      if (!user || !user.uid) {
+        return res.status(401).json({ error: "Unauthorized", details: "User authentication required" });
+      }
+      
+      console.log(`Fetching bookings for user ${user.uid}`);
+      
+      // Get bookings from Firestore
+      const bookingsSnapshot = await adminDb.collection("bookings")
+        .where("userId", "==", user.uid)
+        .orderBy("createdAt", "desc")
+        .get();
+      
+      if (bookingsSnapshot.empty) {
+        console.log(`No bookings found for user ${user.uid}`);
+        return res.json({ bookings: [] });
+      }
+      
+      console.log(`Found ${bookingsSnapshot.size} bookings for user ${user.uid}`);
+      
+      // Process bookings and fetch related data
+      const bookings = await Promise.all(bookingsSnapshot.docs.map(async (doc) => {
+        // Get booking data with proper typing
+        const bookingData: {
+          id: string;
+          packageId?: string;
+          userId?: string;
+          startDate?: string;
+          endDate?: string;
+          totalPrice?: number;
+          status?: string;
+          createdAt?: any;
+          [key: string]: any;
+        } = { 
+          id: doc.id, 
+          ...doc.data() 
+        };
+        
+        // Get yacht details for this booking
+        let yachtData = null;
+        try {
+          // Ensure packageId exists in the booking data
+          if (bookingData.packageId) {
+            const yachtSnapshot = await adminDb.collection("unified_yacht_experiences")
+              .where("package_id", "==", bookingData.packageId)
+              .limit(1)
+              .get();
+              
+            if (!yachtSnapshot.empty) {
+              yachtData = yachtSnapshot.docs[0].data();
+            }
+          } else {
+            console.warn(`No packageId found for booking ${doc.id}`);
+          }
+        } catch (error) {
+          console.warn(`Error fetching yacht data for booking ${doc.id}:`, error);
+        }
+        
+        // Get payment status
+        let paymentStatus = "pending";
+        try {
+          const paymentsSnapshot = await adminDb.collection("payments")
+            .where("bookingId", "==", doc.id)
+            .limit(1)
+            .get();
+            
+          if (!paymentsSnapshot.empty) {
+            paymentStatus = paymentsSnapshot.docs[0].data().status || "pending";
+          }
+        } catch (error) {
+          console.warn(`Error fetching payment status for booking ${doc.id}:`, error);
+        }
+        
+        // Get confirmation data if available
+        let confirmationId = null;
+        try {
+          const confirmationSnapshot = await adminDb.collection("booking_confirmations")
+            .where("bookingId", "==", doc.id)
+            .limit(1)
+            .get();
+            
+          if (!confirmationSnapshot.empty) {
+            confirmationId = confirmationSnapshot.docs[0].id;
+          }
+        } catch (error) {
+          console.warn(`Error fetching confirmation for booking ${doc.id}:`, error);
+        }
+        
+        return {
+          ...bookingData,
+          yacht: yachtData ? {
+            id: yachtData.id || yachtData.package_id || "",
+            title: yachtData.title || yachtData.name || "Unknown Yacht",
+            description: yachtData.description || "",
+            mainImage: yachtData.mainImage || 
+                      (yachtData.media && yachtData.media.length > 0 ? yachtData.media[0].url : ""),
+            location: yachtData.location || {}
+          } : null,
+          paymentStatus,
+          confirmationId
+        };
+      }));
+      
+      return res.json({ bookings });
+    } catch (error) {
+      console.error("Error fetching user bookings:", error);
+      return res.status(500).json({ 
+        error: "Internal Server Error", 
+        details: String(error) 
+      });
+    }
+  });
+  
   // Payment API endpoint
   app.post("/api/payments", verifyAuth, async (req: Request, res: Response) => {
     try {

@@ -1,9 +1,30 @@
 import axios from 'axios';
+import { auth } from '@/lib/firebase';
 
 /**
  * Email template types available for testing
  */
 export type EmailTemplateType = 'welcome' | 'booking' | 'reset';
+
+/**
+ * Get authentication token for API requests
+ * 
+ * @returns Promise that resolves with the token or null if not authenticated
+ */
+async function getAuthToken(): Promise<string | null> {
+  try {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.warn('User must be authenticated to send emails');
+      return null;
+    }
+    
+    return await currentUser.getIdToken();
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return null;
+  }
+}
 
 /**
  * Send a test email of the specified template type
@@ -13,8 +34,14 @@ export type EmailTemplateType = 'welcome' | 'booking' | 'reset';
  */
 export async function sendTestEmail(templateType: EmailTemplateType): Promise<void> {
   try {
+    const token = await getAuthToken();
+    
     const response = await axios.post('/api/email/test', {
       templateType,
+    }, {
+      headers: token ? {
+        'Authorization': `Bearer ${token}`
+      } : undefined
     });
     
     if (response.status !== 200) {
@@ -44,11 +71,17 @@ export async function sendWelcomeEmail(
   businessName?: string
 ): Promise<void> {
   try {
+    const token = await getAuthToken();
+    
     const response = await axios.post('/api/email/welcome', {
       email,
       name,
       role,
       businessName,
+    }, {
+      headers: token ? {
+        'Authorization': `Bearer ${token}`
+      } : undefined
     });
     
     if (response.status !== 200) {
@@ -83,10 +116,21 @@ export async function sendBookingConfirmation(
   }
 ): Promise<void> {
   try {
+    const token = await getAuthToken();
+    
+    if (!token) {
+      console.warn('Authentication required to send booking confirmation email');
+      throw new Error('Authentication required to send booking confirmation email');
+    }
+    
     const response = await axios.post('/api/email/booking-confirmation', {
       to: email,
       name,
       ...bookingDetails,
+    }, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
     
     if (response.status !== 200) {
@@ -114,10 +158,16 @@ export async function sendPasswordResetEmail(
   resetLink: string
 ): Promise<void> {
   try {
+    const token = await getAuthToken();
+    
     const response = await axios.post('/api/email/password-reset', {
       to: email,
       name,
       resetLink,
+    }, {
+      headers: token ? {
+        'Authorization': `Bearer ${token}`
+      } : undefined
     });
     
     if (response.status !== 200) {
