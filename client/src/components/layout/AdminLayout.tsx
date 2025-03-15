@@ -1,145 +1,173 @@
-import React, { ReactNode } from 'react';
+import { useState, ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { 
-  Home, 
-  Mail, 
-  Users, 
-  Sailboat, 
-  Package, 
-  Settings, 
-  Bell, 
-  FileText, 
-  LogOut 
+import {
+  LayoutDashboard,
+  Mail,
+  Users,
+  Settings,
+  Server,
+  Database,
+  FileWarning,
+  LogOut,
+  Menu,
+  X
 } from 'lucide-react';
-import { auth } from '@/lib/firebase';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useToast } from '@/hooks/use-toast';
-
-interface NavItemProps {
-  href: string;
-  icon: React.ReactNode;
-  label: string;
-  current: boolean;
-}
-
-function NavItem({ href, icon, label, current }: NavItemProps) {
-  return (
-    <Link href={href}>
-      <Button 
-        variant={current ? "secondary" : "ghost"} 
-        className={`w-full justify-start mb-1 ${current ? 'bg-muted' : ''}`}
-      >
-        {icon}
-        <span className="ml-2">{label}</span>
-      </Button>
-    </Link>
-  );
-}
+import { useAuth } from '@/hooks/use-auth';
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
 interface AdminLayoutProps {
   children: ReactNode;
 }
 
+interface NavItem {
+  label: string;
+  href: string;
+  icon: ReactNode;
+}
+
 export function AdminLayout({ children }: AdminLayoutProps) {
+  const { user, signOut } = useAuth();
   const [location] = useLocation();
-  const [user] = useAuthState(auth);
-  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
 
-  const handleLogout = async () => {
-    try {
-      await auth.signOut();
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out.",
-      });
-    } catch (error) {
-      console.error("Error signing out:", error);
-      toast({
-        title: "Error",
-        description: "Failed to sign out. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const navItems = [
-    { href: '/admin', icon: <Home className="h-4 w-4" />, label: 'Dashboard' },
-    { href: '/admin/users', icon: <Users className="h-4 w-4" />, label: 'User Management' },
-    { href: '/admin/yachts', icon: <Sailboat className="h-4 w-4" />, label: 'Yacht Listings' },
-    { href: '/admin/packages', icon: <Package className="h-4 w-4" />, label: 'Experience Packages' },
-    { href: '/admin/notifications', icon: <Bell className="h-4 w-4" />, label: 'Notifications' },
-    { href: '/admin/reports', icon: <FileText className="h-4 w-4" />, label: 'Reports' },
-    { href: '/admin/email-test', icon: <Mail className="h-4 w-4" />, label: 'Email System' },
-    { href: '/admin/settings', icon: <Settings className="h-4 w-4" />, label: 'Settings' },
+  const navItems: NavItem[] = [
+    {
+      label: 'Dashboard',
+      href: '/admin',
+      icon: <LayoutDashboard className="mr-2 h-4 w-4" />,
+    },
+    {
+      label: 'Email System',
+      href: '/admin/email',
+      icon: <Mail className="mr-2 h-4 w-4" />,
+    },
+    {
+      label: 'User Management',
+      href: '/admin/users',
+      icon: <Users className="mr-2 h-4 w-4" />,
+    },
+    {
+      label: 'System Settings',
+      href: '/admin/settings',
+      icon: <Settings className="mr-2 h-4 w-4" />,
+    },
+    {
+      label: 'Server Status',
+      href: '/admin/server',
+      icon: <Server className="mr-2 h-4 w-4" />,
+    },
+    {
+      label: 'Database',
+      href: '/admin/database',
+      icon: <Database className="mr-2 h-4 w-4" />,
+    },
+    {
+      label: 'Error Logs',
+      href: '/admin/logs',
+      icon: <FileWarning className="mr-2 h-4 w-4" />,
+    },
   ];
 
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Admin Access Required</h1>
-          <p className="mb-6">Please log in to access the admin panel.</p>
-          <Link href="/login">
-            <Button>Login</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const closeSheet = () => {
+    setOpen(false);
+  };
 
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
-      <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-10">
-        <div className="flex flex-col flex-grow pt-5 pb-4 overflow-y-auto border-r bg-card">
-          <div className="flex items-center flex-shrink-0 px-4 mb-5">
-            <h1 className="text-xl font-bold">Etoile Yachts Admin</h1>
-          </div>
-          
-          {/* User info */}
-          <div className="px-4 mb-6">
-            <div className="flex items-center space-x-3">
-              <Avatar>
-                <AvatarImage src={user?.photoURL || ''} alt={user?.displayName || 'User'} />
-                <AvatarFallback>{(user?.displayName || 'User').charAt(0)}</AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="font-medium">{user?.displayName || user?.email}</p>
-                <p className="text-xs text-muted-foreground">Administrator</p>
+    <div className="min-h-screen flex flex-col">
+      {/* Top navbar */}
+      <header className="bg-primary text-primary-foreground shadow-md py-4 px-6 flex justify-between items-center">
+        <div className="flex items-center">
+          <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger asChild className="md:hidden mr-4">
+              <Button variant="ghost" size="icon" className="text-primary-foreground">
+                <Menu />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-72 p-0">
+              <div className="bg-primary text-primary-foreground p-6 flex items-center justify-between">
+                <h2 className="text-xl font-bold">Admin Panel</h2>
+                <Button variant="ghost" size="icon" onClick={closeSheet}>
+                  <X className="h-5 w-5" />
+                </Button>
               </div>
-            </div>
-          </div>
-          
-          <Separator className="mb-6" />
-          
-          {/* Navigation */}
-          <nav className="mt-2 flex-1 px-3 space-y-1">
+              <nav className="flex flex-col p-4">
+                {navItems.map((item) => (
+                  <Link key={item.href} href={item.href}>
+                    <a
+                      className={`flex items-center px-4 py-3 rounded-md transition-colors mb-1 ${
+                        location === item.href
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : 'hover:bg-muted'
+                      }`}
+                      onClick={closeSheet}
+                    >
+                      {item.icon}
+                      {item.label}
+                    </a>
+                  </Link>
+                ))}
+                <Button
+                  variant="ghost"
+                  className="flex items-center justify-start px-4 py-3 rounded-md w-full hover:bg-muted mt-4"
+                  onClick={() => {
+                    signOut();
+                    closeSheet();
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </Button>
+              </nav>
+            </SheetContent>
+          </Sheet>
+          <h1 className="text-xl font-bold">Admin Panel</h1>
+        </div>
+        <div className="flex items-center">
+          {user && (
+            <span className="mr-4 hidden md:inline-block">
+              {user.email}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            className="text-primary-foreground border-primary-foreground hover:bg-primary-foreground/10"
+            onClick={signOut}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </Button>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <div className="flex flex-1">
+        {/* Sidebar (desktop only) */}
+        <aside className="hidden md:block w-64 bg-muted/50 border-r shadow-sm">
+          <nav className="flex flex-col p-4">
             {navItems.map((item) => (
-              <NavItem
-                key={item.href}
-                href={item.href}
-                icon={item.icon}
-                label={item.label}
-                current={location === item.href}
-              />
+              <Link key={item.href} href={item.href}>
+                <a
+                  className={`flex items-center px-4 py-3 rounded-md transition-colors mb-1 ${
+                    location === item.href
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'hover:bg-muted'
+                  }`}
+                >
+                  {item.icon}
+                  {item.label}
+                </a>
+              </Link>
             ))}
           </nav>
-          
-          <div className="p-3">
-            <Button variant="outline" className="w-full justify-start" onClick={handleLogout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </div>
-      
-      {/* Main content */}
-      <div className="md:pl-64 flex flex-col flex-1">
-        <main className="flex-1 pb-8 pt-2">
+        </aside>
+
+        {/* Main content */}
+        <main className="flex-1 bg-background">
           {children}
         </main>
       </div>

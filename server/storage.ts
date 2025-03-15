@@ -832,6 +832,671 @@ export class FirestoreStorage implements IStorage {
       };
     }
   }
+  
+  // Customer-specific methods for the migration
+  
+  async getRecommendedYachts(userId: string, limit: number = 4): Promise<YachtSummary[]> {
+    try {
+      console.log(`Getting recommended yachts for user ${userId}, limit: ${limit}`);
+      
+      // First, attempt to get user's preferences from their profile
+      const userPreferences = await this.getUserPreferences(userId);
+      
+      // Strategy 1: If user has preferences, use them to find matching yachts
+      if (userPreferences && userPreferences.length > 0) {
+        console.log(`User has ${userPreferences.length} preferences, finding matches`);
+        
+        // Query yachts with matching tags
+        const preferencesSnapshot = await adminDb.collection(UNIFIED_YACHT_COLLECTION)
+          .where('isAvailable', '==', true)
+          .where('tags', 'array-contains-any', userPreferences)
+          .limit(limit)
+          .get();
+        
+        if (!preferencesSnapshot.empty) {
+          console.log(`Found ${preferencesSnapshot.size} matching yachts based on preferences`);
+          
+          // If we have enough preference-based matches, return them
+          if (preferencesSnapshot.size >= limit) {
+            return this.extractFeaturedYachts(preferencesSnapshot);
+          }
+          
+          // If we don't have enough, get the ones we found
+          const preferenceMatches = this.extractFeaturedYachts(preferencesSnapshot);
+          
+          // And supplement with featured yachts (avoiding duplicates)
+          const existingIds = new Set(preferenceMatches.map(yacht => yacht.id));
+          const remainingNeeded = limit - preferenceMatches.length;
+          
+          console.log(`Need ${remainingNeeded} more recommendations, getting featured yachts`);
+          
+          const featuredSnapshot = await adminDb.collection(UNIFIED_YACHT_COLLECTION)
+            .where('isFeatured', '==', true)
+            .limit(limit + 5) // Get extra to account for potential duplicates
+            .get();
+          
+          const featuredYachts = this.extractFeaturedYachts(featuredSnapshot)
+            .filter(yacht => !existingIds.has(yacht.id))
+            .slice(0, remainingNeeded);
+          
+          return [...preferenceMatches, ...featuredYachts];
+        }
+      }
+      
+      // Strategy 2: Use booking history if available
+      const userBookings = await this.getUserBookings(userId);
+      if (userBookings && userBookings.length > 0) {
+        console.log(`User has ${userBookings.length} previous bookings, finding similar yachts`);
+        
+        // Extract categories and regions from booking history
+        const categories = new Set<string>();
+        const regions = new Set<string>();
+        
+        userBookings.forEach(booking => {
+          if (booking.yachtDetails?.category) {
+            categories.add(booking.yachtDetails.category);
+          }
+          if (booking.yachtDetails?.location?.region) {
+            regions.add(booking.yachtDetails.location.region);
+          }
+        });
+        
+        if (categories.size > 0 || regions.size > 0) {
+          // Query similar yachts (we'll prioritize category matches)
+          const categoriesArray = Array.from(categories);
+          const regionsArray = Array.from(regions);
+          
+          let historyBasedYachts: YachtSummary[] = [];
+          
+          // Try to get yachts with matching categories
+          if (categoriesArray.length > 0) {
+            const categoriesSnapshot = await adminDb.collection(UNIFIED_YACHT_COLLECTION)
+              .where('isAvailable', '==', true)
+              .where('category', 'in', categoriesArray.slice(0, 10)) // Firestore 'in' allows max 10 values
+              .limit(limit)
+              .get();
+            
+            if (!categoriesSnapshot.empty) {
+              historyBasedYachts = this.extractFeaturedYachts(categoriesSnapshot);
+            }
+          }
+          
+          // If we need more recommendations, try regions
+          if (historyBasedYachts.length < limit && regionsArray.length > 0) {
+            const existingIds = new Set(historyBasedYachts.map(yacht => yacht.id));
+            const remainingNeeded = limit - historyBasedYachts.length;
+            
+            const regionsSnapshot = await adminDb.collection(UNIFIED_YACHT_COLLECTION)
+              .where('isAvailable', '==', true)
+              .where('location.region', 'in', regionsArray.slice(0, 10)) // Firestore 'in' allows max 10 values
+              .limit(limit + 5) // Get extra to handle duplicates
+              .get();
+            
+            if (!regionsSnapshot.empty) {
+              const regionYachts = this.extractFeaturedYachts(regionsSnapshot)
+                .filter(yacht => !existingIds.has(yacht.id))
+                .slice(0, remainingNeeded);
+              
+              historyBasedYachts = [...historyBasedYachts, ...regionYachts];
+            }
+          }
+          
+          // If we have enough history-based recommendations, return them
+          if (historyBasedYachts.length >= limit) {
+            return historyBasedYachts.slice(0, limit);
+          }
+          
+          // Otherwise, supplement with featured yachts
+          if (historyBasedYachts.length > 0) {
+            const existingIds = new Set(historyBasedYachts.map(yacht => yacht.id));
+            const remainingNeeded = limit - historyBasedYachts.length;
+            
+            console.log(`Need ${remainingNeeded} more recommendations, getting featured yachts`);
+            
+            const featuredSnapshot = await adminDb.collection(UNIFIED_YACHT_COLLECTION)
+              .where('isFeatured', '==', true)
+              .limit(limit + 5) // Get extra to account for potential duplicates
+              .get();
+            
+            const featuredYachts = this.extractFeaturedYachts(featuredSnapshot)
+              .filter(yacht => !existingIds.has(yacht.id))
+              .slice(0, remainingNeeded);
+            
+            return [...historyBasedYachts, ...featuredYachts];
+          }
+        }
+      }
+      
+      // Strategy 3: Fallback - return featured and popular yachts
+      console.log('Using fallback strategy: featured yachts');
+      
+      // Get featured yachts
+      const featuredSnapshot = await adminDb.collection(UNIFIED_YACHT_COLLECTION)
+        .where('isFeatured', '==', true)
+        .limit(limit)
+        .get();
+      
+      const featured = this.extractFeaturedYachts(featuredSnapshot);
+      
+      if (featured.length >= limit) {
+        return featured.slice(0, limit);
+      }
+      
+      // If we don't have enough featured yachts, supplement with availability-sorted yachts
+      const existingIds = new Set(featured.map(yacht => yacht.id));
+      const remainingNeeded = limit - featured.length;
+      
+      console.log(`Need ${remainingNeeded} more recommendations, getting available yachts`);
+      
+      const availableSnapshot = await adminDb.collection(UNIFIED_YACHT_COLLECTION)
+        .where('isAvailable', '==', true)
+        .limit(limit + 5) // Get extra to account for potential duplicates
+        .get();
+      
+      const availableYachts = this.extractFeaturedYachts(availableSnapshot)
+        .filter(yacht => !existingIds.has(yacht.id))
+        .slice(0, remainingNeeded);
+      
+      return [...featured, ...availableYachts];
+    } catch (error) {
+      console.error('Error fetching recommended yachts:', error);
+      return [];
+    }
+  }
+  
+  async searchYachts(query: string, filters?: {
+    type?: string;
+    region?: string;
+    portMarina?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    capacity?: number;
+    tags?: string[];
+    page?: number;
+    pageSize?: number;
+  }): Promise<PaginatedYachtsResponse> {
+    try {
+      console.log(`Searching yachts with query: "${query}" and filters:`, filters);
+      
+      // Start with a base query for all yachts
+      let yachtSnapshot = await adminDb.collection(UNIFIED_YACHT_COLLECTION).get();
+      
+      if (yachtSnapshot.empty) {
+        console.log('No yachts found in collection');
+        return {
+          yachts: [],
+          pagination: {
+            currentPage: 1,
+            pageSize: filters?.pageSize || 10,
+            totalCount: 0,
+            totalPages: 0
+          }
+        };
+      }
+      
+      // Convert to array of Yacht objects for filtering
+      let results = yachtSnapshot.docs.map(doc => {
+        const data = doc.data() as Yacht;
+        return {
+          ...data,
+          id: doc.id
+        } as Yacht;
+      });
+      
+      // Apply text search if query is provided
+      if (query && query.trim() !== '') {
+        const searchTerms = query.toLowerCase().trim().split(/\s+/);
+        
+        console.log(`Searching for terms: ${searchTerms.join(', ')}`);
+        
+        results = results.filter(yacht => {
+          // Check each search term against multiple fields
+          return searchTerms.some(term => 
+            // Title match
+            (yacht.title?.toLowerCase().includes(term)) ||
+            // Description match
+            (yacht.description?.toLowerCase().includes(term)) ||
+            // Category match
+            (yacht.category?.toLowerCase().includes(term)) ||
+            // Location match
+            (yacht.location?.address?.toLowerCase().includes(term)) ||
+            (yacht.location?.region?.toLowerCase().includes(term)) ||
+            (yacht.location?.portMarina?.toLowerCase().includes(term)) ||
+            // Tags match (if available)
+            (yacht.tags?.some(tag => tag.toLowerCase().includes(term)))
+          );
+        });
+        
+        console.log(`Found ${results.length} yachts matching search terms`);
+      }
+      
+      // Apply additional filters
+      if (filters) {
+        // Filter by yacht type/category
+        if (filters.type) {
+          results = results.filter(yacht => 
+            yacht.category?.toLowerCase() === filters.type?.toLowerCase()
+          );
+          console.log(`After type filter: ${results.length} yachts`);
+        }
+        
+        // Filter by region
+        if (filters.region) {
+          results = results.filter(yacht => 
+            yacht.location?.region === filters.region
+          );
+          console.log(`After region filter: ${results.length} yachts`);
+        }
+        
+        // Filter by marina
+        if (filters.portMarina) {
+          results = results.filter(yacht => 
+            yacht.location?.portMarina === filters.portMarina
+          );
+          console.log(`After marina filter: ${results.length} yachts`);
+        }
+        
+        // Price range filters
+        if (filters.minPrice !== undefined) {
+          results = results.filter(yacht => 
+            (yacht.pricing || 0) >= filters.minPrice!
+          );
+          console.log(`After min price filter: ${results.length} yachts`);
+        }
+        
+        if (filters.maxPrice !== undefined) {
+          results = results.filter(yacht => 
+            (yacht.pricing || 0) <= filters.maxPrice!
+          );
+          console.log(`After max price filter: ${results.length} yachts`);
+        }
+        
+        // Capacity filter
+        if (filters.capacity !== undefined) {
+          results = results.filter(yacht => 
+            (yacht.capacity || 0) >= filters.capacity!
+          );
+          console.log(`After capacity filter: ${results.length} yachts`);
+        }
+        
+        // Tags filter
+        if (filters.tags && filters.tags.length > 0) {
+          results = results.filter(yacht => 
+            yacht.tags?.some(tag => filters.tags!.includes(tag))
+          );
+          console.log(`After tags filter: ${results.length} yachts`);
+        }
+      }
+      
+      // Sort results by relevance or availability
+      // (For now we'll sort by availability and then by price)
+      results.sort((a, b) => {
+        // First sort by availability
+        if ((a.isAvailable || false) !== (b.isAvailable || false)) {
+          return (a.isAvailable || false) ? -1 : 1;
+        }
+        
+        // Then sort by price (lower price first)
+        return (a.pricing || 0) - (b.pricing || 0);
+      });
+      
+      // Transform to YachtSummary objects
+      const yachtSummaries = results.map(yacht => {
+        // Extract main image URL
+        const mainImage = yacht.media && yacht.media.length > 0 ? yacht.media[0].url : undefined;
+        
+        return {
+          id: yacht.id,
+          title: yacht.title || "",
+          description: yacht.description || "",
+          category: yacht.category || "",
+          location: yacht.location || {
+            address: "",
+            latitude: 0,
+            longitude: 0,
+            region: "dubai",
+            portMarina: ""
+          },
+          pricing: yacht.pricing || 0,
+          capacity: yacht.capacity || 0,
+          duration: yacht.duration || 0,
+          isAvailable: yacht.isAvailable || false,
+          isFeatured: yacht.isFeatured || false,
+          mainImage
+        };
+      });
+      
+      // Apply pagination
+      const totalCount = yachtSummaries.length;
+      const pageSize = filters?.pageSize || 10;
+      const totalPages = Math.ceil(totalCount / pageSize);
+      const currentPage = filters?.page || 1;
+      
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = Math.min(startIndex + pageSize, yachtSummaries.length);
+      const paginatedResults = yachtSummaries.slice(startIndex, endIndex);
+      
+      console.log(`Returning ${paginatedResults.length} yachts (page ${currentPage} of ${totalPages})`);
+      
+      return {
+        yachts: paginatedResults,
+        pagination: {
+          currentPage,
+          pageSize,
+          totalCount,
+          totalPages
+        }
+      };
+    } catch (error) {
+      console.error('Error searching yachts:', error);
+      return {
+        yachts: [],
+        pagination: {
+          currentPage: 1,
+          pageSize: filters?.pageSize || 10,
+          totalCount: 0,
+          totalPages: 0
+        }
+      };
+    }
+  }
+  
+  async getYachtAvailability(yachtId: string, date: Date): Promise<{
+    availableDates: Date[];
+    timeSlots: {
+      id: string;
+      startTime: string;
+      endTime: string;
+      available: boolean;
+      label: string;
+    }[];
+  }> {
+    try {
+      console.log(`Getting availability for yacht ${yachtId} on ${date.toISOString()}`);
+      
+      // Check if the yacht exists
+      const yachtDoc = await adminDb.collection(UNIFIED_YACHT_COLLECTION).doc(yachtId).get();
+      if (!yachtDoc.exists) {
+        console.log(`Yacht ${yachtId} not found`);
+        return { availableDates: [], timeSlots: [] };
+      }
+      
+      // Get the yacht data
+      const yacht = yachtDoc.data() as Yacht;
+      if (!yacht.isAvailable) {
+        console.log(`Yacht ${yachtId} is marked as unavailable`);
+        return { availableDates: [], timeSlots: [] };
+      }
+      
+      // Check for existing bookings on the requested date
+      const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      
+      const bookingsSnapshot = await adminDb
+        .collection('bookings')
+        .where('yachtId', '==', yachtId)
+        .where('status', 'in', ['confirmed', 'pending'])
+        .get();
+      
+      // Extract booked time slots
+      const bookedTimeSlots = new Set<string>();
+      
+      if (!bookingsSnapshot.empty) {
+        bookingsSnapshot.docs.forEach(doc => {
+          const booking = doc.data();
+          
+          // Check if this booking is for the requested date
+          if (booking.startDate && booking.startDate.includes(dateStr)) {
+            // If the booking has a time slot, mark it as booked
+            if (booking.timeSlot && booking.timeSlot.id) {
+              bookedTimeSlots.add(booking.timeSlot.id);
+            }
+          }
+        });
+      }
+      
+      // Generate available time slots based on yacht duration
+      const duration = yacht.duration || 4; // Default to 4 hours if not specified
+      
+      const timeSlots = [
+        { 
+          id: 'morning', 
+          startTime: '09:00', 
+          endTime: `${9 + duration}:00`, 
+          available: !bookedTimeSlots.has('morning'),
+          label: `Morning (9:00 AM - ${9 + duration}:00 ${9 + duration >= 12 ? 'PM' : 'AM'})` 
+        },
+        { 
+          id: 'afternoon', 
+          startTime: '14:00', 
+          endTime: `${14 + duration}:00`, 
+          available: !bookedTimeSlots.has('afternoon'),
+          label: `Afternoon (2:00 PM - ${(14 + duration) >= 24 ? 
+            `${(14 + duration) - 24}:00 AM` : (14 + duration) >= 12 ? 
+            `${(14 + duration) - 12}:00 PM` : `${14 + duration}:00 AM`})` 
+        },
+        { 
+          id: 'evening', 
+          startTime: '18:00', 
+          endTime: `${18 + Math.min(duration, 6)}:00`, 
+          available: !bookedTimeSlots.has('evening'),
+          label: `Evening (6:00 PM - ${18 + Math.min(duration, 6) >= 24 ? 
+            `${18 + Math.min(duration, 6) - 24}:00 AM` : 
+            `${18 + Math.min(duration, 6) - 12}:00 PM`})` 
+        }
+      ];
+      
+      // Generate a range of available dates (next 30 days)
+      const availableDates: Date[] = [];
+      const today = new Date();
+      
+      for (let i = 0; i < 30; i++) {
+        const futureDate = new Date();
+        futureDate.setDate(today.getDate() + i);
+        availableDates.push(futureDate);
+      }
+      
+      return {
+        availableDates,
+        timeSlots
+      };
+    } catch (error) {
+      console.error(`Error getting availability for yacht ${yachtId}:`, error);
+      return { availableDates: [], timeSlots: [] };
+    }
+  }
+  
+  async getUserBookings(userId: string): Promise<any[]> {
+    try {
+      console.log(`Getting bookings for user ${userId}`);
+      
+      const bookingsSnapshot = await adminDb
+        .collection('bookings')
+        .where('userId', '==', userId)
+        .orderBy('createdAt', 'desc')
+        .get();
+      
+      if (bookingsSnapshot.empty) {
+        console.log(`No bookings found for user ${userId}`);
+        return [];
+      }
+      
+      // Get all yacht IDs from bookings to fetch yacht details
+      const yachtIds = new Set<string>();
+      bookingsSnapshot.docs.forEach(doc => {
+        const booking = doc.data();
+        if (booking.yachtId || booking.packageId) {
+          yachtIds.add(booking.yachtId || booking.packageId);
+        }
+      });
+      
+      // Fetch yacht details for all bookings
+      const yachtDetails: Record<string, Yacht> = {};
+      
+      if (yachtIds.size > 0) {
+        const yachtIdsArray = Array.from(yachtIds);
+        
+        // Firestore 'in' query supports max 10 values, so we chunk if needed
+        const chunkSize = 10;
+        const chunks = [];
+        
+        for (let i = 0; i < yachtIdsArray.length; i += chunkSize) {
+          chunks.push(yachtIdsArray.slice(i, i + chunkSize));
+        }
+        
+        for (const chunk of chunks) {
+          const yachtSnapshot = await adminDb
+            .collection(UNIFIED_YACHT_COLLECTION)
+            .where(adminDb.FieldPath.documentId(), 'in', chunk)
+            .get();
+          
+          yachtSnapshot.docs.forEach(doc => {
+            const yacht = doc.data() as Yacht;
+            yachtDetails[doc.id] = {
+              ...yacht,
+              id: doc.id
+            };
+          });
+        }
+      }
+      
+      // Extract booking data with yacht details
+      return bookingsSnapshot.docs.map(doc => {
+        const booking = doc.data();
+        const yachtId = booking.yachtId || booking.packageId;
+        
+        return {
+          id: doc.id,
+          ...booking,
+          yachtDetails: yachtDetails[yachtId] || null
+        };
+      });
+    } catch (error) {
+      console.error(`Error getting bookings for user ${userId}:`, error);
+      return [];
+    }
+  }
+  
+  async createBooking(bookingData: any): Promise<string> {
+    try {
+      console.log('Creating new booking with data:', bookingData);
+      
+      // Validate required fields
+      if (!bookingData.userId || !bookingData.yachtId) {
+        throw new Error('Missing required booking fields: userId and yachtId');
+      }
+      
+      // Add timestamps
+      const now = new Date();
+      const bookingWithTimestamps = {
+        ...bookingData,
+        createdAt: now,
+        updatedAt: now,
+        status: bookingData.status || 'pending'
+      };
+      
+      // Create the booking
+      const docRef = await adminDb.collection('bookings').add(bookingWithTimestamps);
+      console.log(`Created booking with ID: ${docRef.id}`);
+      
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      throw error;
+    }
+  }
+  
+  async getUserWishlist(userId: string): Promise<string[]> {
+    try {
+      console.log(`Getting wishlist for user ${userId}`);
+      
+      // Get tourist profile
+      const touristProfile = await this.getUserTouristProfile(userId);
+      
+      // Return wishlist from profile if available
+      if (touristProfile && touristProfile.wishlist) {
+        return touristProfile.wishlist;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error(`Error getting wishlist for user ${userId}:`, error);
+      return [];
+    }
+  }
+  
+  async updateUserWishlist(userId: string, yachtId: string, action: 'add' | 'remove'): Promise<boolean> {
+    try {
+      console.log(`${action === 'add' ? 'Adding' : 'Removing'} yacht ${yachtId} ${action === 'add' ? 'to' : 'from'} wishlist for user ${userId}`);
+      
+      // Get the current user profile
+      const touristProfile = await this.getUserTouristProfile(userId);
+      
+      if (!touristProfile) {
+        console.log(`Tourist profile not found for user ${userId}`);
+        return false;
+      }
+      
+      // Get current wishlist or initialize empty array
+      const wishlist = touristProfile.wishlist || [];
+      
+      if (action === 'add') {
+        // Add yacht to wishlist if not already present
+        if (!wishlist.includes(yachtId)) {
+          wishlist.push(yachtId);
+        }
+      } else {
+        // Remove yacht from wishlist
+        const index = wishlist.indexOf(yachtId);
+        if (index !== -1) {
+          wishlist.splice(index, 1);
+        }
+      }
+      
+      // Update the profile with the new wishlist
+      await adminDb.collection('user_profiles_tourist').doc(userId).update({
+        wishlist,
+        lastUpdated: new Date()
+      });
+      
+      console.log(`Successfully ${action === 'add' ? 'added to' : 'removed from'} wishlist`);
+      return true;
+    } catch (error) {
+      console.error(`Error updating wishlist for user ${userId}:`, error);
+      return false;
+    }
+  }
+  
+  // Helper methods for user data
+  
+  private async getUserPreferences(userId: string): Promise<string[]> {
+    try {
+      const touristProfile = await this.getUserTouristProfile(userId);
+      
+      if (touristProfile && touristProfile.preferences) {
+        return touristProfile.preferences;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error(`Error getting preferences for user ${userId}:`, error);
+      return [];
+    }
+  }
+  
+  private async getUserTouristProfile(userId: string): Promise<TouristProfile | null> {
+    try {
+      const profileDoc = await adminDb.collection('user_profiles_tourist').doc(userId).get();
+      
+      if (profileDoc.exists) {
+        return profileDoc.data() as TouristProfile;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`Error getting tourist profile for user ${userId}:`, error);
+      return null;
+    }
+  }
 }
 
 // Helper method to add producer IDs to all yachts
