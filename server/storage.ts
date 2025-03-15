@@ -1,6 +1,6 @@
 import { adminDb } from "./firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
-import type { ProductAddOn, YachtExperience } from "@shared/firestore-schema";
+import { FieldValue, FieldPath } from "firebase-admin/firestore";
+import type { ProductAddOn, YachtExperience, TouristProfile } from "@shared/firestore-schema";
 import type { Yacht, PaginatedYachtsResponse, YachtSummary } from "@shared/unified-schema";
 
 // Constants for collection names
@@ -1346,7 +1346,7 @@ export class FirestoreStorage implements IStorage {
         for (const chunk of chunks) {
           const yachtSnapshot = await adminDb
             .collection(UNIFIED_YACHT_COLLECTION)
-            .where(adminDb.FieldPath.documentId(), 'in', chunk)
+            .where(FieldPath.documentId(), 'in', chunk)
             .get();
           
           yachtSnapshot.docs.forEach(doc => {
