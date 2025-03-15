@@ -211,7 +211,7 @@ export default function Register() {
         const businessName = data.role === UserRole.CONSUMER ? undefined : 
                             `${data.firstName} ${data.lastName}'s Business`;
                             
-        await sendWelcomeEmail(roleValue as 'consumer' | 'producer' | 'partner', businessName);
+        await sendWelcomeEmail(data.email, `${data.firstName} ${data.lastName}`, roleValue as 'consumer' | 'producer' | 'partner', businessName);
         console.log('Welcome email sent successfully');
       } catch (emailError) {
         console.warn('Could not send welcome email, but registration was successful:', emailError);

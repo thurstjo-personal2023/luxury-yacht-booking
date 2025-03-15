@@ -12,7 +12,7 @@ import { BookingPayment, PaymentMethod } from "@shared/payment-schema";
 import { auth, db } from "@/lib/firebase";
 import { collection, addDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { sendBookingConfirmationEmail } from "@/services/email-service";
+import { sendBookingConfirmation } from "@/services/email-service";
 
 interface BookingSummaryData {
   yacht?: YachtExperience;
@@ -156,7 +156,7 @@ export default function PaymentPage() {
 
       // 5. Send booking confirmation email
       try {
-        await sendBookingConfirmationEmail({
+        await sendBookingConfirmation(user.email || '', user.displayName || 'Valued Customer', {
           bookingId: bookingRef.id,
           yachtName: bookingData.yacht.title,
           startDate: formatDate(bookingData.dateRange?.from || new Date()),
