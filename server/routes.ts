@@ -65,6 +65,35 @@ async function getHarmonizedProducerIds(authUserId: string | undefined): Promise
   return { producerId, partnerId };
 }
 
+/**
+ * Get a yacht by its ID
+ * This endpoint is accessible to both authenticated and unauthenticated users
+ * to allow guest browsing of yacht details
+ */
+export async function getYachtById(yachtId: string): Promise<any> {
+  try {
+    console.log(`[SERVER] Fetching yacht details for ID: ${yachtId}`);
+    
+    // Try to fetch from unified_yacht_experiences collection first
+    const db = getFirestore();
+    const yachtRef = doc(db, "unified_yacht_experiences", yachtId);
+    const yachtDoc = await getDoc(yachtRef);
+    
+    if (yachtDoc.exists()) {
+      const yachtData = { id: yachtDoc.id, ...yachtDoc.data() };
+      console.log(`[SERVER] Successfully found yacht ${yachtId} in unified_yacht_experiences`);
+      return yachtData;
+    }
+    
+    // If not found, return null
+    console.log(`[SERVER] Yacht ${yachtId} not found in any collection`);
+    return null;
+  } catch (error) {
+    console.error(`[SERVER] Error fetching yacht details for ID ${yachtId}:`, error);
+    throw error;
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Add endpoint to provide emulator host information
   app.get("/api/emulator-config", (req: Request, res: Response) => {
