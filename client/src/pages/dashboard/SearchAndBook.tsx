@@ -86,7 +86,7 @@ export function SearchAndBook() {
             <SelectValue placeholder="Select type" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Types</SelectItem>
+            <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="yacht-cruise">Yacht Cruise</SelectItem>
             <SelectItem value="water-sports">Water Sports</SelectItem>
           </SelectContent>
@@ -100,7 +100,7 @@ export function SearchAndBook() {
             <SelectValue placeholder="Select region" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Regions</SelectItem>
+            <SelectItem value="all">All Regions</SelectItem>
             <SelectItem value="dubai">Dubai</SelectItem>
             <SelectItem value="abu-dhabi">Abu Dhabi</SelectItem>
           </SelectContent>
@@ -114,7 +114,7 @@ export function SearchAndBook() {
             <SelectValue placeholder="Select marina" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Marinas</SelectItem>
+            <SelectItem value="all">All Marinas</SelectItem>
             <SelectItem value="Dubai Marina">Dubai Marina</SelectItem>
             <SelectItem value="Yas Marina">Yas Marina</SelectItem>
           </SelectContent>
