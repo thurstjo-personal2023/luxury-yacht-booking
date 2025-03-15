@@ -323,6 +323,10 @@ export default function YachtForm() {
   };
   
   // Handle media file upload
+  // File size constants
+  const MAX_FILE_SIZE_MB = 50;
+  const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024; // 50MB in bytes
+  
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !auth.currentUser) return;
@@ -330,6 +334,7 @@ export default function YachtForm() {
     setUploadingMedia(true);
     const newMedia: Media[] = [...media];
     const uploadedMedia: Media[] = [];
+    const skippedFiles: string[] = [];
     
     try {
       // Get auth token for the API request
@@ -339,48 +344,89 @@ export default function YachtForm() {
         const file = files[i];
         const isVideo = file.type.startsWith('video/');
         
+        // Client-side file size validation
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          console.warn(`File "${file.name}" exceeds maximum size limit of ${MAX_FILE_SIZE_MB}MB`);
+          skippedFiles.push(file.name);
+          continue; // Skip this file and move to the next one
+        }
+        
         // Create FormData for the file upload
         const formData = new FormData();
         formData.append('file', file);
         
-        // Upload the file through the server proxy
-        const uploadResponse = await axios.post('/api/upload/media', formData, {
-          headers: {
-            'Authorization': `Bearer ${authToken}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        });
-        
-        if (uploadResponse.data.success) {
-          // Add to uploaded media array using the response data
-          uploadedMedia.push({
-            type: uploadResponse.data.file.type,
-            url: uploadResponse.data.file.url
+        try {
+          // Upload the file through the server proxy
+          const uploadResponse = await axios.post('/api/upload/media', formData, {
+            headers: {
+              'Authorization': `Bearer ${authToken}`,
+              'Content-Type': 'multipart/form-data'
+            }
           });
-        } else {
-          throw new Error(`Failed to upload file: ${uploadResponse.data.error}`);
+          
+          if (uploadResponse.data.success) {
+            // Add to uploaded media array using the response data
+            uploadedMedia.push({
+              type: uploadResponse.data.file.type,
+              url: uploadResponse.data.file.url
+            });
+          } else {
+            console.error(`Failed to upload file: ${uploadResponse.data.error}`);
+            skippedFiles.push(file.name);
+          }
+        } catch (uploadError: any) {
+          console.error(`Error uploading file ${file.name}:`, uploadError);
+          skippedFiles.push(file.name);
+          // Continue with other files instead of failing the entire batch
+          continue;
         }
       }
       
       // Determine if this is the first upload (no existing media)
       const isFirstUpload = newMedia.length === 0;
       
-      if (isFirstUpload) {
-        // If this is the first upload, these become our media with first image as cover
-        setMedia([...uploadedMedia, ...newMedia]);
+      // Display appropriate toast message based on results
+      if (uploadedMedia.length === 0 && skippedFiles.length > 0) {
+        // All files failed
+        toast({
+          title: "Upload Failed",
+          description: `All ${skippedFiles.length} file(s) could not be uploaded. Please check file sizes and try again.`,
+          variant: "destructive",
+        });
+      } else if (skippedFiles.length > 0) {
+        // Some files were uploaded but some were skipped
+        if (isFirstUpload && uploadedMedia.length > 0) {
+          // First upload with some successful files
+          setMedia([...uploadedMedia, ...newMedia]);
+        } else if (uploadedMedia.length > 0) {
+          // Add successful uploads to existing media
+          setMedia([...newMedia, ...uploadedMedia]);
+        }
         
         toast({
-          title: "Upload Complete",
-          description: `Successfully uploaded ${files.length} file(s). First image set as cover.`,
+          title: "Partial Upload",
+          description: `Uploaded ${uploadedMedia.length} file(s) successfully. ${skippedFiles.length} file(s) were skipped due to size limits (max ${MAX_FILE_SIZE_MB}MB).`,
+          variant: "warning",
         });
       } else {
-        // Otherwise add to end of existing media
-        setMedia([...newMedia, ...uploadedMedia]);
-        
-        toast({
-          title: "Upload Complete",
-          description: `Successfully uploaded ${files.length} file(s). Use "Set as Cover" to make any image the cover image.`,
-        });
+        // All files were uploaded successfully
+        if (isFirstUpload) {
+          // If this is the first upload, these become our media with first image as cover
+          setMedia([...uploadedMedia, ...newMedia]);
+          
+          toast({
+            title: "Upload Complete",
+            description: `Successfully uploaded ${uploadedMedia.length} file(s). First image set as cover.`,
+          });
+        } else {
+          // Otherwise add to end of existing media
+          setMedia([...newMedia, ...uploadedMedia]);
+          
+          toast({
+            title: "Upload Complete",
+            description: `Successfully uploaded ${uploadedMedia.length} file(s). Use "Set as Cover" to make any image the cover image.`,
+          });
+        }
       }
     } catch (error) {
       console.error("Error uploading media:", error);
