@@ -41,6 +41,19 @@ interface Booking {
   endDate: string;
   totalPrice: number;
   status: string;
+  paymentStatus?: string;
+  confirmationId?: string;
+  yacht?: {
+    id: string;
+    title: string;
+    description: string;
+    mainImage?: string;
+    location?: {
+      address?: string;
+      latitude?: number;
+      longitude?: number;
+    };
+  };
   [key: string]: any;
 }
 
@@ -88,13 +101,36 @@ export default function ConsumerDashboard() {
     enabled: !!user
   });
 
+  // Updated to use the server-side API endpoint for bookings
   const { data: bookings, isLoading: bookingsLoading } = useQuery({
     queryKey: ["bookings", user?.uid],
     queryFn: async () => {
       if (!user) return [];
-      const q = query(collectionRefs.bookings, where("userId", "==", user.uid));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Booking[];
+      
+      console.log("=== Fetching User Bookings via API ===");
+      try {
+        // Get the authentication token
+        const token = await user.getIdToken();
+        
+        // Call the API endpoint with authentication
+        const response = await axios.get('/api/user/bookings', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        console.log("API bookings response:", response.data);
+        
+        // Return the bookings array from the response
+        return response.data.bookings || [];
+      } catch (error) {
+        console.error("Error fetching bookings from API:", error);
+        // Fallback to direct Firestore query if API fails
+        console.log("Falling back to direct Firestore query for bookings");
+        const q = query(collectionRefs.bookings, where("userId", "==", user.uid));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Booking[];
+      }
     },
     enabled: !!user
   });
@@ -408,12 +444,14 @@ export default function ConsumerDashboard() {
                         <CardContent className="p-4">
                           <div className="flex justify-between items-center">
                             <div>
-                              <h3 className="font-semibold">{booking.packageId}</h3>
+                              <h3 className="font-semibold">
+                                {booking.yacht?.title || `Booking: ${booking.packageId}`}
+                              </h3>
                               <p className="text-sm text-gray-500">
                                 {new Date(booking.startDate).toLocaleDateString()} - 
                                 {new Date(booking.endDate).toLocaleDateString()}
                               </p>
-                              <div className="mt-2">
+                              <div className="flex gap-2 mt-2">
                                 <span className={`px-2 py-1 text-xs rounded ${
                                   booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
                                   booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
@@ -421,11 +459,38 @@ export default function ConsumerDashboard() {
                                 }`}>
                                   {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                                 </span>
+                                
+                                <span className={`px-2 py-1 text-xs rounded ${
+                                  booking.paymentStatus === 'completed' ? 'bg-green-100 text-green-800' :
+                                  booking.paymentStatus === 'processing' ? 'bg-blue-100 text-blue-800' :
+                                  booking.paymentStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {booking.paymentStatus ? 
+                                    booking.paymentStatus.charAt(0).toUpperCase() + booking.paymentStatus.slice(1) : 
+                                    'Payment Status Unknown'}
+                                </span>
                               </div>
+                              
+                              {booking.yacht?.location?.address && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {booking.yacht.location.address}
+                                </p>
+                              )}
                             </div>
                             <div className="text-right">
                               <div className="font-semibold">${booking.totalPrice}</div>
-                              <Button size="sm" variant="outline" className="mt-2">View Details</Button>
+                              {booking.yacht && (
+                                <div className="w-16 h-16 rounded overflow-hidden mb-2 ml-auto">
+                                  <img 
+                                    src={booking.yacht.mainImage || 
+                                      "https://images.unsplash.com/photo-1577032229840-33197764440d?w=800"} 
+                                    alt="Yacht" 
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              )}
+                              <Button size="sm" variant="outline">View Details</Button>
                             </div>
                           </div>
                         </CardContent>
