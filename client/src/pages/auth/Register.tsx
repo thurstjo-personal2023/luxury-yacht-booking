@@ -204,6 +204,18 @@ export default function Register() {
           duration: 5000,
         });
       }
+      
+      // Send welcome email
+      try {
+        console.log('Sending welcome email...');
+        const businessName = data.role === UserRole.CONSUMER ? undefined : 
+                            `${data.firstName} ${data.lastName}'s Business`;
+                            
+        await sendWelcomeEmail(roleValue as 'consumer' | 'producer' | 'partner', businessName);
+        console.log('Welcome email sent successfully');
+      } catch (emailError) {
+        console.warn('Could not send welcome email, but registration was successful:', emailError);
+      }
 
       // Role-based redirection
       const dashboardRoutes = {

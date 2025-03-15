@@ -5,21 +5,37 @@
  * It can be used throughout the application to send various email notifications.
  */
 
-import { apiRequest } from '@/lib/queryClient';
+import axios from 'axios';
+
+// Helper function to make API requests
+async function makeApiRequest(url: string, data: any) {
+  try {
+    const token = localStorage.getItem('authToken');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const response = await axios.post(url, data, { headers });
+    return response.data;
+  } catch (error) {
+    console.error(`Error with request to ${url}:`, error);
+    throw error;
+  }
+}
 
 /**
  * Send a welcome email to a newly registered user
  */
 export async function sendWelcomeEmail(role: 'consumer' | 'producer' | 'partner', businessName?: string) {
   try {
-    const response = await apiRequest('/api/email/welcome', {
-      method: 'POST',
-      data: {
-        role,
-        businessName
-      }
+    return await makeApiRequest('/api/email/welcome', {
+      role,
+      businessName
     });
-    return response.data;
   } catch (error) {
     console.error('Error sending welcome email:', error);
     throw error;
@@ -40,11 +56,7 @@ export async function sendBookingConfirmationEmail(options: {
   producerEmail?: string; // Optional producer email for notification
 }) {
   try {
-    const response = await apiRequest('/api/email/booking-confirmation', {
-      method: 'POST',
-      data: options
-    });
-    return response.data;
+    return await makeApiRequest('/api/email/booking-confirmation', options);
   } catch (error) {
     console.error('Error sending booking confirmation email:', error);
     throw error;
@@ -57,14 +69,10 @@ export async function sendBookingConfirmationEmail(options: {
  */
 export async function sendPasswordResetEmail(email: string, resetLink: string) {
   try {
-    const response = await apiRequest('/api/email/password-reset', {
-      method: 'POST',
-      data: {
-        email,
-        resetLink
-      }
+    return await makeApiRequest('/api/email/password-reset', {
+      email,
+      resetLink
     });
-    return response.data;
   } catch (error) {
     console.error('Error sending password reset email:', error);
     throw error;
@@ -80,11 +88,7 @@ export async function sendVerificationEmail(options: {
   verificationLink: string;
 }) {
   try {
-    const response = await apiRequest('/api/email/verification', {
-      method: 'POST',
-      data: options
-    });
-    return response.data;
+    return await makeApiRequest('/api/email/verification', options);
   } catch (error) {
     console.error('Error sending verification email:', error);
     throw error;
@@ -101,11 +105,7 @@ export async function sendYachtUpdateNotifications(options: {
   subscriberEmails: string[];
 }) {
   try {
-    const response = await apiRequest('/api/email/yacht-update', {
-      method: 'POST',
-      data: options
-    });
-    return response.data;
+    return await makeApiRequest('/api/email/yacht-update', options);
   } catch (error) {
     console.error('Error sending yacht update notifications:', error);
     throw error;
@@ -125,11 +125,7 @@ export async function sendAddonApprovalNotification(options: {
   comments?: string;
 }) {
   try {
-    const response = await apiRequest('/api/email/addon-approval', {
-      method: 'POST',
-      data: options
-    });
-    return response.data;
+    return await makeApiRequest('/api/email/addon-approval', options);
   } catch (error) {
     console.error('Error sending add-on approval notification:', error);
     throw error;
@@ -141,13 +137,9 @@ export async function sendAddonApprovalNotification(options: {
  */
 export async function sendTestEmail(template: 'welcome' | 'booking' | 'reset') {
   try {
-    const response = await apiRequest('/api/email/test', {
-      method: 'POST',
-      data: {
-        template
-      }
+    return await makeApiRequest('/api/email/test', {
+      template
     });
-    return response.data;
   } catch (error) {
     console.error('Error sending test email:', error);
     throw error;
