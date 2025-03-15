@@ -300,7 +300,7 @@ export default function ConsumerDashboard() {
                           <SelectValue placeholder="Select duration" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Any Duration</SelectItem>
+                          <SelectItem value="any">Any Duration</SelectItem>
                           {durations.map(d => (
                             <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                           ))}
