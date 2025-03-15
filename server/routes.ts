@@ -237,16 +237,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get recommended yachts for a user
-  app.get("/api/yachts/recommended", verifyAuth, async (req, res) => {
+  app.get("/api/yachts/recommended", async (req, res) => {
     try {
-      const userId = req.user?.uid;
+      // Get user ID from authentication if available, but don't require it
+      const userId = req.headers.authorization ? 
+        (req as any).user?.uid : // For authenticated users
+        null; // For guests
+      
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 6;
       
-      if (!userId) {
-        return res.status(401).json({ message: "User not authenticated" });
+      // Get featured yachts for non-authenticated users
+      let recommendedYachts;
+      if (userId) {
+        // If user is authenticated, get personalized recommendations
+        recommendedYachts = await storage.getRecommendedYachts(userId, limit);
+      } else {
+        // For guests, return featured yachts
+        recommendedYachts = await storage.getFeaturedYachts();
       }
       
-      const recommendedYachts = await storage.getRecommendedYachts(userId, limit);
       res.json(recommendedYachts);
     } catch (error) {
       console.error("Error fetching recommended yachts:", error);
