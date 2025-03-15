@@ -36,6 +36,10 @@ const AvailabilityPricing = lazy(() => import("@/pages/dashboard/producer/Availa
 const BookingsManagement = lazy(() => import("@/pages/dashboard/producer/BookingsManagement"));
 const AdminUtils = lazy(() => import("@/pages/dashboard/producer/AdminUtils"));
 
+// Admin Pages
+const AdminDashboard = lazy(() => import("@/pages/admin"));
+const EmailTest = lazy(() => import("@/pages/admin/EmailTest"));
+
 // Loading component
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center h-screen">
@@ -136,6 +140,14 @@ function App() {
               </Route>
               <Route path="/dashboard/producer/admin">
                 <PrivateRoute component={AdminUtils} />
+              </Route>
+              
+              {/* Admin Routes */}
+              <Route path="/admin">
+                <PrivateRoute component={AdminDashboard} />
+              </Route>
+              <Route path="/admin/email-test">
+                <PrivateRoute component={EmailTest} />
               </Route>
 
               {/* Fallback to 404 */}
