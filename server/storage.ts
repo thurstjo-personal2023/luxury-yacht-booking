@@ -62,6 +62,34 @@ export interface IStorage {
     pageSize?: number;
     sortByStatus?: boolean;
   }): Promise<PaginatedResponse<ProductAddOn>>;
+  
+  // Customer-specific methods for the migration
+  getRecommendedYachts(userId: string, limit?: number): Promise<YachtSummary[]>;
+  searchYachts(query: string, filters?: {
+    type?: string;
+    region?: string;
+    portMarina?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    capacity?: number;
+    tags?: string[];
+    page?: number;
+    pageSize?: number;
+  }): Promise<PaginatedYachtsResponse>;
+  getYachtAvailability(yachtId: string, date: Date): Promise<{
+    availableDates: Date[];
+    timeSlots: {
+      id: string;
+      startTime: string;
+      endTime: string;
+      available: boolean;
+      label: string;
+    }[];
+  }>;
+  getUserBookings(userId: string): Promise<any[]>; // We'll define a proper Booking type later
+  createBooking(bookingData: any): Promise<string>; // We'll define a proper BookingData type later
+  getUserWishlist(userId: string): Promise<string[]>;
+  updateUserWishlist(userId: string, yachtId: string, action: 'add' | 'remove'): Promise<boolean>;
 }
 
 export class FirestoreStorage implements IStorage {
