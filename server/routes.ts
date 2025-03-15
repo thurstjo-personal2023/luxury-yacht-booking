@@ -236,6 +236,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get recommended yachts for a user
+  app.get("/api/yachts/recommended", verifyAuth, async (req, res) => {
+    try {
+      const userId = req.user?.uid;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 6;
+      
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      
+      const recommendedYachts = await storage.getRecommendedYachts(userId, limit);
+      res.json(recommendedYachts);
+    } catch (error) {
+      console.error("Error fetching recommended yachts:", error);
+      res.status(500).json({ 
+        message: "Error fetching recommended yachts", 
+        error: String(error)
+      });
+    }
+  });
+  
   // Get all yachts with pagination and filtering
   app.get("/api/yachts", async (req, res) => {
     try {
@@ -264,6 +285,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error fetching yachts:", error);
       res.status(500).json({ 
         message: "Error fetching yachts", 
+        error: String(error)
+      });
+    }
+  });
+  
+  // Search yachts with query string and filters
+  app.get("/api/yachts/search", async (req, res) => {
+    try {
+      const { 
+        q, 
+        type, 
+        region, 
+        port_marina: portMarina,
+        min_price: minPrice,
+        max_price: maxPrice,
+        capacity,
+        tags,
+        page = '1', 
+        pageSize = '10'
+      } = req.query;
+      
+      // Validate query string is present
+      if (!q) {
+        return res.status(400).json({ message: "Search query parameter 'q' is required" });
+      }
+      
+      // Parse tags if provided
+      let parsedTags: string[] | undefined;
+      if (tags) {
+        try {
+          // If tags is a string, try to parse it as JSON
+          if (typeof tags === 'string') {
+            parsedTags = JSON.parse(tags as string);
+          } else if (Array.isArray(tags)) {
+            // If it's already an array, use it directly
+            parsedTags = tags as string[];
+          }
+        } catch (e) {
+          console.warn('Could not parse tags parameter:', e);
+        }
+      }
+      
+      const filters = {
+        type: type as string | undefined,
+        region: region as string | undefined,
+        portMarina: portMarina as string | undefined,
+        minPrice: minPrice ? parseInt(minPrice as string, 10) : undefined,
+        maxPrice: maxPrice ? parseInt(maxPrice as string, 10) : undefined,
+        capacity: capacity ? parseInt(capacity as string, 10) : undefined,
+        tags: parsedTags,
+        page: parseInt(page as string, 10),
+        pageSize: parseInt(pageSize as string, 10)
+      };
+      
+      console.log('Search query:', q);
+      console.log('Search filters:', filters);
+      
+      // Get the search results from storage
+      const result = await storage.searchYachts(q as string, filters);
+      res.json(result);
+    } catch (error) {
+      console.error("Error searching yachts:", error);
+      res.status(500).json({ 
+        message: "Error searching yachts", 
         error: String(error)
       });
     }
