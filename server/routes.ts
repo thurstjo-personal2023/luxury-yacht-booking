@@ -75,11 +75,9 @@ export async function getYachtById(yachtId: string): Promise<any> {
     console.log(`[SERVER] Fetching yacht details for ID: ${yachtId}`);
     
     // Try to fetch from unified_yacht_experiences collection first
-    const db = getFirestore();
-    const yachtRef = doc(db, "unified_yacht_experiences", yachtId);
-    const yachtDoc = await getDoc(yachtRef);
+    const yachtDoc = await adminDb.collection("unified_yacht_experiences").doc(yachtId).get();
     
-    if (yachtDoc.exists()) {
+    if (yachtDoc.exists) {
       const yachtData = { id: yachtDoc.id, ...yachtDoc.data() };
       console.log(`[SERVER] Successfully found yacht ${yachtId} in unified_yacht_experiences`);
       return yachtData;
