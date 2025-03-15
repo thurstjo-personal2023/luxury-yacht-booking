@@ -72,123 +72,60 @@ export default function YachtDetails() {
 
       setLoading(true);
       try {
-        // Only use the unified collection
-        const yachtRef = doc(db, "unified_yacht_experiences", yachtId);
-        const yachtDoc = await getDoc(yachtRef);
+        // Use the server API instead of direct Firestore access
+        console.log("Fetching yacht details from API for ID:", yachtId);
+        const response = await fetch(`/api/yachts/${yachtId}`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch yacht details: ${response.status} ${response.statusText}`);
+        }
+        
+        const yachtData = await response.json();
+        console.log("Found yacht data via API:", yachtData);
+        setYacht(yachtData as YachtExperience);
 
-        if (yachtDoc.exists()) {
-          const yachtData = { id: yachtDoc.id, ...yachtDoc.data() } as YachtExperience;
-          console.log("Found yacht data:", yachtData);
-          setYacht(yachtData);
+        // Set initial total price
+        setTotalPrice(yachtData.pricing || 0);
 
-          // Set initial total price
-          setTotalPrice(yachtData.pricing || 0);
+        // Fetch add-ons if any customization options are present
+        if (yachtData.customization_options && yachtData.customization_options.length > 0) {
+          const productIds = yachtData.customization_options.map((option: any) => option.product_id);
+          console.log("Product IDs to fetch:", productIds);
 
-          // Fetch add-ons if any customization options are present
-          if (yachtData.customization_options && yachtData.customization_options.length > 0) {
-            const productIds = yachtData.customization_options.map(option => option.product_id);
-            console.log("Product IDs to fetch:", productIds);
-
-            try {
-              const addOnsRef = collection(db, "products_add_ons");
-              const q = query(addOnsRef, where("product_id", "in", productIds));
-              const addOnsSnapshot = await getDocs(q);
-
-              if (!addOnsSnapshot.empty) {
-                const addOnsData = addOnsSnapshot.docs.map(doc => ({
-                  id: doc.id,
-                  ...doc.data()
-                })) as AddOn[];
-                console.log("Fetched add-ons:", addOnsData);
-                setAddOns(addOnsData);
-              }
-            } catch (error) {
-              console.error("Error fetching add-ons:", error);
-            }
-          }
-
-          // Fetch related yachts
           try {
-            // Only search for related yachts in the unified collection
-            let foundRelatedYachts = false;
-            console.log("Searching for related yachts in unified_yacht_experiences collection...");
-            const experiencesRef = collection(db, "unified_yacht_experiences");
-            let relatedQuery;
+            const addOnsRef = collection(db, "products_add_ons");
+            const q = query(addOnsRef, where("product_id", "in", productIds));
+            const addOnsSnapshot = await getDocs(q);
 
-            // First try to find yachts in the same category
-            if (yachtData.category) {
-              relatedQuery = query(
-                experiencesRef, 
-                where("category", "==", yachtData.category),
-                where("id", "!=", yachtId),
-                limit(3)
-              );
-            } else if (yachtData.location && yachtData.location.address) {
-              // If no category, try to find yachts in the same region
-              const regionTerms = ["Dubai", "Abu Dhabi"];
-              let region = "";
-
-              for (const term of regionTerms) {
-                if (yachtData.location.address.includes(term)) {
-                  region = term;
-                  break;
-                }
-              }
-
-              if (region) {
-                relatedQuery = query(
-                  experiencesRef,
-                  where("location.address", "array-contains", region),
-                  where("id", "!=", yachtId),
-                  limit(3)
-                );
-              }
-            }
-
-            if (relatedQuery) {
-              const relatedSnapshot = await getDocs(relatedQuery);
-              if (!relatedSnapshot.empty) {
-                const relatedYachtData = relatedSnapshot.docs.map(doc => ({
-                  id: doc.id,
-                  ...doc.data()
-                })) as YachtExperience[];
-                setRelatedYachts(relatedYachtData);
-                foundRelatedYachts = true;
-                console.log(`Found ${relatedYachtData.length} related yachts in unified_yacht_experiences collection`);
-              }
-            }
-
-            // If no related yachts found by category or location, get random ones
-            if (!foundRelatedYachts) {
-              const randomQuery = query(
-                experiencesRef,
-                where("published_status", "==", true),
-                where("id", "!=", yachtId),
-                limit(3)
-              );
-
-              const randomSnapshot = await getDocs(randomQuery);
-              if (!randomSnapshot.empty) {
-                const randomYachtData = randomSnapshot.docs.map(doc => ({
-                  id: doc.id,
-                  ...doc.data()
-                })) as YachtExperience[];
-                setRelatedYachts(randomYachtData);
-                foundRelatedYachts = true;
-                console.log(`Found ${randomYachtData.length} random yachts in unified_yacht_experiences collection`);
-              }
+            if (!addOnsSnapshot.empty) {
+              const addOnsData = addOnsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+              })) as AddOn[];
+              console.log("Fetched add-ons:", addOnsData);
+              setAddOns(addOnsData);
             }
           } catch (error) {
-            console.error("Error fetching related yachts:", error);
-          } finally {
-            // Empty finally block to satisfy the syntax requirement
+            console.error("Error fetching add-ons:", error);
           }
-        } else {
-          toast({
-            title: "Yacht not found",
-            description: "The yacht you're looking for doesn't exist or has been removed.",
-            variant: "destructive"
-          });
+        }
+
+        // Fetch related yachts using the API
+        try {
+          console.log("Fetching related yachts via API...");
+          const relatedResponse = await fetch(`/api/yachts/recommended?limit=4`);
+          
+          if (relatedResponse.ok) {
+            const relatedData = await relatedResponse.json();
+            // Filter out the current yacht
+            const filteredRelated = relatedData.filter((yacht: any) => yacht.id !== yachtId);
+            setRelatedYachts(filteredRelated.slice(0, 3));
+            console.log(`Found ${filteredRelated.length} related yachts via API`);
+          } else {
+            console.error("Failed to fetch related yachts:", relatedResponse.statusText);
+          }
+        } catch (error) {
+          console.error("Error fetching related yachts:", error);
         }
       } catch (error) {
         console.error("Error fetching yacht details:", error);
