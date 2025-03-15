@@ -404,9 +404,9 @@ export default function YachtForm() {
         }
         
         toast({
-          title: "Partial Upload",
+          title: "⚠️ Partial Upload",
           description: `Uploaded ${uploadedMedia.length} file(s) successfully. ${skippedFiles.length} file(s) were skipped due to size limits (max ${MAX_FILE_SIZE_MB}MB).`,
-          variant: "warning",
+          variant: "destructive",
         });
       } else {
         // All files were uploaded successfully
@@ -1357,6 +1357,15 @@ export default function YachtForm() {
                   </CardHeader>
                   
                   <CardContent className="space-y-6">
+                    {/* File size limit alert */}
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>File Size Limit</AlertTitle>
+                      <AlertDescription>
+                        Maximum file size is {MAX_FILE_SIZE_MB}MB per file. Larger files will be skipped automatically.
+                      </AlertDescription>
+                    </Alert>
+                    
                     {/* Media Uploader */}
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
