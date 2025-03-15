@@ -12,6 +12,7 @@ import { BookingPayment, PaymentMethod } from "@shared/payment-schema";
 import { auth, db } from "@/lib/firebase";
 import { collection, addDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
+import { sendBookingConfirmationEmail } from "@/services/email-service";
 
 interface BookingSummaryData {
   yacht?: YachtExperience;
@@ -153,14 +154,31 @@ export default function PaymentPage() {
         readStatus: false,
       });
 
-      // 5. Clear booking data from session storage
+      // 5. Send booking confirmation email
+      try {
+        await sendBookingConfirmationEmail({
+          bookingId: bookingRef.id,
+          yachtName: bookingData.yacht.title,
+          startDate: formatDate(bookingData.dateRange?.from || new Date()),
+          endDate: formatDate(bookingData.dateRange?.to || new Date()),
+          totalPrice: bookingData.totalPrice || 0,
+          location: bookingData.yacht.location?.address || 'Location not specified',
+          // If yacht has a providerId, we could also send a notification to the producer
+        });
+        console.log('Booking confirmation email sent successfully');
+      } catch (emailError) {
+        console.warn('Failed to send booking confirmation email:', emailError);
+        // Continue with booking process even if email fails
+      }
+
+      // 6. Clear booking data from session storage
       sessionStorage.removeItem('bookingSummaryData');
 
-      // 6. Set payment as complete
+      // 7. Set payment as complete
       setPaymentComplete(true);
       setIsProcessingBooking(false);
 
-      // 7. Show success toast
+      // 8. Show success toast
       toast({
         title: "Booking confirmed!",
         description: "Your booking has been successfully confirmed. Check your email for details.",
