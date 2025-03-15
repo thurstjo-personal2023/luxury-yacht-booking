@@ -419,6 +419,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Booking API endpoints
+  app.post("/api/bookings", verifyAuth, async (req: Request, res: Response) => {
+    try {
+      const { user } = req;
+      
+      if (!user || !user.uid) {
+        return res.status(401).json({ error: "Unauthorized", details: "User authentication required" });
+      }
+      
+      const { 
+        packageId, 
+        startDate, 
+        endDate, 
+        timeSlot, 
+        totalPrice, 
+        addOns 
+      } = req.body;
+      
+      if (!packageId || !startDate || !endDate || !timeSlot || totalPrice === undefined) {
+        return res.status(400).json({ error: "Bad Request", details: "Missing required booking information" });
+      }
+      
+      console.log(`Creating booking for user ${user.uid} for package ${packageId}`);
+      
+      // Create booking record
+      const bookingRef = await adminDb.collection("bookings").add({
+        userId: user.uid,
+        packageId,
+        startDate,
+        endDate,
+        timeSlot,
+        totalPrice,
+        status: "confirmed",
+        addOns: addOns || [],
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      
+      console.log(`Created booking record: ${bookingRef.id} for user ${user.uid}`);
+      
+      return res.status(201).json({ 
+        success: true, 
+        bookingId: bookingRef.id,
+        message: "Booking created successfully" 
+      });
+    } catch (error) {
+      console.error("Error creating booking:", error);
+      return res.status(500).json({ 
+        error: "Internal Server Error", 
+        details: String(error) 
+      });
+    }
+  });
+  
+  // Payment API endpoint
+  app.post("/api/payments", verifyAuth, async (req: Request, res: Response) => {
+    try {
+      const { user } = req;
+      
+      if (!user || !user.uid) {
+        return res.status(401).json({ error: "Unauthorized", details: "User authentication required" });
+      }
+      
+      const { 
+        bookingId, 
+        amount, 
+        currency, 
+        paymentMethod, 
+        transactionReference 
+      } = req.body;
+      
+      if (!bookingId || amount === undefined || !currency || !paymentMethod) {
+        return res.status(400).json({ error: "Bad Request", details: "Missing required payment information" });
+      }
+      
+      console.log(`Creating payment record for booking ${bookingId}`);
+      
+      // Create payment record
+      const paymentRef = await adminDb.collection("payments").add({
+        bookingId,
+        userId: user.uid,
+        amount,
+        currency,
+        paymentMethod,
+        status: "completed",
+        transactionReference,
+        createdDate: FieldValue.serverTimestamp(),
+        lastUpdatedDate: FieldValue.serverTimestamp(),
+      });
+      
+      console.log(`Created payment record: ${paymentRef.id} for booking ${bookingId}`);
+      
+      return res.status(201).json({ 
+        success: true, 
+        paymentId: paymentRef.id,
+        message: "Payment record created successfully" 
+      });
+    } catch (error) {
+      console.error("Error creating payment record:", error);
+      return res.status(500).json({ 
+        error: "Internal Server Error", 
+        details: String(error) 
+      });
+    }
+  });
+  
+  // Booking confirmation API endpoint
+  app.post("/api/booking-confirmations", verifyAuth, async (req: Request, res: Response) => {
+    try {
+      const { user } = req;
+      
+      if (!user || !user.uid) {
+        return res.status(401).json({ error: "Unauthorized", details: "User authentication required" });
+      }
+      
+      const { 
+        bookingId, 
+        packageId, 
+        paymentId 
+      } = req.body;
+      
+      if (!bookingId || !packageId || !paymentId) {
+        return res.status(400).json({ error: "Bad Request", details: "Missing required confirmation information" });
+      }
+      
+      console.log(`Creating booking confirmation for booking ${bookingId}`);
+      
+      // Create confirmation record
+      const confirmationRef = await adminDb.collection("booking_confirmations").add({
+        bookingId,
+        userId: user.uid,
+        packageId,
+        paymentId,
+        confirmationDate: FieldValue.serverTimestamp(),
+        emailSent: true,
+        notificationSent: true,
+      });
+      
+      console.log(`Created booking confirmation: ${confirmationRef.id}`);
+      
+      // Create a notification for the user
+      const yachtSnapshot = await adminDb.collection("unified_yacht_experiences")
+        .where("package_id", "==", packageId)
+        .limit(1)
+        .get();
+      
+      if (!yachtSnapshot.empty) {
+        const yachtData = yachtSnapshot.docs[0].data();
+        
+        await adminDb.collection("notifications").add({
+          title: "Booking Confirmed",
+          message: `Your booking for ${yachtData.title || 'yacht experience'} has been confirmed.`,
+          type: "Booking Confirmation",
+          recipientId: user.uid,
+          sentDate: FieldValue.serverTimestamp(),
+          readStatus: false,
+        });
+      }
+      
+      return res.status(201).json({ 
+        success: true, 
+        confirmationId: confirmationRef.id,
+        message: "Booking confirmation created successfully" 
+      });
+    } catch (error) {
+      console.error("Error creating booking confirmation:", error);
+      return res.status(500).json({ 
+        error: "Internal Server Error", 
+        details: String(error) 
+      });
+    }
+  });
+  
   // Activate/deactivate yacht endpoint
   app.post("/api/yachts/:id/activate", async (req, res) => {
     try {

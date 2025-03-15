@@ -103,67 +103,95 @@ export default function PaymentPage() {
     setIsProcessingBooking(true);
 
     try {
-      // 1. Create a booking record
-      const bookingRef = await addDoc(collection(db, "bookings"), {
-        userId: user.uid,
+      const bookingDetails = {
         packageId: bookingData.yacht.package_id,
         startDate: bookingData.dateRange?.from.toISOString(),
         endDate: bookingData.dateRange?.to.toISOString(),
         timeSlot: bookingData.timeSlot,
         totalPrice: bookingData.totalPrice,
-        status: "confirmed",
         addOns: bookingData.selectedAddOns || [],
-        createdAt: serverTimestamp(),
+      };
+      
+      // 1. Create a booking record using the API
+      const bookingResponse: Response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${await user.getIdToken()}`
+        },
+        body: JSON.stringify(bookingDetails)
       });
+      
+      if (!bookingResponse.ok) {
+        const errorData = await bookingResponse.json();
+        throw new Error(`Booking creation failed: ${errorData.error || errorData.message || 'Unknown error'}`);
+      }
+      
+      const bookingResult: { bookingId: string; success: boolean } = await bookingResponse.json();
+      const bookingId = bookingResult.bookingId;
+      setBookingId(bookingId);
+      
+      console.log(`Successfully created booking with ID: ${bookingId}`);
 
-      setBookingId(bookingRef.id);
-
-      // 2. Create a payment record
-      const paymentRef = await addDoc(collection(db, "payments"), {
-        bookingId: bookingRef.id,
-        userId: user.uid,
-        amount: bookingData.totalPrice || 0,
-        currency: "USD",
-        paymentMethod: "credit_card", // Default to credit card
-        status: "completed",
-        transactionReference: paymentIntentId,
-        createdDate: serverTimestamp(),
-        lastUpdatedDate: serverTimestamp(),
+      // 2. Create a payment record using the API
+      const paymentResponse: Response = await fetch("/api/payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${await user.getIdToken()}`
+        },
+        body: JSON.stringify({
+          bookingId: bookingId,
+          amount: bookingData.totalPrice || 0,
+          currency: "USD",
+          paymentMethod: "credit_card", // Default to credit card
+          transactionReference: paymentIntentId,
+        })
       });
+      
+      if (!paymentResponse.ok) {
+        const errorData = await paymentResponse.json();
+        throw new Error(`Payment record creation failed: ${errorData.error || errorData.message || 'Unknown error'}`);
+      }
+      
+      const paymentResult: { paymentId: string; success: boolean } = await paymentResponse.json();
+      const paymentId = paymentResult.paymentId;
+      
+      console.log(`Successfully created payment record with ID: ${paymentId}`);
 
-      // 3. Create a booking confirmation
-      const confirmationRef = await addDoc(collection(db, "booking_confirmations"), {
-        bookingId: bookingRef.id,
-        userId: user.uid,
-        packageId: bookingData.yacht.package_id,
-        paymentId: paymentRef.id,
-        confirmationDate: serverTimestamp(),
-        emailSent: true,
-        notificationSent: true,
+      // 3. Create a booking confirmation using the API
+      const confirmationResponse: Response = await fetch("/api/booking-confirmations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${await user.getIdToken()}`
+        },
+        body: JSON.stringify({
+          bookingId: bookingId,
+          packageId: bookingData.yacht.package_id,
+          paymentId: paymentId,
+        })
       });
+      
+      if (!confirmationResponse.ok) {
+        const errorData = await confirmationResponse.json();
+        console.warn(`Booking confirmation creation warning: ${errorData.error || errorData.message || 'Unknown error'}`);
+        // Continue even if confirmation had issues
+      } else {
+        const confirmationResult: { confirmationId: string; success: boolean } = await confirmationResponse.json();
+        setConfirmationId(confirmationResult.confirmationId);
+        console.log(`Successfully created booking confirmation with ID: ${confirmationResult.confirmationId}`);
+      }
 
-      setConfirmationId(confirmationRef.id);
-
-      // 4. Create a notification for the user
-      await addDoc(collection(db, "notifications"), {
-        title: "Booking Confirmed",
-        message: `Your booking for ${bookingData.yacht.title} on ${formatDate(bookingData.dateRange?.from || new Date())} at ${bookingData.timeSlot?.label} has been confirmed.`,
-        type: "Booking Confirmation",
-        recipientId: user.uid,
-        sentDate: serverTimestamp(),
-        readStatus: false,
-      });
-
-      // 5. Send booking confirmation email
+      // 4. Send booking confirmation email
       try {
         await sendBookingConfirmation(user.email || '', user.displayName || 'Valued Customer', {
-          bookingId: bookingRef.id,
+          bookingId: bookingId,
           yachtName: bookingData.yacht.title,
           startDate: formatDate(bookingData.dateRange?.from || new Date()),
           endDate: formatDate(bookingData.dateRange?.to || new Date()),
           totalPrice: bookingData.totalPrice || 0,
           location: bookingData.yacht.location?.address || 'Location not specified',
-          // If yacht has a providerId, we could also send a notification to the producer
         });
         console.log('Booking confirmation email sent successfully');
       } catch (emailError) {
@@ -171,24 +199,24 @@ export default function PaymentPage() {
         // Continue with booking process even if email fails
       }
 
-      // 6. Clear booking data from session storage
+      // 5. Clear booking data from session storage
       sessionStorage.removeItem('bookingSummaryData');
 
-      // 7. Set payment as complete
+      // 6. Set payment as complete
       setPaymentComplete(true);
       setIsProcessingBooking(false);
 
-      // 8. Show success toast
+      // 7. Show success toast
       toast({
         title: "Booking confirmed!",
         description: "Your booking has been successfully confirmed. Check your email for details.",
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error creating booking:", error);
       setIsProcessingBooking(false);
       toast({
         title: "Error creating booking",
-        description: "There was an error processing your booking. Please try again.",
+        description: `There was an error processing your booking: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
         variant: "destructive"
       });
     }
