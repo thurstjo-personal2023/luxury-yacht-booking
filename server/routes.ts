@@ -2392,6 +2392,378 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Partner Dashboard API endpoints
+  
+  /**
+   * Get partner profile data
+   * This endpoint fetches both core user data and partner-specific profile information
+   */
+  app.get("/api/partner/profile", verifyAuth, async (req: Request, res: Response) => {
+    try {
+      // Get authenticated user ID
+      const userId = req.user?.uid;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // Get user data from harmonized_users collection (core data)
+      const userDoc = await adminDb.collection('harmonized_users').doc(userId).get();
+      
+      if (!userDoc.exists) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const userData = userDoc.data();
+      
+      // Verify this is a partner
+      if (userData?.role !== 'partner') {
+        return res.status(403).json({ error: "Access denied. Not a partner account." });
+      }
+      
+      // Get partner profile from user_profiles_service_provider
+      const profileDoc = await adminDb.collection('user_profiles_service_provider').doc(userId).get();
+      const profileData = profileDoc.exists ? profileDoc.data() : null;
+      
+      // Return combined data
+      res.json({
+        core: userData,
+        profile: profileData
+      });
+    } catch (error) {
+      console.error("Error fetching partner profile:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  /**
+   * Get all bookings where partner's add-ons are used
+   */
+  app.get("/api/partner/bookings", verifyAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.uid;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // First, get all add-ons created by this partner
+      const addonsSnapshot = await adminDb.collection('products_add_ons')
+        .where('partnerId', '==', userId)
+        .get();
+      
+      if (addonsSnapshot.empty) {
+        return res.json({ bookings: [] });
+      }
+      
+      // Get the IDs of all add-ons
+      const addonIds = addonsSnapshot.docs.map(doc => doc.id);
+      
+      // Find bookings that include these add-ons
+      const bookingsSnapshot = await adminDb.collection('bookings')
+        .where('status', 'in', ['pending', 'confirmed', 'completed'])
+        .get();
+      
+      // Filter bookings that include partner's add-ons
+      const partnerBookings = bookingsSnapshot.docs
+        .filter(doc => {
+          const bookingData = doc.data();
+          // Check if booking has add-ons field and includes any of the partner's add-ons
+          return bookingData.addOns && 
+                Array.isArray(bookingData.addOns) &&
+                bookingData.addOns.some((addon: any) => 
+                  addonIds.includes(addon.id || addon.productId)
+                );
+        })
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          // Add details about which add-ons from this partner are included
+          partnerAddons: doc.data().addOns?.filter((addon: any) => 
+            addonIds.includes(addon.id || addon.productId)
+          )
+        }));
+      
+      res.json({ bookings: partnerBookings });
+    } catch (error) {
+      console.error("Error fetching partner bookings:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  /**
+   * Get earnings data for a partner
+   */
+  app.get("/api/partner/earnings", verifyAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.uid;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // Get the partner's profile to check for commission rate
+      const profileDoc = await adminDb.collection('user_profiles_service_provider')
+        .doc(userId)
+        .get();
+      
+      if (!profileDoc.exists) {
+        return res.json({
+          earnings: {
+            total: 0,
+            currentMonth: 0,
+            previousMonth: 0,
+            bookingsCount: 0
+          }
+        });
+      }
+      
+      const profileData = profileDoc.data();
+      const commissionRate = profileData?.commissionRate || 0.8; // Default 80% to partner
+      
+      // Get all add-ons created by this partner
+      const addonsSnapshot = await adminDb.collection('products_add_ons')
+        .where('partnerId', '==', userId)
+        .get();
+      
+      if (addonsSnapshot.empty) {
+        return res.json({
+          earnings: {
+            total: 0,
+            currentMonth: 0,
+            previousMonth: 0,
+            bookingsCount: 0
+          }
+        });
+      }
+      
+      // Get the IDs of all add-ons
+      const addonIds = addonsSnapshot.docs.map(doc => doc.id);
+      
+      // Find bookings that include these add-ons
+      const bookingsSnapshot = await adminDb.collection('bookings')
+        .where('status', 'in', ['confirmed', 'completed'])
+        .get();
+      
+      // Filter bookings that include partner's add-ons
+      const partnerBookings = bookingsSnapshot.docs
+        .filter(doc => {
+          const bookingData = doc.data();
+          // Check if booking has add-ons field and includes any of the partner's add-ons
+          return bookingData.addOns && 
+                Array.isArray(bookingData.addOns) &&
+                bookingData.addOns.some((addon: any) => 
+                  addonIds.includes(addon.id || addon.productId)
+                );
+        })
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      
+      // Calculate earnings
+      let totalEarnings = 0;
+      let currentMonthEarnings = 0;
+      let previousMonthEarnings = 0;
+      
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+      const previousMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+      
+      partnerBookings.forEach(booking => {
+        // Calculate earnings for this booking's add-ons created by the partner
+        if (booking.addOns && Array.isArray(booking.addOns)) {
+          const bookingDate = booking.createdAt?.toDate?.() || new Date();
+          const bookingMonth = bookingDate.getMonth();
+          const bookingYear = bookingDate.getFullYear();
+          
+          booking.addOns.forEach((addon: any) => {
+            // Check if this add-on belongs to the partner
+            if (addonIds.includes(addon.id || addon.productId)) {
+              const addonPrice = addon.price || 0;
+              const partnerEarning = addonPrice * commissionRate;
+              
+              // Add to total
+              totalEarnings += partnerEarning;
+              
+              // Add to current month if applicable
+              if (bookingMonth === currentMonth && bookingYear === currentYear) {
+                currentMonthEarnings += partnerEarning;
+              }
+              
+              // Add to previous month if applicable
+              if (bookingMonth === previousMonth && bookingYear === previousMonthYear) {
+                previousMonthEarnings += partnerEarning;
+              }
+            }
+          });
+        }
+      });
+      
+      res.json({
+        earnings: {
+          total: totalEarnings,
+          currentMonth: currentMonthEarnings,
+          previousMonth: previousMonthEarnings,
+          bookingsCount: partnerBookings.length,
+          commissionRate
+        }
+      });
+    } catch (error) {
+      console.error("Error getting partner earnings:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  /**
+   * Get all add-ons created by this partner
+   */
+  app.get("/api/partner/addons", verifyAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.uid;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // Query add-ons created by this partner
+      const addonsSnapshot = await adminDb.collection('products_add_ons')
+        .where('partnerId', '==', userId)
+        .get();
+      
+      const addons = addonsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      res.json({ addons });
+    } catch (error) {
+      console.error("Error fetching partner add-ons:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  /**
+   * Create a new add-on
+   */
+  app.post("/api/partner/addons/create", verifyAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.uid;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { name, description, category, pricing, media, availability, tags } = req.body;
+      
+      // Basic validation
+      if (!name || !category || pricing === undefined) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      // Create add-on document
+      const addonData = {
+        productId: `addon-${userId}-${Date.now()}`,
+        name,
+        description: description || "",
+        category,
+        pricing: parseFloat(pricing),
+        media: media || [],
+        availability: availability !== false,
+        tags: tags || [],
+        partnerId: userId,
+        createdDate: FieldValue.serverTimestamp(),
+        lastUpdatedDate: FieldValue.serverTimestamp()
+      };
+      
+      // Save to Firestore
+      const addonRef = adminDb.collection('products_add_ons').doc(addonData.productId);
+      await addonRef.set(addonData);
+      
+      res.json({
+        success: true,
+        addon: {
+          id: addonData.productId,
+          ...addonData
+        }
+      });
+    } catch (error) {
+      console.error("Error creating add-on:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  /**
+   * Update partner profile
+   */
+  app.post("/api/partner/profile/update", verifyAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.uid;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { core, profile } = req.body;
+      
+      // Update core user data in harmonized_users (only specific fields)
+      if (core) {
+        const allowedCoreFields = ['name', 'phone', 'email'];
+        const coreUpdates: Record<string, any> = {};
+        
+        allowedCoreFields.forEach(field => {
+          if (core[field] !== undefined) {
+            coreUpdates[field] = core[field];
+          }
+        });
+        
+        if (Object.keys(coreUpdates).length > 0) {
+          coreUpdates.updatedAt = FieldValue.serverTimestamp();
+          
+          await adminDb.collection('harmonized_users').doc(userId).update(coreUpdates);
+        }
+      }
+      
+      // Update profile data in user_profiles_service_provider
+      if (profile) {
+        const profileUpdates: Record<string, any> = { ...profile };
+        profileUpdates.lastUpdated = FieldValue.serverTimestamp();
+        
+        // Check if profile exists first
+        const profileDoc = await adminDb.collection('user_profiles_service_provider').doc(userId).get();
+        
+        if (profileDoc.exists) {
+          await adminDb.collection('user_profiles_service_provider').doc(userId).update(profileUpdates);
+        } else {
+          // Create new profile if it doesn't exist
+          const newProfile = {
+            providerId: userId,
+            businessName: profile.businessName || core?.name || "Partner Business",
+            contactInformation: {
+              address: profile.contactInformation?.address || "",
+              ...(profile.contactInformation || {})
+            },
+            profilePhoto: profile.profilePhoto || "",
+            servicesOffered: profile.servicesOffered || [],
+            certifications: profile.certifications || [],
+            ratings: 0,
+            tags: profile.tags || [],
+            lastUpdated: FieldValue.serverTimestamp()
+          };
+          
+          await adminDb.collection('user_profiles_service_provider').doc(userId).set(newProfile);
+        }
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating partner profile:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Register User Profile routes
   registerUserProfileRoutes(app);
 
