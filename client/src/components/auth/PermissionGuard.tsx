@@ -1,32 +1,43 @@
 import { ReactNode } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { checkPermission } from '@/lib/role-verification';
+import { checkPermission, checkMultiplePermissions, checkAnyPermission } from '@/lib/role-verification';
 
 interface PermissionGuardProps {
   children: ReactNode;
-  permissionRequired: string;
+  permission?: string;
+  permissions?: string[];
+  requireAll?: boolean;
   fallback?: ReactNode;
 }
 
 /**
- * Permission Guard component
- * Only renders children if user has the required permission
+ * Permission-based component guard
+ * Only renders children if user has required permission(s)
+ * Does not redirect; simply shows or hides content based on permissions
  */
-export const PermissionGuard = ({ 
-  children, 
-  permissionRequired,
-  fallback = null
+export const PermissionGuard = ({
+  children,
+  permission, // Single permission to check
+  permissions = [], // Multiple permissions to check
+  requireAll = true, // Whether to require all permissions or just one
+  fallback = null // What to render if permission check fails
 }: PermissionGuardProps) => {
-  const { user, userRole } = useAuth();
+  const { userRole } = useAuth();
   
-  // No user means no permissions
-  if (!user) {
-    return <>{fallback}</>;
+  // Single permission check
+  if (permission) {
+    return checkPermission(userRole, permission) ? <>{children}</> : <>{fallback}</>;
   }
   
-  // Check if the user has the required permission based on their role
-  const hasPermission = checkPermission(userRole, permissionRequired);
+  // Multiple permissions check (either all or any)
+  if (permissions.length > 0) {
+    const hasPermissions = requireAll
+      ? checkMultiplePermissions(userRole, permissions)
+      : checkAnyPermission(userRole, permissions);
+    
+    return hasPermissions ? <>{children}</> : <>{fallback}</>;
+  }
   
-  // Show the children only if user has permission
-  return hasPermission ? <>{children}</> : <>{fallback}</>;
+  // If no permissions specified, render children (fail open)
+  return <>{children}</>;
 };

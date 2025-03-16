@@ -8,7 +8,7 @@ import {
   User as FirebaseUser
 } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { UserRoleType } from '@/shared/user-schema';
+import { UserRoleType } from '@shared/user-schema';
 
 // User model with Firebase authentication properties
 interface AuthUser {
@@ -213,11 +213,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+    // Calculate the user role from the user object
+  const userRole = user?.role as UserRoleType | null;
+  
   // Create the context value object
   const contextValue: AuthContextType = {
     user,
     currentUser: user,
-    userRole: user?.role as UserRoleType | null, // Cast user role to UserRoleType
+    userRole,
     loading,
     signIn,
     signUp,

@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
-import { UserRoleType } from '@/shared/user-schema';
+import { UserRoleType } from '@shared/user-schema';
 
 interface RoleRouteProps {
   children: ReactNode;
