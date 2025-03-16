@@ -1,71 +1,33 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuthContext } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { ServiceProviderProfile } from '../../../../shared/harmonized-user-schema';
+import { 
+  ServiceProviderProfile, 
+  PartnerProfileResponse, 
+  PartnerAddon,
+  PartnerBooking,
+  PartnerEarnings
+} from '@/types/partner';
 
-// Define response types to fix type errors
-interface PartnerProfileResponse {
-  core: any;
-  profile: ServiceProviderProfile | null;
-}
-
+// Define response types using the imported interfaces
 interface AddonsResponse {
-  addons: Array<{
-    id: string;
-    name: string;
-    description: string;
-    category: string;
-    pricing: number;
-    media?: Array<{ type: string; url: string }>;
-    availability: boolean;
-    tags: string[];
-    partnerId: string;
-    createdDate: any;
-    lastUpdatedDate: any;
-  }>;
+  addons: PartnerAddon[];
 }
 
 interface BookingsResponse {
-  bookings: Array<{
-    id: string;
-    yachtId?: string;
-    userId?: string;
-    status?: 'pending' | 'confirmed' | 'completed' | 'cancelled';
-    startDate?: string | Date;
-    endDate?: string | Date;
-    totalPrice?: number;
-    addOns?: Array<{
-      id?: string;
-      productId?: string;
-      name?: string;
-      price?: number;
-    }>;
-    partnerAddons?: Array<{
-      id?: string;
-      productId?: string;
-      name?: string;
-      price?: number;
-    }>;
-    createdAt?: any;
-  }>;
+  bookings: PartnerBooking[];
 }
 
 interface EarningsResponse {
-  earnings: {
-    total: number;
-    currentMonth: number;
-    previousMonth: number;
-    bookingsCount: number;
-    commissionRate: number;
-  };
+  earnings: PartnerEarnings;
 }
 
 /**
  * Hook for fetching partner profile data
  */
 export function usePartnerProfile() {
-  const { currentUser } = useAuth();
+  const { currentUser } = useAuthContext();
   
   return useQuery<PartnerProfileResponse>({
     queryKey: ['/api/partner/profile'],
@@ -117,7 +79,7 @@ export function useUpdatePartnerProfile() {
  * Hook for fetching partner's add-ons
  */
 export function usePartnerAddons() {
-  const { currentUser } = useAuth();
+  const { currentUser } = useAuthContext();
   
   return useQuery<AddonsResponse['addons']>({
     queryKey: ['/api/partner/addons'],
@@ -177,7 +139,7 @@ export function useCreateAddon() {
  * Hook for fetching partner bookings
  */
 export function usePartnerBookings() {
-  const { currentUser } = useAuth();
+  const { currentUser } = useAuthContext();
   
   return useQuery<BookingsResponse['bookings']>({
     queryKey: ['/api/partner/bookings'],
@@ -193,7 +155,7 @@ export function usePartnerBookings() {
  * Hook for fetching partner earnings data
  */
 export function usePartnerEarnings() {
-  const { currentUser } = useAuth();
+  const { currentUser } = useAuthContext();
   
   return useQuery<EarningsResponse['earnings']>({
     queryKey: ['/api/partner/earnings'],

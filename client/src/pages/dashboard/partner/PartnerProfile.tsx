@@ -50,7 +50,8 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { ServiceProviderProfile } from "../../../../shared/harmonized-user-schema";
+// Import ServiceProviderProfile type from the correct path
+import type { ServiceProviderProfile } from "@/types/partner";
 
 // Form schema for profile
 const profileFormSchema = z.object({
