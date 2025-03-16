@@ -103,45 +103,82 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [auth]);
 
   const signIn = async (email: string, password: string): Promise<AuthUser> => {
+    console.log('Beginning sign-in process for user:', email);
+    
     try {
       setLoading(true);
+      
+      // Perform Firebase authentication
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log('Firebase auth successful, retrieving user details');
       
       // Force token refresh to ensure we have the latest claims
       await userCredential.user.getIdToken(true);
+      console.log('Forced token refresh to get latest claims');
       
-      // After forcing refresh, get the user with updated role information
+      // Map Firebase user to our user format with enhanced debugging
       const user = await mapFirebaseUser(userCredential.user);
-      console.log('User signed in with initial role from token:', user.role);
+      console.log('User mapped with initial role from token:', user.role);
       
-      // If role is missing from token, try to get it from Firestore using API
-      if (!user.role) {
-        console.log('Role missing from token, attempting to synchronize with Firestore');
-        try {
-          // Dynamically import to avoid circular dependencies
-          const { syncAuthClaims } = await import('@/lib/user-profile-utils');
-          const syncResult = await syncAuthClaims();
+      // Always attempt to synchronize with Firestore for consistent role information
+      console.log('Attempting role synchronization regardless of initial token state');
+      
+      try {
+        // Dynamically import to avoid circular dependencies
+        const { syncAuthClaims } = await import('@/lib/user-profile-utils');
+        
+        // Always call syncAuthClaims to ensure roles are synchronized
+        console.log('Calling syncAuthClaims to verify role information');
+        const syncResult = await syncAuthClaims();
+        
+        if (syncResult.success) {
+          console.log('Role synchronization completed with result:', syncResult);
           
-          if (syncResult.success && syncResult.newRole) {
-            console.log('Successfully synchronized claims, new role:', syncResult.newRole);
-            // Update user object with the role from synchronization
+          // If we have a new role from sync that differs from the initial token, update it
+          if (syncResult.newRole && syncResult.newRole !== user.role) {
+            console.log(`Updating user role from "${user.role || 'undefined'}" to "${syncResult.newRole}"`);
             user.role = syncResult.newRole;
           } else {
-            console.warn('Role synchronization failed or returned no role');
+            console.log('Role remained the same after synchronization:', user.role);
           }
-        } catch (syncError) {
-          console.error('Error during role synchronization:', syncError);
+        } else {
+          console.warn('Role synchronization failed:', syncResult.message);
         }
+      } catch (syncError) {
+        console.error('Error during role synchronization:', syncError);
+      }
+      
+      // Verify the role is a valid user role type
+      const validRoles = ['consumer', 'producer', 'partner'];
+      if (user.role && !validRoles.includes(user.role as UserRoleType)) {
+        console.warn(`Invalid role type "${user.role}" found after sync, clearing it`);
+        user.role = undefined;
+      }
+      
+      // If we still don't have a role after sync, default to consumer for safety
+      if (!user.role) {
+        console.warn('No valid role determined after synchronization, defaulting to "consumer"');
+        user.role = 'consumer';
+        
+        // This is a fallback only - in production we should investigate why sync failed
+        console.log('⚠️ Using fallback role assignment - should be temporary');
       }
       
       // Store the updated user in state
       setUser(user);
+      console.log('User stored in auth state with role:', user.role);
       
       // Store authentication token in localStorage for API calls
-      const token = await userCredential.user.getIdToken();
-      localStorage.setItem('authToken', token);
-      console.log('Auth token stored in localStorage');
+      try {
+        // Always get a fresh token after sync attempts
+        const token = await userCredential.user.getIdToken(true);
+        localStorage.setItem('authToken', token);
+        console.log('Fresh auth token stored in localStorage');
+      } catch (tokenError) {
+        console.error('Error getting/storing token:', tokenError);
+      }
       
+      console.log('Sign-in process completed successfully');
       return user;
     } catch (error: any) {
       let errorMessage = 'Failed to sign in';
@@ -213,8 +250,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-    // Calculate the user role from the user object
-  const userRole = user?.role as UserRoleType | null;
+    // Calculate and validate user role from the user object
+  let userRole: UserRoleType | null = null;
+  
+  if (user && user.role) {
+    // Only set role if it's one of our valid types
+    const validRoles: UserRoleType[] = ['consumer', 'producer', 'partner'];
+    if (validRoles.includes(user.role as UserRoleType)) {
+      userRole = user.role as UserRoleType;
+      console.log('Auth context using validated role:', userRole);
+    } else {
+      console.warn(`Auth context received invalid role "${user.role}", defaulting to null`);
+    }
+  } else {
+    console.log('Auth context: No role available from user object');
+  }
   
   // Create the context value object
   const contextValue: AuthContextType = {
@@ -251,9 +301,25 @@ async function mapFirebaseUser(firebaseUser: FirebaseUser): Promise<AuthUser> {
   try {
     // Get custom claims including role from token
     const token = await firebaseUser.getIdTokenResult();
-    const role = token.claims.role as string | undefined;
     
-    return {
+    // Enhanced debugging for token claims
+    console.log('Token claims received:', JSON.stringify(token.claims, null, 2));
+    
+    // Extract role from claims with proper validation
+    let role = token.claims.role as string | undefined;
+    
+    // Log the extracted role for debugging
+    console.log('Raw role from token claims:', role);
+    
+    // Validate the role is one of our expected types
+    const validRoles = ['consumer', 'producer', 'partner'];
+    if (role && !validRoles.includes(role)) {
+      console.warn(`Invalid role "${role}" found in token claims, will be treated as undefined`);
+      role = undefined;
+    }
+    
+    // Build the user object
+    const authUser: AuthUser = {
       uid: firebaseUser.uid,
       email: firebaseUser.email,
       displayName: firebaseUser.displayName,
@@ -261,6 +327,9 @@ async function mapFirebaseUser(firebaseUser: FirebaseUser): Promise<AuthUser> {
       photoURL: firebaseUser.photoURL,
       role: role,
     };
+    
+    console.log('Mapped user with role:', authUser.role);
+    return authUser;
   } catch (error) {
     console.error('Error getting user token claims in mapFirebaseUser:', error);
     // Fallback to basic user info without role
