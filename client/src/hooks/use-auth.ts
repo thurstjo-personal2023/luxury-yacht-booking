@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
@@ -211,18 +211,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  // Create the context value object
+  const contextValue: AuthContextType = {
+    user,
+    currentUser: user,
+    loading,
+    signIn,
+    signUp,
+    signOut
+  };
+  
   // Return the auth context provider with all values
-  return (
-    <AuthContext.Provider value={{ 
-      user, 
-      currentUser: user, 
-      loading, 
-      signIn, 
-      signUp, 
-      signOut 
-    }}>
-      {children}
-    </AuthContext.Provider>
+  return React.createElement(
+    AuthContext.Provider,
+    { value: contextValue },
+    children
   );
 }
 
