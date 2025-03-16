@@ -1,11 +1,7 @@
 /**
- * Unified User Schema
- * 
- * This file defines a standardized schema for user data across the application.
- * It ensures consistent field naming and typing for user-related entities.
+ * User Schema
+ * This file defines the user roles, types, and interfaces used throughout the application.
  */
-
-import { Timestamp } from "firebase/firestore";
 
 /**
  * User role string literals
@@ -32,20 +28,16 @@ export interface User {
   // Basic information
   name: string;
   email: string;
-  phone: string;
+  phone?: string;
   
   // Role and status
   role: UserRoleType;
-  emailVerified: boolean;
-  points: number;
+  emailVerified?: boolean;
+  points?: number;
   
   // Timestamps
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  
-  // Standardization tracking
-  _standardized?: boolean;
-  _standardizedVersion?: number;
+  createdAt?: any; // Timestamp
+  updatedAt?: any; // Timestamp
 }
 
 /**
@@ -67,8 +59,8 @@ export interface ProducerUser extends User {
   role: 'producer';
   
   // Aliases for consistent references across the application
-  producerId: string; // Always matches id
-  providerId: string; // Always matches id
+  producerId?: string; // Always matches id
+  providerId?: string; // Always matches id
   
   // Producer-specific fields
   businessName?: string;
@@ -84,7 +76,7 @@ export interface PartnerUser extends User {
   role: 'partner';
   
   // Partner-specific fields
-  partnerId: string; // Always matches id
+  partnerId?: string; // Always matches id
   businessName?: string;
   serviceTypes?: string[];
 }
@@ -98,53 +90,52 @@ export type UserType = ConsumerUser | ProducerUser | PartnerUser;
  * Convert a raw user object to the standardized schema
  */
 export function standardizeUser(user: any): UserType {
+  // Default to consumer role if none is specified
+  const role = user.role as UserRoleType || 'consumer';
+  
   // Base user fields
-  const baseUser = {
-    id: user.id || user.userId || '',
-    userId: user.id || user.userId || '',
-    name: user.name || '',
+  const baseUser: User = {
+    id: user.id || user.uid || '',
+    userId: user.userId || user.id || user.uid || '',
+    name: user.name || user.displayName || '',
     email: user.email || '',
-    phone: user.phone || '',
-    role: ((user.role || 'consumer') as UserRoleType).toLowerCase() as UserRoleType,
-    emailVerified: user.emailVerified === true,
-    points: typeof user.points === 'number' ? user.points : 0,
-    createdAt: user.createdAt || new Date(),
-    updatedAt: user.updatedAt || new Date(),
-    _standardized: true,
-    _standardizedVersion: 1
+    phone: user.phone || user.phoneNumber || '',
+    role: role,
+    emailVerified: user.emailVerified || false,
+    points: user.points || 0,
+    createdAt: user.createdAt || user.created_date || new Date(),
+    updatedAt: user.updatedAt || user.updated_date || new Date()
   };
   
-  // Add role-specific fields
-  switch (baseUser.role) {
+  // Return the appropriate user type based on role
+  switch (role) {
     case 'producer':
       return {
         ...baseUser,
         role: 'producer',
-        producerId: baseUser.id,
-        providerId: baseUser.id,
-        businessName: user.businessName || user.name || '',
+        producerId: user.producerId || user.id || user.uid || '',
+        providerId: user.providerId || user.id || user.uid || '',
+        businessName: user.businessName || '',
         yearsOfExperience: user.yearsOfExperience || 0,
-        certifications: Array.isArray(user.certifications) ? user.certifications : [],
-        servicesOffered: Array.isArray(user.servicesOffered) ? user.servicesOffered : []
+        certifications: user.certifications || [],
+        servicesOffered: user.servicesOffered || []
       };
-    
     case 'partner':
       return {
         ...baseUser,
         role: 'partner',
-        partnerId: baseUser.id,
-        businessName: user.businessName || user.name || '',
-        serviceTypes: Array.isArray(user.serviceTypes) ? user.serviceTypes : []
+        partnerId: user.partnerId || user.id || user.uid || '',
+        businessName: user.businessName || '',
+        serviceTypes: user.serviceTypes || []
       };
-    
     case 'consumer':
     default:
       return {
         ...baseUser,
         role: 'consumer',
-        preferences: Array.isArray(user.preferences) ? user.preferences : [],
-        wishlist: Array.isArray(user.wishlist) ? user.wishlist : [],
-        bookingHistory: Array.isArray(user.bookingHistory) ? user.bookingHistory : []
+        preferences: user.preferences || [],
+        wishlist: user.wishlist || [],
+        bookingHistory: user.bookingHistory || []
       };
   }
 }

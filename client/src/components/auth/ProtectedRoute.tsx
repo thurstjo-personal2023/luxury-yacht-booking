@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -17,8 +17,8 @@ const AuthLoadingSpinner = () => (
 );
 
 /**
- * Protected route component
- * Only allows access to authenticated users
+ * Authentication-based route protection component
+ * Only allows access to authenticated users regardless of role
  */
 export const ProtectedRoute = ({ 
   children, 
@@ -26,19 +26,25 @@ export const ProtectedRoute = ({
 }: ProtectedRouteProps) => {
   const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
     // If we're not loading and there's no user, redirect to login
-    if (!loading && !user) {
-      setLocation(fallbackPath);
+    if (!loading) {
+      const authenticated = !!user;
+      setIsAuthenticated(authenticated);
+      
+      if (!authenticated) {
+        setLocation(fallbackPath);
+      }
     }
   }, [user, loading, fallbackPath, setLocation]);
 
   // Show loading state while we check authentication
-  if (loading) {
+  if (loading || isAuthenticated === null) {
     return <AuthLoadingSpinner />;
   }
 
   // Show the children only if authenticated
-  return user ? <>{children}</> : null;
+  return isAuthenticated ? <>{children}</> : null;
 };
