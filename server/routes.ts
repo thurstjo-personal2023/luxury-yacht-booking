@@ -9,6 +9,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { standardizeUser, UserType } from "../shared/user-schema";
 import { registerUserProfileRoutes } from "./user-profile-routes";
 import { createAllYachtExperiences, fixGrandTourYacht } from './create-yacht-experiences';
+import { ServiceProviderProfile } from "../shared/harmonized-user-schema";
 
 import { insertTestYachts } from "./create-test-data";
 
