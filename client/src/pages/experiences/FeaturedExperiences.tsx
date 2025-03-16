@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getYachtImageProps } from "@/lib/image-utils";
-import type { Yacht } from "@shared/unified-schema";
+import type { Yacht, Location } from "@shared/unified-schema";
 
 export default function FeaturedExperiences() {
   const [activeRegion, setActiveRegion] = useState<string>("all");
