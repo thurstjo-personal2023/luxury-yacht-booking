@@ -1043,9 +1043,83 @@ export class FirestoreStorage implements IStorage {
         } as Yacht;
       });
       
+      // Calculate relevance score for a yacht
+      const calculateRelevanceScore = (yacht: Yacht, searchTerms: string[] = [], searchTags: string[] = []): number => {
+        let score = 0;
+        
+        // Base score for all yachts
+        score += 1;
+        
+        // Higher score for featured yachts
+        if (yacht.isFeatured || (yacht as any).featured) {
+          score += 5;
+        }
+        
+        // Score for availability
+        if (yacht.isAvailable || yacht.available || yacht.availability_status) {
+          score += 3;
+        }
+        
+        // Tag matches (highest priority)
+        if (searchTags.length > 0 && yacht.tags && yacht.tags.length > 0) {
+          const matchingTags = yacht.tags.filter(tag => 
+            searchTags.some(searchTag => tag.toLowerCase() === searchTag.toLowerCase())
+          );
+          
+          // Significant boost for exact tag matches (15 points per tag)
+          score += matchingTags.length * 15;
+        }
+        
+        // Score for search term matches
+        if (searchTerms.length > 0) {
+          for (const term of searchTerms) {
+            // Title match (high importance)
+            if (yacht.title?.toLowerCase().includes(term)) {
+              score += 10;
+            }
+            
+            // Category match (medium-high importance)
+            if (yacht.category?.toLowerCase().includes(term)) {
+              score += 8;
+            }
+            
+            // Description match (medium importance)
+            if (yacht.description?.toLowerCase().includes(term)) {
+              score += 5;
+            }
+            
+            // Location matches (medium importance)
+            if (yacht.location?.address?.toLowerCase().includes(term)) {
+              score += 7;
+            }
+            
+            if (yacht.location?.region?.toLowerCase().includes(term)) {
+              score += 8;
+            }
+            
+            if (yacht.location?.portMarina?.toLowerCase().includes(term)) {
+              score += 6;
+            }
+            
+            // Tag matches based on search terms (medium-high importance)
+            if (yacht.tags && yacht.tags.some(tag => tag.toLowerCase().includes(term))) {
+              score += 8;
+            }
+          }
+        }
+        
+        // Region-specific match bonus (if searching by region)
+        if (filters?.region && yacht.location?.region === filters.region) {
+          score += 12;
+        }
+        
+        return score;
+      }
+      
       // Apply text search if query is provided
+      let searchTerms: string[] = [];
       if (query && query.trim() !== '') {
-        const searchTerms = query.toLowerCase().trim().split(/\s+/);
+        searchTerms = query.toLowerCase().trim().split(/\s+/);
         
         console.log(`Searching for terms: ${searchTerms.join(', ')}`);
         
@@ -1069,6 +1143,9 @@ export class FirestoreStorage implements IStorage {
         
         console.log(`Found ${results.length} yachts matching search terms`);
       }
+      
+      // Extract search tags from filters
+      const searchTags = filters?.tags || [];
       
       // Apply additional filters
       if (filters) {
@@ -1128,16 +1205,16 @@ export class FirestoreStorage implements IStorage {
         }
       }
       
-      // Sort results by relevance or availability
-      // (For now we'll sort by availability and then by price)
+      // Calculate relevance score for each yacht and sort
+      results.forEach(yacht => {
+        // @ts-ignore: Add relevance score to yacht object
+        yacht._relevanceScore = calculateRelevanceScore(yacht, searchTerms, searchTags);
+      });
+      
+      // Sort by relevance score (higher first)
       results.sort((a, b) => {
-        // First sort by availability
-        if ((a.isAvailable || false) !== (b.isAvailable || false)) {
-          return (a.isAvailable || false) ? -1 : 1;
-        }
-        
-        // Then sort by price (lower price first)
-        return (a.pricing || 0) - (b.pricing || 0);
+        // @ts-ignore: Access relevance score
+        return (b._relevanceScore || 0) - (a._relevanceScore || 0);
       });
       
       // Transform to YachtSummary objects
