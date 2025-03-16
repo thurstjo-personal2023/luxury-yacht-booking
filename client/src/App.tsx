@@ -10,6 +10,7 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { Suspense, lazy, useEffect } from "react";
 import { initializeFirestore } from "./lib/firestore-init";
 import { initializeConnectionManager } from "./lib/connection-manager";
+import { AuthProvider } from "@/hooks/use-auth";
 
 // Lazy load pages
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -90,15 +91,16 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-1">
-          <Suspense fallback={<LoadingSpinner />}>
-            <Switch>
-              <Route path="/" component={Home} />
-              <Route path="/login" component={Login} />
-              <Route path="/register" component={Register} />
-              <Route path="/yacht/:id" component={YachtDetails} />
+      <AuthProvider>
+        <div className="min-h-screen flex flex-col">
+          <Navbar />
+          <main className="flex-1">
+            <Suspense fallback={<LoadingSpinner />}>
+              <Switch>
+                <Route path="/" component={Home} />
+                <Route path="/login" component={Login} />
+                <Route path="/register" component={Register} />
+                <Route path="/yacht/:id" component={YachtDetails} />
               
               {/* Guest Experience Routes */}
               <Route path="/explore" component={GuestDashboard} />
@@ -178,6 +180,7 @@ function App() {
         <ConnectionStatus />
       </div>
       <Toaster />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
