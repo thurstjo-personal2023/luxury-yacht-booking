@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
 import { UserRoleType } from '@shared/user-schema';
+import { verifyUserRole, getDashboardUrlForRole } from '@/lib/role-verification';
 
 interface RoleRouteProps {
   children: ReactNode;
@@ -21,6 +22,8 @@ const AuthLoadingSpinner = () => (
 /**
  * Role-based route protection component
  * Only allows access to users with specified roles
+ * 
+ * Enhanced with improved role validation and consistent redirection logic
  */
 export const RoleRoute = ({ 
   children, 
@@ -32,8 +35,8 @@ export const RoleRoute = ({
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Added debugging to trace the authorization flow
-    console.log('RoleRoute evaluating access with:', { 
+    // Enhanced debugging to trace the authorization flow
+    console.log('🔍 RoleRoute evaluating access with:', { 
       loading, 
       userExists: !!user, 
       userRole,
@@ -42,22 +45,21 @@ export const RoleRoute = ({
 
     // If still loading, don't make any decisions yet
     if (loading) {
-      console.log('RoleRoute: Still loading, skipping authorization check');
+      console.log('⏳ RoleRoute: Still loading, skipping authorization check');
       return;
     }
     
     // No user means not authenticated at all
     if (!user) {
-      console.log('RoleRoute: No user found, redirecting to', fallbackPath);
+      console.log(`🔒 RoleRoute: No user found, redirecting to ${fallbackPath}`);
       setLocation(fallbackPath);
       setIsAuthorized(false);
       return;
     }
 
-    // Check if user's role is valid and in the allowed roles list
-    // We explicitly handle null/undefined cases for better debugging
-    if (!userRole) {
-      console.log('RoleRoute: User has no role, redirecting to login');
+    // Verify the user's role is valid using our centralized verification utility
+    if (!userRole || !verifyUserRole(userRole)) {
+      console.log(`❌ RoleRoute: Invalid or missing role "${userRole}", redirecting to login`);
       setIsAuthorized(false);
       setLocation(fallbackPath);
       return;
@@ -65,28 +67,15 @@ export const RoleRoute = ({
     
     // Now check if the role is allowed for this route
     const hasAuthorizedRole = roles.includes(userRole);
-    console.log(`RoleRoute: User role "${userRole}" ${hasAuthorizedRole ? 'is' : 'is not'} allowed for this route`);
+    console.log(`${hasAuthorizedRole ? '✅' : '❌'} RoleRoute: User role "${userRole}" ${hasAuthorizedRole ? 'is' : 'is not'} allowed for this route`);
     setIsAuthorized(hasAuthorizedRole);
     
     // Handle redirection if not authorized
     if (!hasAuthorizedRole) {
-      console.log(`RoleRoute: Redirecting user with role "${userRole}" to appropriate dashboard`);
-      
-      // Make sure we use type-safe comparisons and handle each case explicitly
-      switch(userRole) {
-        case 'consumer':
-          setLocation('/dashboard/consumer');
-          break;
-        case 'producer':
-          setLocation('/dashboard/producer');
-          break;
-        case 'partner':
-          setLocation('/dashboard/partner');
-          break;
-        default:
-          console.warn(`RoleRoute: Unknown role "${userRole}", falling back to login`);
-          setLocation(fallbackPath);
-      }
+      // Use our centralized utility to get the correct dashboard URL
+      const dashboardUrl = getDashboardUrlForRole(userRole);
+      console.log(`🔄 RoleRoute: Redirecting user with role "${userRole}" to ${dashboardUrl}`);
+      setLocation(dashboardUrl);
     }
   }, [user, loading, userRole, roles, fallbackPath, setLocation]);
 

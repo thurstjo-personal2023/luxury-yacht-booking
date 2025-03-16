@@ -50,47 +50,78 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
-          console.log('Auth state changed: User signed in, ID:', firebaseUser.uid);
+          console.log('🔵 Auth state changed: User signed in, ID:', firebaseUser.uid);
           
           // Force token refresh to ensure the latest claims
-          await firebaseUser.getIdToken(true);
-          console.log('Auth token refreshed');
+          try {
+            await firebaseUser.getIdToken(true);
+            console.log('✅ Auth token refreshed successfully');
+          } catch (refreshError) {
+            console.error('❌ Error refreshing auth token:', refreshError);
+          }
           
           // Use the shared mapFirebaseUser function to get user with role
           const mappedUser = await mapFirebaseUser(firebaseUser);
-          console.log('Auth state changed - user mapped with role:', mappedUser.role);
+          console.log('📋 Auth state changed - user mapped with initial role:', mappedUser.role);
           
-          // If role is missing from token but user exists, try to sync with Firestore
-          if (!mappedUser.role) {
-            console.log('Role missing from token after auth state change, attempting to sync');
-            try {
-              // Dynamically import to avoid circular dependencies
-              const { syncAuthClaims } = await import('@/lib/user-profile-utils');
-              const syncResult = await syncAuthClaims();
+          // Always try to synchronize with Firestore, not just when role is missing
+          console.log('🔄 Always attempting to sync claims during auth state change');
+          
+          try {
+            // Dynamically import to avoid circular dependencies
+            const { syncAuthClaims } = await import('@/lib/user-profile-utils');
+            const syncResult = await syncAuthClaims();
+            
+            if (syncResult.success) {
+              console.log('✅ Auth state change - claims synchronized successfully:', syncResult);
               
-              if (syncResult.success && syncResult.newRole) {
-                console.log('Successfully synchronized claims, new role:', syncResult.newRole);
+              // If we have a new role from sync that differs from the initial token, update it
+              if (syncResult.newRole && syncResult.newRole !== mappedUser.role) {
+                console.log(`🔄 Auth state change - updating role from "${mappedUser.role || 'undefined'}" to "${syncResult.newRole}"`);
                 mappedUser.role = syncResult.newRole;
+              } else {
+                console.log('📋 Auth state change - role remained the same after sync:', mappedUser.role);
               }
-            } catch (syncError) {
-              console.error('Failed to sync claims after auth state change:', syncError);
+            } else {
+              console.warn('⚠️ Auth state change - role synchronization failed:', syncResult.message);
             }
+          } catch (syncError) {
+            console.error('❌ Auth state change - error during role synchronization:', syncError);
+          }
+          
+          // Verify the role is a valid user role type
+          const validRoles = ['consumer', 'producer', 'partner'];
+          if (mappedUser.role && !validRoles.includes(mappedUser.role as UserRoleType)) {
+            console.warn(`⚠️ Auth state change - invalid role type "${mappedUser.role}" found after sync, clearing it`);
+            mappedUser.role = undefined;
+          }
+          
+          // If we still don't have a role after sync, default to consumer for safety
+          if (!mappedUser.role) {
+            console.warn('⚠️ Auth state change - no valid role determined after sync, defaulting to "consumer"');
+            mappedUser.role = 'consumer';
+            console.log('⚠️ Using fallback role assignment - should be temporary');
           }
           
           // Update auth token in localStorage for API calls
-          const token = await firebaseUser.getIdToken();
-          localStorage.setItem('authToken', token);
-          console.log('Auth token stored in localStorage');
+          try {
+            const token = await firebaseUser.getIdToken();
+            localStorage.setItem('authToken', token);
+            console.log('✅ Auth token stored in localStorage');
+          } catch (tokenError) {
+            console.error('❌ Error getting/storing token:', tokenError);
+          }
           
+          console.log('✅ Auth state change - setting user with final role:', mappedUser.role);
           setUser(mappedUser);
         } else {
-          console.log('Auth state change: User signed out');
+          console.log('🔵 Auth state change: User signed out');
           localStorage.removeItem('authToken');
-          console.log('Auth token removed from localStorage');
+          console.log('✅ Auth token removed from localStorage');
           setUser(null);
         }
       } catch (error) {
-        console.error('Error in auth state change handler:', error);
+        console.error('❌ Error in auth state change handler:', error);
         // Still set user to null if we can't process the user
         localStorage.removeItem('authToken');
         setUser(null);
