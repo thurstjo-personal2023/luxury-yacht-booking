@@ -22,6 +22,7 @@ interface AuthUser {
 // Context type definition
 interface AuthContextType {
   user: AuthUser | null;
+  currentUser: AuthUser | null; // Alias for user, for compatibility
   loading: boolean;
   signIn: (email: string, password: string) => Promise<AuthUser>;
   signUp: (email: string, password: string) => Promise<AuthUser>;
@@ -160,8 +161,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  // Create auth context value with both user and currentUser as aliases
+  const authValue = {
+    user,
+    currentUser: user, // Add alias for compatibility
+    loading,
+    signIn,
+    signUp,
+    signOut
+  };
+  
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={authValue}>
       {children}
     </AuthContext.Provider>
   );
@@ -174,6 +185,9 @@ export function useAuth() {
   }
   return context;
 }
+
+// Alias for useAuth for compatibility with different naming conventions
+export const useAuthContext = useAuth;
 
 // Helper function to map Firebase user to our AuthUser type
 function mapFirebaseUser(firebaseUser: FirebaseUser): AuthUser {
