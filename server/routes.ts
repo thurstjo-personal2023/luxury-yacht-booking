@@ -8,6 +8,7 @@ import path from "path";
 import { FieldValue } from "firebase-admin/firestore";
 import { standardizeUser, UserType } from "../shared/user-schema";
 import { registerUserProfileRoutes } from "./user-profile-routes";
+import { createAllYachtExperiences, fixGrandTourYacht } from './create-yacht-experiences';
 
 import { insertTestYachts } from "./create-test-data";
 
@@ -2340,6 +2341,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Endpoint to fix the Abu Dhabi Grand Tour Yacht image
+  app.post("/api/fix-grand-tour-yacht", async (_req: Request, res: Response) => {
+    try {
+      const success = await fixGrandTourYacht();
+      
+      if (success) {
+        res.json({ 
+          success: true, 
+          message: "Successfully updated Abu Dhabi Grand Tour Yacht image"
+        });
+      } else {
+        res.status(500).json({ 
+          success: false, 
+          message: "Failed to update Abu Dhabi Grand Tour Yacht image"
+        });
+      }
+    } catch (error) {
+      console.error("Error fixing Grand Tour Yacht:", error);
+      res.status(500).json({ 
+        error: "Failed to fix Grand Tour Yacht", 
+        message: String(error)
+      });
+    }
+  });
+  
+  // Endpoint to create all yacht experiences
+  app.post("/api/create-yacht-experiences", async (_req: Request, res: Response) => {
+    try {
+      const success = await createAllYachtExperiences();
+      
+      if (success) {
+        res.json({ 
+          success: true, 
+          message: "Successfully created all yacht experiences"
+        });
+      } else {
+        res.status(500).json({ 
+          success: false, 
+          message: "Failed to create all yacht experiences"
+        });
+      }
+    } catch (error) {
+      console.error("Error creating all yacht experiences:", error);
+      res.status(500).json({ 
+        error: "Failed to create yacht experiences", 
+        message: String(error)
+      });
+    }
+  });
+
   // Register User Profile routes
   registerUserProfileRoutes(app);
 
