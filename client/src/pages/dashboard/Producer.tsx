@@ -38,15 +38,15 @@ export default function ProducerDashboard() {
 
   // Queries for producer data
   const { data: yachts, isLoading: yachtsLoading } = useQuery<YachtExperience[]>({
-    queryKey: ["/api/yachts/producer"],
+    queryKey: ["/api/producer/yachts"],
   });
 
   const { data: bookings, isLoading: bookingsLoading } = useQuery<ProducerBooking[]>({
-    queryKey: ["/api/bookings/producer"],
+    queryKey: ["/api/producer/bookings"],
   });
 
   const { data: reviews, isLoading: reviewsLoading } = useQuery<Review[]>({
-    queryKey: ["/api/reviews/producer"],
+    queryKey: ["/api/producer/reviews"],
   });
 
   // Get producer profile data

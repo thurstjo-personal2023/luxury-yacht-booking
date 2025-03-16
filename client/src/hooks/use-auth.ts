@@ -46,28 +46,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          // Get custom claims (including role) from token
-          const token = await firebaseUser.getIdTokenResult();
-          const role = token.claims.role as string | undefined;
-          
-          setUser({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName,
-            phoneNumber: firebaseUser.phoneNumber,
-            photoURL: firebaseUser.photoURL,
-            role: role,
-          });
-        } catch (error) {
-          console.error('Error getting user token claims:', error);
-          setUser(mapFirebaseUser(firebaseUser));
+      try {
+        if (firebaseUser) {
+          // Use the shared mapFirebaseUser function to get user with role
+          const mappedUser = await mapFirebaseUser(firebaseUser);
+          console.log('Auth state changed - user mapped with role:', mappedUser.role);
+          setUser(mappedUser);
+        } else {
+          setUser(null);
         }
-      } else {
+      } catch (error) {
+        console.error('Error in auth state change handler:', error);
+        // Still set user to null if we can't process the user
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -77,17 +71,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setLoading(true);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const token = await userCredential.user.getIdTokenResult();
-      const role = token.claims.role as string | undefined;
       
-      const user = {
-        uid: userCredential.user.uid,
-        email: userCredential.user.email,
-        displayName: userCredential.user.displayName,
-        phoneNumber: userCredential.user.phoneNumber,
-        photoURL: userCredential.user.photoURL,
-        role: role,
-      };
+      // Get the user with role information using our shared function
+      const user = await mapFirebaseUser(userCredential.user);
+      console.log('User signed in with role:', user.role);
       
       setUser(user);
       return user;
@@ -122,7 +109,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setLoading(true);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
-      const user = mapFirebaseUser(userCredential.user);
+      const user = await mapFirebaseUser(userCredential.user);
       setUser(user);
       return user;
     } catch (error: any) {
@@ -180,12 +167,29 @@ export function useAuth() {
 export const useAuthContext = useAuth;
 
 // Helper function to map Firebase user to our AuthUser type
-function mapFirebaseUser(firebaseUser: FirebaseUser): AuthUser {
-  return {
-    uid: firebaseUser.uid,
-    email: firebaseUser.email,
-    displayName: firebaseUser.displayName,
-    phoneNumber: firebaseUser.phoneNumber,
-    photoURL: firebaseUser.photoURL,
-  };
+async function mapFirebaseUser(firebaseUser: FirebaseUser): Promise<AuthUser> {
+  try {
+    // Get custom claims including role from token
+    const token = await firebaseUser.getIdTokenResult();
+    const role = token.claims.role as string | undefined;
+    
+    return {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      displayName: firebaseUser.displayName,
+      phoneNumber: firebaseUser.phoneNumber,
+      photoURL: firebaseUser.photoURL,
+      role: role,
+    };
+  } catch (error) {
+    console.error('Error getting user token claims in mapFirebaseUser:', error);
+    // Fallback to basic user info without role
+    return {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      displayName: firebaseUser.displayName,
+      phoneNumber: firebaseUser.phoneNumber,
+      photoURL: firebaseUser.photoURL,
+    };
+  }
 }
