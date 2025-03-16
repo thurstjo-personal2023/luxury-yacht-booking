@@ -82,7 +82,7 @@ export default function Home() {
                 Discover our curated collection of luxury yacht experiences.
               </p>
               <Link href="/experiences">
-                <Button variant="outline" className="w-full">Learn More</Button>
+                <Button variant="outline" className="w-full">View Featured Experiences</Button>
               </Link>
             </CardContent>
           </Card>
