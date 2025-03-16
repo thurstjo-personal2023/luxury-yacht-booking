@@ -27,6 +27,9 @@ const GuestDashboard = lazy(() => import("@/pages/explore/GuestDashboard"));
 const ProfilePage = lazy(() => import("@/pages/profile/ProfilePage"));
 const FeaturedExperiences = lazy(() => import("@/pages/experiences/FeaturedExperiences"));
 
+// Partner Dashboard Pages
+const PartnerProfile = lazy(() => import("@/pages/dashboard/partner/PartnerProfile"));
+
 // Producer Dashboard Pages
 const ProducerProfile = lazy(() => import("@/pages/dashboard/producer/ProducerProfile"));
 const AssetManagement = lazy(() => import("@/pages/dashboard/producer/AssetManagement"));
@@ -122,6 +125,11 @@ function App() {
               </Route>
               <Route path="/profile">
                 <PrivateRoute component={ProfilePage} />
+              </Route>
+              
+              {/* Partner Dashboard Routes */}
+              <Route path="/dashboard/partner/profile">
+                <PrivateRoute component={PartnerProfile} />
               </Route>
               
               {/* Producer Dashboard Routes */}
