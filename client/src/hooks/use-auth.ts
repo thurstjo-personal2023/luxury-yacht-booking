@@ -162,16 +162,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   return (
-    <AuthContext.Provider 
-      value={{
-        user,
-        currentUser: user, // Add alias for compatibility
-        loading,
-        signIn,
-        signUp,
-        signOut
-      }}
-    >
+    <AuthContext.Provider value={{ user, currentUser: user, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
