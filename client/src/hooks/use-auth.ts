@@ -161,18 +161,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  // Create auth context value with both user and currentUser as aliases
-  const authValue = {
-    user,
-    currentUser: user, // Add alias for compatibility
-    loading,
-    signIn,
-    signUp,
-    signOut
-  };
-  
   return (
-    <AuthContext.Provider value={authValue}>
+    <AuthContext.Provider 
+      value={{
+        user,
+        currentUser: user, // Add alias for compatibility
+        loading,
+        signIn,
+        signUp,
+        signOut
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

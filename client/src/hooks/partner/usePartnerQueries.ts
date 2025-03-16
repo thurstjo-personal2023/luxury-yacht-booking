@@ -27,15 +27,15 @@ interface EarningsResponse {
  * Hook for fetching partner profile data
  */
 export function usePartnerProfile() {
-  const { currentUser } = useAuthContext();
+  const { user } = useAuth();
   
-  return useQuery<PartnerProfileResponse>({
+  return useQuery({
     queryKey: ['/api/partner/profile'],
     queryFn: async () => {
-      const response = await apiRequest<PartnerProfileResponse>('/api/partner/profile');
-      return response;
+      const response = await apiRequest('/api/partner/profile');
+      return response as unknown as PartnerProfileResponse;
     },
-    enabled: !!currentUser && currentUser.role === 'partner',
+    enabled: !!user && user?.role === 'partner',
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
@@ -79,15 +79,16 @@ export function useUpdatePartnerProfile() {
  * Hook for fetching partner's add-ons
  */
 export function usePartnerAddons() {
-  const { currentUser } = useAuthContext();
+  const { user } = useAuth();
   
-  return useQuery<AddonsResponse['addons']>({
+  return useQuery({
     queryKey: ['/api/partner/addons'],
     queryFn: async () => {
-      const response = await apiRequest<AddonsResponse>('/api/partner/addons');
-      return response.addons || [];
+      const response = await apiRequest('/api/partner/addons');
+      const typedResponse = response as unknown as AddonsResponse;
+      return typedResponse.addons || [];
     },
-    enabled: !!currentUser && currentUser.role === 'partner',
+    enabled: !!user && user?.role === 'partner',
   });
 }
 
@@ -139,15 +140,16 @@ export function useCreateAddon() {
  * Hook for fetching partner bookings
  */
 export function usePartnerBookings() {
-  const { currentUser } = useAuthContext();
+  const { user } = useAuth();
   
-  return useQuery<BookingsResponse['bookings']>({
+  return useQuery({
     queryKey: ['/api/partner/bookings'],
     queryFn: async () => {
-      const response = await apiRequest<BookingsResponse>('/api/partner/bookings');
-      return response.bookings || [];
+      const response = await apiRequest('/api/partner/bookings');
+      const typedResponse = response as unknown as BookingsResponse;
+      return typedResponse.bookings || [];
     },
-    enabled: !!currentUser && currentUser.role === 'partner',
+    enabled: !!user && user?.role === 'partner',
   });
 }
 
@@ -155,13 +157,14 @@ export function usePartnerBookings() {
  * Hook for fetching partner earnings data
  */
 export function usePartnerEarnings() {
-  const { currentUser } = useAuthContext();
+  const { user } = useAuth();
   
-  return useQuery<EarningsResponse['earnings']>({
+  return useQuery({
     queryKey: ['/api/partner/earnings'],
     queryFn: async () => {
-      const response = await apiRequest<EarningsResponse>('/api/partner/earnings');
-      return response.earnings || {
+      const response = await apiRequest('/api/partner/earnings');
+      const typedResponse = response as unknown as EarningsResponse;
+      return typedResponse.earnings || {
         total: 0,
         currentMonth: 0,
         previousMonth: 0,
@@ -169,6 +172,6 @@ export function usePartnerEarnings() {
         commissionRate: 0.8,
       };
     },
-    enabled: !!currentUser && currentUser.role === 'partner',
+    enabled: !!user && user?.role === 'partner',
   });
 }
