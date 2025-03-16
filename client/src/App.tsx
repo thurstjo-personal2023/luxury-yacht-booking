@@ -25,6 +25,7 @@ const PaymentPage = lazy(() => import("@/pages/PaymentPage"));
 const SearchAndBook = lazy(() => import("@/pages/explore/SearchAndBook"));
 const GuestDashboard = lazy(() => import("@/pages/explore/GuestDashboard"));
 const ProfilePage = lazy(() => import("@/pages/profile/ProfilePage"));
+const FeaturedExperiences = lazy(() => import("@/pages/experiences/FeaturedExperiences"));
 
 // Producer Dashboard Pages
 const ProducerProfile = lazy(() => import("@/pages/dashboard/producer/ProducerProfile"));
@@ -99,6 +100,7 @@ function App() {
               {/* Guest Experience Routes */}
               <Route path="/explore" component={GuestDashboard} />
               <Route path="/explore/search" component={SearchAndBook} />
+              <Route path="/experiences" component={FeaturedExperiences} />
               
               {/* Booking Routes */}
               <Route path="/booking-summary">
