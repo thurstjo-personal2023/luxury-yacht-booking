@@ -17,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { Yacht as LegacyYacht } from "@shared/schema";
 import type { YachtExperience } from "@shared/firestore-schema";
 import type { Yacht as UnifiedYacht } from "@shared/unified-schema";
+import { getYachtMainImage, getYachtImageProps } from "@/lib/image-utils";
 
 // Define a normalized yacht type that will work with both data structures
 interface NormalizedYacht {
@@ -28,6 +29,7 @@ interface NormalizedYacht {
   location?: string;
   capacity?: number;
   activities?: string[];
+  originalYacht: any; // Store the original yacht data for image utilities
 }
 
 interface YachtCarouselProps {
@@ -55,18 +57,8 @@ function normalizeYacht(yacht: any): NormalizedYacht {
     activities = yacht.tags.split(',').map((item: string) => item.trim());
   }
 
-  // Extract an image URL from any schema format
-  let imageUrl = yacht.imageUrl; // legacy schema
-  
-  // Try media array from various schema formats
-  if (!imageUrl && yacht.media && Array.isArray(yacht.media) && yacht.media.length > 0) {
-    imageUrl = yacht.media[0].url;
-  }
-  
-  // Default image if none found
-  if (!imageUrl) {
-    imageUrl = "https://images.unsplash.com/photo-1577032229840-33197764440d?w=800";
-  }
+  // Extract an image URL using the utility function that handles all formats
+  const imageUrl = getYachtMainImage(yacht);
 
   // Extract location string from any schema format
   let locationString = "Location unavailable";
@@ -105,7 +97,10 @@ function normalizeYacht(yacht: any): NormalizedYacht {
     capacity: yacht.capacity || yacht.max_guests || 0,
     
     // Activities/tags array
-    activities: activities
+    activities: activities,
+    
+    // Store original yacht for image utilities
+    originalYacht: yacht
   };
 }
 
@@ -193,8 +188,7 @@ export function YachtCarousel({
                       <CardContent className="p-0">
                         <div className="relative h-64 overflow-hidden">
                           <img 
-                            src={yacht.imageUrl} 
-                            alt={yacht.name} 
+                            {...getYachtImageProps(yacht.originalYacht)}
                             className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
