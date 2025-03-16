@@ -57,11 +57,45 @@ export default function Login() {
       }
 
       // Get user profile from Firestore using the harmonized users collection
-      const userDoc = await getDoc(doc(collectionRefs.users, userCredential.user.uid));
-      const rawUserData = userDoc.data();
+      // Add retry mechanism for getting user data
+      let rawUserData = null;
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (!rawUserData && retryCount < maxRetries) {
+        try {
+          const userDoc = await getDoc(doc(collectionRefs.users, userCredential.user.uid));
+          rawUserData = userDoc.data();
+          
+          if (!rawUserData && retryCount < maxRetries - 1) {
+            console.log(`User data not found, retrying (${retryCount + 1}/${maxRetries})...`);
+            // Wait before retry (increasing delay)
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+          }
+        } catch (fetchError) {
+          console.error(`Error fetching user data (attempt ${retryCount + 1}/${maxRetries}):`, fetchError);
+          if (retryCount < maxRetries - 1) {
+            // Wait before retry (increasing delay)
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+          }
+        }
+        retryCount++;
+      }
 
+      // Use fallback data if user profile not found, to prevent login failures
       if (!rawUserData) {
-        throw new Error("User profile not found. Please contact support.");
+        console.warn("User profile not found in Firestore. Using minimal fallback profile.");
+        rawUserData = {
+          name: userCredential.user.displayName || "User",
+          email: userCredential.user.email || "",
+          role: "consumer", // Default to consumer role
+          userId: userCredential.user.uid,
+          phone: "",
+          points: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          emailVerified: userCredential.user.emailVerified
+        };
       }
 
       // Ensure consistent user schema by applying standardizeUser function

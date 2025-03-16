@@ -69,11 +69,20 @@ function App() {
     // Initialize connection manager
     const cleanup = initializeConnectionManager();
 
-    // Initialize Firestore collections
-    initializeFirestore().catch(console.error);
+    // Initialize Firestore collections - skip verification until user is authenticated
+    initializeFirestore(true).catch(console.error);
 
     return cleanup;
   }, []);
+  
+  // Once a user is authenticated, validate Firestore collections
+  useEffect(() => {
+    if (user) {
+      // Now that we have authentication, verify collections
+      console.log("User authenticated, verifying Firestore collections");
+      initializeFirestore(false).catch(console.error);
+    }
+  }, [user]);
 
   return (
     <QueryClientProvider client={queryClient}>

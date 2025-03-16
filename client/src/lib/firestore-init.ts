@@ -66,11 +66,16 @@ async function verifyCollection(collectionName: string) {
 }
 
 // Initialize Firestore collections
-export async function initializeFirestore() {
+export async function initializeFirestore(skipVerification = false) {
   const mode = USE_FIREBASE_EMULATORS ? "emulator" : "production";
   console.log(`Initializing Firestore collections in ${mode} mode...`);
 
   try {
+    if (skipVerification) {
+      console.log(`Skipping collection verification during initialization (will verify after authentication)`);
+      return;
+    }
+    
     // Verify all collections exist
     const verificationPromises = Object.values(collections).map(verifyCollection);
     await Promise.all(verificationPromises);
@@ -78,7 +83,8 @@ export async function initializeFirestore() {
     console.log(`All Firestore collections initialized successfully in ${mode} mode`);
   } catch (error) {
     console.error(`Error initializing Firestore collections in ${mode} mode:`, error);
-    throw error;
+    // Don't throw the error, just log it to prevent app crashes
+    // throw error;
   }
 }
 
