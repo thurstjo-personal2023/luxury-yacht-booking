@@ -53,13 +53,23 @@ export default function ProducerDashboard() {
   useEffect(() => {
     const checkProducerAccessAndFetchProfile = async () => {
       // Import dynamically to avoid circular imports
-      const { verifyProducerAccess } = await import('@/lib/user-profile-utils');
+      const { verifyProducerRole } = await import('@/lib/role-verification');
       
-      // Verify producer access
-      const accessCheck = await verifyProducerAccess();
-      if (!accessCheck.hasAccess) {
-        console.error('User does not have producer access:', accessCheck.message);
-        // Redirect to home if user doesn't have producer access
+      // Verify producer role using enhanced verification
+      const roleCheck = await verifyProducerRole();
+      console.log('Producer role verification result:', roleCheck);
+      
+      if (!roleCheck.hasRole) {
+        console.error('User does not have producer role access:', roleCheck.message);
+        // Show toast notification with error message
+        toast({
+          title: 'Access Denied',
+          description: roleCheck.message || 'You do not have producer role access',
+          variant: 'destructive',
+          duration: 4000,
+        });
+        
+        // Redirect to home if user doesn't have producer role
         setLocation('/');
         return;
       }

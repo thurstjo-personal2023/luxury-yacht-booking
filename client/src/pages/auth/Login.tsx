@@ -113,16 +113,35 @@ export default function Login() {
         duration: 2000,
       });
 
-      // Role-based redirection using the standardized role field
-      const roleRedirects = {
-        [UserRole.CONSUMER]: "/dashboard/consumer",
-        [UserRole.PRODUCER]: "/dashboard/producer",
-        [UserRole.PARTNER]: "/dashboard/partner"
-      };
-
+      // Import the enhanced role verification utilities
+      const { getDashboardUrlForRole, verifyUserRole } = await import('@/lib/role-verification');
+      
       // Make sure role is lowercase for consistent lookup
       const userRole = (userData.role || "consumer").toLowerCase() as UserRoleType;
-      setLocation(roleRedirects[userRole] || "/");
+      
+      // Verify the user's role against their expected role from Firestore
+      console.log(`Verifying role before redirection: ${userRole}`);
+      const roleVerification = await verifyUserRole(userRole);
+      
+      if (roleVerification.hasRole) {
+        // Use verified role for redirection
+        console.log(`Role verified (${userRole}), redirecting to appropriate dashboard`);
+        setLocation(getDashboardUrlForRole(userRole));
+      } else if (roleVerification.actualRole) {
+        // If verification failed but we have an actual role, use that instead
+        console.log(`Role verification failed, but found actual role: ${roleVerification.actualRole}`);
+        console.log(`Redirecting to ${getDashboardUrlForRole(roleVerification.actualRole)} instead`);
+        toast({
+          title: "Role Mismatch",
+          description: `Your role has been updated to ${roleVerification.actualRole}`,
+          duration: 3000,
+        });
+        setLocation(getDashboardUrlForRole(roleVerification.actualRole));
+      } else {
+        // Fallback to consumer dashboard if no role could be verified
+        console.warn("Could not verify any role, defaulting to consumer dashboard");
+        setLocation(getDashboardUrlForRole("consumer"));
+      }
     } catch (error: any) {
       setError(error.message);
       toast({
