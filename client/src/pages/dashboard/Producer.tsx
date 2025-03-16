@@ -49,9 +49,21 @@ export default function ProducerDashboard() {
     queryKey: ["/api/producer/reviews"],
   });
 
-  // Get producer profile data
+  // Check producer access and get profile data
   useEffect(() => {
-    const fetchProducerProfile = async () => {
+    const checkProducerAccessAndFetchProfile = async () => {
+      // Import dynamically to avoid circular imports
+      const { verifyProducerAccess } = await import('@/lib/user-profile-utils');
+      
+      // Verify producer access
+      const accessCheck = await verifyProducerAccess();
+      if (!accessCheck.hasAccess) {
+        console.error('User does not have producer access:', accessCheck.message);
+        // Redirect to home if user doesn't have producer access
+        setLocation('/');
+        return;
+      }
+      
       const user = auth.currentUser;
       if (user) {
         const profileDocRef = doc(db, "user_profiles_service_provider", user.uid);
@@ -107,8 +119,8 @@ export default function ProducerDashboard() {
       }
     };
     
-    fetchProducerProfile();
-  }, []);
+    checkProducerAccessAndFetchProfile();
+  }, [setLocation]);
   
   // Calculate dashboard statistics
   const totalBookings = bookings?.length || 0;

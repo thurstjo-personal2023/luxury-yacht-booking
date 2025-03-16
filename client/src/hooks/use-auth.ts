@@ -148,8 +148,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  // Return the auth context provider with all values
   return (
-    <AuthContext.Provider value={{ user, currentUser: user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      currentUser: user, 
+      loading, 
+      signIn, 
+      signUp, 
+      signOut 
+    }}>
       {children}
     </AuthContext.Provider>
   );
