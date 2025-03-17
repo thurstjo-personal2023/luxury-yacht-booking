@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -32,8 +31,18 @@ export function usePartnerProfile() {
   return useQuery({
     queryKey: ['/api/partner/profile'],
     queryFn: async () => {
-      const response = await apiRequest('/api/partner/profile');
-      return response as unknown as PartnerProfileResponse;
+      const response = await fetch('/api/partner/profile', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        },
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch partner profile');
+      }
+      
+      return await response.json() as PartnerProfileResponse;
     },
     enabled: !!user && user?.role === 'partner',
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -52,11 +61,27 @@ export function useUpdatePartnerProfile() {
     profile?: Partial<ServiceProviderProfile>;
   }>({
     mutationFn: async ({ core, profile }) => {
-      const response = await apiRequest<{ success: boolean }>('/api/partner/profile/update', {
-        method: 'POST',
-        body: JSON.stringify({ core, profile }),
-      });
-      return response;
+      try {
+        const response = await fetch('/api/partner/profile/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          },
+          credentials: 'include',
+          body: JSON.stringify({ core, profile }),
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || response.statusText);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('Error updating partner profile:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/partner/profile'] });
@@ -84,8 +109,18 @@ export function usePartnerAddons() {
   return useQuery({
     queryKey: ['/api/partner/addons'],
     queryFn: async () => {
-      const response = await apiRequest('/api/partner/addons');
-      const typedResponse = response as unknown as AddonsResponse;
+      const response = await fetch('/api/partner/addons', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        },
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch partner add-ons');
+      }
+      
+      const typedResponse = await response.json() as AddonsResponse;
       return typedResponse.addons || [];
     },
     enabled: !!user && user?.role === 'partner',
