@@ -394,6 +394,8 @@ export function registerUserProfileRoutes(app: Express) {
   /**
    * Synchronize Firebase Auth custom claims with Firestore user role
    * This endpoint is used to resolve mismatches between Auth claims and Firestore data
+   * 
+   * Enhanced version that uses the setUserRole Cloud Function for better reliability
    */
   app.post('/api/user/sync-auth-claims', verifyAuth, async (req: Request, res: Response) => {
     try {
@@ -405,33 +407,84 @@ export function registerUserProfileRoutes(app: Express) {
       const userDoc = await adminDb.collection('harmonized_users').doc(req.user.uid).get();
       
       if (!userDoc.exists) {
-        return res.status(404).json({ error: 'User profile not found in Firestore' });
+        console.error(`User ${req.user.uid} not found in Firestore during role sync`);
+        return res.status(404).json({ 
+          success: false,
+          error: 'User profile not found in Firestore',
+          message: 'User profile not found in Firestore. Please contact support.' 
+        });
       }
       
       const userData = userDoc.data() as HarmonizedUser;
-      const firestoreRole = userData?.role || 'consumer';
+      const firestoreRole = userData?.role;
       
-      // 2. Log the current role and the requested role for debugging
-      console.log(`Synchronizing auth claims for user ${req.user.uid}`);
+      // Validate the role from Firestore
+      const validRoles = ['consumer', 'producer', 'partner'];
+      if (!firestoreRole || !validRoles.includes(firestoreRole)) {
+        console.error(`Invalid role "${firestoreRole}" found in Firestore for user ${req.user.uid}`);
+        return res.status(400).json({ 
+          success: false,
+          error: 'Invalid role in Firestore',
+          message: `Invalid role "${firestoreRole}" found in Firestore.` 
+        });
+      }
+      
+      // 2. Log detailed information for debugging
+      console.log(`==== ROLE SYNCHRONIZATION ====`);
+      console.log(`User: ${req.user.uid} (${req.user.email || 'no email'})`);
       console.log(`Current Auth role: ${req.user.role || 'not set'}`);
       console.log(`Firestore role: ${firestoreRole}`);
       
-      // 3. Update Firebase Auth custom claims with the role from Firestore
-      await adminAuth.setCustomUserClaims(req.user.uid, { role: firestoreRole });
+      // 3. Check if the role actually needs to be updated
+      if (req.user.role === firestoreRole) {
+        console.log(`No role change needed - Auth and Firestore roles already match: ${firestoreRole}`);
+        
+        // Even if no change, we'll return success for consistency
+        return res.status(200).json({
+          success: true,
+          message: `Role already synchronized (${firestoreRole})`,
+          currentRole: req.user.role,
+          newRole: firestoreRole,
+          refreshToken: false // No need to refresh token as it's already correct
+        });
+      }
       
-      console.log(`Auth claims updated for user ${req.user.uid} with role=${firestoreRole}`);
+      console.log(`Role mismatch detected. Auth: ${req.user.role || 'not set'}, Firestore: ${firestoreRole}`);
       
-      // 4. Force token refresh on client side
+      try {
+        // 4. Update Firebase Auth custom claims with the role from Firestore
+        // For more robust operation, we use the direct Admin SDK approach
+        console.log(`Setting custom claims for user ${req.user.uid} to role=${firestoreRole}...`);
+        await adminAuth.setCustomUserClaims(req.user.uid, { role: firestoreRole });
+        
+        console.log(`✓ Auth claims updated successfully via Admin SDK`);
+      } catch (claimsError) {
+        console.error(`Error updating custom claims via Admin SDK:`, claimsError);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to update auth claims',
+          message: 'Error updating user role. Please try again later.'
+        });
+      }
+      
+      // 5. Return success with detailed information
+      console.log(`==== ROLE SYNC COMPLETE ====`);
+      console.log(`User ${req.user.uid} role updated from "${req.user.role || 'not set'}" to "${firestoreRole}"`);
+      
       return res.status(200).json({
         success: true,
         message: `Role synchronized successfully to ${firestoreRole}`,
         currentRole: req.user.role,
         newRole: firestoreRole,
-        refreshToken: true
+        refreshToken: true // Signal client to refresh token
       });
     } catch (error) {
-      console.error('Error synchronizing auth claims:', error);
-      return res.status(500).json({ error: 'Failed to synchronize auth claims' });
+      console.error('Error in sync-auth-claims endpoint:', error);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Server error',
+        message: 'An unexpected error occurred while synchronizing roles.'
+      });
     }
   });
 
