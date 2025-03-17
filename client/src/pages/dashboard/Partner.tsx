@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Card, 
   CardContent, 
@@ -21,10 +21,12 @@ import {
   Clock, 
   AlertCircle
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PartnerSidebar } from "@/components/layout/PartnerSidebar";
 import { usePartnerEarnings, usePartnerBookings, usePartnerAddons } from "@/hooks/partner/usePartnerQueries";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function PartnerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
