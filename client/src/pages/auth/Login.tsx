@@ -84,11 +84,18 @@ export default function Login() {
 
       // Use fallback data if user profile not found, to prevent login failures
       if (!rawUserData) {
-        console.warn("User profile not found in Firestore. Using minimal fallback profile.");
+        console.warn("User profile not found in Firestore. Using minimal fallback profile with role from token.");
+        
+        // Get the role from token claims if available
+        const tokenResult = await userCredential.user.getIdTokenResult();
+        const tokenRole = (tokenResult.claims.role as string) || "consumer";
+        
+        console.log(`Using role from token claims for fallback profile: "${tokenRole}"`);
+        
         rawUserData = {
           name: userCredential.user.displayName || "User",
           email: userCredential.user.email || "",
-          role: "consumer", // Default to consumer role
+          role: tokenRole, // Use authenticated role from token instead of hardcoding "consumer"
           userId: userCredential.user.uid,
           phone: "",
           points: 0,
@@ -124,18 +131,38 @@ export default function Login() {
       const roleVerification = await verifyUserRole(userRole);
       
       if (roleVerification.hasRole) {
-        // Use verified role for redirection
-        console.log(`Role verified (${userRole}), redirecting to appropriate dashboard`);
-        setLocation(getDashboardUrlForRole(userRole));
+        // Always use the verified role from the verification result for redirection
+        // This is crucial - it ensures we use the authoritative role from the token
+        const redirectRole = roleVerification.actualRole || userRole;
+        
+        // Check if there was a role mismatch
+        if (roleVerification.actualRole && roleVerification.actualRole !== userRole) {
+          console.log(`Role mismatch detected: Token has "${roleVerification.actualRole}" but profile had "${userRole}"`);
+          console.log(`Using verified role from token: "${redirectRole}" for redirection`);
+          
+          // Notify user of the role change
+          toast({
+            title: "Role Updated",
+            description: `Your role has been updated to ${redirectRole}`,
+            duration: 3000,
+          });
+        } else {
+          console.log(`Role verified (${redirectRole}), redirecting to appropriate dashboard`);
+        }
+        
+        // Always redirect to the dashboard for the verified role
+        setLocation(getDashboardUrlForRole(redirectRole));
       } else if (roleVerification.actualRole) {
         // If verification failed but we have an actual role, use that instead
         console.log(`Role verification failed, but found actual role: ${roleVerification.actualRole}`);
         console.log(`Redirecting to ${getDashboardUrlForRole(roleVerification.actualRole)} instead`);
+        
         toast({
           title: "Role Mismatch",
           description: `Your role has been updated to ${roleVerification.actualRole}`,
           duration: 3000,
         });
+        
         setLocation(getDashboardUrlForRole(roleVerification.actualRole));
       } else {
         // Fallback to consumer dashboard if no role could be verified
