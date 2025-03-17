@@ -4,11 +4,15 @@
  * This script uploads service add-ons for partner users directly to Firestore.
  */
 
-const admin = require('firebase-admin');
-const serviceAccount = require('./firebase-data-connect.json');
+import admin from 'firebase-admin';
+import { readFile } from 'fs/promises';
 
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
+  const serviceAccount = JSON.parse(
+    await readFile(new URL('./firebase-data-connect.json', import.meta.url))
+  );
+  
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
   });
