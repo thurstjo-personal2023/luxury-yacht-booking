@@ -37,6 +37,7 @@ import {
   Info, 
   Loader2, 
   NavigationIcon, 
+  PackageOpen,
   Plus, 
   Trash2, 
   UploadCloud, 
@@ -63,6 +64,8 @@ import {
   deleteObject
 } from "firebase/storage";
 import { YachtExperience as BaseYachtExperience, Media, Location } from "@shared/firestore-schema";
+import { AddOnReference } from "@shared/unified-schema";
+import AddOnSelector from "@/components/yacht/AddOnSelector";
 
 // Extended interface to handle both naming conventions
 interface YachtExperience extends BaseYachtExperience {
@@ -128,6 +131,9 @@ export default function YachtForm() {
     producerId: string;
     providerId: string;
   } | null>(null);
+  // Add state for add-ons
+  const [includedAddOns, setIncludedAddOns] = useState<AddOnReference[]>([]);
+  const [optionalAddOns, setOptionalAddOns] = useState<AddOnReference[]>([]);
   
   // Initialize form with default values
   const form = useForm<YachtFormValues>({
@@ -285,6 +291,14 @@ export default function YachtForm() {
         setMedia(normalizedData.media || []);
         setCustomizationOptions(normalizedData.customization_options || []);
         setLocation_(normalizedData.location);
+        
+        // Set add-on data if present
+        if (data.includedAddOns) {
+          setIncludedAddOns(data.includedAddOns);
+        }
+        if (data.optionalAddOns) {
+          setOptionalAddOns(data.optionalAddOns);
+        }
         
         // Set form values using the normalized data
         form.reset({

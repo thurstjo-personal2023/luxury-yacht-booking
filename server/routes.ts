@@ -3042,7 +3042,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where('partnerId', '==', partnerId)
         .get();
       
-      const addons = [];
+      const addons: Array<Record<string, any>> = [];
       
       addonsSnapshot.forEach((doc) => {
         const data = doc.data();
@@ -3060,6 +3060,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error fetching partner add-ons:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+  
+  /**
+   * Test endpoint to get yachts for a producer without authentication
+   * This is used for testing and development only
+   */
+  app.get("/api/test/producer-yachts/:producerId", async (req: Request, res: Response) => {
+    try {
+      const { producerId } = req.params;
+      
+      if (!producerId) {
+        return res.status(400).json({ error: "Missing producer ID" });
+      }
+      
+      console.log(`Fetching yachts for producer ${producerId}`);
+      
+      // Query Firestore for producer's yachts
+      const yachtsSnapshot = await adminDb.collection('unified_yacht_experiences')
+        .where('providerId', '==', producerId)
+        .limit(10)
+        .get();
+      
+      const yachts: Array<Record<string, any>> = [];
+      
+      yachtsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        yachts.push({
+          id: doc.id,
+          title: data.title || data.name || 'Unnamed Yacht',
+          description: data.description || '',
+          category: data.category || '',
+          location: data.location || {},
+          pricing: data.pricing || data.price || 0,
+          providerId: data.providerId || data.producerId || producerId,
+          createdAt: data.createdAt || data.created_date,
+          updatedAt: data.updatedAt || data.last_updated_date,
+          media: data.media || []
+        });
+      });
+      
+      console.log(`Found ${yachts.length} yachts for producer ${producerId}`);
+      
+      res.json({
+        success: true,
+        yachts: yachts
+      });
+    } catch (error) {
+      console.error("Error fetching producer yachts:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+  
+  /**
+   * Test endpoint to update a yacht with partner add-ons
+   * This is used for testing and development only
+   */
+  app.post("/api/test/update-yacht-addons/:yachtId", async (req: Request, res: Response) => {
+    try {
+      const { yachtId } = req.params;
+      const { includedAddOns, optionalAddOns } = req.body;
+      
+      if (!yachtId) {
+        return res.status(400).json({ error: "Missing yacht ID" });
+      }
+      
+      console.log(`Updating yacht ${yachtId} with partner add-ons`);
+      console.log(`Included add-ons: ${includedAddOns ? includedAddOns.length : 0}`);
+      console.log(`Optional add-ons: ${optionalAddOns ? optionalAddOns.length : 0}`);
+      
+      // Get the yacht document
+      const yachtRef = adminDb.collection('unified_yacht_experiences').doc(yachtId);
+      const yachtDoc = await yachtRef.get();
+      
+      if (!yachtDoc.exists) {
+        return res.status(404).json({ error: "Yacht not found" });
+      }
+      
+      // Update the yacht with the add-ons
+      const updateData: Record<string, any> = {};
+      
+      if (includedAddOns) {
+        updateData.includedAddOns = includedAddOns;
+      }
+      
+      if (optionalAddOns) {
+        updateData.optionalAddOns = optionalAddOns;
+      }
+      
+      // Always update the timestamp
+      updateData.updatedAt = FieldValue.serverTimestamp();
+      updateData.last_updated_date = FieldValue.serverTimestamp(); // For backward compatibility
+      
+      // Update the document
+      await yachtRef.update(updateData);
+      
+      console.log(`Successfully updated yacht ${yachtId} with partner add-ons`);
+      
+      res.json({
+        success: true,
+        yachtId,
+        message: "Successfully bundled partner add-ons with yacht"
+      });
+    } catch (error) {
+      console.error("Error updating yacht with add-ons:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+  
+  /**
+   * Test endpoint to create the bundling endpoint
+   * This is just a utility endpoint for testing
+   */
+  app.post("/api/test/create-bundling-endpoint", async (req: Request, res: Response) => {
+    try {
+      console.log("Creating bundling endpoint for testing");
+      
+      res.json({
+        success: true,
+        message: "Bundling endpoint is available"
+      });
+    } catch (error) {
+      console.error("Error creating bundling endpoint:", error);
       res.status(500).json({ error: "Server error" });
     }
   });
