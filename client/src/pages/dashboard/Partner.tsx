@@ -30,6 +30,29 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function PartnerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
+  const { user, userRole } = useAuth();
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  
+  // Role verification - ensure user has partner role
+  useEffect(() => {
+    if (user && userRole !== 'partner') {
+      toast({
+        title: "Access Restricted",
+        description: "You don't have permission to access the partner dashboard.",
+        variant: "destructive"
+      });
+      
+      // Redirect to appropriate dashboard based on role
+      if (userRole === 'consumer') {
+        window.location.href = '/dashboard/consumer';
+      } else if (userRole === 'producer') {
+        window.location.href = '/dashboard/producer';
+      } else {
+        window.location.href = '/';
+      }
+    }
+  }, [user, userRole, toast, setLocation]);
   
   const { data: earningsData, isLoading: earningsLoading } = usePartnerEarnings();
   const { data: bookings, isLoading: bookingsLoading } = usePartnerBookings();
