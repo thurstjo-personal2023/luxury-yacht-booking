@@ -27,6 +27,7 @@ const SearchAndBook = lazy(() => import("@/pages/explore/SearchAndBook"));
 const GuestDashboard = lazy(() => import("@/pages/explore/GuestDashboard"));
 const ProfilePage = lazy(() => import("@/pages/profile/ProfilePage"));
 const FeaturedExperiences = lazy(() => import("@/pages/experiences/FeaturedExperiences"));
+const RoleDebugPage = lazy(() => import("@/pages/debug/RoleDebugPage"));
 
 // Partner Dashboard Pages
 const PartnerProfile = lazy(() => import("@/pages/dashboard/partner/PartnerProfile"));
@@ -169,6 +170,11 @@ function App() {
               </Route>
               <Route path="/admin/email-test">
                 <PrivateRoute component={EmailTest} />
+              </Route>
+              
+              {/* Debug Tools */}
+              <Route path="/debug/role">
+                <PrivateRoute component={RoleDebugPage} />
               </Route>
 
               {/* Fallback to 404 */}
