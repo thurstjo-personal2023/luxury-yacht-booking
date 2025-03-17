@@ -1608,17 +1608,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         yachtData.media = [];
       }
       
+      // Define AddOnReference interface for type safety
+      interface AddOnRef {
+        addOnId: string;
+        [key: string]: any;
+      }
+      
       // Handle add-on bundling fields
       if (yachtData.includedAddOns && Array.isArray(yachtData.includedAddOns)) {
         // Validate the add-on IDs for included add-ons
-        const includedAddOnIds = yachtData.includedAddOns.map(addon => addon.addOnId);
+        const includedAddOnIds = yachtData.includedAddOns.map((addon: AddOnRef) => addon.addOnId);
         if (includedAddOnIds.length > 0) {
           try {
             const validationResult = await storage.validateAddOnIds(includedAddOnIds);
             if (validationResult.invalidIds.length > 0) {
               console.warn(`Create Yacht API: Invalid included add-on IDs: ${validationResult.invalidIds.join(', ')}`);
               // Filter out invalid add-ons (optional, could return an error instead)
-              yachtData.includedAddOns = yachtData.includedAddOns.filter(addon => 
+              yachtData.includedAddOns = yachtData.includedAddOns.filter((addon: AddOnRef) => 
                 validationResult.validIds.includes(addon.addOnId));
             }
           } catch (validationError) {
@@ -1633,14 +1639,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (yachtData.optionalAddOns && Array.isArray(yachtData.optionalAddOns)) {
         // Validate the add-on IDs for optional add-ons
-        const optionalAddOnIds = yachtData.optionalAddOns.map(addon => addon.addOnId);
+        const optionalAddOnIds = yachtData.optionalAddOns.map((addon: AddOnRef) => addon.addOnId);
         if (optionalAddOnIds.length > 0) {
           try {
             const validationResult = await storage.validateAddOnIds(optionalAddOnIds);
             if (validationResult.invalidIds.length > 0) {
               console.warn(`Create Yacht API: Invalid optional add-on IDs: ${validationResult.invalidIds.join(', ')}`);
               // Filter out invalid add-ons (optional, could return an error instead)
-              yachtData.optionalAddOns = yachtData.optionalAddOns.filter(addon => 
+              yachtData.optionalAddOns = yachtData.optionalAddOns.filter((addon: AddOnRef) => 
                 validationResult.validIds.includes(addon.addOnId));
             }
           } catch (validationError) {
@@ -1808,17 +1814,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.last_updated_date = FieldValue.serverTimestamp();
         updateData.updatedAt = FieldValue.serverTimestamp();
         
+        // Define AddOnReference interface for type safety
+        interface AddOnRef {
+          addOnId: string;
+          [key: string]: any;
+        }
+        
         // Handle add-on bundling fields for updates
         if (updateData.includedAddOns && Array.isArray(updateData.includedAddOns)) {
           // Validate the add-on IDs for included add-ons
-          const includedAddOnIds = updateData.includedAddOns.map(addon => addon.addOnId);
+          const includedAddOnIds = updateData.includedAddOns.map((addon: AddOnRef) => addon.addOnId);
           if (includedAddOnIds.length > 0) {
             try {
               const validationResult = await storage.validateAddOnIds(includedAddOnIds);
               if (validationResult.invalidIds.length > 0) {
                 console.warn(`Update Yacht API: Invalid included add-on IDs: ${validationResult.invalidIds.join(', ')}`);
                 // Filter out invalid add-ons
-                updateData.includedAddOns = updateData.includedAddOns.filter(addon => 
+                updateData.includedAddOns = updateData.includedAddOns.filter((addon: AddOnRef) => 
                   validationResult.validIds.includes(addon.addOnId));
               }
             } catch (validationError) {
@@ -1830,14 +1842,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (updateData.optionalAddOns && Array.isArray(updateData.optionalAddOns)) {
           // Validate the add-on IDs for optional add-ons
-          const optionalAddOnIds = updateData.optionalAddOns.map(addon => addon.addOnId);
+          const optionalAddOnIds = updateData.optionalAddOns.map((addon: AddOnRef) => addon.addOnId);
           if (optionalAddOnIds.length > 0) {
             try {
               const validationResult = await storage.validateAddOnIds(optionalAddOnIds);
               if (validationResult.invalidIds.length > 0) {
                 console.warn(`Update Yacht API: Invalid optional add-on IDs: ${validationResult.invalidIds.join(', ')}`);
                 // Filter out invalid add-ons
-                updateData.optionalAddOns = updateData.optionalAddOns.filter(addon => 
+                updateData.optionalAddOns = updateData.optionalAddOns.filter((addon: AddOnRef) => 
                   validationResult.validIds.includes(addon.addOnId));
               }
             } catch (validationError) {
@@ -2670,6 +2682,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Unauthorized" });
       }
       
+      // Define booking with add-ons interface for type safety
+      interface BookingWithAddOns {
+        id?: string;
+        addOns?: Array<{
+          id?: string;
+          productId?: string;
+          name?: string;
+          price?: number;
+          quantity?: number;
+          [key: string]: any;
+        }>;
+        status?: string;
+        [key: string]: any;
+      }
+      
       // First, get all add-ons created by this partner
       const addonsSnapshot = await adminDb.collection('products_add_ons')
         .where('partnerId', '==', userId)
@@ -2690,22 +2717,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter bookings that include partner's add-ons
       const partnerBookings = bookingsSnapshot.docs
         .filter(doc => {
-          const bookingData = doc.data();
+          const bookingData = doc.data() as BookingWithAddOns;
           // Check if booking has add-ons field and includes any of the partner's add-ons
           return bookingData.addOns && 
                 Array.isArray(bookingData.addOns) &&
-                bookingData.addOns.some((addon: any) => 
-                  addonIds.includes(addon.id || addon.productId)
+                bookingData.addOns.some(addon => 
+                  addonIds.includes(addon.id || addon.productId || '')
                 );
         })
-        .map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          // Add details about which add-ons from this partner are included
-          partnerAddons: doc.data().addOns?.filter((addon: any) => 
-            addonIds.includes(addon.id || addon.productId)
-          )
-        }));
+        .map(doc => {
+          const bookingData = doc.data() as BookingWithAddOns;
+          return {
+            id: doc.id,
+            ...bookingData,
+            // Add details about which add-ons from this partner are included
+            partnerAddons: bookingData.addOns?.filter(addon => 
+              addonIds.includes(addon.id || addon.productId || '')
+            )
+          };
+        });
       
       res.json({ bookings: partnerBookings });
     } catch (error) {
@@ -2723,6 +2753,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // Define booking with add-ons interface for type safety
+      interface BookingWithAddOns {
+        id?: string;
+        addOns?: Array<{
+          id?: string;
+          productId?: string;
+          name?: string;
+          price?: number;
+          quantity?: number;
+          [key: string]: any;
+        }>;
+        status?: string;
+        createdAt?: {
+          toDate?: () => Date;
+          [key: string]: any;
+        };
+        [key: string]: any;
       }
       
       // Get the partner's profile to check for commission rate
@@ -2771,18 +2820,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter bookings that include partner's add-ons
       const partnerBookings = bookingsSnapshot.docs
         .filter(doc => {
-          const bookingData = doc.data();
+          const bookingData = doc.data() as BookingWithAddOns;
           // Check if booking has add-ons field and includes any of the partner's add-ons
           return bookingData.addOns && 
                 Array.isArray(bookingData.addOns) &&
-                bookingData.addOns.some((addon: any) => 
-                  addonIds.includes(addon.id || addon.productId)
+                bookingData.addOns.some(addon => 
+                  addonIds.includes(addon.id || addon.productId || '')
                 );
         })
-        .map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+        .map(doc => {
+          const data = doc.data() as BookingWithAddOns;
+          return {
+            id: doc.id,
+            ...data
+          };
+        });
       
       // Calculate earnings
       let totalEarnings = 0;
@@ -2802,9 +2854,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const bookingMonth = bookingDate.getMonth();
           const bookingYear = bookingDate.getFullYear();
           
-          booking.addOns.forEach((addon: any) => {
+          booking.addOns.forEach(addon => {
             // Check if this add-on belongs to the partner
-            if (addonIds.includes(addon.id || addon.productId)) {
+            if (addonIds.includes(addon.id || addon.productId || '')) {
               const addonPrice = addon.price || 0;
               const partnerEarning = addonPrice * commissionRate;
               
