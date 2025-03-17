@@ -858,16 +858,18 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log(`Getting available add-ons for producer: ${producerId}`);
       
-      // Get all add-ons
-      const snapshot = await adminDb.collection('products_add-ons').get();
+      // Get all add-ons - Using collection name with underscore instead of hyphen
+      const snapshot = await adminDb.collection('products_add_ons').get();
       
       if (snapshot.empty) {
-        console.log('No add-ons found');
+        console.log('No add-ons found in collection products_add_ons');
         return {
           producerAddOns: [],
           partnerAddOns: []
         };
       }
+      
+      console.log(`Found ${snapshot.size} total add-ons in the collection`);
       
       // Map documents to ProductAddOn type and separate by owner
       const producerAddOns: ProductAddOn[] = [];
@@ -881,15 +883,22 @@ export class FirestoreStorage implements IStorage {
           media: data.media || []
         };
         
+        // Log each add-on for debugging
+        console.log(`Add-on: ${addOn.name}, partnerId: ${addOn.partnerId}, availability: ${addOn.availability}`);
+        
         // Only include available add-ons
         if (addOn.availability !== false) {
           // Check if this add-on belongs to the producer or a partner
           if (addOn.partnerId === producerId) {
+            console.log(`✅ Adding to producer add-ons: ${addOn.name}`);
             producerAddOns.push(addOn);
           } else {
             // This is a partner add-on
+            console.log(`✅ Adding to partner add-ons: ${addOn.name}`);
             partnerAddOns.push(addOn);
           }
+        } else {
+          console.log(`⚠️ Skipping unavailable add-on: ${addOn.name}`);
         }
       });
       
@@ -931,10 +940,10 @@ export class FirestoreStorage implements IStorage {
       const validIds: string[] = [];
       const invalidIds: string[] = [];
       
-      // For each ID, check if it exists in the collection
+      // For each ID, check if it exists in the collection (using products_add_ons instead of products_add-ons)
       for (const id of ids) {
         try {
-          const docRef = await adminDb.collection('products_add-ons').doc(id).get();
+          const docRef = await adminDb.collection('products_add_ons').doc(id).get();
           
           if (docRef.exists) {
             const data = docRef.data() as ProductAddOn;
@@ -942,15 +951,16 @@ export class FirestoreStorage implements IStorage {
             // Only consider it valid if it's available
             if (data.availability !== false) {
               validIds.push(id);
+              console.log(`✅ Add-on ${id} is valid and available`);
             } else {
               // Add-on exists but is not available
               invalidIds.push(id);
-              console.log(`Add-on ${id} exists but is not available`);
+              console.log(`⚠️ Add-on ${id} exists but is not available`);
             }
           } else {
             // Add-on doesn't exist
             invalidIds.push(id);
-            console.log(`Add-on ${id} doesn't exist`);
+            console.log(`❌ Add-on ${id} doesn't exist in collection products_add_ons`);
           }
         } catch (error) {
           console.error(`Error checking add-on ${id}:`, error);
