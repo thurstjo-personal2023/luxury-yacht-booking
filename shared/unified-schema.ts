@@ -75,6 +75,22 @@ export interface Review {
 }
 
 /**
+ * Reference to a service or product add-on that can be bundled with a yacht experience
+ */
+export interface AddOnReference {
+  addOnId: string;         // ID of the add-on
+  partnerId?: string;      // ID of the partner who created it (null if producer's own)
+  name: string;            // Name of the add-on (for display purposes)
+  description?: string;    // Brief description of the add-on
+  pricing: number;         // Price set by producer for this experience
+  isRequired: boolean;     // Whether this add-on is mandatory or optional
+  commissionRate: number;  // Percentage that goes to the partner
+  maxQuantity?: number;    // Maximum units that can be purchased (optional)
+  category?: string;       // Category of the add-on
+  mediaUrl?: string;       // Primary image URL for the add-on
+}
+
+/**
  * Unified Yacht interface that combines all fields from previous schemas
  * with standardized field naming
  */
@@ -99,6 +115,10 @@ export interface Yacht {
   
   // Options and customization
   customizationOptions: CustomizationOption[];
+  
+  // Add-ons bundling
+  includedAddOns?: AddOnReference[];  // Add-ons included in base price
+  optionalAddOns?: AddOnReference[];  // Add-ons available for extra charge
   
   // Media
   media: Media[];
@@ -152,6 +172,9 @@ export interface YachtSummary {
   isAvailable: boolean;
   isFeatured: boolean;
   mainImage?: string;
+  includedAddOnsCount?: number;   // Count of included add-ons
+  optionalAddOnsCount?: number;   // Count of optional add-ons
+  hasPartnerAddOns?: boolean;     // Whether yacht includes partner add-ons
 }
 
 /**

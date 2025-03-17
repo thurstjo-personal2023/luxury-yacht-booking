@@ -19,6 +19,14 @@ export interface PartnerProfileResponse {
 }
 
 /**
+ * Available add-ons response from the API for producers 
+ */
+export interface AvailableAddOnsResponse {
+  producerAddOns: PartnerAddon[];   // Add-ons created by the producer
+  partnerAddOns: PartnerAddon[];    // Add-ons created by partners
+}
+
+/**
  * Service provider profile type from shared/harmonized-user-schema.ts
  */
 export interface ServiceProviderProfile {
@@ -72,6 +80,20 @@ export interface PartnerAddon {
 }
 
 /**
+ * Booking Add-On
+ */
+export interface BookingAddOn {
+  addOnId: string;
+  name: string;
+  price: number;
+  partnerId: string;
+  commissionRate: number;
+  commissionAmount: number;
+  quantity: number;
+  isIncluded: boolean;
+}
+
+/**
  * Partner booking
  */
 export interface PartnerBooking {
@@ -84,13 +106,22 @@ export interface PartnerBooking {
   endDate: string;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   totalPrice: number;
-  addOns: {
-    addonId: string;
-    name: string;
-    price: number;
-    partnerId: string;
-  }[];
+  addOns: BookingAddOn[];
+  addOnTotal: number;
+  commissionTotal: number;
   createdAt: Timestamp;
+}
+
+/**
+ * Add-on usage statistics
+ */
+export interface AddOnUsage {
+  addOnId: string;
+  name: string;
+  bookingCount: number;
+  totalRevenue: number;
+  totalCommission: number;
+  category: string;
 }
 
 /**
@@ -107,4 +138,5 @@ export interface PartnerEarnings {
     amount: number;
     bookingIds: string[];
   }[];
+  addOnUsage?: AddOnUsage[];  // Usage statistics for partner's add-ons
 }
