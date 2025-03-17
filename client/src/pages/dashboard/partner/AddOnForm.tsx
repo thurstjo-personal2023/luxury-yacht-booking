@@ -164,16 +164,31 @@ export default function AddOnForm() {
       // Add tags to the form values
       values.tags = tags;
       
-      // Add media to create addon mutation
+      // Transform the data to match what the API expects
       await createAddOnMutation.mutateAsync({
-        ...values,
+        name: values.name,
+        description: values.description,
+        category: values.category,
+        pricing: values.pricing,
+        availability: values.availability,
+        tags: values.tags,
         media: media.map(item => ({ type: item.type, url: item.url })),
+      });
+      
+      toast({
+        title: "Service Add-on Created",
+        description: "Your service has been successfully created.",
       });
       
       // Navigate back to the partner add-ons page
       navigate("/dashboard/partner/add-ons");
     } catch (error) {
       console.error("Error creating add-on:", error);
+      toast({
+        title: "Error Creating Service",
+        description: "There was a problem creating your service. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
