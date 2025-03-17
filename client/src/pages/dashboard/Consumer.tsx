@@ -78,7 +78,27 @@ const durations = [
 
 export default function ConsumerDashboard() {
   const { toast } = useToast();
-  const [user] = useAuthState(auth);
+  const { user, userRole } = useAuth();
+  
+  // Role verification - ensure user has consumer role
+  useEffect(() => {
+    if (user && userRole !== 'consumer') {
+      toast({
+        title: "Access Restricted",
+        description: "You don't have permission to access the consumer dashboard.",
+        variant: "destructive"
+      });
+      
+      // Redirect to appropriate dashboard based on role
+      if (userRole === 'producer') {
+        window.location.href = '/dashboard/producer';
+      } else if (userRole === 'partner') {
+        window.location.href = '/dashboard/partner';
+      } else {
+        window.location.href = '/';
+      }
+    }
+  }, [user, userRole, toast]);
   const [location, setLocation] = useState<string>("");
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
@@ -109,8 +129,8 @@ export default function ConsumerDashboard() {
       
       console.log("=== Fetching User Bookings via API ===");
       try {
-        // Get the authentication token
-        const token = await user.getIdToken();
+        // Get the authentication token from localStorage
+        const token = localStorage.getItem('authToken');
         
         // Call the API endpoint with authentication
         const response = await axios.get('/api/user/bookings', {
