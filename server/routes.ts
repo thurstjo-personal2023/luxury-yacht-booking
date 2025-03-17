@@ -3022,6 +3022,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Server error" });
     }
   });
+  
+  /**
+   * Test endpoint to list partner add-ons without authentication
+   * This is used for testing and development only
+   */
+  app.get("/api/test/partner-addons/:partnerId", async (req: Request, res: Response) => {
+    try {
+      const { partnerId } = req.params;
+      
+      if (!partnerId) {
+        return res.status(400).json({ error: "Missing partner ID" });
+      }
+      
+      console.log(`Fetching add-ons for partner ${partnerId}`);
+      
+      // Query Firestore for partner's add-ons
+      const addonsSnapshot = await adminDb.collection('products_add_ons')
+        .where('partnerId', '==', partnerId)
+        .get();
+      
+      const addons = [];
+      
+      addonsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        addons.push({
+          id: doc.id,
+          ...data
+        });
+      });
+      
+      console.log(`Found ${addons.length} add-ons for partner ${partnerId}`);
+      
+      res.json({
+        success: true,
+        addons: addons
+      });
+    } catch (error) {
+      console.error("Error fetching partner add-ons:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
 
   /**
    * Update partner profile

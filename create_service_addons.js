@@ -5,7 +5,7 @@
  */
 
 // Import axios for API calls
-const axios = require('axios');
+import axios from 'axios';
 
 // Configure API base URL
 const API_BASE_URL = 'http://localhost:5000'; // Using local API server
