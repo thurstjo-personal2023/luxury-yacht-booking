@@ -20,6 +20,19 @@ export interface CustomizationOption {
   product_id: string;  // Added product_id property
 }
 
+export interface AddOnReference {
+  addOnId: string;         // ID of the add-on
+  partnerId?: string;      // ID of the partner who created it (null if producer's own)
+  name: string;            // Name of the add-on (for display purposes)
+  description?: string;    // Brief description of the add-on
+  pricing: number;         // Price set by producer for this experience
+  isRequired: boolean;     // Whether this add-on is mandatory or optional
+  commissionRate: number;  // Percentage that goes to the partner
+  maxQuantity?: number;    // Maximum units that can be purchased (optional)
+  category?: string;       // Category of the add-on
+  mediaUrl?: string;       // Primary image URL for the add-on
+}
+
 // Define VirtualTourHotspot interface
 export interface VirtualTourHotspot {
   id: string;
@@ -50,6 +63,10 @@ export interface YachtExperience {
   title: string;
   description: string;
   category: string;
+  
+  // Add-on bundling fields
+  includedAddOns?: AddOnReference[];
+  optionalAddOns?: AddOnReference[];
   location: Location;
   duration: number;
   capacity: number;

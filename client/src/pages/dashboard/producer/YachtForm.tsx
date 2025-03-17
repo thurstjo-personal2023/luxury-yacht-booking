@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import AddOnSelector from "@/components/yacht/AddOnSelector";
 import { 
   Form, 
   FormControl, 
@@ -63,9 +64,7 @@ import {
   ref, 
   deleteObject
 } from "firebase/storage";
-import { YachtExperience as BaseYachtExperience, Media, Location } from "@shared/firestore-schema";
-import { AddOnReference } from "@shared/unified-schema";
-import AddOnSelector from "@/components/yacht/AddOnSelector";
+import { YachtExperience as BaseYachtExperience, Media, Location, AddOnReference } from "@shared/firestore-schema";
 
 // Extended interface to handle both naming conventions
 interface YachtExperience extends BaseYachtExperience {
@@ -1634,7 +1633,7 @@ export default function YachtForm() {
                           type="button" 
                           variant="outline" 
                           onClick={() => {
-                            const prevTab = activeTab === "media" ? "details" : "basic";
+                            const prevTab = activeTab === "media" ? "addons" : (activeTab === "addons" ? "details" : "basic");
                             setActiveTab(prevTab);
                           }}
                           className="flex items-center gap-2"
@@ -1648,7 +1647,7 @@ export default function YachtForm() {
                         <Button 
                           type="button" 
                           onClick={() => {
-                            const nextTab = activeTab === "basic" ? "details" : "media";
+                            const nextTab = activeTab === "basic" ? "details" : (activeTab === "details" ? "addons" : "media");
                             setActiveTab(nextTab);
                           }}
                           className="flex items-center gap-2 ml-auto"
