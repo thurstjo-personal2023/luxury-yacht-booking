@@ -5,8 +5,8 @@
  */
 
 // Import necessary modules
-const axios = require('axios');
-const { execSync } = require('child_process');
+import axios from 'axios';
+import { execSync } from 'child_process';
 
 // Configure API base URL
 const API_BASE_URL = 'http://localhost:5000'; // Using local API server
