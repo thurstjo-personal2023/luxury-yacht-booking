@@ -1808,6 +1808,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.last_updated_date = FieldValue.serverTimestamp();
         updateData.updatedAt = FieldValue.serverTimestamp();
         
+        // Handle add-on bundling fields for updates
+        if (updateData.includedAddOns && Array.isArray(updateData.includedAddOns)) {
+          // Validate the add-on IDs for included add-ons
+          const includedAddOnIds = updateData.includedAddOns.map(addon => addon.addOnId);
+          if (includedAddOnIds.length > 0) {
+            try {
+              const validationResult = await storage.validateAddOnIds(includedAddOnIds);
+              if (validationResult.invalidIds.length > 0) {
+                console.warn(`Update Yacht API: Invalid included add-on IDs: ${validationResult.invalidIds.join(', ')}`);
+                // Filter out invalid add-ons
+                updateData.includedAddOns = updateData.includedAddOns.filter(addon => 
+                  validationResult.validIds.includes(addon.addOnId));
+              }
+            } catch (validationError) {
+              console.error("Update Yacht API: Error validating included add-on IDs:", validationError);
+              // Continue with update but log the error
+            }
+          }
+        }
+        
+        if (updateData.optionalAddOns && Array.isArray(updateData.optionalAddOns)) {
+          // Validate the add-on IDs for optional add-ons
+          const optionalAddOnIds = updateData.optionalAddOns.map(addon => addon.addOnId);
+          if (optionalAddOnIds.length > 0) {
+            try {
+              const validationResult = await storage.validateAddOnIds(optionalAddOnIds);
+              if (validationResult.invalidIds.length > 0) {
+                console.warn(`Update Yacht API: Invalid optional add-on IDs: ${validationResult.invalidIds.join(', ')}`);
+                // Filter out invalid add-ons
+                updateData.optionalAddOns = updateData.optionalAddOns.filter(addon => 
+                  validationResult.validIds.includes(addon.addOnId));
+              }
+            } catch (validationError) {
+              console.error("Update Yacht API: Error validating optional add-on IDs:", validationError);
+              // Continue with update but log the error
+            }
+          }
+        }
+        
         // Update the yacht document
         console.log(`Update Yacht API: Updating yacht ${yachtId} with data:`, updateData);
         await adminDb.collection('unified_yacht_experiences').doc(yachtId).update(updateData);
