@@ -19,22 +19,14 @@ const PARTNER_ADDONS = {
   'p3wafU2xFnNZugiepyC6OOgw3fE2': [
     {
       name: 'Professional Water Skiing Experience',
-      id: 'addon-p3wafU2xFnNZugiepyC6OOgw3fE2-1742227130645'
-    },
-    {
-      name: 'Luxury Flyboard Experience',
-      id: 'addon-p3wafU2xFnNZugiepyC6OOgw3fE2-1742227131001'
+      id: 'addon-p3wafU2xFnNZugiepyC6OOgw3fE2-1742233022189'
     }
   ],
   // Gary Santil - Dining Services
   'IETQG0edpxWJW1tzYylgLZHMMoB2': [
     {
       name: 'Exclusive Private Chef Experience',
-      id: 'addon-IETQG0edpxWJW1tzYylgLZHMMoB2-1742227131345'
-    },
-    {
-      name: 'Premium Yacht Catering Service', 
-      id: 'addon-IETQG0edpxWJW1tzYylgLZHMMoB2-1742227131584'
+      id: 'addon-IETQG0edpxWJW1tzYylgLZHMMoB2-1742233022419'
     }
   ]
 };
