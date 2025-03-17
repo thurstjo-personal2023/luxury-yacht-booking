@@ -1242,6 +1242,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get available add-ons (both producer's own and partner add-ons) for bundling
+  app.get("/api/producer/available-addons", verifyAuth, async (req: Request, res: Response) => {
+    // Set content type explicitly to ensure JSON response
+    res.setHeader('Content-Type', 'application/json');
+    
+    try {
+      console.log('Available Add-ons API: Request received');
+      
+      // Set cache control headers to prevent caching
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
+      // Log user info from auth
+      console.log('Available Add-ons API: User info from auth:', {
+        uid: req.user?.uid,
+        role: req.user?.role,
+        email: req.user?.email,
+      });
+      
+      // Check if the user is authenticated
+      if (!req.user) {
+        console.log('Available Add-ons API: Unauthenticated request');
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // Check if user is a producer
+      if (req.user.role !== 'producer') {
+        console.log(`Available Add-ons API: User role ${req.user.role} not authorized`);
+        return res.status(403).json({ error: "Only producers can access available add-ons" });
+      }
+      
+      // Get the producer ID from user ID
+      const { producerId } = await getHarmonizedProducerIds(req.user.uid);
+      console.log(`Available Add-ons API: Using producer ID: ${producerId}`);
+      
+      // Get the available add-ons
+      try {
+        const availableAddons = await storage.getAvailableAddOns(producerId);
+        
+        console.log('Available Add-ons API: Retrieved', {
+          producerAddOns: availableAddons.producerAddOns.length,
+          partnerAddOns: availableAddons.partnerAddOns.length
+        });
+        
+        // Return the response
+        res.json(availableAddons);
+      } catch (storageError) {
+        console.error('Available Add-ons API: Error in storage.getAvailableAddOns:', storageError);
+        
+        // Return a more detailed error for debugging
+        return res.status(500).json({
+          error: "Database operation failed",
+          details: String(storageError)
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching available add-ons:", error);
+      res.status(500).json({ 
+        error: "Failed to fetch available add-ons",
+        message: String(error)
+      });
+    }
+  });
+  
+  // Validate add-on IDs to ensure they exist and are available
+  app.post("/api/producer/validate-addons", verifyAuth, async (req: Request, res: Response) => {
+    // Set content type explicitly to ensure JSON response
+    res.setHeader('Content-Type', 'application/json');
+    
+    try {
+      console.log('Validate Add-ons API: Request received');
+      
+      // Set cache control headers to prevent caching
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
+      // Extract add-on IDs from request body
+      const { addonIds } = req.body;
+      
+      if (!addonIds || !Array.isArray(addonIds)) {
+        console.warn('Validate Add-ons API: No add-on IDs provided or invalid format');
+        return res.status(400).json({ 
+          error: "Invalid request", 
+          message: "addonIds must be an array of strings"
+        });
+      }
+      
+      console.log(`Validate Add-ons API: Validating ${addonIds.length} add-on IDs`);
+      
+      // Log user info from auth
+      console.log('Validate Add-ons API: User info from auth:', {
+        uid: req.user?.uid,
+        role: req.user?.role,
+        email: req.user?.email,
+      });
+      
+      // Check if the user is authenticated
+      if (!req.user) {
+        console.log('Validate Add-ons API: Unauthenticated request');
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // Check if user is a producer
+      if (req.user.role !== 'producer') {
+        console.log(`Validate Add-ons API: User role ${req.user.role} not authorized`);
+        return res.status(403).json({ error: "Only producers can validate add-ons" });
+      }
+      
+      // Validate the add-on IDs
+      try {
+        const validationResult = await storage.validateAddOnIds(addonIds);
+        
+        console.log('Validate Add-ons API: Validation result:', {
+          validIds: validationResult.validIds.length,
+          invalidIds: validationResult.invalidIds.length
+        });
+        
+        // Return the validation result
+        res.json(validationResult);
+      } catch (storageError) {
+        console.error('Validate Add-ons API: Error in storage.validateAddOnIds:', storageError);
+        
+        // Return a more detailed error for debugging
+        return res.status(500).json({
+          error: "Database operation failed",
+          details: String(storageError)
+        });
+      }
+    } catch (error) {
+      console.error("Error validating add-on IDs:", error);
+      res.status(500).json({ 
+        error: "Failed to validate add-on IDs",
+        message: String(error)
+      });
+    }
+  });
+  
   // Create a new add-on for a producer
   app.post("/api/producer/addons/create", verifyAuth, async (req: Request, res: Response) => {
     // Set content type explicitly to ensure JSON response
