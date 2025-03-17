@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,8 +18,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import type { YachtExperience } from "@shared/firestore-schema";
 import { getDocs, query, where, limit, collection } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
-import { useAuthState } from "react-firebase-hooks/auth";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/hooks/use-auth";
 import { DateRange } from "react-day-picker";
 import { Progress } from "@/components/ui/progress";
 import { PlacesAutocomplete } from "@/components/ui/places-autocomplete";
