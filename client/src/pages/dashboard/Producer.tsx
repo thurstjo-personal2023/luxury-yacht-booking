@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ import { ServiceProviderProfile, YachtExperience, Review, ProducerBooking } from
 export default function ProducerDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user, userRole, loading } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [producerProfile, setProducerProfile] = useState<ServiceProviderProfile | null>(null);
@@ -54,19 +56,19 @@ export default function ProducerDashboard() {
   // Check producer access and get profile data
   useEffect(() => {
     const checkProducerAccessAndFetchProfile = async () => {
-      // Import dynamically to avoid circular imports
-      const { verifyProducerRole } = await import('@/lib/role-verification');
+      // If still loading auth state, wait
+      if (loading) {
+        return;
+      }
       
-      // Verify producer role using enhanced verification
-      const roleCheck = await verifyProducerRole();
-      console.log('Producer role verification result:', roleCheck);
-      
-      if (!roleCheck.hasRole) {
-        console.error('User does not have producer role access:', roleCheck.message);
+      // Check if user exists and has the producer role
+      if (!user || userRole !== 'producer') {
+        console.error('User does not have producer role access');
+        
         // Show toast notification with error message
         toast({
           title: 'Access Denied',
-          description: roleCheck.message || 'You do not have producer role access',
+          description: 'You do not have producer role access',
           variant: 'destructive',
           duration: 4000,
         });
@@ -76,7 +78,7 @@ export default function ProducerDashboard() {
         return;
       }
       
-      const user = auth.currentUser;
+      // User has producer role, fetch their profile
       if (user) {
         const profileDocRef = doc(db, "user_profiles_service_provider", user.uid);
         try {
@@ -132,7 +134,7 @@ export default function ProducerDashboard() {
     };
     
     checkProducerAccessAndFetchProfile();
-  }, [setLocation, toast]);
+  }, [user, userRole, loading, setLocation, toast]);
   
   // Calculate dashboard statistics
   const totalBookings = bookings?.length || 0;
