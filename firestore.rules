@@ -10,6 +10,19 @@ service cloud.firestore {
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
+    
+    function hasRole(role) {
+      return request.auth.token.role == role;
+    }
+    
+    function isProducerOrPartner() {
+      return request.auth.token.role in ['producer', 'partner'];
+    }
+    
+    function isYachtOwner(resource) {
+      return resource.data.producerId == request.auth.uid || 
+             resource.data.providerId == request.auth.uid;
+    }
 
     // User profiles - original collection
     match /users/{userId} {
@@ -20,6 +33,13 @@ service cloud.firestore {
       allow read: if isSignedIn() && isOwner(userId);
       allow update: if isSignedIn() && isOwner(userId);
       allow delete: if false; // Prevent user deletion through client
+    }
+    
+    // Harmonized users collection
+    match /harmonized_users/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isOwner(userId);
+      allow delete: if false;
     }
     
     // Service provider profiles
@@ -48,6 +68,17 @@ service cloud.firestore {
       allow write: if request.time < timestamp.date(2024, 12, 31);
     }
     
+    // Unified Yacht Experiences (new consolidated collection)
+    match /unified_yacht_experiences/{document} {
+      allow read;
+      allow create: if isSignedIn() && isProducerOrPartner();
+      // Enhanced rule for yacht owner validation - checking both producerId and providerId
+      allow update, delete: if isSignedIn() && isProducerOrPartner() && (
+        resource.data.producerId == request.auth.uid || 
+        resource.data.providerId == request.auth.uid
+      );
+    }
+    
     // Product Add-ons (original format)
     match /products_add_ons/{document} {
       allow read;
@@ -62,8 +93,14 @@ service cloud.firestore {
     
     // Product Add-ons (consolidated collection)
     match /product_add_ons/{document} {
+      // Allow read for all users
       allow read;
-      allow write: if request.time < timestamp.date(2024, 12, 31);
+      // Allow creation for producers and partners
+      allow create: if isSignedIn() && isProducerOrPartner();
+      // Allow updates and deletions for the partner who created the add-on
+      allow update, delete: if isSignedIn() && isProducerOrPartner() && (
+        resource.data.partnerId == request.auth.uid
+      );
     }
     
     // Other collections
