@@ -31,6 +31,8 @@ const RoleDebugPage = lazy(() => import("@/pages/debug/RoleDebugPage"));
 
 // Partner Dashboard Pages
 const PartnerProfile = lazy(() => import("@/pages/dashboard/partner/PartnerProfile"));
+const PartnerAddOns = lazy(() => import("@/pages/dashboard/partner/AddOns"));
+const AddOnForm = lazy(() => import("@/pages/dashboard/partner/AddOnForm"));
 
 // Producer Dashboard Pages
 const ProducerProfile = lazy(() => import("@/pages/dashboard/producer/ProducerProfile"));
@@ -138,6 +140,12 @@ function App() {
               {/* Partner Dashboard Routes */}
               <Route path="/dashboard/partner/profile">
                 <PrivateRoute component={PartnerProfile} />
+              </Route>
+              <Route path="/dashboard/partner/add-ons">
+                <PrivateRoute component={PartnerAddOns} />
+              </Route>
+              <Route path="/dashboard/partner/add-ons/create">
+                <PrivateRoute component={AddOnForm} />
               </Route>
               
               {/* Producer Dashboard Routes */}
