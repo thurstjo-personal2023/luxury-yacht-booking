@@ -877,10 +877,18 @@ export class FirestoreStorage implements IStorage {
       
       snapshot.docs.forEach(doc => {
         const data = doc.data() as ProductAddOn;
+        
+        // Normalize the tags field to ensure it's always an array
+        const normalizedTags = Array.isArray(data.tags) ? data.tags : 
+                               (typeof data.tags === 'string' ? [data.tags] : []);
+        
+        console.log(`Normalizing add-on: ${data.name}, tags type: ${typeof data.tags}, normalized to array: ${Array.isArray(normalizedTags)}`);
+        
         const addOn: ProductAddOn = {
           ...data,
           productId: doc.id,
-          media: data.media || []
+          media: data.media || [],
+          tags: normalizedTags  // Ensure tags is always an array
         };
         
         // Log each add-on for debugging
@@ -947,6 +955,13 @@ export class FirestoreStorage implements IStorage {
           
           if (docRef.exists) {
             const data = docRef.data() as ProductAddOn;
+            
+            // Normalize the tags field to ensure it's always an array (similar to getAvailableAddOns)
+            const normalizedTags = Array.isArray(data.tags) ? data.tags : 
+                                 (typeof data.tags === 'string' ? [data.tags] : []);
+            
+            // Update the data object with normalized tags
+            data.tags = normalizedTags;
             
             // Only consider it valid if it's available
             if (data.availability !== false) {

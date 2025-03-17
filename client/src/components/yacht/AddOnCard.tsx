@@ -79,9 +79,12 @@ export function AddOnCard({
         <div className="flex flex-wrap gap-1">
           <Badge variant="outline" className="text-xs">{addOn.category || "Uncategorized"}</Badge>
           <Badge variant="outline" className="text-xs">${addOn.pricing.toFixed(2)}</Badge>
-          {addOn.tags.slice(0, 2).map(tag => (
-            <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
-          ))}
+          {/* Add defensive check for tags array */}
+          {Array.isArray(addOn.tags) ? (
+            addOn.tags.slice(0, 2).map(tag => (
+              <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+            ))
+          ) : null}
         </div>
         
         {/* Commission rate input for partner add-ons */}
