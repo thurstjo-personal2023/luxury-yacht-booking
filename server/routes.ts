@@ -2969,6 +2969,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Server error" });
     }
   });
+  
+  /**
+   * Admin endpoint to create partner add-ons
+   * This is used for testing and development only
+   */
+  app.post("/api/test/create-partner-addon", async (req: Request, res: Response) => {
+    try {
+      const { partnerId, addon } = req.body;
+      
+      if (!partnerId || !addon) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      // Basic validation
+      if (!addon.name || !addon.category || addon.pricing === undefined) {
+        return res.status(400).json({ error: "Missing required add-on fields" });
+      }
+      
+      console.log(`Creating add-on "${addon.name}" for partner ${partnerId}`);
+      
+      // Create add-on document
+      const addonData = {
+        productId: `addon-${partnerId}-${Date.now()}`,
+        name: addon.name,
+        description: addon.description || "",
+        category: addon.category,
+        pricing: parseFloat(addon.pricing),
+        media: addon.media || [],
+        availability: addon.availability !== false,
+        tags: addon.tags || [],
+        partnerId: partnerId,
+        createdDate: FieldValue.serverTimestamp(),
+        lastUpdatedDate: FieldValue.serverTimestamp()
+      };
+      
+      // Save to Firestore
+      const addonRef = adminDb.collection('products_add_ons').doc(addonData.productId);
+      await addonRef.set(addonData);
+      
+      console.log(`Successfully created add-on: ${addon.name} with ID: ${addonData.productId}`);
+      
+      res.json({
+        success: true,
+        addon: {
+          id: addonData.productId,
+          ...addonData
+        }
+      });
+    } catch (error) {
+      console.error("Error creating partner add-on:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
 
   /**
    * Update partner profile
