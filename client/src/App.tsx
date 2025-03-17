@@ -116,7 +116,12 @@ function App() {
                 <PrivateRoute component={PaymentPage} />
               </Route>
 
-              {/* Protected Routes */}
+              {/* Protected Routes with Role Verification */}
+              {/* 
+                These routes are now protected by both:
+                1. PrivateRoute - Ensures user is authenticated
+                2. Internal role verification - Each dashboard component now verifies correct role
+              */}
               <Route path="/dashboard/consumer">
                 <PrivateRoute component={ConsumerDashboard} />
               </Route>
