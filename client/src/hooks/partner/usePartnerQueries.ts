@@ -113,11 +113,27 @@ export function useCreateAddon() {
     }
   >({
     mutationFn: async (addonData) => {
-      const response = await apiRequest<{ success: boolean; addon: any }>('/api/partner/addons/create', {
-        method: 'POST',
-        body: JSON.stringify(addonData),
-      });
-      return response;
+      try {
+        const response = await fetch('/api/partner/addons/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          },
+          credentials: 'include',
+          body: JSON.stringify(addonData),
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || response.statusText);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('Error creating add-on:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/partner/addons'] });
@@ -145,8 +161,18 @@ export function usePartnerBookings() {
   return useQuery({
     queryKey: ['/api/partner/bookings'],
     queryFn: async () => {
-      const response = await apiRequest('/api/partner/bookings');
-      const typedResponse = response as unknown as BookingsResponse;
+      const response = await fetch('/api/partner/bookings', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        },
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch bookings');
+      }
+      
+      const typedResponse = await response.json() as BookingsResponse;
       return typedResponse.bookings || [];
     },
     enabled: !!user && user?.role === 'partner',
@@ -162,8 +188,18 @@ export function usePartnerEarnings() {
   return useQuery({
     queryKey: ['/api/partner/earnings'],
     queryFn: async () => {
-      const response = await apiRequest('/api/partner/earnings');
-      const typedResponse = response as unknown as EarningsResponse;
+      const response = await fetch('/api/partner/earnings', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        },
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch earnings data');
+      }
+      
+      const typedResponse = await response.json() as EarningsResponse;
       return typedResponse.earnings || {
         total: 0,
         currentMonth: 0,
