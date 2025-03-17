@@ -1608,6 +1608,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         yachtData.media = [];
       }
       
+      // Handle add-on bundling fields
+      if (yachtData.includedAddOns && Array.isArray(yachtData.includedAddOns)) {
+        // Validate the add-on IDs for included add-ons
+        const includedAddOnIds = yachtData.includedAddOns.map(addon => addon.addOnId);
+        if (includedAddOnIds.length > 0) {
+          try {
+            const validationResult = await storage.validateAddOnIds(includedAddOnIds);
+            if (validationResult.invalidIds.length > 0) {
+              console.warn(`Create Yacht API: Invalid included add-on IDs: ${validationResult.invalidIds.join(', ')}`);
+              // Filter out invalid add-ons (optional, could return an error instead)
+              yachtData.includedAddOns = yachtData.includedAddOns.filter(addon => 
+                validationResult.validIds.includes(addon.addOnId));
+            }
+          } catch (validationError) {
+            console.error("Create Yacht API: Error validating included add-on IDs:", validationError);
+            // Continue with creation but log the error
+          }
+        }
+      } else {
+        // Initialize as empty array if not provided
+        yachtData.includedAddOns = [];
+      }
+      
+      if (yachtData.optionalAddOns && Array.isArray(yachtData.optionalAddOns)) {
+        // Validate the add-on IDs for optional add-ons
+        const optionalAddOnIds = yachtData.optionalAddOns.map(addon => addon.addOnId);
+        if (optionalAddOnIds.length > 0) {
+          try {
+            const validationResult = await storage.validateAddOnIds(optionalAddOnIds);
+            if (validationResult.invalidIds.length > 0) {
+              console.warn(`Create Yacht API: Invalid optional add-on IDs: ${validationResult.invalidIds.join(', ')}`);
+              // Filter out invalid add-ons (optional, could return an error instead)
+              yachtData.optionalAddOns = yachtData.optionalAddOns.filter(addon => 
+                validationResult.validIds.includes(addon.addOnId));
+            }
+          } catch (validationError) {
+            console.error("Create Yacht API: Error validating optional add-on IDs:", validationError);
+            // Continue with creation but log the error
+          }
+        }
+      } else {
+        // Initialize as empty array if not provided
+        yachtData.optionalAddOns = [];
+      }
+      
       // Add standardization tracking
       yachtData._standardized = true;
       yachtData._standardizedVersion = 1;
