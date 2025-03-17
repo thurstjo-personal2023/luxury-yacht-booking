@@ -84,7 +84,7 @@ export default function AddOnSelector({
     });
     
     setCommissionRates(rates);
-  }, []);
+  }, [includedAddOns, optionalAddOns]);
 
   // Handle error state
   if (error) {
@@ -292,6 +292,22 @@ export default function AddOnSelector({
           </AlertDescription>
         </Alert>
       )}
+      
+      {/* Partner add-ons explanation */}
+      {availableAddOns.partnerAddOns && availableAddOns.partnerAddOns.length > 0 && (
+        <Alert variant="default" className="bg-blue-50 border-blue-200">
+          <Info className="h-4 w-4 text-blue-500" />
+          <AlertTitle>Partner Add-ons Available</AlertTitle>
+          <AlertDescription>
+            <p className="mb-1">You can bundle partner-created add-ons with your yacht experiences. The commission slider lets you control how much of the add-on price goes to the partner.</p>
+            <ul className="list-disc list-inside text-sm space-y-1 mt-2">
+              <li>Required add-ons default to 15% commission</li>
+              <li>Optional add-ons default to 10% commission</li>
+              <li>Commission rates can be adjusted between 5-30%</li>
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Selected add-ons summary */}
       <div className="space-y-2">
@@ -434,7 +450,9 @@ function AddOnCard({
               {isProducerOwned ? (
                 <Badge variant="default" className="ml-2 text-xs">Your Add-on</Badge>
               ) : (
-                <Badge variant="secondary" className="ml-2 text-xs">Partner Add-on</Badge>
+                <Badge variant="secondary" className="ml-2 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200">
+                  Partner Add-on
+                </Badge>
               )}
             </CardTitle>
             <CardDescription className="line-clamp-2 mt-1">
@@ -459,11 +477,14 @@ function AddOnCard({
         
         {/* Commission rate input for partner add-ons */}
         {!isProducerOwned && isSelected && (
-          <div className="mt-4">
-            <Label htmlFor={`commission-${addOn.productId}`} className="text-xs flex justify-between">
-              <span>Partner Commission (%)</span>
-              <span className="text-muted-foreground">{commissionRate}%</span>
-            </Label>
+          <div className="mt-4 border rounded-md p-3 bg-blue-50/30">
+            <div className="flex justify-between items-center mb-2">
+              <Label htmlFor={`commission-${addOn.productId}`} className="text-xs font-medium">
+                Partner Commission
+              </Label>
+              <Badge variant="outline" className="bg-blue-100">{commissionRate}%</Badge>
+            </div>
+            
             <Input
               id={`commission-${addOn.productId}`}
               type="range"
@@ -475,9 +496,26 @@ function AddOnCard({
               className="mt-1"
               disabled={disabled}
             />
+            
             <div className="flex justify-between text-xs text-muted-foreground mt-1">
               <span>5%</span>
               <span>30%</span>
+            </div>
+            
+            {/* Commission breakdown */}
+            <div className="mt-3 text-xs space-y-1">
+              <div className="flex justify-between items-center">
+                <span>Base Price:</span>
+                <span className="font-medium">${addOn.pricing.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-blue-600">
+                <span>Partner Receives:</span>
+                <span className="font-medium">${(addOn.pricing * commissionRate / 100).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-green-600">
+                <span>Your Revenue:</span>
+                <span className="font-medium">${(addOn.pricing * (100 - commissionRate) / 100).toFixed(2)}</span>
+              </div>
             </div>
           </div>
         )}
