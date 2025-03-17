@@ -1,0 +1,45 @@
+Objective
+Enable Producers (Yacht Owners) to bundle their own Service Add-Ons and Product Add-Ons with those created by Partners (Water Sports Instructors, Caterers, etc.) within the Yacht Experience Form.
+
+Current Application Overview
+User Roles : Consumers, Producers, and Partners.
+Producer Journey : Manage yacht listings, handle booking requests, update availability, track earnings, respond to reviews, manage compliance documents.
+Partner Journey : Create and manage service add-ons, track usage of services, monitor revenue and commissions, update service availability.
+Separate Entities : Yacht Experiences, Service Add-Ons, and Product Add-Ons are currently managed separately by Producers and Partners.
+Analysis Steps
+Review Existing Functionality
+Analyze the current Yacht Experience Form structure and data model.
+Identify how Service Add-Ons and Product Add-Ons are currently stored and linked to Yacht Experiences.
+Review the role-based access control mechanisms to ensure security when bundling services.
+Data Model Assessment
+Evaluate the Firestore collections (unified_yacht_experiences, service_add_ons, product_add_ons) to understand relationships between entities.
+Determine if additional fields or subcollections are needed to support bundled services.
+Frontend Integration
+Inspect the React components used for creating and managing Yacht Experiences.
+Assess how these components can be extended to include Partner’s Service Add-Ons selection.
+Backend API Review
+Examine the Express.js API endpoints related to Yacht Experiences and Add-Ons.
+Ensure the API supports fetching Partner’s Add-Ons and linking them to Yacht Experiences.
+Security Considerations
+Validate that Firebase Authentication and custom claims allow Producers to access Partner’s Add-Ons while maintaining role-based restrictions.
+Proposed Solution
+Enhance Yacht Experience Form
+Modify the form to include a section where Producers can select Partner’s Service Add-Ons.
+Implement a searchable dropdown or list view to display available Partner Add-Ons.
+Update Data Model
+Introduce a new field in unified_yacht_experiences to store an array of Partner Add-On IDs.
+Ensure data consistency and integrity through Zod schemas.
+Extend Backend Logic
+Update the relevant API endpoint to accept and process Partner Add-On selections.
+Implement server-side validation to prevent unauthorized bundling.
+Frontend Adjustments
+Utilize React Query to fetch Partner Add-Ons dynamically.
+Use Zustand stores to manage selected Add-Ons state during form submission.
+Testing & Validation
+Develop test cases to verify successful bundling of services.
+Perform role-based testing to ensure security constraints are honored.
+Deliverables
+A detailed report summarizing the existing application architecture and identifying areas for enhancement.
+Proposed modifications to the frontend, backend, and data model.
+Implementation plan including timelines and resource requirements.
+Test cases and validation strategies to ensure the new functionality works as expected.
