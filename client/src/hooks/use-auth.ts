@@ -18,6 +18,10 @@ interface AuthUser {
   role?: string;
   phoneNumber?: string | null;
   photoURL?: string | null;
+  
+  // Firebase Auth methods for token/claims management
+  getIdToken: (forceRefresh?: boolean) => Promise<string>;
+  getIdTokenResult: (forceRefresh?: boolean) => Promise<any>;
 }
 
 // Context type definition
@@ -29,6 +33,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<AuthUser>;
   signUp: (email: string, password: string) => Promise<AuthUser>;
   signOut: () => Promise<void>;
+  refreshUserRole: () => Promise<UserRoleType | null>; // Method to refresh role from token
 }
 
 // Create the auth context with undefined default value
@@ -280,8 +285,76 @@ export function AuthProvider({ children }: AuthProviderProps) {
       throw error;
     }
   };
+  
+  /**
+   * Refresh the user's role from their ID token
+   * This is useful when role claims might have changed and need to be refreshed
+   */
+  const refreshUserRole = async (): Promise<UserRoleType | null> => {
+    if (!auth.currentUser) {
+      console.log('Cannot refresh role: No authenticated user');
+      return null;
+    }
+    
+    try {
+      console.log('Refreshing user role from token...');
+      
+      // Force token refresh to get latest claims
+      await auth.currentUser.getIdToken(true);
+      
+      // Get updated token result
+      const tokenResult = await auth.currentUser.getIdTokenResult();
+      const tokenRole = tokenResult.claims.role as string | undefined;
+      
+      console.log('Role from refreshed token:', tokenRole);
+      
+      // Validate role format
+      const validRoles: UserRoleType[] = ['consumer', 'producer', 'partner'];
+      let validatedRole: UserRoleType | null = null;
+      
+      if (tokenRole && validRoles.includes(tokenRole as UserRoleType)) {
+        validatedRole = tokenRole as UserRoleType;
+        
+        // Update user object if it exists
+        if (user) {
+          const updatedUser = { ...user, role: validatedRole };
+          setUser(updatedUser);
+        }
+        
+        console.log('Role refreshed successfully:', validatedRole);
+      } else {
+        console.warn(`Invalid role in token: "${tokenRole}"`);
+        
+        // Try to get role from Firestore as fallback
+        try {
+          // Dynamically import to avoid circular dependencies
+          const { syncAuthClaims } = await import('@/lib/user-profile-utils');
+          const syncResult = await syncAuthClaims();
+          
+          if (syncResult.success && syncResult.newRole) {
+            validatedRole = syncResult.newRole as UserRoleType;
+            
+            // Update user object if it exists
+            if (user) {
+              const updatedUser = { ...user, role: validatedRole };
+              setUser(updatedUser);
+            }
+            
+            console.log('Role refreshed from Firestore:', validatedRole);
+          }
+        } catch (error) {
+          console.error('Error getting role from Firestore:', error);
+        }
+      }
+      
+      return validatedRole;
+    } catch (error) {
+      console.error('Error refreshing user role:', error);
+      return null;
+    }
+  };
 
-    // Calculate and validate user role from the user object
+  // Calculate and validate user role from the user object
   let userRole: UserRoleType | null = null;
   
   if (user && user.role) {
@@ -305,7 +378,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loading,
     signIn,
     signUp,
-    signOut
+    signOut,
+    refreshUserRole
   };
   
   // Return the auth context provider with all values
@@ -349,7 +423,7 @@ async function mapFirebaseUser(firebaseUser: FirebaseUser): Promise<AuthUser> {
       role = undefined;
     }
     
-    // Build the user object
+    // Build the user object with Firebase auth methods
     const authUser: AuthUser = {
       uid: firebaseUser.uid,
       email: firebaseUser.email,
@@ -357,6 +431,10 @@ async function mapFirebaseUser(firebaseUser: FirebaseUser): Promise<AuthUser> {
       phoneNumber: firebaseUser.phoneNumber,
       photoURL: firebaseUser.photoURL,
       role: role,
+      
+      // Pass through the Firebase methods needed by our AuthUser interface
+      getIdToken: (forceRefresh?: boolean) => firebaseUser.getIdToken(forceRefresh),
+      getIdTokenResult: (forceRefresh?: boolean) => firebaseUser.getIdTokenResult(forceRefresh)
     };
     
     console.log('Mapped user with role:', authUser.role);
@@ -370,6 +448,10 @@ async function mapFirebaseUser(firebaseUser: FirebaseUser): Promise<AuthUser> {
       displayName: firebaseUser.displayName,
       phoneNumber: firebaseUser.phoneNumber,
       photoURL: firebaseUser.photoURL,
+      
+      // Pass through the Firebase methods
+      getIdToken: (forceRefresh?: boolean) => firebaseUser.getIdToken(forceRefresh),
+      getIdTokenResult: (forceRefresh?: boolean) => firebaseUser.getIdTokenResult(forceRefresh)
     };
   }
 }
