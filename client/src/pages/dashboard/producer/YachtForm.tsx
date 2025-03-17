@@ -742,6 +742,9 @@ export default function YachtForm() {
         tags: values.tags,
         // Add producer ID from harmonized_users collection
         producerId: producerData?.producerId || auth.currentUser?.uid || 'unknown-producer',
+        // Add-on bundling data
+        includedAddOns: includedAddOns,
+        optionalAddOns: optionalAddOns,
         providerId: producerData?.providerId || auth.currentUser?.uid || 'unknown-producer',
         virtualTour: {
           isEnabled: values.virtual_tour_enabled, // unified field
@@ -949,9 +952,10 @@ export default function YachtForm() {
               }} 
               className="space-y-6"
             >
-              <TabsList className="grid grid-cols-3 mb-6">
+              <TabsList className="grid grid-cols-4 mb-6">
                 <TabsTrigger value="basic">Basic Information</TabsTrigger>
                 <TabsTrigger value="details">Details & Pricing</TabsTrigger>
+                <TabsTrigger value="addons">Add-ons</TabsTrigger>
                 <TabsTrigger value="media">Media & Settings</TabsTrigger>
               </TabsList>
               
@@ -1345,6 +1349,51 @@ export default function YachtForm() {
                       >
                         <ArrowLeft className="h-4 w-4" />
                         Back to Basic Information
+                      </Button>
+                      
+                      <Button 
+                        type="button" 
+                        onClick={() => setActiveTab("addons")}
+                        className="flex items-center gap-2"
+                      >
+                        Next: Add-ons
+                        <ArrowLeft className="h-4 w-4 rotate-180" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              {/* Add-ons Tab */}
+              <TabsContent value="addons" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Add-ons & Partner Services</CardTitle>
+                    <CardDescription>
+                      Bundle your own add-ons and partner services with your yacht experience
+                    </CardDescription>
+                  </CardHeader>
+                  
+                  <CardContent className="space-y-6">
+                    {/* Add-on selector component */}
+                    <AddOnSelector 
+                      includedAddOns={includedAddOns}
+                      optionalAddOns={optionalAddOns}
+                      onIncludedAddOnsChange={setIncludedAddOns}
+                      onOptionalAddOnsChange={setOptionalAddOns}
+                      producerId={producerData?.producerId || auth.currentUser?.uid || ''}
+                      disabled={loading}
+                    />
+                    
+                    <div className="flex justify-between mt-6">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => setActiveTab("details")}
+                        className="flex items-center gap-2"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to Details & Pricing
                       </Button>
                       
                       <Button 
