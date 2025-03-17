@@ -63,6 +63,16 @@ export interface IStorage {
     sortByStatus?: boolean;
   }): Promise<PaginatedResponse<ProductAddOn>>;
   
+  // Add-on bundling methods
+  getAvailableAddOns(producerId: string): Promise<{
+    producerAddOns: ProductAddOn[];
+    partnerAddOns: ProductAddOn[];
+  }>;
+  validateAddOnIds(ids: string[]): Promise<{
+    validIds: string[];
+    invalidIds: string[];
+  }>;
+  
   // Customer-specific methods for the migration
   getRecommendedYachts(userId: string, limit?: number): Promise<YachtSummary[]>;
   searchYachts(query: string, filters?: {
@@ -835,6 +845,134 @@ export class FirestoreStorage implements IStorage {
   
   // Customer-specific methods for the migration
   
+  /**
+   * Get all available add-ons for a producer, divided into their own add-ons and partner add-ons
+   * 
+   * @param producerId The producer ID to get available add-ons for
+   * @returns Promise with object containing producer's own add-ons and partner add-ons
+   */
+  async getAvailableAddOns(producerId: string): Promise<{
+    producerAddOns: ProductAddOn[];
+    partnerAddOns: ProductAddOn[];
+  }> {
+    try {
+      console.log(`Getting available add-ons for producer: ${producerId}`);
+      
+      // Get all add-ons
+      const snapshot = await adminDb.collection('products_add-ons').get();
+      
+      if (snapshot.empty) {
+        console.log('No add-ons found');
+        return {
+          producerAddOns: [],
+          partnerAddOns: []
+        };
+      }
+      
+      // Map documents to ProductAddOn type and separate by owner
+      const producerAddOns: ProductAddOn[] = [];
+      const partnerAddOns: ProductAddOn[] = [];
+      
+      snapshot.docs.forEach(doc => {
+        const data = doc.data() as ProductAddOn;
+        const addOn: ProductAddOn = {
+          ...data,
+          productId: doc.id,
+          media: data.media || []
+        };
+        
+        // Only include available add-ons
+        if (addOn.availability !== false) {
+          // Check if this add-on belongs to the producer or a partner
+          if (addOn.partnerId === producerId) {
+            producerAddOns.push(addOn);
+          } else {
+            // This is a partner add-on
+            partnerAddOns.push(addOn);
+          }
+        }
+      });
+      
+      console.log(`Found ${producerAddOns.length} producer add-ons and ${partnerAddOns.length} partner add-ons`);
+      
+      return {
+        producerAddOns,
+        partnerAddOns
+      };
+    } catch (error) {
+      console.error('Error getting available add-ons:', error);
+      return {
+        producerAddOns: [],
+        partnerAddOns: []
+      };
+    }
+  }
+  
+  /**
+   * Validate a list of add-on IDs to ensure they exist and are available
+   * 
+   * @param ids Array of add-on IDs to validate
+   * @returns Promise with object containing valid and invalid IDs
+   */
+  async validateAddOnIds(ids: string[]): Promise<{
+    validIds: string[];
+    invalidIds: string[];
+  }> {
+    try {
+      console.log(`Validating ${ids.length} add-on IDs`);
+      
+      if (!ids.length) {
+        return {
+          validIds: [],
+          invalidIds: []
+        };
+      }
+      
+      const validIds: string[] = [];
+      const invalidIds: string[] = [];
+      
+      // For each ID, check if it exists in the collection
+      for (const id of ids) {
+        try {
+          const docRef = await adminDb.collection('products_add-ons').doc(id).get();
+          
+          if (docRef.exists) {
+            const data = docRef.data() as ProductAddOn;
+            
+            // Only consider it valid if it's available
+            if (data.availability !== false) {
+              validIds.push(id);
+            } else {
+              // Add-on exists but is not available
+              invalidIds.push(id);
+              console.log(`Add-on ${id} exists but is not available`);
+            }
+          } else {
+            // Add-on doesn't exist
+            invalidIds.push(id);
+            console.log(`Add-on ${id} doesn't exist`);
+          }
+        } catch (error) {
+          console.error(`Error checking add-on ${id}:`, error);
+          invalidIds.push(id);
+        }
+      }
+      
+      console.log(`Validation complete: ${validIds.length} valid, ${invalidIds.length} invalid`);
+      
+      return {
+        validIds,
+        invalidIds
+      };
+    } catch (error) {
+      console.error('Error validating add-on IDs:', error);
+      return {
+        validIds: [],
+        invalidIds: ids // Consider all IDs invalid if there's an error
+      };
+    }
+  }
+
   async getRecommendedYachts(userId: string, limit: number = 4): Promise<YachtSummary[]> {
     try {
       console.log(`Getting recommended yachts for user ${userId}, limit: ${limit}`);
