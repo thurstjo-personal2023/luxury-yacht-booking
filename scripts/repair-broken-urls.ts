@@ -153,6 +153,11 @@ async function repairBrokenUrl(
     const data = doc.data();
     
     // Update document based on field and subField
+    if (!data) {
+      console.log(`Document data is undefined for ${docId} in ${collection}`);
+      return { success: false, newUrl: url };
+    }
+
     if (subField && subField.includes('[') && subField.includes(']')) {
       // Handle array fields (e.g., media[0].url)
       const arrayMatch = subField.match(/\[(\d+)\]/);

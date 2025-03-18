@@ -195,4 +195,104 @@ export function registerAdminRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to fetch media validation reports' });
     }
   });
+
+  /**
+   * Repair broken URLs identified in the latest validation report
+   * This endpoint will replace broken URLs with placeholders
+   */
+  app.post('/api/admin/repair-broken-urls', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      console.log('Starting broken URL repair via admin API...');
+      
+      // Import the repair function dynamically
+      const { repairAllBrokenUrls } = await import('../scripts/repair-broken-urls');
+      
+      // Run repair operation
+      const report = await repairAllBrokenUrls();
+      
+      // Return success response with report
+      res.json({
+        success: true,
+        report
+      });
+    } catch (error) {
+      console.error('Error repairing broken URLs:', error);
+      res.status(500).json({ error: 'Failed to repair broken URLs' });
+    }
+  });
+
+  /**
+   * Get list of URL repair reports
+   */
+  app.get('/api/admin/url-repair-reports', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      // Get the reports from Firestore, sorted by createdAt
+      const reportsSnapshot = await adminDb.collection('url_repair_reports')
+        .orderBy('createdAt', 'desc')
+        .limit(10)
+        .get();
+      
+      // Map to array of reports
+      const reports = reportsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Return the reports
+      res.json({ reports });
+    } catch (error) {
+      console.error('Error fetching URL repair reports:', error);
+      res.status(500).json({ error: 'Failed to fetch URL repair reports' });
+    }
+  });
+
+  /**
+   * Resolve blob URLs in the database
+   * This endpoint will replace blob:// URLs with placeholders
+   */
+  app.post('/api/admin/resolve-blob-urls', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      console.log('Starting blob URL resolution via admin API...');
+      
+      // Import the resolve function dynamically
+      const { resolveAllBlobUrls } = await import('../scripts/resolve-blob-urls');
+      
+      // Run resolution operation
+      const report = await resolveAllBlobUrls();
+      
+      // Return success response with report
+      res.json({
+        success: true,
+        report
+      });
+    } catch (error) {
+      console.error('Error resolving blob URLs:', error);
+      res.status(500).json({ error: 'Failed to resolve blob URLs' });
+    }
+  });
+
+  /**
+   * Get list of blob URL resolution reports
+   */
+  app.get('/api/admin/blob-url-reports', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      // Get the reports from Firestore, sorted by createdAt
+      const reportsSnapshot = await adminDb.collection('blob_url_resolution_reports')
+        .orderBy('createdAt', 'desc')
+        .limit(10)
+        .get();
+      
+      // Map to array of reports
+      const reports = reportsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Return the reports
+      res.json({ reports });
+    } catch (error) {
+      console.error('Error fetching blob URL resolution reports:', error);
+      res.status(500).json({ error: 'Failed to fetch blob URL resolution reports' });
+    }
+  });
 }
