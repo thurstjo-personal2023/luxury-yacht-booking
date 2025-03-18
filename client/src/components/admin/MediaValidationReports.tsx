@@ -117,9 +117,9 @@ export function MediaValidationReports() {
   // Get the most recent validation report
   const latestReport = validationReports && validationReports.length > 0 ? validationReports[0] : null;
   
-  // Calculate issue counts
+  // Calculate issue counts - handle both field naming conventions
   const invalidUrlCount = latestReport?.stats?.invalidUrls || 0;
-  const totalChecked = latestReport?.stats?.totalChecked || 0;
+  const totalChecked = latestReport?.stats?.totalChecked || latestReport?.stats?.totalUrls || 0;
   const issuePercentage = totalChecked ? Math.round((invalidUrlCount / totalChecked) * 100) : 0;
   
   return (
@@ -182,10 +182,14 @@ export function MediaValidationReports() {
               {latestReport && (
                 <div className="flex items-center gap-2">
                   <Badge variant="outline">
-                    <ImageIcon className="mr-1 h-3 w-3" /> {latestReport.stats.imageCount} Images
+                    <ImageIcon className="mr-1 h-3 w-3" /> 
+                    {latestReport.stats.imageCount || 
+                     (latestReport.stats.imageStats ? latestReport.stats.imageStats.total : 0)} Images
                   </Badge>
                   <Badge variant="outline">
-                    <VideoIcon className="mr-1 h-3 w-3" /> {latestReport.stats.videoCount} Videos
+                    <VideoIcon className="mr-1 h-3 w-3" /> 
+                    {latestReport.stats.videoCount || 
+                     (latestReport.stats.videoStats ? latestReport.stats.videoStats.total : 0)} Videos
                   </Badge>
                   <Badge variant={invalidUrlCount > 0 ? 'destructive' : 'outline'}>
                     {invalidUrlCount} Issues
@@ -258,16 +262,21 @@ export function MediaValidationReports() {
                   </TableBody>
                 </Table>
                 
-                {Object.entries(latestReport.stats.errorTypes).length > 0 && (
+                {/* Display error types if available */}
+                {latestReport.stats.errorTypes && Object.keys(latestReport.stats.errorTypes).length > 0 && (
                   <div className="mt-6">
                     <h4 className="text-md font-semibold mb-2">Error Types</h4>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {Object.entries(latestReport.stats.errorTypes).map(([type, count]) => (
-                        <Badge key={type} variant="outline" className="p-2 justify-between">
-                          <span className="truncate">{type}</span>
-                          <span className="ml-2 font-semibold">{count}</span>
-                        </Badge>
-                      ))}
+                      {(() => {
+                        // Handle TypeScript type safely
+                        const errorTypes = latestReport.stats.errorTypes || {};
+                        return Object.entries(errorTypes as Record<string, number>).map(([type, count]) => (
+                          <Badge key={type} variant="outline" className="p-2 justify-between">
+                            <span className="truncate">{type}</span>
+                            <span className="ml-2 font-semibold">{count}</span>
+                          </Badge>
+                        ));
+                      })()}
                     </div>
                   </div>
                 )}
