@@ -1,157 +1,229 @@
-import { AdminLayout } from '@/components/layout/AdminLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+/**
+ * Admin Dashboard
+ * 
+ * This page provides access to various admin tools and features.
+ */
+
+import React from 'react';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
 import { Link } from 'wouter';
-import { 
-  Users, 
-  Sailboat, 
-  Mail, 
-  CalendarClock, 
-  Package, 
-  TrendingUp, 
-  Bell, 
-  Wrench,
-  ImageIcon
-} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { CheckCircle, AlertTriangle, Image, Database, FileText, Settings } from 'lucide-react';
 
-export default function AdminDashboard() {
-  const adminModules = [
-    {
-      title: 'User Management',
-      description: 'Manage users, roles, and permissions',
-      icon: <Users className="h-8 w-8 text-primary" />,
-      href: '/admin/users',
-    },
-    {
-      title: 'Yacht Listings',
-      description: 'Manage yacht listings and availability',
-      icon: <Sailboat className="h-8 w-8 text-primary" />,
-      href: '/admin/yachts',
-    },
-    {
-      title: 'Experience Packages',
-      description: 'Manage experience packages and pricing',
-      icon: <Package className="h-8 w-8 text-primary" />,
-      href: '/admin/packages',
-    },
-    {
-      title: 'Bookings',
-      description: 'View and manage all bookings',
-      icon: <CalendarClock className="h-8 w-8 text-primary" />,
-      href: '/admin/bookings',
-    },
-    {
-      title: 'Email System',
-      description: 'Test and manage email notifications',
-      icon: <Mail className="h-8 w-8 text-primary" />,
-      href: '/admin/email-test',
-    },
-    {
-      title: 'Reports & Analytics',
-      description: 'View booking metrics and reports',
-      icon: <TrendingUp className="h-8 w-8 text-primary" />,
-      href: '/admin/reports',
-    },
-    {
-      title: 'Notifications',
-      description: 'Manage system notifications',
-      icon: <Bell className="h-8 w-8 text-primary" />,
-      href: '/admin/notifications',
-    },
-    {
-      title: 'System Settings',
-      description: 'Configure system preferences',
-      icon: <Wrench className="h-8 w-8 text-primary" />,
-      href: '/admin/settings',
-    },
-    {
-      title: 'Media Validation',
-      description: 'Validate and repair media URLs',
-      icon: <ImageIcon className="h-8 w-8 text-primary" />,
-      href: '/admin/media-validation',
-    },
-  ];
-
-  return (
-    <AdminLayout>
-      <div className="container mx-auto p-6">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <div className="flex space-x-2">
-            <Button variant="outline">
-              <Bell className="h-4 w-4 mr-2" />
-              Notifications
+const AdminDashboard: React.FC = () => {
+  const { user, isAdmin } = useAuth();
+  const { toast } = useToast();
+  
+  // If user is not logged in
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Access Denied</CardTitle>
+            <CardDescription>
+              Please log in to access the admin dashboard.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href="/login">Go to Login</Link>
             </Button>
-            <Button>View Website</Button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Users
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">87</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                <span className="text-green-500">+12%</span> from last month
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Active Listings
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">23</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                <span className="text-green-500">+3</span> new this week
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Bookings This Month
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">42</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                <span className="text-green-500">+24%</span> from last month
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-        
-        <h2 className="text-xl font-semibold mb-6">Admin Modules</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {adminModules.map((module, index) => (
-            <Link key={index} href={module.href}>
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    {module.icon}
-                  </div>
-                  <CardTitle className="text-lg mt-4">{module.title}</CardTitle>
-                  <CardDescription>{module.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <Button variant="ghost" className="p-0 h-auto">
-                    <span className="text-primary">Access module</span>
-                  </Button>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+          </CardContent>
+        </Card>
       </div>
-    </AdminLayout>
+    );
+  }
+  
+  // If user is not an admin
+  if (!isAdmin && user.role !== 'producer') {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Access Denied</CardTitle>
+            <CardDescription>
+              You do not have permission to access this page.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href="/">Go to Home</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Render the admin dashboard
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <p className="text-gray-500">
+          Welcome to the admin dashboard. Use the tools below to manage the application.
+        </p>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Media Validation Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Image className="h-5 w-5" />
+              Media Management
+            </CardTitle>
+            <CardDescription>
+              Validate and repair media URLs across the application.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-500 mb-4">
+              Tools for checking media integrity, resolving blob URLs, and fixing broken image and video links.
+            </p>
+          </CardContent>
+          <CardFooter>
+            <Button asChild>
+              <Link href="/admin/media-validation">Media Validation Tools</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+        
+        {/* Content Management Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Content Management
+            </CardTitle>
+            <CardDescription>
+              Manage yacht listings, experiences, and content.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-500 mb-4">
+              Tools for managing site content, yacht experiences, and other application data.
+            </p>
+          </CardContent>
+          <CardFooter>
+            <Button asChild>
+              <Link href="/admin/content">Content Management</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+        
+        {/* Database Management Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Database Management
+            </CardTitle>
+            <CardDescription>
+              View and manage database collections.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-500 mb-4">
+              Tools for viewing, editing, and managing database collections and documents.
+            </p>
+          </CardContent>
+          <CardFooter>
+            <Button asChild>
+              <Link href="/admin/database">Database Management</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+        
+        {/* System Settings Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              System Settings
+            </CardTitle>
+            <CardDescription>
+              Configure application settings and preferences.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-500 mb-4">
+              Tools for configuring system settings, user roles, and application preferences.
+            </p>
+          </CardContent>
+          <CardFooter>
+            <Button asChild>
+              <Link href="/admin/settings">System Settings</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+      
+      {/* Status Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              System Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span>Database Connection</span>
+                <span className="text-green-600 font-medium">Online</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Firestore Connection</span>
+                <span className="text-green-600 font-medium">Online</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Auth Service</span>
+                <span className="text-green-600 font-medium">Online</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>API Endpoints</span>
+                <span className="text-green-600 font-medium">Online</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              Monitoring Alerts
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span>Media Validation</span>
+                <span className="text-amber-600 font-medium">Requires Attention</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>API Performance</span>
+                <span className="text-green-600 font-medium">Normal</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Error Rate</span>
+                <span className="text-green-600 font-medium">Low</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>User Activity</span>
+                <span className="text-green-600 font-medium">Normal</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
-}
+};
+
+export default AdminDashboard;
