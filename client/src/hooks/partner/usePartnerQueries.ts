@@ -6,7 +6,8 @@ import {
   PartnerProfileResponse, 
   PartnerAddon,
   PartnerBooking,
-  PartnerEarnings
+  PartnerEarnings,
+  ServiceAnalyticsResponse
 } from '@/types/partner';
 
 // Define response types using the imported interfaces
@@ -242,6 +243,53 @@ export function usePartnerEarnings() {
         bookingsCount: 0,
         commissionRate: 0.8,
       };
+    },
+    enabled: !!user && user?.role === 'partner',
+  });
+}
+
+/**
+ * Hook for fetching partner service analytics data
+ * This hook fetches utilization data for partner services with filtering capabilities
+ */
+export function useServiceAnalytics(options?: {
+  startDate?: Date;
+  endDate?: Date;
+  aggregateBy?: 'day' | 'week' | 'month';
+}) {
+  const { user } = useAuth();
+  
+  // Create query parameters
+  const queryParams = new URLSearchParams();
+  if (options?.startDate) {
+    queryParams.append('startDate', options.startDate.toISOString());
+  }
+  if (options?.endDate) {
+    queryParams.append('endDate', options.endDate.toISOString());
+  }
+  if (options?.aggregateBy) {
+    queryParams.append('aggregateBy', options.aggregateBy);
+  }
+  
+  const queryString = queryParams.toString();
+  const endpoint = `/api/partner/service-analytics${queryString ? `?${queryString}` : ''}`;
+  
+  return useQuery({
+    queryKey: ['/api/partner/service-analytics', options],
+    queryFn: async () => {
+      const response = await fetch(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        },
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch service analytics data');
+      }
+      
+      const data = await response.json() as ServiceAnalyticsResponse;
+      return data.analytics;
     },
     enabled: !!user && user?.role === 'partner',
   });
