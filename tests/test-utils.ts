@@ -1,8 +1,11 @@
 /**
- * Common test utilities for the Etoile Yachts project
+ * Test Utilities
+ * 
+ * This file provides common test utilities and mock implementations
+ * for Firebase-related functionality.
  */
 
-// Types for mock documents and collections
+// Mock Document Interface
 export interface MockDocument {
   id: string;
   data: any;
@@ -11,24 +14,32 @@ export interface MockDocument {
     id: string;
     path: string;
     collection: (path: string) => MockCollection;
-    update: (data: any) => Promise<void>;
-    set: (data: any, options?: any) => Promise<void>;
+    update: jest.Mock;
+    set: jest.Mock;
   };
+  data(): any;
 }
 
+// Mock Collection Interface
 export interface MockCollection {
   docs: MockDocument[];
   empty: boolean;
   size: number;
   forEach: (callback: (doc: MockDocument) => void) => void;
   doc: (id: string) => MockDocument['ref'];
-  add: (data: any) => Promise<{ id: string }>;
-  get: () => Promise<{ docs: MockDocument[]; empty: boolean; size: number; forEach: (callback: (doc: MockDocument) => void) => void; }>;
+  add: jest.Mock;
+  get: () => Promise<{
+    docs: MockDocument[];
+    empty: boolean;
+    size: number;
+    forEach: (callback: (doc: MockDocument) => void) => void;
+  }>;
   where: (field: string, op: string, value: any) => MockCollection;
   orderBy: (field: string, direction?: 'asc' | 'desc') => MockCollection;
   limit: (limit: number) => MockCollection;
 }
 
+// Mock Query Snapshot Interface
 export interface MockQuerySnapshot {
   docs: MockDocument[];
   empty: boolean;
@@ -38,131 +49,142 @@ export interface MockQuerySnapshot {
 
 // Mock Firestore implementation
 export const mockFirestore = {
-  collection: (path: string) => createMockCollection(path),
-  batch: () => ({
-    set: jest.fn().mockReturnThis(),
-    update: jest.fn().mockReturnThis(),
-    delete: jest.fn().mockReturnThis(),
-    commit: jest.fn().mockResolvedValue(undefined),
-  }),
-  runTransaction: jest.fn((fn) => {
-    return Promise.resolve(fn({
-      get: jest.fn(),
+  collection: jest.fn((path: string) => createMockCollection(path)),
+  batch: jest.fn(() => ({
+    set: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    commit: jest.fn(() => Promise.resolve())
+  })),
+  runTransaction: jest.fn((fn: (transaction: any) => Promise<any>) => {
+    const transaction = {
+      get: jest.fn((docRef: any) => Promise.resolve({
+        exists: true,
+        data: () => ({}),
+        id: docRef.id
+      })),
       set: jest.fn(),
       update: jest.fn(),
-      delete: jest.fn(),
-    }));
-  }),
+      delete: jest.fn()
+    };
+    return fn(transaction);
+  })
 };
 
 // Mock Storage implementation
 export const mockStorage = {
-  bucket: (name?: string) => ({
-    file: (path: string) => ({
-      getSignedUrl: jest.fn(() => Promise.resolve(['https://storage.example.com/test.jpg'])),
-      save: jest.fn((data: any, options: any) => Promise.resolve()),
-      delete: jest.fn(() => Promise.resolve()),
-      exists: jest.fn(() => Promise.resolve([true])),
-    }),
+  bucket: jest.fn(() => ({
+    file: jest.fn((path: string) => ({
+      getSignedUrl: jest.fn(() => Promise.resolve([`https://storage.googleapis.com/${path}`])),
+      download: jest.fn(() => Promise.resolve(['file content'])),
+      save: jest.fn((content: any) => Promise.resolve()),
+      delete: jest.fn(() => Promise.resolve())
+    })),
     upload: jest.fn((path: string, options: any) => Promise.resolve()),
-    getFiles: jest.fn(() => Promise.resolve([[{ name: 'test.jpg' }]])),
-  }),
+    getFiles: jest.fn(() => Promise.resolve([[{ name: 'file1.jpg' }, { name: 'file2.jpg' }]]))
+  }))
 };
 
-// Factory function to create mock documents
+/**
+ * Create a mock Firestore document
+ */
 export function createMockDocument(options: { id: string; data: any; exists?: boolean }): MockDocument {
   const { id, data, exists = true } = options;
-  const path = `mock/collection/${id}`;
   
-  return {
+  const doc = {
     id,
-    data: { ...data },
+    data,
     exists,
     ref: {
       id,
-      path,
-      collection: (collectionPath: string) => createMockCollection(`${path}/${collectionPath}`),
-      update: jest.fn((updateData) => {
-        Object.assign(data, updateData);
-        return Promise.resolve();
-      }),
-      set: jest.fn((newData, options = {}) => {
-        if (options.merge) {
-          Object.assign(data, newData);
-        } else {
-          Object.keys(data).forEach(key => {
-            delete data[key];
-          });
-          Object.assign(data, newData);
-        }
-        return Promise.resolve();
-      }),
+      path: `mock-collection/${id}`,
+      collection: jest.fn((path: string) => createMockCollection(path)),
+      update: jest.fn((newData: any) => Promise.resolve()),
+      set: jest.fn((newData: any, options?: any) => Promise.resolve())
     },
+    data: () => data
   };
+  
+  return doc;
 }
 
-// Factory function to create mock collections
+/**
+ * Create a mock Firestore collection
+ */
 export function createMockCollection(path: string, docs: MockDocument[] = []): MockCollection {
-  return {
+  const collection = {
     docs,
     empty: docs.length === 0,
     size: docs.length,
-    forEach: (callback) => docs.forEach(callback),
-    doc: (id: string) => {
+    forEach: (callback: (doc: MockDocument) => void) => docs.forEach(callback),
+    doc: jest.fn((id: string) => {
       const existingDoc = docs.find(d => d.id === id);
       if (existingDoc) {
         return existingDoc.ref;
       }
       
-      const newDoc = createMockDocument({ id, data: {}, exists: false });
-      docs.push(newDoc);
-      return newDoc.ref;
-    },
-    add: jest.fn((data) => {
-      const id = `auto-id-${Date.now()}`;
-      const newDoc = createMockDocument({ id, data });
-      docs.push(newDoc);
-      return Promise.resolve({ id });
+      // Create a new document reference if it doesn't exist
+      return {
+        id,
+        path: `${path}/${id}`,
+        collection: jest.fn((subPath: string) => createMockCollection(`${path}/${id}/${subPath}`)),
+        update: jest.fn((data: any) => Promise.resolve()),
+        set: jest.fn((data: any, options?: any) => Promise.resolve())
+      };
     }),
-    get: jest.fn(() => {
-      return Promise.resolve({
-        docs,
-        empty: docs.length === 0,
-        size: docs.length,
-        forEach: (callback: (doc: MockDocument) => void) => docs.forEach(callback),
-      });
-    }),
-    where: jest.fn(() => createMockCollection(path, docs)),
-    orderBy: jest.fn(() => createMockCollection(path, docs)),
-    limit: jest.fn(() => createMockCollection(path, docs)),
+    add: jest.fn((data: any) => Promise.resolve({ id: `new-doc-${Date.now()}` })),
+    get: jest.fn(() => Promise.resolve({
+      docs,
+      empty: docs.length === 0,
+      size: docs.length,
+      forEach: (callback: (doc: MockDocument) => void) => docs.forEach(callback)
+    })),
+    where: jest.fn(() => collection),
+    orderBy: jest.fn(() => collection),
+    limit: jest.fn(() => collection)
   };
+  
+  return collection;
 }
 
-// Create a mock query snapshot
+/**
+ * Create a mock query snapshot
+ */
 export function createMockQuerySnapshot(docs: MockDocument[]): MockQuerySnapshot {
   return {
     docs,
     empty: docs.length === 0,
     size: docs.length,
-    forEach: (callback) => docs.forEach(callback),
+    forEach: (callback: (doc: MockDocument) => void) => docs.forEach(callback)
   };
 }
 
-// Helper to create a mock Firestore timestamp
+/**
+ * Create a mock Firestore timestamp
+ */
 export function createMockTimestamp(date = new Date()): any {
   return {
     toDate: () => date,
-    seconds: Math.floor(date.getTime() / 1000),
-    nanoseconds: (date.getTime() % 1000) * 1000000,
-    isEqual: (other: any) => other?.seconds === Math.floor(date.getTime() / 1000),
+    toMillis: () => date.getTime(),
+    valueOf: () => date.getTime(),
+    _seconds: Math.floor(date.getTime() / 1000),
+    _nanoseconds: (date.getTime() % 1000) * 1000000
   };
 }
 
-// Helper to create an array of test documents
+/**
+ * Create a batch of test documents
+ */
 export function createTestDocuments(count: number, dataFn?: (index: number) => any): MockDocument[] {
-  return Array.from({ length: count }).map((_, i) => {
-    const id = `test-doc-${i}`;
-    const data = dataFn ? dataFn(i) : { name: `Test ${i}`, value: i };
-    return createMockDocument({ id, data });
-  });
+  const docs = [];
+  
+  for (let i = 0; i < count; i++) {
+    const data = dataFn ? dataFn(i) : { index: i };
+    docs.push(createMockDocument({
+      id: `test-doc-${i}`,
+      data
+    }));
+  }
+  
+  return docs;
 }
