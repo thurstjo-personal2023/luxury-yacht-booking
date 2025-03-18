@@ -33,6 +33,7 @@ import {
   useServiceAnalytics
 } from "@/hooks/partner/usePartnerQueries";
 import { useAuth } from "@/hooks/use-auth";
+import { PartnerAnalytics } from "@/components/partner/PartnerAnalytics";
 import { useToast } from "@/hooks/use-toast";
 
 export default function PartnerDashboard() {
