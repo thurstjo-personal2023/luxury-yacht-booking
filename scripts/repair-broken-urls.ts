@@ -302,6 +302,8 @@ async function repairBrokenUrl(
 export async function repairAllBrokenUrls(): Promise<RepairReport> {
   const brokenUrls = await findBrokenUrls();
   
+  console.log(`[${new Date().toISOString()}] Found ${brokenUrls.length} broken URLs to repair`);
+  
   const report: RepairReport = {
     timestamp: new Date().toISOString(),
     repairedUrls: [],
@@ -313,6 +315,19 @@ export async function repairAllBrokenUrls(): Promise<RepairReport> {
       byCollection: {}
     }
   };
+  
+  // If no broken URLs found, return early with empty report
+  if (brokenUrls.length === 0) {
+    console.log(`[${new Date().toISOString()}] No broken URLs found, nothing to repair`);
+    
+    // Save report to Firestore
+    await adminDb.collection('url_repair_reports').add({
+      ...report,
+      createdAt: FieldValue.serverTimestamp()
+    });
+    
+    return report;
+  }
   
   // Initialize collection stats
   for (const url of brokenUrls) {
@@ -371,32 +386,34 @@ export async function repairAllBrokenUrls(): Promise<RepairReport> {
 // Main execution if run directly
 async function main() {
   try {
-    console.log('Starting broken URL repair...');
+    console.log(`[${new Date().toISOString()}] Starting broken URL repair...`);
     
     const report = await repairAllBrokenUrls();
     
-    console.log(`\nRepair Complete:`);
+    console.log(`\n[${new Date().toISOString()}] Repair Complete:`);
     console.log(`Found ${report.stats.totalIdentified} broken URLs`);
     console.log(`Repaired ${report.stats.totalRepaired} URLs`);
     console.log(`Images: ${report.stats.imageCount}, Videos: ${report.stats.videoCount}`);
     
-    console.log('\nResults by collection:');
+    console.log(`\n[${new Date().toISOString()}] Results by collection:`);
     for (const [collection, count] of Object.entries(report.stats.byCollection)) {
       if (count > 0) {
         console.log(`- ${collection}: ${count} URLs repaired`);
       }
     }
     
-    console.log('\nBroken URL repair completed successfully.');
-  } catch (error) {
-    console.error('Error in broken URL repair:', error);
+    console.log(`\n[${new Date().toISOString()}] Broken URL repair completed successfully.`);
+  } catch (error: any) {
+    console.error(`[${new Date().toISOString()}] Error in broken URL repair:`, error.message || String(error));
   }
 }
 
-// For direct execution in ESM context
+// For direct execution in ESM or CommonJS context
 if (typeof require !== 'undefined' && require.main === module) {
   main().catch(error => {
-    console.error('Error running broken URL repair:', error);
+    console.error(`[${new Date().toISOString()}] Error running broken URL repair:`, 
+      error instanceof Error ? error.message : String(error));
+    process.exit(1);
   });
 }
 

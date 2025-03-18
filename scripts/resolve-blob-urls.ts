@@ -220,14 +220,19 @@ async function processDocument(
   
   // If we found changes and have a batch, add to batch
   if (hasChanges && batch) {
-    batch.update(adminDb.collection(collectionName).doc(docId), updates);
+    try {
+      batch.update(adminDb.collection(collectionName).doc(docId), updates);
+    } catch (error: any) {
+      console.error(`[${new Date().toISOString()}] Error adding document ${collectionName}/${docId} to batch:`, error.message || String(error));
+      hasChanges = false; // Mark as not updated due to error
+    }
   }
   // If we found changes but no batch, update directly
   else if (hasChanges && !batch) {
     try {
       await adminDb.collection(collectionName).doc(docId).update(updates);
-    } catch (error) {
-      console.error(`[${new Date().toISOString()}] Error updating document ${collectionName}/${docId}:`, error);
+    } catch (error: any) {
+      console.error(`[${new Date().toISOString()}] Error updating document ${collectionName}/${docId}:`, error.message || String(error));
       hasChanges = false; // Mark as not updated due to error
     }
   }
