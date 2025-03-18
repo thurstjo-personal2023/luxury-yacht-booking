@@ -264,9 +264,9 @@ async function processCollection(collectionName: string): Promise<FixedUrl[]> {
       try {
         await currentBatch.commit();
         console.log(`[${new Date().toISOString()}] Committed final batch #${batchCount} with ${batchOperations} operations for ${collectionName}`);
-      } catch (batchError) {
-        console.error(`[${new Date().toISOString()}] Error committing final batch #${batchCount} for ${collectionName}:`, batchError);
-        const errorMsg = `Final batch #${batchCount} error: ${batchError.message || String(batchError)}`;
+      } catch (error: any) {
+        console.error(`[${new Date().toISOString()}] Error committing final batch #${batchCount} for ${collectionName}:`, error);
+        const errorMsg = `Final batch #${batchCount} error: ${error.message || String(error)}`;
         errors.push(errorMsg);
       }
     }
@@ -278,7 +278,7 @@ async function processCollection(collectionName: string): Promise<FixedUrl[]> {
     }
     
     return fixedUrls;
-  } catch (error) {
+  } catch (error: any) {
     const errorMsg = `Error processing collection ${collectionName}: ${error.message || String(error)}`;
     console.error(`[${new Date().toISOString()}] ${errorMsg}`);
     errors.push(errorMsg);
@@ -306,7 +306,7 @@ export async function fixRelativeUrls(): Promise<FixReport> {
         allFixedUrls = allFixedUrls.concat(fixedUrls);
         collectionStats[collection] = fixedUrls.length;
       }
-    } catch (error) {
+    } catch (error: any) {
       const errorMsg = `Failed to process collection ${collection}: ${error.message || String(error)}`;
       console.error(`[${new Date().toISOString()}] ${errorMsg}`);
       errors.push(errorMsg);
@@ -340,7 +340,7 @@ export async function fixRelativeUrls(): Promise<FixReport> {
   try {
     const reportRef = await adminDb.collection('relative_url_fix_reports').add(report);
     console.log(`[${new Date().toISOString()}] Relative URL fix report created with ID: ${reportRef.id}`);
-  } catch (error) {
+  } catch (error: any) {
     const errorMsg = `Error creating relative URL fix report: ${error.message || String(error)}`;
     console.error(`[${new Date().toISOString()}] ${errorMsg}`);
     errors.push(errorMsg);

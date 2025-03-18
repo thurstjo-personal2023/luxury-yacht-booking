@@ -256,9 +256,9 @@ async function processCollection(collectionName: string, reportData: BlobResolut
             await currentBatch.commit();
             console.log(`[${new Date().toISOString()}] Committed batch #${batchCount} with ${batchOperations} operations for ${collectionName}`);
             currentBatch = null;
-          } catch (batchError) {
-            console.error(`[${new Date().toISOString()}] Error committing batch #${batchCount} for ${collectionName}:`, batchError);
-            const errorMsg = `Batch #${batchCount} error: ${batchError.message || String(batchError)}`;
+          } catch (error: any) {
+            console.error(`[${new Date().toISOString()}] Error committing batch #${batchCount} for ${collectionName}:`, error);
+            const errorMsg = `Batch #${batchCount} error: ${error.message || String(error)}`;
             errors.push(errorMsg);
             currentBatch = null; // Reset the batch after error
           }
@@ -271,9 +271,9 @@ async function processCollection(collectionName: string, reportData: BlobResolut
       try {
         await currentBatch.commit();
         console.log(`[${new Date().toISOString()}] Committed final batch #${batchCount} with ${batchOperations} operations for ${collectionName}`);
-      } catch (batchError) {
-        console.error(`[${new Date().toISOString()}] Error committing final batch #${batchCount} for ${collectionName}:`, batchError);
-        const errorMsg = `Final batch #${batchCount} error: ${batchError.message || String(batchError)}`;
+      } catch (error: any) {
+        console.error(`[${new Date().toISOString()}] Error committing final batch #${batchCount} for ${collectionName}:`, error);
+        const errorMsg = `Final batch #${batchCount} error: ${error.message || String(error)}`;
         errors.push(errorMsg);
       }
     }
@@ -292,7 +292,7 @@ async function processCollection(collectionName: string, reportData: BlobResolut
     }
     
     return resolvedCount;
-  } catch (error) {
+  } catch (error: any) {
     const errorMsg = `Error processing collection ${collectionName}: ${error.message || String(error)}`;
     console.error(`[${new Date().toISOString()}] ${errorMsg}`);
     
@@ -330,7 +330,7 @@ export async function resolveAllBlobUrls(): Promise<BlobResolutionReport> {
     try {
       const resolvedCount = await processCollection(collectionName, reportData);
       reportData.totalResolved += resolvedCount;
-    } catch (error) {
+    } catch (error: any) {
       const errorMsg = `Failed to process collection ${collectionName}: ${error.message || String(error)}`;
       console.error(`[${new Date().toISOString()}] ${errorMsg}`);
       
@@ -374,7 +374,7 @@ export async function resolveAllBlobUrls(): Promise<BlobResolutionReport> {
     reportData.id = reportRef.id;
     
     return reportData;
-  } catch (error) {
+  } catch (error: any) {
     const errorMsg = `Error creating blob URL resolution report: ${error.message || String(error)}`;
     console.error(`[${new Date().toISOString()}] ${errorMsg}`);
     
