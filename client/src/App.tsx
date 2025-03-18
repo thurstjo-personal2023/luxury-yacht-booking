@@ -50,6 +50,7 @@ const AdminUtils = lazy(() => import("@/pages/dashboard/producer/AdminUtils"));
 const AdminDashboard = lazy(() => import("@/pages/admin"));
 const EmailTest = lazy(() => import("@/pages/admin/EmailTest"));
 const ImageValidator = lazy(() => import("@/pages/admin/ImageValidator"));
+const MediaAdmin = lazy(() => import("@/pages/admin/MediaAdmin"));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -192,6 +193,9 @@ function App() {
               </Route>
               <Route path="/admin/media">
                 <PrivateRoute component={MediaManagement} />
+              </Route>
+              <Route path="/admin/media-validation">
+                <PrivateRoute component={MediaAdmin} />
               </Route>
               
               {/* Debug Tools */}
