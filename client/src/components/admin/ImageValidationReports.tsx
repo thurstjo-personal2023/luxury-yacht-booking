@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { InfoIcon, AlertTriangleIcon, CheckCircleIcon, ImageIcon, RefreshCwIcon } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 
 interface ValidationStats {
   totalDocuments: number;
@@ -51,25 +52,63 @@ interface ValidationReport {
 
 export function ImageValidationReports() {
   const [activeTab, setActiveTab] = useState('overview');
+  const { user } = useAuth(); // Get the authenticated user
+  
+  // Function to get the authentication token
+  const getIdToken = async () => {
+    if (!user) throw new Error('User not authenticated');
+    return await user.getIdToken(true); // Force refresh for latest claims
+  };
   
   // Fetch validation reports
   const { data: reports, isLoading, error, refetch } = useQuery({
     queryKey: ['image-validation-reports'],
     queryFn: async () => {
-      const response = await fetch('/api/admin/image-validation-reports');
-      if (!response.ok) {
-        throw new Error('Failed to fetch validation reports');
+      try {
+        // Get the auth token
+        const token = await getIdToken();
+        
+        // Make the API request with the auth token
+        const response = await fetch('/api/admin/image-validation-reports', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          console.error('API error:', response.status, await response.text());
+          throw new Error(`Failed to fetch validation reports: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data.reports as ValidationReport[];
+      } catch (err) {
+        console.error('Error fetching validation reports:', err);
+        throw err;
       }
-      const data = await response.json();
-      return data.reports as ValidationReport[];
     },
-    enabled: false,
+    enabled: false, // Don't run automatically
   });
   
   // Trigger a new validation run
   const runValidation = async () => {
     try {
-      await fetch('/api/admin/validate-images');
+      // Get the auth token
+      const token = await getIdToken();
+      
+      // Make the API request with the auth token
+      const response = await fetch('/api/admin/validate-images', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        console.error('Validation API error:', response.status, await response.text());
+        throw new Error(`Failed to run validation: ${response.status}`);
+      }
+      
+      // Refresh the reports list
       refetch();
     } catch (error) {
       console.error('Error running validation:', error);
