@@ -3257,6 +3257,181 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /**
+   * Get service utilization analytics for a partner
+   * Returns analytics data for how often a partner's services are being used
+   * Supports date range filtering and aggregation by different time periods
+   */
+  app.get("/api/partner/service-analytics", verifyAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user?.uid;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // Parse query parameters for date filtering
+      const startDateParam = req.query.startDate as string;
+      const endDateParam = req.query.endDate as string;
+      const aggregateBy = (req.query.aggregateBy as string) || 'day'; // 'day', 'week', 'month'
+      
+      // Set default date range to last 30 days if not specified
+      const endDate = endDateParam ? new Date(endDateParam) : new Date();
+      const startDate = startDateParam 
+        ? new Date(startDateParam) 
+        : new Date(endDate.getTime() - (30 * 24 * 60 * 60 * 1000)); // 30 days before end date
+      
+      // Get all add-ons created by this partner
+      const addonsSnapshot = await adminDb.collection('products_add_ons')
+        .where('partnerId', '==', userId)
+        .get();
+      
+      const addonIds = addonsSnapshot.docs.map(doc => doc.id);
+      
+      if (addonIds.length === 0) {
+        return res.json({
+          analytics: {
+            timeSeriesData: [],
+            totalBookings: 0,
+            totalUsage: 0,
+            servicePopularity: []
+          }
+        });
+      }
+      
+      // Query bookings containing the partner's add-ons
+      // We need to query for each add-on ID since Firebase doesn't support array-contains-any with multiple values
+      const bookingsPromises = addonIds.map(addonId => 
+        adminDb.collection('bookings')
+          .where('addOnIds', 'array-contains', addonId)
+          .get()
+      );
+      
+      const bookingsResults = await Promise.all(bookingsPromises);
+      
+      // Combine and deduplicate booking results
+      const bookingMap = new Map();
+      
+      bookingsResults.forEach(snapshot => {
+        snapshot.docs.forEach(doc => {
+          const bookingData = doc.data();
+          const bookingDate = bookingData.createdAt?.toDate?.() || new Date(bookingData.createdAt);
+          
+          // Only include bookings within the specified date range
+          if (bookingDate >= startDate && bookingDate <= endDate) {
+            bookingMap.set(doc.id, {
+              id: doc.id,
+              ...bookingData,
+              createdAt: bookingDate
+            });
+          }
+        });
+      });
+      
+      const bookings = Array.from(bookingMap.values());
+      
+      // Analyze add-on usage by service
+      const serviceUsage = new Map();
+      const timeSeriesData = [];
+      
+      // Initialize tracking
+      const addonDetails = new Map();
+      addonsSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        addonDetails.set(doc.id, {
+          name: data.name,
+          category: data.category || 'Other',
+          count: 0
+        });
+      });
+      
+      // Process bookings to extract usage data
+      bookings.forEach(booking => {
+        if (booking.addOns && Array.isArray(booking.addOns)) {
+          booking.addOns.forEach((addon: { id?: string; productId?: string; [key: string]: any }) => {
+            const addonId = addon.id || addon.productId;
+            if (addonIds.includes(addonId)) {
+              // Increment total count for this add-on
+              const details = addonDetails.get(addonId);
+              if (details) {
+                details.count += 1;
+                addonDetails.set(addonId, details);
+              }
+              
+              // Track by category
+              const category = details?.category || 'Other';
+              const currentCount = serviceUsage.get(category) || 0;
+              serviceUsage.set(category, currentCount + 1);
+            }
+          });
+        }
+      });
+      
+      // Generate time series data based on aggregation preference
+      const timeMap = new Map();
+      
+      bookings.forEach(booking => {
+        const date = booking.createdAt;
+        let timeKey;
+        
+        // Format the time key based on aggregation preference
+        if (aggregateBy === 'month') {
+          timeKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        } else if (aggregateBy === 'week') {
+          // Calculate the week number
+          const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+          const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
+          const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+          timeKey = `${date.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+        } else {
+          // Daily aggregation
+          timeKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        }
+        
+        // Count usage for this time period
+        const current = timeMap.get(timeKey) || { period: timeKey, count: 0 };
+        current.count += 1;
+        timeMap.set(timeKey, current);
+      });
+      
+      // Convert maps to arrays for the response
+      const timeSeriesArray = Array.from(timeMap.values())
+        .sort((a, b) => a.period.localeCompare(b.period));
+      
+      const servicePopularity = Array.from(serviceUsage.entries())
+        .map(([category, count]) => ({ category, count }))
+        .sort((a, b) => b.count - a.count);
+      
+      // Individual add-on popularity
+      const addonPopularity = Array.from(addonDetails.entries())
+        .map(([id, detail]) => ({
+          id,
+          name: detail.name,
+          category: detail.category,
+          count: detail.count
+        }))
+        .sort((a, b) => b.count - a.count);
+      
+      res.json({
+        analytics: {
+          timeSeriesData: timeSeriesArray,
+          totalBookings: bookings.length,
+          totalUsage: Array.from(serviceUsage.values()).reduce((sum, count) => sum + count, 0),
+          servicePopularity,
+          addonPopularity,
+          dateRange: {
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString()
+          },
+          aggregateBy
+        }
+      });
+    } catch (error) {
+      console.error("Error getting partner service analytics:", error);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Register User Profile routes
   registerUserProfileRoutes(app);
 
