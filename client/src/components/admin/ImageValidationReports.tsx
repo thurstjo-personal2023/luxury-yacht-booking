@@ -87,7 +87,7 @@ export function ImageValidationReports() {
         throw err;
       }
     },
-    enabled: false, // Don't run automatically
+    enabled: !!user, // Run automatically when user is authenticated
   });
   
   // Trigger a new validation run
@@ -118,11 +118,11 @@ export function ImageValidationReports() {
   // Get the latest report
   const latestReport = reports?.[0];
   
-  // Safely access report properties
+  // Safely access report properties with proper typing based on our interface
   const hasInvalidImages: boolean = Boolean(latestReport?.sampleIssues?.invalid?.length);
   const hasMissingImages: boolean = Boolean(latestReport?.sampleIssues?.missing?.length);
-  const invalidImages: any[] = latestReport?.sampleIssues?.invalid || [];
-  const missingImages: any[] = latestReport?.sampleIssues?.missing || [];
+  const invalidImages = latestReport?.sampleIssues?.invalid || [];
+  const missingImages = latestReport?.sampleIssues?.missing || [];
   
   return (
     <Card className="w-full">

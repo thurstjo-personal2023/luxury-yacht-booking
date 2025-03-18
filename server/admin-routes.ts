@@ -7,6 +7,8 @@
 import { Request, Response, Express, NextFunction } from 'express';
 import { verifyAuth, adminDb } from './firebase-admin';
 import validateImageUrls from '../scripts/validate-images';
+// Import will be loaded dynamically to avoid initialization issues
+// import { validateMediaUrls, saveMediaValidationResults } from '../scripts/validate-media';
 
 // Middleware to verify admin role
 export const verifyAdminAuth = async (req: Request, res: Response, next: NextFunction) => {
@@ -110,6 +112,87 @@ export function registerAdminRoutes(app: Express) {
     } catch (error) {
       console.error('Error fetching validation reports:', error);
       res.status(500).json({ error: 'Failed to fetch validation reports' });
+    }
+  });
+
+  /**
+   * Run media validation across all collections
+   * This endpoint validates both images and videos
+   */
+  app.get('/api/admin/validate-media', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      console.log('Starting media validation via admin API...');
+      
+      // Import the validation function dynamically
+      const { validateMediaUrls, saveMediaValidationResults } = await import('../scripts/validate-media');
+      
+      // Run validation
+      const results = await validateMediaUrls();
+      
+      // Save results to Firestore
+      const reportId = await saveMediaValidationResults(results);
+      
+      // Return summary results
+      res.json({
+        success: true,
+        reportId,
+        timestamp: results.timestamp,
+        stats: results.stats,
+        sampleIssues: {
+          invalid: results.invalid.slice(0, 5),
+          missing: results.missing.slice(0, 5)
+        }
+      });
+    } catch (error) {
+      console.error('Error running media validation:', error);
+      res.status(500).json({ error: 'Failed to run media validation' });
+    }
+  });
+
+  /**
+   * Get detailed media validation results for a specific report
+   */
+  app.get('/api/admin/media-validation/:reportId', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      const { reportId } = req.params;
+      
+      // Get the report from Firestore
+      const reportDoc = await adminDb.collection('media_validation_reports').doc(reportId).get();
+      
+      if (!reportDoc.exists) {
+        return res.status(404).json({ error: 'Report not found' });
+      }
+      
+      // Return the report data
+      res.json(reportDoc.data());
+    } catch (error) {
+      console.error('Error fetching media validation report:', error);
+      res.status(500).json({ error: 'Failed to fetch media validation report' });
+    }
+  });
+
+  /**
+   * Get list of media validation reports
+   */
+  app.get('/api/admin/media-validation-reports', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      // Get the reports from Firestore, sorted by createdAt
+      const reportsSnapshot = await adminDb.collection('media_validation_reports')
+        .orderBy('createdAt', 'desc')
+        .limit(10)
+        .get();
+      
+      // Map to array of reports
+      const reports = reportsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Return the reports
+      res.json({ reports });
+    } catch (error) {
+      console.error('Error fetching media validation reports:', error);
+      res.status(500).json({ error: 'Failed to fetch media validation reports' });
     }
   });
 }
