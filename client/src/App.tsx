@@ -25,6 +25,7 @@ const BookingSummary = lazy(() => import("@/pages/BookingSummary"));
 const PaymentPage = lazy(() => import("@/pages/PaymentPage"));
 const SearchAndBook = lazy(() => import("@/pages/explore/SearchAndBook"));
 const GuestDashboard = lazy(() => import("@/pages/explore/GuestDashboard"));
+const MediaManagement = lazy(() => import("@/pages/admin/MediaManagement"));
 const ProfilePage = lazy(() => import("@/pages/profile/ProfilePage"));
 const FeaturedExperiences = lazy(() => import("@/pages/experiences/FeaturedExperiences"));
 const RoleDebugPage = lazy(() => import("@/pages/debug/RoleDebugPage"));
@@ -188,6 +189,9 @@ function App() {
               </Route>
               <Route path="/admin/image-validator">
                 <PrivateRoute component={ImageValidator} />
+              </Route>
+              <Route path="/admin/media">
+                <PrivateRoute component={MediaManagement} />
               </Route>
               
               {/* Debug Tools */}
