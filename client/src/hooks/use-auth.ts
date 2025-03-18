@@ -29,6 +29,7 @@ interface AuthContextType {
   user: AuthUser | null;
   currentUser: AuthUser | null; // Alias for user, for compatibility
   userRole: UserRoleType | null; // Explicit role accessor for easier role checks
+  isAdmin: boolean; // Whether the user has admin privileges (currently producer role)
   loading: boolean;
   signIn: (email: string, password: string) => Promise<AuthUser>;
   signUp: (email: string, password: string) => Promise<AuthUser>;
@@ -375,6 +376,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     currentUser: user,
     userRole,
+    isAdmin: userRole === 'producer', // In our app, producers have admin privileges
     loading,
     signIn,
     signUp,
