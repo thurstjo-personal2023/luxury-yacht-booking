@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { registerUserProfileRoutes } from "./user-profile-routes";
 import { registerUploadRoutes } from "./upload-routes";
 import { registerEmailRoutes } from "./email-routes";
+import { registerAdminRoutes } from "./admin-routes";
 import { testProductionStorage, runStorageTest } from "./test-storage";
 import { USE_FIREBASE_EMULATORS } from "./env-config";
 
