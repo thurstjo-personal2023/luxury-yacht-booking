@@ -16,7 +16,7 @@
 import fetch from 'node-fetch';
 import { adminDb } from '../server/firebase-admin';
 import { format } from 'date-fns';
-import * as admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 // Types for validation results
 interface ValidationEntry {
@@ -397,7 +397,7 @@ async function saveValidationResults(results: ValidationResults): Promise<string
   try {
     const docRef = await adminDb.collection('image_validation_reports').add({
       ...results,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp()
     });
     
     console.log(`Validation results saved to Firestore with ID: ${docRef.id}`);
