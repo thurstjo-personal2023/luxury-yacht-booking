@@ -1,7 +1,7 @@
- Removing unpermitted intrinsics
- [vite] connecting...
- [vite] connected.
- Firebase initialized in PRODUCTION mode
+lockdown-install.js:1 Removing unpermitted intrinsics
+client:495 [vite] connecting...
+client:614 [vite] connected.
+firebase.ts:23 Firebase initialized in PRODUCTION mode
 firebase.ts:35 Setting up auth state listener for Firebase...
 firebase.ts:132 Using PRODUCTION Firebase services - skipping emulator connection
 firebase.ts:363 Using production Firebase services - emulator connection disabled
@@ -16,7 +16,7 @@ use-auth.ts:58 🔵 Auth state changed: User signed in, ID: N2hCWi8Kfsdv3N5MbUyI
 use-auth.ts:370 Auth context: No role available from user object
 App.tsx:93 User authenticated, verifying Firestore collections
 firestore-init.ts:71 Initializing Firestore collections in production mode...
-firebase.ts:58 Auth token refreshed and stored in localStorage: eyJhbGciOi...HsnbA
+firebase.ts:58 Auth token refreshed and stored in localStorage: eyJhbGciOi...m1BLw
 firebase.ts:62 Refreshing user claims...
 use-auth.ts:63 ✅ Auth token refreshed successfully
 use-auth.ts:411 Token claims received: {
@@ -24,11 +24,11 @@ use-auth.ts:411 Token claims received: {
   "role": "producer",
   "iss": "https://securetoken.google.com/etoile-yachts",
   "aud": "etoile-yachts",
-  "auth_time": 1742294944,
+  "auth_time": 1742297772,
   "user_id": "N2hCWi8Kfsdv3N5MbUyIRYVRHRQ2",
   "sub": "N2hCWi8Kfsdv3N5MbUyIRYVRHRQ2",
-  "iat": 1742295021,
-  "exp": 1742298621,
+  "iat": 1742297801,
+  "exp": 1742301401,
   "email": "ally.gee@hotmail.com",
   "email_verified": true,
   "firebase": {
@@ -73,8 +73,24 @@ use-auth.ts:365 Auth context using validated role: producer
 use-auth.ts:365 Auth context using validated role: producer
 use-auth.ts:365 Auth context using validated role: producer
 use-auth.ts:365 Auth context using validated role: producer
+/api/admin/resolve-blob-urls:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+/api/admin/resolve-blob-urls:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
 use-auth.ts:365 Auth context using validated role: producer
 use-auth.ts:365 Auth context using validated role: producer
+/api/admin/fix-relative-urls:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+/api/admin/fix-relative-urls:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
 use-auth.ts:365 Auth context using validated role: producer
 use-auth.ts:365 Auth context using validated role: producer
 /api/admin/resolve-blob-urls:1 
@@ -82,6 +98,62 @@ use-auth.ts:365 Auth context using validated role: producer
             
            Failed to load resource: the server responded with a status of 500 (Internal Server Error)
 /api/admin/resolve-blob-urls:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+use-auth.ts:365 Auth context using validated role: producer
+use-auth.ts:365 Auth context using validated role: producer
+/api/admin/resolve-blob-urls:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+/api/admin/resolve-blob-urls:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+use-auth.ts:365 Auth context using validated role: producer
+use-auth.ts:365 Auth context using validated role: producer
+/api/admin/resolve-blob-urls:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+/api/admin/resolve-blob-urls:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+use-auth.ts:365 Auth context using validated role: producer
+use-auth.ts:365 Auth context using validated role: producer
+use-auth.ts:365 Auth context using validated role: producer
+use-auth.ts:365 Auth context using validated role: producer
+use-auth.ts:365 Auth context using validated role: producer
+use-auth.ts:365 Auth context using validated role: producer
+firebase.ts:77 Performing scheduled token refresh...
+firebase.ts:80 Auth token refreshed on schedule
+/api/admin/fix-relative-urls:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+/api/admin/fix-relative-urls:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+use-auth.ts:365 Auth context using validated role: producer
+use-auth.ts:365 Auth context using validated role: producer
+/api/admin/fix-relative-urls:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+/api/admin/fix-relative-urls:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+use-auth.ts:365 Auth context using validated role: producer
+use-auth.ts:365 Auth context using validated role: producer
+/api/admin/fix-relative-urls:1 
+            
+            
+           Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+/api/admin/fix-relative-urls:1 
             
             
            Failed to load resource: the server responded with a status of 500 (Internal Server Error)
