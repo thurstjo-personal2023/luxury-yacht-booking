@@ -3349,8 +3349,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       bookings.forEach(booking => {
         if (booking.addOns && Array.isArray(booking.addOns)) {
           booking.addOns.forEach((addon: { id?: string; productId?: string; [key: string]: any }) => {
-            const addonId = addon.id || addon.productId;
-            if (addonIds.includes(addonId)) {
+            const addonId = addon.id || addon.productId || '';
+            if (addonId && addonIds.includes(addonId)) {
               // Increment total count for this add-on
               const details = addonDetails.get(addonId);
               if (details) {
