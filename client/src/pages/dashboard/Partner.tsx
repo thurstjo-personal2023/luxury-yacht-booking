@@ -19,7 +19,9 @@ import {
   ArrowUpRight,
   CircleCheck, 
   Clock, 
-  AlertCircle
+  AlertCircle,
+  PieChart,
+  LineChart
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
