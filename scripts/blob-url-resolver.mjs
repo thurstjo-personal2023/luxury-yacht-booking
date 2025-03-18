@@ -1,52 +1,19 @@
 /**
- * Blob URL Resolution Script (ES Module Version)
+ * Blob URL Resolver Module
  * 
- * This script identifies and replaces blob:// URLs in Firestore documents with appropriate
- * placeholder images based on their usage context.
+ * This module resolves blob:// URLs in Firestore documents by replacing them
+ * with appropriate placeholder URLs. It's designed to handle large collections
+ * efficiently and provide detailed reporting.
  * 
- * Issues with blob URLs:
- * - Blob URLs are only valid in the browser session where they were created
- * - They cannot be accessed by servers or other users
- * - They typically appear when users upload files but the upload doesn't complete properly
+ * Using .mjs extension for explicit ES Module support.
  */
 
-// Initialize Firebase Admin first to prevent module compatibility issues
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+// Import Firebase Admin SDK using ES Module syntax
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { v4 as uuidv4 } from 'uuid';
 
-// Initialize Firebase Admin if not already initialized
-let firestore;
-if (getApps().length === 0) {
-  try {
-    // Initialize with project ID if no service account provided
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || 'etoile-yachts';
-    
-    // Check for Firebase service account from environment variable
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-      const app = initializeApp({
-        credential: cert(serviceAccount),
-        projectId
-      });
-      firestore = getFirestore(app);
-    } else {
-      // Use application default credentials
-      const app = initializeApp({ projectId });
-      firestore = getFirestore(app);
-    }
-  } catch (error) {
-    console.error('Error initializing Firebase Admin:', error.message);
-    throw error;
-  }
-} else {
-  // Use existing app
-  firestore = getFirestore();
-}
-
-/**
- * Default placeholder images to use when replacing blob URLs
- */
+// Default placeholder images to use when replacing blob URLs
 const DEFAULT_PLACEHOLDERS = {
   image: 'https://storage.googleapis.com/etoile-yachts.firebasestorage.app/placeholders/yacht-placeholder.jpg',
   video: 'https://storage.googleapis.com/etoile-yachts.firebasestorage.app/placeholders/video-placeholder.mp4',
@@ -56,11 +23,33 @@ const DEFAULT_PLACEHOLDERS = {
   addon: 'https://storage.googleapis.com/etoile-yachts.firebasestorage.app/placeholders/addon-placeholder.jpg',
 };
 
+// Collection to store blob URL resolution reports
+const REPORTS_COLLECTION = 'blob_url_reports';
+
+/**
+ * Initialize Firebase Admin app if not already initialized
+ * This is designed to work when imported as an ES module
+ */
+function initializeFirebase() {
+  if (getApps().length === 0) {
+    try {
+      // Initialize with project ID only
+      const projectId = process.env.VITE_FIREBASE_PROJECT_ID || 'etoile-yachts';
+      console.log(`[${new Date().toISOString()}] Initializing Firebase Admin with project ID: ${projectId}`);
+      
+      const app = initializeApp({ projectId });
+      return getFirestore(app);
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Error initializing Firebase Admin:`, error);
+      throw error;
+    }
+  } else {
+    return getFirestore();
+  }
+}
+
 /**
  * Get the appropriate placeholder for a blob URL based on context
- * 
- * @param {string} fieldPath - The path of the field containing the blob URL
- * @returns {string} - URL of the appropriate placeholder image
  */
 function getPlaceholderForContext(fieldPath) {
   const lowerPath = fieldPath.toLowerCase();
@@ -83,293 +72,244 @@ function getPlaceholderForContext(fieldPath) {
 
 /**
  * Scan a Firestore document for blob URLs
- * 
- * @param {Object} data - The document data
- * @param {string} path - Current path in the document (for recursion)
- * @param {Array} results - Array to store found blob URLs
  */
-function scanForBlobUrls(data, path = '', results = []) {
-  if (!data || typeof data !== 'object') {
-    return results;
-  }
+function scanDocumentForBlobUrls(data, path = '') {
+  const blobUrls = [];
   
-  if (Array.isArray(data)) {
-    // Handle arrays by recursively scanning each element with index
-    data.forEach((item, index) => {
-      if (typeof item === 'string' && item.startsWith('blob:')) {
-        results.push({
-          path: path ? `${path}.[${index}]` : `[${index}]`,
-          value: item
-        });
-      } else if (typeof item === 'object' && item !== null) {
-        scanForBlobUrls(item, path ? `${path}.[${index}]` : `[${index}]`, results);
-      }
-    });
-  } else {
-    // Handle objects by recursively scanning each property
-    Object.entries(data).forEach(([key, value]) => {
-      const currentPath = path ? `${path}.${key}` : key;
-      
-      if (typeof value === 'string' && value.startsWith('blob:')) {
-        results.push({
-          path: currentPath,
-          value: value
-        });
-      } else if (typeof value === 'object' && value !== null) {
-        scanForBlobUrls(value, currentPath, results);
-      }
-    });
-  }
-  
-  return results;
-}
-
-/**
- * Replace a value at a specific path in a nested object
- * 
- * @param {Object} obj - The object to modify
- * @param {string} path - The path to the property to replace
- * @param {any} value - The new value
- * @returns {Object} - The modified object
- */
-function setNestedValue(obj, path, value) {
-  if (!path) {
-    return obj;
-  }
-  
-  // Parse the path string into parts
-  // Handle both regular properties and array indices
-  let parts;
-  
-  if (path.includes('.')) {
-    parts = path.split('.');
-  } else {
-    parts = [path];
-  }
-  
-  let current = obj;
-  
-  for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i];
-    
-    // Handle array indices
-    if (part.startsWith('[') && part.endsWith(']')) {
-      const index = parseInt(part.substring(1, part.length - 1), 10);
-      if (!Array.isArray(current)) {
-        return obj; // Cannot set property of non-array
-      }
-      if (!current[index] || typeof current[index] !== 'object') {
-        current[index] = {};
-      }
-      current = current[index];
-    } else {
-      if (!current[part] || typeof current[part] !== 'object') {
-        current[part] = {};
-      }
-      current = current[part];
+  function scan(obj, currentPath) {
+    if (!obj || typeof obj !== 'object') {
+      return;
     }
-  }
-  
-  // Set the value on the final part
-  const lastPart = parts[parts.length - 1];
-  
-  // Handle array indices in the last part
-  if (lastPart.startsWith('[') && lastPart.endsWith(']')) {
-    const index = parseInt(lastPart.substring(1, lastPart.length - 1), 10);
-    if (Array.isArray(current)) {
-      current[index] = value;
-    }
-  } else {
-    current[lastPart] = value;
-  }
-  
-  return obj;
-}
-
-/**
- * Resolve blob URLs in a specific Firestore collection
- * 
- * @param {string} collectionName - Name of the collection to process
- * @returns {Promise<Object>} - Results of the resolution process
- */
-async function resolveCollectionBlobUrls(collectionName) {
-  const results = {
-    collection: collectionName,
-    scanned: 0,
-    resolved: 0,
-    failed: 0,
-    details: []
-  };
-  
-  try {
-    const snapshot = await firestore.collection(collectionName).get();
-    results.scanned = snapshot.size;
     
-    for (const doc of snapshot.docs) {
-      const data = doc.data();
-      const blobUrls = scanForBlobUrls(data);
-      
-      if (blobUrls.length > 0) {
-        // Create a copy of the data for updates
-        let updatedData = { ...data };
+    if (Array.isArray(obj)) {
+      // Handle arrays
+      obj.forEach((item, index) => {
+        const newPath = currentPath ? `${currentPath}.[${index}]` : `[${index}]`;
         
-        // Replace each blob URL with an appropriate placeholder
-        blobUrls.forEach(({ path, value }) => {
-          try {
-            const placeholder = getPlaceholderForContext(path);
-            updatedData = setNestedValue(updatedData, path, placeholder);
-            
-            results.details.push({
-              documentId: doc.id,
-              field: path,
-              originalUrl: value,
-              newUrl: placeholder,
-              status: 'resolved'
-            });
-            
-            results.resolved++;
-          } catch (error) {
-            console.error(`Error resolving blob URL in ${collectionName}/${doc.id} at ${path}:`, error);
-            
-            results.details.push({
-              documentId: doc.id,
-              field: path,
-              originalUrl: value,
-              error: error.message,
-              status: 'failed'
-            });
-            
-            results.failed++;
-          }
-        });
-        
-        // Update the document if blob URLs were found and resolved
-        if (results.resolved > 0) {
-          try {
-            await doc.ref.update(updatedData);
-          } catch (error) {
-            console.error(`Error updating document ${collectionName}/${doc.id}:`, error);
-            
-            // Mark all resolutions for this document as failed
-            results.details.forEach(detail => {
-              if (detail.documentId === doc.id && detail.status === 'resolved') {
-                detail.status = 'failed';
-                detail.error = 'Document update failed: ' + error.message;
-                results.resolved--;
-                results.failed++;
-              }
-            });
-          }
+        if (typeof item === 'string' && item.startsWith('blob:')) {
+          blobUrls.push({
+            path: newPath,
+            value: item
+          });
+        } else if (typeof item === 'object' && item !== null) {
+          scan(item, newPath);
         }
-      }
+      });
+    } else {
+      // Handle objects
+      Object.entries(obj).forEach(([key, value]) => {
+        const newPath = currentPath ? `${currentPath}.${key}` : key;
+        
+        if (typeof value === 'string' && value.startsWith('blob:')) {
+          blobUrls.push({
+            path: newPath,
+            value: value
+          });
+        } else if (typeof value === 'object' && value !== null) {
+          scan(value, newPath);
+        }
+      });
     }
-  } catch (error) {
-    console.error(`Error processing collection ${collectionName}:`, error);
-    results.error = error.message;
   }
   
-  return results;
+  scan(data, path);
+  return blobUrls;
 }
 
 /**
- * Get a list of all collections in Firestore
- * 
- * @returns {Promise<string[]>} - Array of collection names
+ * Update a document to replace blob URLs with placeholders
  */
-async function getAllCollections() {
-  try {
-    const collections = await firestore.listCollections();
-    return collections.map(col => col.id);
-  } catch (error) {
-    console.error('Error getting collections:', error);
-    return [];
+async function replaceDocumentBlobUrls(docRef, blobUrls) {
+  if (blobUrls.length === 0) {
+    return { success: true, replacedUrls: 0 };
   }
-}
-
-/**
- * Resolve all blob URLs in Firestore
- * 
- * @returns {Promise<Object>} - Results of the resolution process
- */
-export async function resolveAllBlobUrls() {
-  const startTime = Date.now();
   
   try {
-    // Generate a unique ID for this operation
-    const operationId = uuidv4();
+    // Create update object for each blob URL
+    const updates = {};
     
-    console.log(`[${new Date().toISOString()}] Starting blob URL resolution operation with ID ${operationId}`);
-    
-    // Get all collections
-    const collections = await getAllCollections();
-    console.log(`[${new Date().toISOString()}] Found ${collections.length} collections to scan`);
-    
-    // Track overall results
-    const results = {
-      totalDocs: 0,
-      totalResolved: 0,
-      totalFailed: 0,
-      collections: []
-    };
-    
-    // Process each collection
-    for (const collection of collections) {
-      console.log(`[${new Date().toISOString()}] Scanning collection ${collection}`);
+    blobUrls.forEach(({ path, value }) => {
+      // Get appropriate placeholder based on field context
+      const placeholder = getPlaceholderForContext(path);
       
-      const collectionResults = await resolveCollectionBlobUrls(collection);
-      results.totalDocs += collectionResults.scanned;
-      results.totalResolved += collectionResults.resolved;
-      results.totalFailed += collectionResults.failed;
-      results.collections.push(collectionResults);
-    }
+      // Handle nested paths correctly
+      // Convert array notation from path.[0] to path.0 for Firestore updates
+      const firestorePath = path.replace(/\.\[(\d+)\]/g, '.$1');
+      updates[firestorePath] = placeholder;
+    });
     
-    // Calculate execution time
-    const endTime = Date.now();
-    const executionTime = endTime - startTime;
-    
-    // Create a report document
-    const report = {
-      id: operationId,
-      timestamp: new Date(),
-      executionTime,
-      totalDocs: results.totalDocs,
-      totalResolved: results.totalResolved,
-      totalFailed: results.totalFailed,
-      collections: results.collections.map(c => ({
-        name: c.collection,
-        scanned: c.scanned,
-        resolved: c.resolved,
-        failed: c.failed
-      })),
-      details: results.collections.flatMap(c => c.details || [])
-    };
-    
-    // Store the report in Firestore
-    try {
-      await firestore.collection('blob_url_reports').doc(operationId).set(report);
-      console.log(`[${new Date().toISOString()}] Blob URL resolution report saved with ID ${operationId}`);
-    } catch (error) {
-      console.error('Error saving blob URL resolution report:', error);
-    }
-    
-    console.log(`[${new Date().toISOString()}] Blob URL resolution completed: ${results.totalResolved} resolved, ${results.totalFailed} failed`);
+    // Update the document with all replacements
+    await docRef.update(updates);
     
     return {
       success: true,
-      reportId: operationId,
-      stats: {
-        totalDocs: results.totalDocs,
-        totalResolved: results.totalResolved,
-        totalFailed: results.totalFailed,
-        executionTime
-      }
+      replacedUrls: blobUrls.length,
+      replacements: blobUrls.map(({ path, value }) => ({
+        path,
+        from: value,
+        to: getPlaceholderForContext(path)
+      }))
     };
   } catch (error) {
-    console.error('Error resolving blob URLs:', error);
-    
+    console.error(`[${new Date().toISOString()}] Error replacing blob URLs:`, error);
     return {
       success: false,
-      error: error.message
+      error: error.message,
+      replacedUrls: 0
     };
+  }
+}
+
+/**
+ * Process a collection to resolve blob URLs
+ */
+async function processCollection(db, collectionName, operationId) {
+  console.log(`[${new Date().toISOString()}] Scanning collection ${collectionName}`);
+  
+  const results = {
+    collectionName,
+    documentsScanned: 0,
+    documentsWithBlobUrls: 0,
+    blobUrlsFound: 0,
+    blobUrlsReplaced: 0,
+    errors: [],
+    replacements: []
+  };
+  
+  try {
+    // Get all documents in the collection
+    const snapshot = await db.collection(collectionName).get();
+    results.documentsScanned = snapshot.size;
+    
+    // Process each document
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      const docId = doc.id;
+      
+      // Find blob URLs in the document
+      const blobUrls = scanDocumentForBlobUrls(data);
+      
+      if (blobUrls.length > 0) {
+        results.documentsWithBlobUrls++;
+        results.blobUrlsFound += blobUrls.length;
+        
+        // Replace blob URLs with placeholders
+        const updateResult = await replaceDocumentBlobUrls(doc.ref, blobUrls);
+        
+        if (updateResult.success) {
+          results.blobUrlsReplaced += updateResult.replacedUrls;
+          results.replacements.push({
+            documentId: docId,
+            replacements: updateResult.replacements
+          });
+        } else {
+          results.errors.push({
+            documentId: docId,
+            error: updateResult.error
+          });
+        }
+      }
+    }
+    
+    return results;
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error processing collection ${collectionName}:`, error);
+    results.errors.push({
+      collectionName,
+      error: error.message
+    });
+    return results;
+  }
+}
+
+/**
+ * Save blob URL resolution report to Firestore
+ */
+async function saveReport(db, report) {
+  try {
+    const reportId = uuidv4();
+    await db.collection(REPORTS_COLLECTION).doc(reportId).set({
+      ...report,
+      timestamp: Timestamp.now()
+    });
+    console.log(`[${new Date().toISOString()}] Saved blob URL resolution report with ID: ${reportId}`);
+    return reportId;
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error saving blob URL resolution report:`, error);
+    return null;
+  }
+}
+
+/**
+ * Main function to resolve all blob URLs in the database
+ */
+export async function resolveAllBlobUrls() {
+  const operationId = uuidv4();
+  console.log(`[${new Date().toISOString()}] Starting blob URL resolution operation with ID ${operationId}`);
+  
+  const db = initializeFirebase();
+  
+  const report = {
+    operationId,
+    startTime: new Date().toISOString(),
+    collectionsScanned: 0,
+    totalDocumentsScanned: 0,
+    totalDocumentsWithBlobUrls: 0,
+    totalBlobUrlsFound: 0,
+    totalBlobUrlsReplaced: 0,
+    collectionResults: [],
+    errors: []
+  };
+  
+  try {
+    // Get all collections in the database
+    const collections = await db.listCollections();
+    const collectionNames = collections.map(collection => collection.id);
+    
+    console.log(`[${new Date().toISOString()}] Found ${collectionNames.length} collections to scan`);
+    report.collectionsScanned = collectionNames.length;
+    
+    // Process each collection
+    for (const collectionName of collectionNames) {
+      const collectionResults = await processCollection(db, collectionName, operationId);
+      report.collectionResults.push(collectionResults);
+      
+      // Update aggregated statistics
+      report.totalDocumentsScanned += collectionResults.documentsScanned;
+      report.totalDocumentsWithBlobUrls += collectionResults.documentsWithBlobUrls;
+      report.totalBlobUrlsFound += collectionResults.blobUrlsFound;
+      report.totalBlobUrlsReplaced += collectionResults.blobUrlsReplaced;
+      
+      if (collectionResults.errors.length > 0) {
+        report.errors.push(...collectionResults.errors);
+      }
+    }
+    
+    // Finalize report
+    report.endTime = new Date().toISOString();
+    report.durationMs = new Date(report.endTime).getTime() - new Date(report.startTime).getTime();
+    report.success = true;
+    
+    // Save the report
+    const reportId = await saveReport(db, report);
+    report.reportId = reportId;
+    
+    console.log(`[${new Date().toISOString()}] Blob URL resolution completed. Found ${report.totalBlobUrlsFound} blob URLs in ${report.totalDocumentsWithBlobUrls} documents and replaced ${report.totalBlobUrlsReplaced}.`);
+    
+    return report;
+    
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error resolving blob URLs:`, error);
+    
+    report.endTime = new Date().toISOString();
+    report.durationMs = new Date(report.endTime).getTime() - new Date(report.startTime).getTime();
+    report.success = false;
+    report.error = error.message;
+    
+    // Save the error report
+    const reportId = await saveReport(db, report);
+    report.reportId = reportId;
+    
+    return report;
   }
 }
