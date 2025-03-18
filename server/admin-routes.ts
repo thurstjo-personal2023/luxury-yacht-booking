@@ -182,11 +182,47 @@ export function registerAdminRoutes(app: Express) {
         .limit(10)
         .get();
       
-      // Map to array of reports
-      const reports = reportsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      // Map to array of reports with proper format expected by the client
+      const reports = reportsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        
+        // Ensure we have a valid report structure that the frontend expects
+        const processedReport = {
+          id: doc.id,
+          ...data,
+        };
+        
+        // Make sure errors or invalid is an array
+        if (!processedReport.errors && !processedReport.invalid) {
+          console.log(`Adding missing errors array to report ${doc.id}`);
+          processedReport.errors = [];
+        } else if (processedReport.errors && !Array.isArray(processedReport.errors)) {
+          console.log(`Converting errors to array in report ${doc.id}`);
+          processedReport.errors = [];
+        } else if (processedReport.invalid && !Array.isArray(processedReport.invalid)) {
+          console.log(`Converting invalid to array in report ${doc.id}`);
+          processedReport.invalid = [];
+        }
+        
+        // Ensure stats object exists
+        if (!processedReport.stats) {
+          processedReport.stats = {
+            imageCount: 0,
+            videoCount: 0,
+            invalidUrls: 0,
+            byCollection: {}
+          };
+        }
+        
+        // Log the processed report for debugging
+        console.log(`Processed report ${doc.id}:`, {
+          hasErrors: !!processedReport.errors && Array.isArray(processedReport.errors),
+          hasInvalid: !!processedReport.invalid && Array.isArray(processedReport.invalid),
+          stats: processedReport.stats
+        });
+        
+        return processedReport;
+      });
       
       // Return the reports
       res.json({ reports });
