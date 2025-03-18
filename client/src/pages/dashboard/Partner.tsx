@@ -26,7 +26,12 @@ import {
 import { Link, useLocation } from "wouter";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PartnerSidebar } from "@/components/layout/PartnerSidebar";
-import { usePartnerEarnings, usePartnerBookings, usePartnerAddons } from "@/hooks/partner/usePartnerQueries";
+import { 
+  usePartnerEarnings, 
+  usePartnerBookings, 
+  usePartnerAddons,
+  useServiceAnalytics
+} from "@/hooks/partner/usePartnerQueries";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 
@@ -109,10 +114,14 @@ export default function PartnerDashboard() {
               </div>
               
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-3 md:w-[500px]">
+                <TabsList className="grid w-full grid-cols-4 md:w-[580px]">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="bookings">Bookings</TabsTrigger>
                   <TabsTrigger value="earnings">Earnings</TabsTrigger>
+                  <TabsTrigger value="analytics">
+                    <LineChart className="h-4 w-4 mr-2" />
+                    Analytics
+                  </TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="overview" className="space-y-6">
@@ -619,6 +628,127 @@ export default function PartnerDashboard() {
                       </div>
                     </CardContent>
                   </Card>
+                </TabsContent>
+
+                {/* Analytics Tab */}
+                <TabsContent value="analytics" className="space-y-6">
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <Card className="w-full md:w-[250px]">
+                      <CardHeader>
+                        <CardTitle>Service Analytics</CardTitle>
+                        <CardDescription>
+                          Track the utilization of your service add-ons
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {/* Period Selection */}
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-medium">Time Period</h3>
+                          <div className="flex flex-col space-y-1.5">
+                            <Button variant="outline" className="justify-start">
+                              <Calendar className="mr-2 h-4 w-4" />
+                              Last 30 Days
+                            </Button>
+                            <Button variant="ghost" className="justify-start">
+                              <Calendar className="mr-2 h-4 w-4" />
+                              Last 3 Months
+                            </Button>
+                            <Button variant="ghost" className="justify-start">
+                              <Calendar className="mr-2 h-4 w-4" />
+                              Last 12 Months
+                            </Button>
+                            <Button variant="ghost" className="justify-start">
+                              <Calendar className="mr-2 h-4 w-4" />
+                              Custom Range
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {/* Aggregation Type */}
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-medium">View By</h3>
+                          <div className="flex flex-col space-y-1.5">
+                            <Button variant="outline" className="justify-start">
+                              <BarChart4 className="mr-2 h-4 w-4" />
+                              Daily
+                            </Button>
+                            <Button variant="ghost" className="justify-start">
+                              <BarChart4 className="mr-2 h-4 w-4" />
+                              Weekly
+                            </Button>
+                            <Button variant="ghost" className="justify-start">
+                              <BarChart4 className="mr-2 h-4 w-4" />
+                              Monthly
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <div className="flex flex-col flex-1 gap-4">
+                      <Card className="w-full">
+                        <CardHeader>
+                          <CardTitle>Service Usage Over Time</CardTitle>
+                          <CardDescription>
+                            Number of bookings including your services
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="px-2">
+                          <div className="h-[300px] w-full">
+                            {/* Usage Time Series Chart */}
+                            <div className="flex items-center justify-center h-full">
+                              <div className="text-center text-muted-foreground">
+                                <BarChart4 className="h-12 w-12 mx-auto opacity-20" />
+                                <p className="mt-2">Service usage data is loading...</p>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>Service Popularity</CardTitle>
+                            <CardDescription>
+                              Distribution by service category
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="h-[200px]">
+                              {/* Service Category Distribution Chart */}
+                              <div className="flex items-center justify-center h-full">
+                                <div className="text-center text-muted-foreground">
+                                  <PieChart className="h-12 w-12 mx-auto opacity-20" />
+                                  <p className="mt-2">Category distribution chart</p>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>Most Popular Add-ons</CardTitle>
+                            <CardDescription>
+                              Your most-booked service add-ons
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-4">
+                              {/* Top Services List */}
+                              <div className="flex items-center justify-center h-[200px]">
+                                <div className="text-center text-muted-foreground">
+                                  <ListOrdered className="h-12 w-12 mx-auto opacity-20" />
+                                  <p className="mt-2">Top add-ons will appear here</p>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                  </div>
                 </TabsContent>
               </Tabs>
             </div>
