@@ -1,151 +1,154 @@
 /**
- * Manual Test Script for Blob URL Resolver (Single Collection)
+ * Test Single Collection Blob URL Resolution
  * 
- * This script tests the blob URL resolver functionality for a single collection.
+ * This script tests the blob URL resolution functionality on a single collection
+ * with multiple test documents.
+ * 
+ * Usage: node scripts/test-single-collection.js [collection_name]
  */
 
-// Import functions from Firebase Admin
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { v4 as uuidv4 } from 'uuid';
+import { 
+  isBlobUrl,
+  replaceBlobUrl,
+  resolveBlobUrlsInCollection
+} from './blob-url-resolver-test-exports.js';
 
-// Default placeholder images
-const DEFAULT_PLACEHOLDERS = {
-  image: 'https://storage.googleapis.com/etoile-yachts.firebasestorage.app/placeholders/yacht-placeholder.jpg',
-  video: 'https://storage.googleapis.com/etoile-yachts.firebasestorage.app/placeholders/video-placeholder.mp4',
-  avatar: 'https://storage.googleapis.com/etoile-yachts.firebasestorage.app/placeholders/avatar-placeholder.png',
-  thumbnail: 'https://storage.googleapis.com/etoile-yachts.firebasestorage.app/placeholders/thumbnail-placeholder.jpg',
-  yacht: 'https://storage.googleapis.com/etoile-yachts.firebasestorage.app/placeholders/yacht-placeholder.jpg',
-  addon: 'https://storage.googleapis.com/etoile-yachts.firebasestorage.app/placeholders/addon-placeholder.jpg',
+// Mock documents for a test collection
+const TEST_COLLECTION_DOCS = [
+  {
+    id: 'doc-1',
+    data: {
+      title: 'Yacht 1',
+      description: 'Luxury yacht experience',
+      mainImage: 'blob:https://etoile-yachts.replit.app/yacht1-main',
+      media: [
+        { type: 'image', url: 'blob:https://etoile-yachts.replit.app/yacht1-media1' },
+        { type: 'image', url: 'https://storage.googleapis.com/valid-yacht-image.jpg' },
+        { type: 'video', url: 'https://storage.googleapis.com/valid-yacht-video.mp4' }
+      ]
+    }
+  },
+  {
+    id: 'doc-2',
+    data: {
+      title: 'Yacht 2',
+      description: 'Premium yacht experience',
+      mainImage: 'https://storage.googleapis.com/valid-yacht2-image.jpg',
+      media: [
+        { type: 'image', url: 'blob:https://etoile-yachts.replit.app/yacht2-media1' },
+        { type: 'image', url: 'blob:https://etoile-yachts.replit.app/yacht2-media2' }
+      ]
+    }
+  },
+  {
+    id: 'doc-3',
+    data: {
+      title: 'Yacht 3',
+      description: 'Economy yacht experience',
+      mainImage: 'blob://yacht3-invalid-blob',
+      media: [
+        { type: 'image', url: 'blob://yacht3-media1-invalid' },
+        { type: 'image', url: '/relative/path/yacht3-image.jpg' }
+      ]
+    }
+  }
+];
+
+// Create a mock Firestore implementation
+const createMockFirestore = () => {
+  const collections = new Map();
+  
+  // Add test collection
+  collections.set('test_collection', {
+    docs: TEST_COLLECTION_DOCS.map(doc => ({
+      id: doc.id,
+      data: () => ({ ...doc.data }),
+      ref: {
+        update: async (newData) => {
+          console.log(`Mocked update for document ${doc.id}`);
+          return Promise.resolve();
+        }
+      }
+    }))
+  });
+  
+  return {
+    collection: (name) => {
+      if (!collections.has(name)) {
+        console.warn(`Collection "${name}" does not exist in mock Firestore`);
+        return { get: () => Promise.resolve({ docs: [] }) };
+      }
+      
+      return {
+        get: () => Promise.resolve({
+          docs: collections.get(name).docs,
+          forEach: (callback) => collections.get(name).docs.forEach(callback)
+        })
+      };
+    }
+  };
 };
 
-/**
- * Initialize Firebase Admin
- */
-function initializeFirebase() {
-  if (getApps().length === 0) {
-    try {
-      // Initialize with project ID only
-      const projectId = process.env.VITE_FIREBASE_PROJECT_ID || 'etoile-yachts';
-      console.log(`Initializing Firebase Admin with project ID: ${projectId}`);
-      
-      const app = initializeApp({ projectId });
-      return getFirestore(app);
-    } catch (error) {
-      console.error('Error initializing Firebase Admin:', error);
-      throw error;
-    }
-  } else {
-    return getFirestore();
-  }
-}
-
-/**
- * Get the appropriate placeholder for a blob URL based on context
- */
-function getPlaceholderForContext(fieldPath) {
-  const lowerPath = fieldPath.toLowerCase();
+// Run tests
+async function runTests() {
+  console.log('===== COLLECTION BLOB URL RESOLVER TEST =====\n');
   
-  if (lowerPath.includes('profile') || lowerPath.includes('avatar')) {
-    return DEFAULT_PLACEHOLDERS.avatar;
-  } else if (lowerPath.includes('thumbnail')) {
-    return DEFAULT_PLACEHOLDERS.thumbnail;
-  } else if (lowerPath.includes('video')) {
-    return DEFAULT_PLACEHOLDERS.video;
-  } else if (lowerPath.includes('yacht')) {
-    return DEFAULT_PLACEHOLDERS.yacht;
-  } else if (lowerPath.includes('addon')) {
-    return DEFAULT_PLACEHOLDERS.addon;
-  }
+  // Get collection name from command line args or use default
+  const collectionName = process.argv[2] || 'test_collection';
+  console.log(`Testing collection: ${collectionName}`);
   
-  // Default to generic image placeholder
-  return DEFAULT_PLACEHOLDERS.image;
-}
-
-/**
- * Scan a Firestore document for blob URLs
- */
-function scanForBlobUrls(data, path = '', results = []) {
-  if (!data || typeof data !== 'object') {
-    return results;
-  }
+  // Create mock Firestore
+  const mockFirestore = createMockFirestore();
   
-  if (Array.isArray(data)) {
-    // Handle arrays
-    data.forEach((item, index) => {
-      if (typeof item === 'string' && item.startsWith('blob:')) {
-        results.push({
-          path: path ? `${path}.[${index}]` : `[${index}]`,
-          value: item
-        });
-      } else if (typeof item === 'object' && item !== null) {
-        scanForBlobUrls(item, path ? `${path}.[${index}]` : `[${index}]`, results);
-      }
-    });
-  } else {
-    // Handle objects
-    Object.entries(data).forEach(([key, value]) => {
-      const currentPath = path ? `${path}.${key}` : key;
-      
-      if (typeof value === 'string' && value.startsWith('blob:')) {
-        results.push({
-          path: currentPath,
-          value: value
-        });
-      } else if (typeof value === 'object' && value !== null) {
-        scanForBlobUrls(value, currentPath, results);
-      }
-    });
-  }
-  
-  return results;
-}
-
-/**
- * Test resolving blob URLs in a single collection
- */
-async function testSingleCollection(collectionName) {
-  console.log(`=== Testing Blob URL Resolution for Collection: ${collectionName} ===`);
-  
-  const firestore = initializeFirebase();
-  
-  try {
-    const snapshot = await firestore.collection(collectionName).get();
-    console.log(`Retrieved ${snapshot.size} documents from collection ${collectionName}`);
-    
-    // Count of found blob URLs
-    let foundCount = 0;
-    
-    // Process each document
-    for (const doc of snapshot.docs) {
-      const data = doc.data();
-      const blobUrls = scanForBlobUrls(data);
-      
-      if (blobUrls.length > 0) {
-        foundCount += blobUrls.length;
-        console.log(`\nFound ${blobUrls.length} blob URLs in document ${doc.id}:`);
+  // Print the test documents
+  console.log('\nTest Documents:');
+  mockFirestore.collection(collectionName).get()
+    .then(snapshot => {
+      snapshot.docs.forEach(doc => {
+        console.log(`- Document ${doc.id}:`);
+        console.log(`  Main Image: ${doc.data().mainImage}`);
+        console.log(`  Media Count: ${doc.data().media?.length || 0}`);
         
-        blobUrls.forEach(({ path, value }) => {
-          const placeholder = getPlaceholderForContext(path);
-          console.log(`  - Path: ${path}`);
-          console.log(`    URL: ${value}`);
-          console.log(`    Replacement: ${placeholder}`);
+        // Count blob URLs
+        let blobCount = 0;
+        if (isBlobUrl(doc.data().mainImage)) blobCount++;
+        doc.data().media?.forEach(item => {
+          if (isBlobUrl(item.url)) blobCount++;
         });
-      }
+        
+        console.log(`  Blob URLs: ${blobCount}`);
+      });
+    });
+  
+  // Process the collection
+  console.log('\nProcessing collection...');
+  try {
+    const result = await resolveBlobUrlsInCollection(mockFirestore, collectionName);
+    
+    console.log('\nResults:');
+    console.log(`- Success: ${result.success}`);
+    console.log(`- Documents Processed: ${result.stats.processed}`);
+    console.log(`- Documents Updated: ${result.stats.updated}`);
+    console.log(`- Documents Skipped: ${result.stats.skipped}`);
+    console.log(`- Errors: ${result.stats.errors}`);
+    console.log(`- Total URLs Resolved: ${result.resolvedUrls}`);
+    
+    // Additional details if available
+    if (result.details) {
+      console.log('\nDetails:');
+      result.details.forEach(detail => {
+        console.log(`- ${detail}`);
+      });
     }
     
-    if (foundCount === 0) {
-      console.log(`\nNo blob URLs found in collection ${collectionName}`);
-    } else {
-      console.log(`\nFound ${foundCount} total blob URLs in collection ${collectionName}`);
-    }
-    
-    console.log('=== Test Complete ===');
   } catch (error) {
-    console.error(`Error testing collection ${collectionName}:`, error);
+    console.error('Error processing collection:', error);
   }
+  
+  console.log('\n===== TEST COMPLETED =====');
 }
 
-// Run the test
-const targetCollection = process.argv[2] || 'products_add_ons';
-testSingleCollection(targetCollection);
+// Execute tests
+runTests().catch(error => {
+  console.error('Test failed:', error);
+});

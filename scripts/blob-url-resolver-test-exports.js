@@ -2,11 +2,11 @@
  * Blob URL Resolver Test Exports
  * 
  * This file exports utility functions from the blob URL resolver module
- * in CommonJS format for use in Jest tests.
+ * in ES Module format for use in Jest tests.
  */
 
 // Default placeholder images to use when replacing blob URLs
-const PLACEHOLDER_IMAGES = {
+export const PLACEHOLDER_IMAGES = {
   default: '/assets/images/yacht-placeholder.jpg',
   yacht: '/assets/images/yacht-placeholder.jpg',
   profile: '/assets/images/profile-placeholder.jpg',
@@ -19,7 +19,7 @@ const PLACEHOLDER_IMAGES = {
  * @param {string} url The URL to check
  * @returns {boolean} True if the URL is a blob URL, false otherwise
  */
-function isBlobUrl(url) {
+export function isBlobUrl(url) {
   if (!url) return false;
   return url.startsWith('blob:') || url.startsWith('blob://');
 }
@@ -31,7 +31,7 @@ function isBlobUrl(url) {
  * @param {string} type Optional type to determine which placeholder to use
  * @returns {string} The original URL if it's not a blob URL, or a placeholder URL if it is
  */
-function replaceBlobUrl(url, type = 'default') {
+export function replaceBlobUrl(url, type = 'default') {
   if (!isBlobUrl(url)) return url;
   return PLACEHOLDER_IMAGES[type] || PLACEHOLDER_IMAGES.default;
 }
@@ -43,7 +43,7 @@ function replaceBlobUrl(url, type = 'default') {
  * @param {Set} visited Set of already visited objects to prevent circular references
  * @returns {number} The number of blob URLs replaced
  */
-function replaceBlobUrlsInObject(obj, visited = new Set()) {
+export function replaceBlobUrlsInObject(obj, visited = new Set()) {
   if (!obj || typeof obj !== 'object' || visited.has(obj)) return 0;
   visited.add(obj);
   
@@ -90,7 +90,7 @@ function replaceBlobUrlsInObject(obj, visited = new Set()) {
  * @param {object} doc The document to process
  * @returns {Promise<object>} Promise resolving to the processed document
  */
-async function resolveBlobUrlsInDocument(doc) {
+export async function resolveBlobUrlsInDocument(doc) {
   // Clone the document data to avoid modifying the original
   const clonedData = JSON.parse(JSON.stringify(doc.data));
   
@@ -119,7 +119,7 @@ async function resolveBlobUrlsInDocument(doc) {
  * @param {string} collectionPath Path to the collection
  * @returns {Promise<object>} Promise resolving to the results of the operation
  */
-async function resolveBlobUrlsInCollection(firestore, collectionPath) {
+export async function resolveBlobUrlsInCollection(firestore, collectionPath) {
   // In a real implementation, this would query documents and update them
   // For testing purposes, we return a success result
   return {
@@ -133,13 +133,3 @@ async function resolveBlobUrlsInCollection(firestore, collectionPath) {
     resolvedUrls: 3
   };
 }
-
-// Export for CommonJS
-module.exports = {
-  PLACEHOLDER_IMAGES,
-  isBlobUrl,
-  replaceBlobUrl,
-  replaceBlobUrlsInObject,
-  resolveBlobUrlsInDocument,
-  resolveBlobUrlsInCollection
-};
