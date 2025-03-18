@@ -1,18 +1,20 @@
-import { ReactNode } from 'react';
-import { Link, useLocation } from 'wouter';
+import React from 'react';
+import { Link } from 'wouter';
+import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
-import { Button } from '@/components/ui/button';
+
 import {
-  BarChartIcon,
-  ImageIcon,
   LayoutDashboardIcon,
   UsersIcon,
+  ImageIcon,
+  BarChartIcon,
   AlertTriangleIcon,
   SettingsIcon,
   HomeIcon,
   LogOutIcon,
 } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu,
@@ -22,9 +24,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface AdminLayoutProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
