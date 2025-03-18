@@ -4,7 +4,7 @@
  * This file contains tests for the blob URL resolution functionality.
  */
 
-const { scanForBlobUrls, setNestedValue, getPlaceholderForContext } = require('../scripts/blob-url-resolver-test-exports');
+import { scanForBlobUrls, setNestedValue, getPlaceholderForContext } from '../scripts/blob-url-resolver-test-exports';
 
 // Test suite for scanForBlobUrls function
 describe('scanForBlobUrls', () => {
