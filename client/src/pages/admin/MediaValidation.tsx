@@ -36,8 +36,8 @@ const MediaValidationPage: React.FC = () => {
     );
   }
   
-  // If user is not an admin
-  if (!isAdmin && user.role !== 'producer') {
+  // If user is not authorized 
+  if (!(isAdmin || user.role === 'producer')) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card>

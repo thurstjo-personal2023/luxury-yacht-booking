@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { CheckCircle, AlertTriangle, Image, Database, FileText, Settings } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, userRole } = useAuth();
   const { toast } = useToast();
   
   // If user is not logged in
@@ -37,8 +37,8 @@ const AdminDashboard: React.FC = () => {
     );
   }
   
-  // If user is not an admin
-  if (!isAdmin && user.role !== 'producer') {
+  // If user is not authorized
+  if (!(isAdmin || user.role === 'producer')) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card>

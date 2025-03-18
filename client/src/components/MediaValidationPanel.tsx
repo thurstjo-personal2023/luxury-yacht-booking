@@ -70,10 +70,10 @@ const MediaValidationPanel: React.FC = () => {
   const [selectedReport, setSelectedReport] = useState<ValidationReport | RepairReport | null>(null);
   
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   
-  // Check if user is admin or producer role
-  const isAuthorized = user && (user.role === 'producer' || user.role === 'admin');
+  // Check if user is authorized to access admin tools
+  const isAuthorized = isAdmin || (user && user.role === 'producer');
   
   // Fetch initial reports on component mount
   useEffect(() => {
