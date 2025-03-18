@@ -31,15 +31,21 @@ interface ValidationReport {
   id: string;
   timestamp: string;
   createdAt: { seconds: number; nanoseconds: number };
-  errors: ValidationError[];
+  // Fields from server response
+  invalid?: ValidationError[];  // Server uses 'invalid' instead of 'errors'
+  errors?: ValidationError[];   // For backward compatibility
   stats: {
-    totalChecked: number;
+    totalChecked?: number;
+    totalUrls?: number;         // Server uses this
     invalidUrls: number;
-    totalCollections: number;
-    imageCount: number;
-    videoCount: number;
-    byCollection: Record<string, number>;
-    errorTypes: Record<string, number>;
+    totalCollections?: number;
+    totalDocuments?: number;    // Server uses this
+    imageCount?: number;
+    videoCount?: number;
+    imageStats?: { total: number; valid: number; invalid: number };
+    videoStats?: { total: number; valid: number; invalid: number };
+    byCollection: Record<string, any>;
+    errorTypes?: Record<string, number>;
   };
 }
 
@@ -202,7 +208,9 @@ export function MediaValidationReports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {latestReport.errors.slice(0, 5).map((error, index) => (
+                    {/* Use either errors or invalid array based on which one exists */}
+                    {/* Map validation errors, using either "errors" or "invalid" field */}
+                    {(latestReport.errors || latestReport.invalid || []).slice(0, 5).map((error, index) => (
                       <TableRow key={index}>
                         <TableCell>{error.collection}</TableCell>
                         <TableCell className="font-mono text-xs">{error.docId.substring(0, 12)}...</TableCell>
@@ -236,13 +244,17 @@ export function MediaValidationReports() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {latestReport.errors.length > 5 && (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground">
-                          ...and {latestReport.errors.length - 5} more issues
-                        </TableCell>
-                      </TableRow>
-                    )}
+                    {/* Show count of additional errors */}
+                    {(() => {
+                      const errorList = latestReport.errors || latestReport.invalid || [];
+                      return errorList.length > 5 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                            ...and {errorList.length - 5} more issues
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })()}
                   </TableBody>
                 </Table>
                 
