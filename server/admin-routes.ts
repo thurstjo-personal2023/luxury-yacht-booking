@@ -260,8 +260,9 @@ export function registerAdminRoutes(app: Express) {
     try {
       console.log(`[${new Date().toISOString()}] Starting blob URL resolution via admin API...`);
       
-      // Import the resolve function dynamically
-      const { resolveAllBlobUrls } = await import('../scripts/resolve-blob-urls');
+      // Import the resolve function from our ES module
+      // Using the new blob-url-resolver.mjs module which properly handles Firebase Admin initialization
+      const { resolveAllBlobUrls } = await import('../scripts/blob-url-resolver.mjs');
       
       // Run resolution operation with improved logging
       console.log(`[${new Date().toISOString()}] Executing resolveAllBlobUrls function...`);
@@ -278,7 +279,8 @@ export function registerAdminRoutes(app: Express) {
       console.error(`[${new Date().toISOString()}] Error resolving blob URLs:`, errorMessage);
       res.status(500).json({ 
         error: 'Failed to resolve blob URLs', 
-        details: errorMessage 
+        details: errorMessage,
+        stack: error.stack // Include stack trace for debugging
       });
     }
   });
@@ -288,9 +290,10 @@ export function registerAdminRoutes(app: Express) {
    */
   app.get('/api/admin/blob-url-reports', verifyAdminAuth, async (req: Request, res: Response) => {
     try {
-      // Get the reports from Firestore, sorted by createdAt
-      const reportsSnapshot = await adminDb.collection('blob_url_resolution_reports')
-        .orderBy('createdAt', 'desc')
+      // Get the reports from Firestore, sorted by timestamp
+      // Updated to use the correct collection name that matches our implementation
+      const reportsSnapshot = await adminDb.collection('blob_url_reports')
+        .orderBy('timestamp', 'desc')
         .limit(10)
         .get();
       
