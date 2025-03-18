@@ -6,7 +6,8 @@ import { InfoIcon } from 'lucide-react';
 import MediaValidationReports from '@/components/admin/MediaValidationReports';
 import BrokenUrlRepair from '@/components/admin/BrokenUrlRepair';
 import BlobUrlResolution from '@/components/admin/BlobUrlResolution';
-import AdminLayout from '@/components/layouts/AdminLayout';
+// Import directly using relative path to fix TypeScript module resolution
+import AdminLayout from '../../components/layouts/AdminLayout';
 import { useAuth } from '@/hooks/use-auth';
 import { useLocation } from 'wouter';
 
