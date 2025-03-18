@@ -26,14 +26,18 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock for IntersectionObserver
-global.IntersectionObserver = class IntersectionObserver {
-  constructor(callback) {
-    this.callback = callback;
-  }
+global.IntersectionObserver = class MockIntersectionObserver {
+  root: Element | null = null;
+  rootMargin: string = '0px';
+  thresholds: ReadonlyArray<number> = [0];
+  
+  constructor(private callback: IntersectionObserverCallback) {}
+  
   observe() {}
   unobserve() {}
   disconnect() {}
-};
+  takeRecords(): IntersectionObserverEntry[] { return []; }
+} as unknown as typeof IntersectionObserver;
 
 // Web Storage API Mock
 const localStorageMock = (() => {
