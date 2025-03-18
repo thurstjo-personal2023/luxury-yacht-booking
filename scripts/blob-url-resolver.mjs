@@ -223,15 +223,74 @@ async function processCollection(db, collectionName, operationId) {
 }
 
 /**
+ * Transform the report into the format expected by the client
+ */
+function transformReportForClient(report) {
+  // Create resolved URLs array from replacements data
+  const resolvedUrls = [];
+  
+  // Iterate through each collection result
+  report.collectionResults.forEach(colResult => {
+    if (colResult.replacements && colResult.replacements.length > 0) {
+      // Process each replacement in the collection
+      colResult.replacements.forEach(replacement => {
+        const documentId = replacement.documentId;
+        
+        // Process each individual URL replacement
+        if (replacement.replacements && replacement.replacements.length > 0) {
+          replacement.replacements.forEach(rep => {
+            resolvedUrls.push({
+              docId: documentId,
+              collection: colResult.collectionName,
+              field: rep.path,
+              oldUrl: rep.from,
+              newUrl: rep.to,
+              timestamp: new Date().toISOString()
+            });
+          });
+        }
+      });
+    }
+  });
+  
+  // Create the client-compatible report
+  return {
+    operationId: report.operationId,
+    reportId: report.reportId,
+    timestamp: new Date().toISOString(),
+    createdAt: Timestamp.now(),
+    resolvedUrls: resolvedUrls,
+    collectionStats: report.collectionResults.reduce((stats, col) => {
+      stats[col.collectionName] = col.blobUrlsReplaced;
+      return stats;
+    }, {}),
+    totalIdentified: report.totalBlobUrlsFound,
+    totalResolved: report.totalBlobUrlsReplaced,
+    stats: {
+      imageCount: resolvedUrls.filter(url => !url.oldUrl.includes('video')).length,
+      videoCount: resolvedUrls.filter(url => url.oldUrl.includes('video')).length
+    },
+    success: report.success,
+    errors: report.errors
+  };
+}
+
+/**
  * Save blob URL resolution report to Firestore
  */
 async function saveReport(db, report) {
   try {
     const reportId = uuidv4();
-    await db.collection(REPORTS_COLLECTION).doc(reportId).set({
+    
+    // Transform the report for client consumption
+    const clientReport = transformReportForClient({
       ...report,
-      timestamp: Timestamp.now()
+      reportId
     });
+    
+    // Save the client-compatible report
+    await db.collection(REPORTS_COLLECTION).doc(reportId).set(clientReport);
+    
     console.log(`[${new Date().toISOString()}] Saved blob URL resolution report with ID: ${reportId}`);
     return reportId;
   } catch (error) {

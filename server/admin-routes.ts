@@ -297,11 +297,31 @@ export function registerAdminRoutes(app: Express) {
         .limit(10)
         .get();
       
-      // Map to array of reports
-      const reports = reportsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      // Map to array of reports with expected structure
+      const reports = reportsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        
+        // Ensure reports have the expected structure for the client
+        // If resolvedUrls is missing, provide an empty array
+        if (!data.resolvedUrls) {
+          console.log(`Adding missing resolvedUrls array to report ${doc.id}`);
+          data.resolvedUrls = [];
+        }
+        
+        // If totalIdentified or totalResolved is missing, use appropriate values
+        if (data.totalIdentified === undefined) {
+          data.totalIdentified = data.totalBlobUrlsFound || 0;
+        }
+        
+        if (data.totalResolved === undefined) {
+          data.totalResolved = data.totalBlobUrlsReplaced || 0;
+        }
+        
+        return {
+          id: doc.id,
+          ...data
+        };
+      });
       
       // Return the reports
       res.json({ reports });
