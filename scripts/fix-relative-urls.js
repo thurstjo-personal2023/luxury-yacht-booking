@@ -19,7 +19,7 @@ const db = admin.firestore();
 const COLLECTIONS_TO_SCAN = [
   'unified_yacht_experiences',
   'yacht_profiles',
-  'products_add-ons',
+  'products_add_ons',
   'articles_and_guides',
   'event_announcements',
   'test_media_validation' // Our test collection

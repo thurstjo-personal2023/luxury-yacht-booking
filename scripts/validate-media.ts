@@ -93,7 +93,7 @@ function extractMediaUrls(collection: string, data: any): { url: string; field: 
                 // If type is not specified, try to infer from URL
                 const url = mediaItem.url.toLowerCase();
                 if (url.endsWith('.mp4') || url.endsWith('.mov') || url.endsWith('.webm') || 
-                    url.endsWith('.avi') || url.includes('video')) {
+                    url.endsWith('.avi') || url.includes('video') || url.includes('.mp4')) {
                   mediaType = 'video';
                 } else if (url.endsWith('.jpg') || url.endsWith('.jpeg') || url.endsWith('.png') || 
                           url.endsWith('.gif') || url.endsWith('.webp') || url.includes('image')) {
@@ -233,9 +233,20 @@ async function testMediaUrl(
     return;
   }
   
+  // Handle relative URLs
+  let resolvedUrl = url;
+  const isRelative = url.startsWith('/') && !url.startsWith('//');
+  
+  if (isRelative) {
+    // Convert relative URL to absolute URL using the BASE_URL
+    const BASE_URL = process.env.BASE_URL || 'https://etoile-yachts.replit.app';
+    resolvedUrl = `${BASE_URL}${url}`;
+    console.log(`Resolving relative URL: ${url} -> ${resolvedUrl}`);
+  }
+  
   try {
     // Test if the URL is valid by making a HEAD request
-    const response = await fetch(url, { method: 'HEAD' });
+    const response = await fetch(resolvedUrl, { method: 'HEAD' });
     
     if (response.ok) {
       const contentType = response.headers.get('content-type') || '';
