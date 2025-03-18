@@ -118,6 +118,12 @@ export function ImageValidationReports() {
   // Get the latest report
   const latestReport = reports?.[0];
   
+  // Safely access report properties
+  const hasInvalidImages: boolean = Boolean(latestReport?.sampleIssues?.invalid?.length);
+  const hasMissingImages: boolean = Boolean(latestReport?.sampleIssues?.missing?.length);
+  const invalidImages: any[] = latestReport?.sampleIssues?.invalid || [];
+  const missingImages: any[] = latestReport?.sampleIssues?.missing || [];
+  
   return (
     <Card className="w-full">
       <CardHeader>
@@ -286,14 +292,14 @@ export function ImageValidationReports() {
             
             <TabsContent value="issues">
               <div className="space-y-6">
-                {latestReport.sampleIssues.invalid.length > 0 ? (
+                {hasInvalidImages ? (
                   <div>
                     <h3 className="text-lg font-semibold mb-3 flex items-center">
                       <AlertTriangleIcon className="h-4 w-4 mr-2 text-red-500" />
                       Invalid Images
                     </h3>
                     <div className="space-y-3">
-                      {latestReport.sampleIssues.invalid.map((issue, index) => (
+                      {invalidImages.map((issue, index) => (
                         <Card key={`invalid-${index}`} className="border-red-200">
                           <CardContent className="p-4">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -325,14 +331,14 @@ export function ImageValidationReports() {
                   </Alert>
                 )}
                 
-                {latestReport.sampleIssues.missing.length > 0 ? (
+                {hasMissingImages ? (
                   <div>
                     <h3 className="text-lg font-semibold mb-3 flex items-center">
                       <InfoIcon className="h-4 w-4 mr-2 text-yellow-500" />
                       Missing Images
                     </h3>
                     <div className="space-y-3">
-                      {latestReport.sampleIssues.missing.map((issue, index) => (
+                      {missingImages.map((issue, index) => (
                         <Card key={`missing-${index}`} className="border-yellow-200">
                           <CardContent className="p-4">
                             <p className="text-sm font-semibold">{issue.collection} / {issue.docId}</p>
