@@ -6,6 +6,7 @@ import { InfoIcon } from 'lucide-react';
 import MediaValidationReports from '@/components/admin/MediaValidationReports';
 import BrokenUrlRepair from '@/components/admin/BrokenUrlRepair';
 import BlobUrlResolution from '@/components/admin/BlobUrlResolution';
+import RelativeUrlFixer from '@/components/admin/RelativeUrlFixer';
 // Import directly using relative path to fix TypeScript module resolution
 import AdminLayout from '../../components/layouts/AdminLayout';
 import { useAuth } from '@/hooks/use-auth';
@@ -55,6 +56,7 @@ export default function MediaManagement() {
             <TabsTrigger value="validation">Media Validation</TabsTrigger>
             <TabsTrigger value="repair">URL Repair</TabsTrigger>
             <TabsTrigger value="blob">Blob Resolution</TabsTrigger>
+            <TabsTrigger value="relative">Relative URLs</TabsTrigger>
           </TabsList>
           
           <TabsContent value="validation" className="space-y-4">
@@ -68,9 +70,13 @@ export default function MediaManagement() {
           <TabsContent value="blob" className="space-y-4">
             <BlobUrlResolution />
           </TabsContent>
+          
+          <TabsContent value="relative" className="space-y-4">
+            <RelativeUrlFixer />
+          </TabsContent>
         </Tabs>
         
-        <div className="mt-8 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-8 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader>
               <CardTitle>Media Type Validation</CardTitle>
@@ -112,6 +118,21 @@ export default function MediaManagement() {
               <p className="text-sm text-muted-foreground">
                 Blob URLs are temporary browser-based references that cannot
                 be accessed across sessions or by other users.
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Relative URL Fixing</CardTitle>
+              <CardDescription>
+                Converts relative URLs to absolute URLs
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Relative URLs (like /images/yacht.jpg) can't be validated externally
+                and must be converted to absolute URLs (https://domain.com/images/yacht.jpg).
               </p>
             </CardContent>
           </Card>

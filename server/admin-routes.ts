@@ -295,4 +295,54 @@ export function registerAdminRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to fetch blob URL resolution reports' });
     }
   });
+  
+  /**
+   * Fix relative URLs in the database
+   * This endpoint will replace relative image/video URLs with absolute URLs
+   */
+  app.post('/api/admin/fix-relative-urls', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      console.log('Starting relative URL fix via admin API...');
+      
+      // Import the fix function dynamically
+      const { fixRelativeUrls } = await import('../scripts/fix-relative-urls');
+      
+      // Run fix operation
+      const report = await fixRelativeUrls();
+      
+      // Return success response with report
+      res.json({
+        success: true,
+        report
+      });
+    } catch (error) {
+      console.error('Error fixing relative URLs:', error);
+      res.status(500).json({ error: 'Failed to fix relative URLs' });
+    }
+  });
+  
+  /**
+   * Get list of relative URL fix reports
+   */
+  app.get('/api/admin/relative-url-reports', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      // Get the reports from Firestore, sorted by createdAt
+      const reportsSnapshot = await adminDb.collection('relative_url_fix_reports')
+        .orderBy('createdAt', 'desc')
+        .limit(10)
+        .get();
+      
+      // Map to array of reports
+      const reports = reportsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Return the reports
+      res.json({ reports });
+    } catch (error) {
+      console.error('Error fetching relative URL fix reports:', error);
+      res.status(500).json({ error: 'Failed to fetch relative URL fix reports' });
+    }
+  });
 }
