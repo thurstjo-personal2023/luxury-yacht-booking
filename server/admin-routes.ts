@@ -187,7 +187,7 @@ export function registerAdminRoutes(app: Express) {
         const data = doc.data();
         
         // Ensure we have a valid report structure that the frontend expects
-        const processedReport = {
+        const processedReport: any = {
           id: doc.id,
           ...data,
         };
@@ -404,7 +404,7 @@ export function registerAdminRoutes(app: Express) {
   app.get('/api/admin/relative-url-reports', verifyAdminAuth, async (req: Request, res: Response) => {
     try {
       // Get the reports from Firestore, sorted by createdAt
-      const reportsSnapshot = await adminDb.collection('relative_url_fix_reports')
+      const reportsSnapshot = await adminDb.collection('relative_url_reports')
         .orderBy('createdAt', 'desc')
         .limit(10)
         .get();
