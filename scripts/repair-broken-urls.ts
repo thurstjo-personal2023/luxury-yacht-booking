@@ -119,8 +119,8 @@ async function findBrokenUrls(): Promise<BrokenUrlDetail[]> {
  */
 async function repairBrokenUrl(
   brokenUrl: BrokenUrlDetail,
-  defaultImageUrl: string = '/yacht-placeholder.jpg',
-  defaultVideoUrl: string = '/video-placeholder.mp4'
+  defaultImageUrl: string = 'https://storage.googleapis.com/etoile-yachts.appspot.com/placeholders/image-placeholder.jpg',
+  defaultVideoUrl: string = 'https://storage.googleapis.com/etoile-yachts.appspot.com/placeholders/video-placeholder.mp4'
 ): Promise<{ success: boolean; newUrl: string }> {
   try {
     const { docId, collection, field, subField, url, mediaType } = brokenUrl;
@@ -158,8 +158,34 @@ async function repairBrokenUrl(
       return { success: false, newUrl: url };
     }
 
+    // Case 1: Handle direct field that contains an array (common in yacht listings)
+    if (field === 'media' && Array.isArray(data.media)) {
+      let updated = false;
+      const updatedMedia = [...data.media];
+      
+      // Check all items in the media array
+      for (let i = 0; i < updatedMedia.length; i++) {
+        // Handle 'url' field in media objects
+        if (updatedMedia[i] && updatedMedia[i].url === url) {
+          updatedMedia[i] = {
+            ...updatedMedia[i],
+            url: placeholderUrl
+          };
+          updated = true;
+        }
+      }
+      
+      if (updated) {
+        await docRef.update({
+          media: updatedMedia,
+          lastUpdated: FieldValue.serverTimestamp()
+        });
+        return { success: true, newUrl: placeholderUrl };
+      }
+    }
+    
+    // Case 2: Handle array fields with subField notation (e.g., media[0].url)
     if (subField && subField.includes('[') && subField.includes(']')) {
-      // Handle array fields (e.g., media[0].url)
       const arrayMatch = subField.match(/\[(\d+)\]/);
       if (arrayMatch && data[field] && Array.isArray(data[field])) {
         const index = parseInt(arrayMatch[1]);
@@ -189,14 +215,78 @@ async function repairBrokenUrl(
           }
         }
       }
-    } else if (data[field] === url) {
-      // Handle direct field (e.g., profilePhoto)
+    } 
+    // Case 3: Handle direct field (e.g., profilePhoto)
+    else if (data[field] === url) {
       await docRef.update({
         [field]: placeholderUrl,
         lastUpdated: FieldValue.serverTimestamp()
       });
       
       return { success: true, newUrl: placeholderUrl };
+    }
+    
+    // Case 4: Handle field path notation (e.g., "media.0.url")
+    if (field.includes('.')) {
+      // Split the field path
+      const fieldParts = field.split('.');
+      
+      // Navigate to the nested field
+      let currentObj: any = data;
+      let parentObj: any = null;
+      let lastKey: string = '';
+      
+      for (let i = 0; i < fieldParts.length; i++) {
+        const part = fieldParts[i];
+        
+        // Handle array index (numeric part)
+        if (!isNaN(parseInt(part)) && Array.isArray(currentObj)) {
+          parentObj = currentObj;
+          currentObj = currentObj[parseInt(part)];
+          lastKey = part; // Keep as string for consistency
+        } 
+        // Handle normal object properties
+        else if (currentObj && typeof currentObj === 'object') {
+          parentObj = currentObj;
+          currentObj = currentObj[part];
+          lastKey = part;
+        } else {
+          // Path doesn't exist
+          break;
+        }
+        
+        // If we've reached the last part and it matches the URL
+        if (i === fieldParts.length - 1 && currentObj === url) {
+          // Create update object with the correct field path
+          if (parentObj && Array.isArray(parentObj)) {
+            // Make a deep copy of the array
+            const updatedArray = JSON.parse(JSON.stringify(parentObj));
+            // Update the specific index
+            updatedArray[lastKey] = placeholderUrl;
+            
+            // Construct the update path for the parent array
+            const parentPath = fieldParts.slice(0, -1).join('.');
+            
+            await docRef.update({
+              [parentPath]: updatedArray,
+              lastUpdated: FieldValue.serverTimestamp()
+            });
+            
+            return { success: true, newUrl: placeholderUrl };
+          } else if (parentObj && typeof parentObj === 'object') {
+            // Update the specific property in the object
+            const updateObj = {};
+            updateObj[field] = placeholderUrl;
+            
+            await docRef.update({
+              ...updateObj,
+              lastUpdated: FieldValue.serverTimestamp()
+            });
+            
+            return { success: true, newUrl: placeholderUrl };
+          }
+        }
+      }
     }
     
     return { success: false, newUrl: url };
