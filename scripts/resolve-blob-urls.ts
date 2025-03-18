@@ -6,12 +6,25 @@
  * These URLs are temporary and don't work outside the user's browser session.
  */
 
-import { firestore } from 'firebase-admin';
-import { initializeFirebaseAdmin } from '../server/firebase-admin';
+import { firestore, getFirestore } from 'firebase-admin';
+import * as admin from 'firebase-admin';
 import { USE_FIREBASE_EMULATORS } from '../server/env-config';
 
-// Initialize Firebase Admin
-const adminDb = initializeFirebaseAdmin();
+// Initialize Firebase Admin if it's not already initialized
+let adminDb: firestore.Firestore;
+if (!admin.apps.length) {
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
+    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
+    : undefined;
+
+  admin.initializeApp({
+    credential: serviceAccount
+      ? admin.credential.cert(serviceAccount)
+      : admin.credential.applicationDefault(),
+  });
+}
+
+adminDb = getFirestore();
 
 // Media type specific placeholders
 const IMAGE_PLACEHOLDER_URL = 'https://storage.googleapis.com/etoile-yachts.appspot.com/placeholders/image-placeholder.jpg';
@@ -33,8 +46,8 @@ const COLLECTIONS_TO_SCAN = [
 /**
  * Check if a URL is a blob URL
  */
-function isBlobUrl(url: string): boolean {
-  return url && typeof url === 'string' && url.startsWith('blob:');
+function isBlobUrl(url: unknown): boolean {
+  return !!url && typeof url === 'string' && url.startsWith('blob:');
 }
 
 /**
