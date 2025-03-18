@@ -61,9 +61,11 @@ const MediaValidationPanel: React.FC = () => {
   const [isValidating, setIsValidating] = useState(false);
   const [isRepairing, setIsRepairing] = useState(false);
   const [isResolvingBlobs, setIsResolvingBlobs] = useState(false);
+  const [isFixingMediaIssues, setIsFixingMediaIssues] = useState(false);
   const [validationReports, setValidationReports] = useState<ValidationReport[]>([]);
   const [repairReports, setRepairReports] = useState<RepairReport[]>([]);
   const [blobReports, setBlobReports] = useState<RepairReport[]>([]);
+  const [mediaIssuesReports, setMediaIssuesReports] = useState<any[]>([]);
   const [validationProgress, setValidationProgress] = useState(0);
   const [activeTab, setActiveTab] = useState('validation');
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
