@@ -202,22 +202,28 @@ export function registerAdminRoutes(app: Express) {
    */
   app.post('/api/admin/repair-broken-urls', verifyAdminAuth, async (req: Request, res: Response) => {
     try {
-      console.log('Starting broken URL repair via admin API...');
+      console.log(`[${new Date().toISOString()}] Starting broken URL repair via admin API...`);
       
       // Import the repair function dynamically
       const { repairAllBrokenUrls } = await import('../scripts/repair-broken-urls');
       
-      // Run repair operation
+      // Run repair operation with improved logging
+      console.log(`[${new Date().toISOString()}] Executing repairAllBrokenUrls function...`);
       const report = await repairAllBrokenUrls();
+      console.log(`[${new Date().toISOString()}] Broken URL repair operation completed successfully`);
       
       // Return success response with report
       res.json({
         success: true,
         report
       });
-    } catch (error) {
-      console.error('Error repairing broken URLs:', error);
-      res.status(500).json({ error: 'Failed to repair broken URLs' });
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[${new Date().toISOString()}] Error repairing broken URLs:`, errorMessage);
+      res.status(500).json({ 
+        error: 'Failed to repair broken URLs', 
+        details: errorMessage 
+      });
     }
   });
 
@@ -252,22 +258,28 @@ export function registerAdminRoutes(app: Express) {
    */
   app.post('/api/admin/resolve-blob-urls', verifyAdminAuth, async (req: Request, res: Response) => {
     try {
-      console.log('Starting blob URL resolution via admin API...');
+      console.log(`[${new Date().toISOString()}] Starting blob URL resolution via admin API...`);
       
       // Import the resolve function dynamically
       const { resolveAllBlobUrls } = await import('../scripts/resolve-blob-urls');
       
-      // Run resolution operation
+      // Run resolution operation with improved logging
+      console.log(`[${new Date().toISOString()}] Executing resolveAllBlobUrls function...`);
       const report = await resolveAllBlobUrls();
+      console.log(`[${new Date().toISOString()}] Blob URL resolution operation completed successfully`);
       
       // Return success response with report
       res.json({
         success: true,
         report
       });
-    } catch (error) {
-      console.error('Error resolving blob URLs:', error);
-      res.status(500).json({ error: 'Failed to resolve blob URLs' });
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[${new Date().toISOString()}] Error resolving blob URLs:`, errorMessage);
+      res.status(500).json({ 
+        error: 'Failed to resolve blob URLs', 
+        details: errorMessage 
+      });
     }
   });
 
