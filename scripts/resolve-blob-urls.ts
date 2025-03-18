@@ -66,10 +66,16 @@ function isBlobUrl(url: unknown): boolean {
   if (!url || typeof url !== 'string') return false;
   
   // Check for blob protocol with more strict validation
-  return url.startsWith('blob:') && (
-    url.includes('://') || // Contains protocol separator
-    url.length > 10 // At least some content after 'blob:'
-  );
+  const isBlobProtocol = url.startsWith('blob:');
+  const hasProtocolSeparator = url.includes('://');
+  const hasMinimumLength = url.length > 10; // At least some content after 'blob:'
+  
+  // Special case for the pattern we saw in the validation logs
+  const isJanewayBlobPattern = url.includes('blob:https://') && 
+    (url.includes('.janeway.replit.dev/') || url.includes('.janeway.re/'));
+  
+  return (isBlobProtocol && (hasProtocolSeparator || hasMinimumLength)) || 
+         isJanewayBlobPattern;
 }
 
 /**
@@ -116,28 +122,55 @@ async function processDocument(
     // Handle arrays
     if (Array.isArray(obj)) {
       obj.forEach((item, index) => {
-        if (typeof item === 'string' && isBlobUrl(item)) {
-          const fullPath = [...path, index.toString()].join('.');
-          const replacementUrl = getReplacementUrl(fullPath);
-          
-          // Record the replacement
-          reportData.resolvedUrls.push({
-            docId,
-            collection: collectionName,
-            field: path.join('.'),
-            arrayIndex: index,
-            oldUrl: item,
-            newUrl: replacementUrl,
-            timestamp
-          });
-          
-          // Update the object
-          obj[index] = replacementUrl;
-          hasChanges = true;
-          
-          // Update collection stats
-          reportData.collectionStats[collectionName] = (reportData.collectionStats[collectionName] || 0) + 1;
+        if (typeof item === 'string') {
+          // Check for blob URLs, including special Janeway pattern
+          if (isBlobUrl(item)) {
+            const fullPath = [...path, index.toString()].join('.');
+            const replacementUrl = getReplacementUrl(fullPath);
+            
+            // Record the replacement
+            reportData.resolvedUrls.push({
+              docId,
+              collection: collectionName,
+              field: path.join('.'),
+              arrayIndex: index,
+              oldUrl: item,
+              newUrl: replacementUrl,
+              timestamp
+            });
+            
+            // Update the object
+            obj[index] = replacementUrl;
+            hasChanges = true;
+            
+            // Update collection stats
+            reportData.collectionStats[collectionName] = (reportData.collectionStats[collectionName] || 0) + 1;
+          }
         } else if (typeof item === 'object' && item !== null) {
+          // Special handling for media objects with URL property
+          if (item.url && typeof item.url === 'string' && isBlobUrl(item.url)) {
+            const urlPath = [...path, index.toString(), 'url'].join('.');
+            const replacementUrl = getReplacementUrl(urlPath);
+            
+            // Record the replacement
+            reportData.resolvedUrls.push({
+              docId,
+              collection: collectionName,
+              field: [...path, index.toString(), 'url'].join('.'),
+              oldUrl: item.url,
+              newUrl: replacementUrl,
+              timestamp
+            });
+            
+            // Update the object
+            item.url = replacementUrl;
+            hasChanges = true;
+            
+            // Update collection stats
+            reportData.collectionStats[collectionName] = (reportData.collectionStats[collectionName] || 0) + 1;
+          }
+          
+          // Continue scanning nested objects
           scanObject(item, [...path, index.toString()]);
         }
       });
@@ -148,29 +181,35 @@ async function processDocument(
     for (const [key, value] of Object.entries(obj)) {
       const currentPath = [...path, key];
       
-      if (typeof value === 'string' && isBlobUrl(value)) {
-        const fullPath = currentPath.join('.');
-        const replacementUrl = getReplacementUrl(fullPath);
-        
-        // Create dot notation path for Firestore update
-        const updatePath = fullPath;
-        updates[updatePath] = replacementUrl;
-        
-        // Record the replacement
-        reportData.resolvedUrls.push({
-          docId,
-          collection: collectionName,
-          field: currentPath.join('.'),
-          oldUrl: value,
-          newUrl: replacementUrl,
-          timestamp
-        });
-        
-        hasChanges = true;
-        
-        // Update collection stats
-        reportData.collectionStats[collectionName] = (reportData.collectionStats[collectionName] || 0) + 1;
+      if (typeof value === 'string') {
+        if (isBlobUrl(value)) {
+          const fullPath = currentPath.join('.');
+          const replacementUrl = getReplacementUrl(fullPath);
+          
+          // Create dot notation path for Firestore update
+          const updatePath = fullPath;
+          updates[updatePath] = replacementUrl;
+          
+          // Record the replacement
+          reportData.resolvedUrls.push({
+            docId,
+            collection: collectionName,
+            field: fullPath,
+            oldUrl: value,
+            newUrl: replacementUrl,
+            timestamp
+          });
+          
+          // Also update the original object for consistency
+          obj[key] = replacementUrl;
+          
+          hasChanges = true;
+          
+          // Update collection stats
+          reportData.collectionStats[collectionName] = (reportData.collectionStats[collectionName] || 0) + 1;
+        }
       } else if (typeof value === 'object' && value !== null) {
+        // Continue scanning nested objects
         scanObject(value, currentPath);
       }
     }
