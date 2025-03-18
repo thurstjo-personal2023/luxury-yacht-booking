@@ -12,6 +12,7 @@ import { adminDb } from '../server/firebase-admin';
 
 // Base URL for converting relative URLs to absolute
 const BASE_URL = 'https://etoile-yachts.app'; // Default production URL
+const STORAGE_URL = 'https://storage.googleapis.com/etoile-yachts.appspot.com/placeholders'; // Firebase Storage URL for placeholders
 
 // Configuration
 const MAX_BATCH_SIZE = 500; // Maximum number of operations in a batch
@@ -86,6 +87,15 @@ function isAbsoluteUrl(url: string): boolean {
 function toAbsoluteUrl(relativeUrl: string): string {
   if (typeof relativeUrl !== 'string' || !relativeUrl.trim() || isAbsoluteUrl(relativeUrl)) {
     return relativeUrl; // Don't modify if already absolute or empty
+  }
+  
+  // Special handling for placeholder images and videos
+  if (relativeUrl === '/yacht-placeholder.jpg' || relativeUrl.includes('placeholder')) {
+    return `${STORAGE_URL}/image-placeholder.jpg`;
+  }
+  
+  if (relativeUrl === '/video-placeholder.mp4' || (relativeUrl.includes('placeholder') && relativeUrl.endsWith('.mp4'))) {
+    return `${STORAGE_URL}/video-placeholder.mp4`;
   }
   
   // Handle paths with or without leading slash
