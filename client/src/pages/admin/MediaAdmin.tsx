@@ -1,7 +1,7 @@
 import React from 'react';
 import { Helmet } from 'react-helmet';
 import MediaValidationPanel from '@/components/admin/MediaValidationPanel';
-import { useUser } from '@/contexts/user-context';
+import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Link } from 'wouter';
@@ -13,7 +13,7 @@ import { Link } from 'wouter';
  * It's accessible only to users with admin privileges.
  */
 const MediaAdmin: React.FC = () => {
-  const { user, loading } = useUser();
+  const { user, loading } = useAuth();
   
   // Check if user has admin privileges
   const isAdmin = user?.role === 'producer'; // Currently using 'producer' as admin

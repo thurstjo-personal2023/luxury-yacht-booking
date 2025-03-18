@@ -10,7 +10,8 @@ import {
   Package, 
   TrendingUp, 
   Bell, 
-  Wrench 
+  Wrench,
+  ImageIcon
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -62,6 +63,12 @@ export default function AdminDashboard() {
       description: 'Configure system preferences',
       icon: <Wrench className="h-8 w-8 text-primary" />,
       href: '/admin/settings',
+    },
+    {
+      title: 'Media Validation',
+      description: 'Validate and repair media URLs',
+      icon: <ImageIcon className="h-8 w-8 text-primary" />,
+      href: '/admin/media-validation',
     },
   ];
 
