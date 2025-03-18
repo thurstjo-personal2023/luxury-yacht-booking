@@ -6,24 +6,9 @@
  * These URLs are temporary and don't work outside the user's browser session.
  */
 
-import * as admin from 'firebase-admin';
-import { USE_FIREBASE_EMULATORS } from '../server/env-config';
-
-// Initialize Firebase Admin if it's not already initialized
-let adminDb: admin.firestore.Firestore;
-if (!admin.apps.length) {
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
-    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
-    : undefined;
-
-  admin.initializeApp({
-    credential: serviceAccount
-      ? admin.credential.cert(serviceAccount)
-      : admin.credential.applicationDefault(),
-  });
-}
-
-adminDb = admin.firestore();
+// Import the existing configured adminDb instance and firestore
+import { adminDb } from '../server/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 // Media type specific placeholders
 const IMAGE_PLACEHOLDER_URL = 'https://storage.googleapis.com/etoile-yachts.appspot.com/placeholders/image-placeholder.jpg';
@@ -229,7 +214,7 @@ export async function resolveAllBlobUrls() {
   try {
     const reportRef = await adminDb.collection('blob_url_resolution_reports').add({
       ...reportData,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp()
     });
     
     console.log(`Blob URL resolution complete. Report saved with ID: ${reportRef.id}`);
