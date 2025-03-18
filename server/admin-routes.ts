@@ -314,22 +314,28 @@ export function registerAdminRoutes(app: Express) {
    */
   app.post('/api/admin/fix-relative-urls', verifyAdminAuth, async (req: Request, res: Response) => {
     try {
-      console.log('Starting relative URL fix via admin API...');
+      console.log(`[${new Date().toISOString()}] Starting relative URL fix via admin API...`);
       
       // Import the fix function dynamically
       const { fixRelativeUrls } = await import('../scripts/fix-relative-urls');
       
-      // Run fix operation
+      // Run fix operation with improved logging
+      console.log(`[${new Date().toISOString()}] Executing fixRelativeUrls function...`);
       const report = await fixRelativeUrls();
+      console.log(`[${new Date().toISOString()}] Relative URL fix operation completed successfully`);
       
       // Return success response with report
       res.json({
         success: true,
         report
       });
-    } catch (error) {
-      console.error('Error fixing relative URLs:', error);
-      res.status(500).json({ error: 'Failed to fix relative URLs' });
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[${new Date().toISOString()}] Error fixing relative URLs:`, errorMessage);
+      res.status(500).json({ 
+        error: 'Failed to fix relative URLs', 
+        details: errorMessage 
+      });
     }
   });
   

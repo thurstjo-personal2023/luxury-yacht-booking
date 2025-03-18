@@ -244,6 +244,17 @@ async function testMediaUrl(
       // Validate based on expected media type
       let isValid = false;
       let expectedContentType = 'unknown';
+      let actualMediaType = 'unknown';
+      
+      // Determine the actual media type based on content-type
+      if (contentType.startsWith('image/')) {
+        actualMediaType = 'image';
+      } else if (contentType.startsWith('video/')) {
+        actualMediaType = 'video';
+      }
+      
+      // Check for media type mismatch (declared as image but is a video or vice versa)
+      const typeMismatch = mediaType !== 'unknown' && actualMediaType !== 'unknown' && mediaType !== actualMediaType;
       
       if (mediaType === 'image') {
         isValid = contentType.startsWith('image/');
@@ -257,6 +268,34 @@ async function testMediaUrl(
         // For unknown media types, accept either image or video
         isValid = contentType.startsWith('image/') || contentType.startsWith('video/');
         expectedContentType = 'image/* or video/*';
+      }
+      
+      // Special handling for media type mismatches
+      if (typeMismatch) {
+        isValid = false; // Force invalid for type mismatches
+        const mismatchReason = `Media type mismatch: Declared as ${mediaType} but actually ${actualMediaType}`;
+        
+        const invalidEntry: InvalidMediaEntry = {
+          ...entry,
+          reason: 'Invalid content type',
+          status: response.status,
+          statusText: response.statusText,
+          error: `${mismatchReason} (got: ${contentType}, expected: ${expectedContentType})`
+        };
+        
+        results.invalid.push(invalidEntry);
+        results.stats.invalidUrls++;
+        results.stats.badContentTypes++;
+        results.stats.byCollection[collection].invalid++;
+        
+        // Update type-specific stats based on declared media type
+        if (mediaType === 'image') {
+          results.stats.imageStats.invalid++;
+        } else if (mediaType === 'video') {
+          results.stats.videoStats.invalid++;
+        }
+        
+        return;
       }
       
       if (isValid) {
