@@ -81,9 +81,25 @@ function extractMediaUrls(collection: string, data: any): { url: string; field: 
         if (data.media && Array.isArray(data.media)) {
           data.media.forEach((mediaItem: any, index: number) => {
             if (mediaItem && mediaItem.url) {
-              // Determine media type based on the 'type' field
-              const mediaType = mediaItem.type === 'video' ? 'video' : 
-                               (mediaItem.type === 'image' ? 'image' : 'unknown');
+              // Determine media type based on the 'type' field or file extension
+              let mediaType: 'image' | 'video' | 'unknown' = 'unknown';
+              
+              // First check the explicit type property
+              if (mediaItem.type === 'video') {
+                mediaType = 'video';
+              } else if (mediaItem.type === 'image') {
+                mediaType = 'image';
+              } else {
+                // If type is not specified, try to infer from URL
+                const url = mediaItem.url.toLowerCase();
+                if (url.endsWith('.mp4') || url.endsWith('.mov') || url.endsWith('.webm') || 
+                    url.endsWith('.avi') || url.includes('video')) {
+                  mediaType = 'video';
+                } else if (url.endsWith('.jpg') || url.endsWith('.jpeg') || url.endsWith('.png') || 
+                          url.endsWith('.gif') || url.endsWith('.webp') || url.includes('image')) {
+                  mediaType = 'image';
+                }
+              }
               
               media.push({ 
                 url: mediaItem.url,

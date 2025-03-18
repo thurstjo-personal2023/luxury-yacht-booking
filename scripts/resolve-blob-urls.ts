@@ -19,7 +19,7 @@ const COLLECTIONS_TO_SCAN = [
   'unified_yacht_experiences',
   'yacht_profiles',
   'experience_packages',
-  'products_add-ons',
+  'products_add_ons', // Fix: Changed hyphen to underscore to match actual collection name
   'articles_and_guides',
   'event_announcements',
   'promotions_and_offers',
