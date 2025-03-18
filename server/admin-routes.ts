@@ -363,4 +363,61 @@ export function registerAdminRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to fetch relative URL fix reports' });
     }
   });
+
+  /**
+   * Run the media validation test suite
+   * This endpoint will run a comprehensive test of our media validation and repair tools
+   */
+  app.post('/api/admin/test-media-validation', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      console.log(`[${new Date().toISOString()}] Starting media validation test via admin API...`);
+      
+      // Import the test function dynamically
+      const { runMediaValidationTest } = await import('../scripts/test-validation-media');
+      
+      // Run the test with improved logging
+      console.log(`[${new Date().toISOString()}] Executing runMediaValidationTest function...`);
+      const results = await runMediaValidationTest();
+      console.log(`[${new Date().toISOString()}] Media validation test completed successfully`);
+      
+      // Return success response with results
+      res.json({
+        success: true,
+        results,
+        message: `Media validation test completed with ${results.successRate}% success rate`
+      });
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[${new Date().toISOString()}] Error running media validation test:`, errorMessage);
+      res.status(500).json({ 
+        error: 'Failed to run media validation test', 
+        details: errorMessage 
+      });
+    }
+  });
+  
+  /**
+   * Get list of media validation test reports
+   */
+  app.get('/api/admin/media-validation-tests', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      // Get the test reports from Firestore, sorted by timestamp
+      const reportsSnapshot = await adminDb.collection('media_validation_tests')
+        .orderBy('timestamp', 'desc')
+        .limit(10)
+        .get();
+      
+      // Map to array of reports
+      const tests = reportsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Return the reports
+      res.json({ tests });
+    } catch (error) {
+      console.error('Error fetching media validation test reports:', error);
+      res.status(500).json({ error: 'Failed to fetch media validation test reports' });
+    }
+  });
 }

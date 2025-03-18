@@ -1,14 +1,17 @@
 /**
- * Test Media Validation System
+ * Test Validation Media Script
  * 
- * This script creates test documents with various media issues in a test collection
- * to verify our media validation and repair system.
+ * This script runs a comprehensive test of our media validation and repair tools
+ * using a test collection populated with various problematic media URLs.
  */
 
 const admin = require('firebase-admin');
-const fetch = require('node-fetch');
-const fs = require('fs');
-const path = require('path');
+const { v4: uuidv4 } = require('uuid');
+const { createTestCollection } = require('./create-test-media-collection');
+const { validateMediaUrls, printMediaValidationReport } = require('./validate-media');
+const { repairAllBrokenUrls } = require('./repair-broken-urls');
+const { resolveAllBlobUrls } = require('./resolve-blob-urls');
+const { fixRelativeUrls } = require('./fix-relative-urls');
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
@@ -16,118 +19,151 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
+
+// Test collection name
 const TEST_COLLECTION = 'test_media_validation';
 
-// Test URLs for various media issues
-const TEST_URLS = {
-  // Valid images
-  validImage: 'https://storage.googleapis.com/etoile-yachts.appspot.com/test_media/valid-yacht-image.jpg',
-  
-  // Valid video
-  validVideo: 'https://storage.googleapis.com/etoile-yachts.appspot.com/test_media/valid-yacht-video.mp4',
-  
-  // Invalid URLs - special cases
-  relativeUrl: '/yacht-placeholder.jpg',
-  blobUrl: 'blob:https://example.com/1234-5678-90ab-cdef',
-  
-  // Incorrect MIME type - video marked as image
-  videoAsImage: 'https://storage.googleapis.com/etoile-yachts.firebasestorage.app/yacht_media/IPwWfOoHOkgkJimhvPwABhyZ3Kn1/1742024835470_826b5a1fd71b2151_Dynamic%20motion.mp4',
-  
-  // Broken URL that should 404
-  brokenUrl: 'https://storage.googleapis.com/etoile-yachts.appspot.com/non-existent-image.jpg',
-  
-  // Malformed URL
-  malformedUrl: 'htp:/invalid-url',
+// Override collection lists for testing
+const originalCollections = {
+  validate: require('./validate-media').COLLECTIONS_TO_SCAN,
+  repair: require('./repair-broken-urls').COLLECTIONS_TO_SCAN,
+  resolve: require('./resolve-blob-urls').COLLECTIONS_TO_SCAN,
+  fix: require('./fix-relative-urls').COLLECTIONS_TO_SCAN
 };
 
+function overrideCollections() {
+  require('./validate-media').COLLECTIONS_TO_SCAN = [TEST_COLLECTION];
+  require('./repair-broken-urls').COLLECTIONS_TO_SCAN = [TEST_COLLECTION];
+  require('./resolve-blob-urls').COLLECTIONS_TO_SCAN = [TEST_COLLECTION];
+  require('./fix-relative-urls').COLLECTIONS_TO_SCAN = [TEST_COLLECTION];
+}
+
+function restoreCollections() {
+  require('./validate-media').COLLECTIONS_TO_SCAN = originalCollections.validate;
+  require('./repair-broken-urls').COLLECTIONS_TO_SCAN = originalCollections.repair;
+  require('./resolve-blob-urls').COLLECTIONS_TO_SCAN = originalCollections.resolve;
+  require('./fix-relative-urls').COLLECTIONS_TO_SCAN = originalCollections.fix;
+}
+
 /**
- * Create test documents with various media issues
+ * Run a comprehensive test of our media validation and repair tools
  */
-async function createTestDocuments() {
+async function runMediaValidationTest() {
   try {
-    console.log('Creating test documents in collection:', TEST_COLLECTION);
+    const testId = uuidv4().substring(0, 8);
+    console.log(`\n==== STARTING MEDIA VALIDATION TEST [${testId}] ====\n`);
     
-    // Document 1: Valid media
-    await db.collection(TEST_COLLECTION).doc('valid-media').set({
-      title: 'Test Document with Valid Media',
-      description: 'This document contains valid image and video media',
-      media: [
-        { type: 'image', url: TEST_URLS.validImage },
-        { type: 'video', url: TEST_URLS.validVideo }
-      ],
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    console.log('✓ Created document with valid media');
+    // Step 1: Create test collection with problematic URLs
+    console.log('Step 1: Creating test collection with problematic media URLs...');
+    await createTestCollection();
+    console.log('✓ Test collection created\n');
     
-    // Document 2: Video incorrectly marked as image
-    await db.collection(TEST_COLLECTION).doc('invalid-mime-type').set({
-      title: 'Test Document with Invalid MIME Type',
-      description: 'This document contains a video incorrectly marked as an image',
-      media: [
-        { type: 'image', url: TEST_URLS.videoAsImage } // Video incorrectly marked as image
-      ],
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    console.log('✓ Created document with invalid MIME type');
+    // Override collections to only scan our test collection
+    overrideCollections();
     
-    // Document 3: Relative and blob URLs
-    await db.collection(TEST_COLLECTION).doc('relative-and-blob-urls').set({
-      title: 'Test Document with Relative and Blob URLs',
-      description: 'This document contains relative URLs and blob URLs',
-      media: [
-        { type: 'image', url: TEST_URLS.relativeUrl }, // Relative URL
-        { type: 'image', url: TEST_URLS.blobUrl }      // Blob URL
-      ],
-      profilePhoto: TEST_URLS.relativeUrl, // Another relative URL in a different field
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    console.log('✓ Created document with relative and blob URLs');
-    
-    // Document 4: Broken URLs
-    await db.collection(TEST_COLLECTION).doc('broken-urls').set({
-      title: 'Test Document with Broken URLs',
-      description: 'This document contains broken URLs that should 404',
-      media: [
-        { type: 'image', url: TEST_URLS.brokenUrl },   // Should 404
-        { type: 'image', url: TEST_URLS.malformedUrl } // Malformed URL
-      ],
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    console.log('✓ Created document with broken URLs');
-    
-    console.log('\nSetup complete: Created 4 test documents in', TEST_COLLECTION);
-    console.log('You can now run the validation tools on this collection.');
-    
+    try {
+      // Step 2: Run initial validation to identify issues
+      console.log('Step 2: Running initial media validation...');
+      const initialResults = await validateMediaUrls();
+      printMediaValidationReport(initialResults);
+      
+      const initialIssues = initialResults.invalid.length + 
+                           initialResults.blob.length + 
+                           initialResults.relative.length +
+                           initialResults.missing.length;
+      
+      console.log(`✓ Initial validation complete. Found ${initialIssues} issues\n`);
+      
+      // Step 3: Fix relative URLs
+      console.log('Step 3: Fixing relative URLs...');
+      const relativeResults = await fixRelativeUrls();
+      console.log(`✓ Fixed ${relativeResults.stats.totalFixed} relative URLs\n`);
+      
+      // Step 4: Resolve blob URLs
+      console.log('Step 4: Resolving blob URLs...');
+      const blobResults = await resolveAllBlobUrls();
+      console.log(`✓ Resolved ${blobResults.stats.totalResolved} blob URLs\n`);
+      
+      // Step 5: Repair broken URLs
+      console.log('Step 5: Repairing broken URLs...');
+      const repairResults = await repairAllBrokenUrls();
+      console.log(`✓ Repaired ${repairResults.stats.totalRepaired} broken URLs\n`);
+      
+      // Step 6: Run final validation to verify fixes
+      console.log('Step 6: Running final validation to verify fixes...');
+      const finalResults = await validateMediaUrls();
+      printMediaValidationReport(finalResults);
+      
+      const remainingIssues = finalResults.invalid.length + 
+                             finalResults.blob.length + 
+                             finalResults.relative.length +
+                             finalResults.missing.length;
+      
+      const fixedIssues = initialIssues - remainingIssues;
+      const successRate = Math.round((fixedIssues / initialIssues) * 100);
+      
+      console.log('\n==== MEDIA VALIDATION TEST SUMMARY ====\n');
+      console.log(`Initial issues: ${initialIssues}`);
+      console.log(`Issues fixed: ${fixedIssues}`);
+      console.log(`Remaining issues: ${remainingIssues}`);
+      console.log(`Success rate: ${successRate}%\n`);
+      
+      if (remainingIssues > 0) {
+        console.log('Remaining issues may include:');
+        console.log('- URLs that are genuinely inaccessible');
+        console.log('- Content mismatches that require manual correction');
+        console.log('- Special cases not covered by the automated fixes\n');
+      }
+      
+      console.log(`==== MEDIA VALIDATION TEST [${testId}] COMPLETE ====\n`);
+      
+      return {
+        testId,
+        initialIssues,
+        fixedIssues,
+        remainingIssues,
+        successRate
+      };
+    } finally {
+      // Always restore the original collections
+      restoreCollections();
+    }
   } catch (error) {
-    console.error('Error creating test documents:', error);
+    console.error('Error running media validation test:', error);
+    restoreCollections();
+    throw error;
   }
 }
 
 /**
- * Clean up test collection
+ * Save test results to Firestore
+ * 
+ * @param {Object} results Test results
+ * @returns {Promise<string>} ID of the saved report
  */
-async function cleanupTestCollection() {
+async function saveTestResults(results) {
   try {
-    console.log(`Deleting all documents in ${TEST_COLLECTION} collection...`);
+    const reportId = results.testId;
+    const timestamp = admin.firestore.FieldValue.serverTimestamp();
     
-    const snapshot = await db.collection(TEST_COLLECTION).get();
+    // Create a summary of the results
+    const summary = {
+      id: reportId,
+      timestamp,
+      initialIssues: results.initialIssues,
+      fixedIssues: results.fixedIssues,
+      remainingIssues: results.remainingIssues,
+      successRate: results.successRate
+    };
     
-    if (snapshot.empty) {
-      console.log('No documents to delete.');
-      return;
-    }
+    // Save the summary to Firestore
+    await db.collection('media_validation_tests').doc(reportId).set(summary);
     
-    const batch = db.batch();
-    
-    snapshot.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-    
-    await batch.commit();
-    
-    console.log(`✓ Successfully deleted ${snapshot.size} documents`);
+    console.log(`Test results saved with ID: ${reportId}`);
+    return reportId;
   } catch (error) {
-    console.error('Error cleaning up test collection:', error);
+    console.error('Error saving test results:', error);
+    throw error;
   }
 }
 
@@ -135,22 +171,22 @@ async function cleanupTestCollection() {
  * Main function
  */
 async function main() {
-  const args = process.argv.slice(2);
-  const command = args[0] || 'create';
-  
-  if (command === 'create') {
-    await createTestDocuments();
-  } else if (command === 'cleanup') {
-    await cleanupTestCollection();
-  } else {
-    console.log('Usage: node test-validation-media.js [create|cleanup]');
+  try {
+    const results = await runMediaValidationTest();
+    await saveTestResults(results);
+    process.exit(0);
+  } catch (error) {
+    console.error('Error in main process:', error);
+    process.exit(1);
   }
-  
-  process.exit(0);
 }
 
-// Run the script
-main().catch(error => {
-  console.error('Error executing script:', error);
-  process.exit(1);
-});
+// Run the script if executed directly
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  runMediaValidationTest,
+  TEST_COLLECTION
+};
