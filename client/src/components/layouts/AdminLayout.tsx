@@ -29,7 +29,7 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const [location] = useLocation();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboardIcon },
@@ -40,8 +40,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { name: 'Settings', href: '/admin/settings', icon: SettingsIcon },
   ];
   
-  const handleLogout = async () => {
-    await logout();
+  const handleLogout = () => {
+    // Navigate to logout page
+    window.location.href = '/logout';
   };
   
   return (

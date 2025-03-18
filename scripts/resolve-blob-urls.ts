@@ -6,12 +6,11 @@
  * These URLs are temporary and don't work outside the user's browser session.
  */
 
-import { firestore, getFirestore } from 'firebase-admin';
 import * as admin from 'firebase-admin';
 import { USE_FIREBASE_EMULATORS } from '../server/env-config';
 
 // Initialize Firebase Admin if it's not already initialized
-let adminDb: firestore.Firestore;
+let adminDb: admin.firestore.Firestore;
 if (!admin.apps.length) {
   const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
     ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
@@ -24,7 +23,7 @@ if (!admin.apps.length) {
   });
 }
 
-adminDb = getFirestore();
+adminDb = admin.firestore();
 
 // Media type specific placeholders
 const IMAGE_PLACEHOLDER_URL = 'https://storage.googleapis.com/etoile-yachts.appspot.com/placeholders/image-placeholder.jpg';
@@ -170,13 +169,27 @@ async function processDocument(
 /**
  * Scan all collections for blob URLs and replace them
  */
+// Define report data interface
+interface BlobResolutionReport {
+  timestamp: string;
+  resolvedUrls: any[];
+  collectionStats: Record<string, number>;
+  totalIdentified: number;
+  totalResolved: number;
+  stats: {
+    imageCount: number;
+    videoCount: number;
+  };
+  id?: string; // Added after report is saved
+}
+
 export async function resolveAllBlobUrls() {
   console.log('Starting blob URL resolution...');
   
-  const reportData = {
+  const reportData: BlobResolutionReport = {
     timestamp: new Date().toISOString(),
-    resolvedUrls: [] as any[],
-    collectionStats: {} as Record<string, number>,
+    resolvedUrls: [],
+    collectionStats: {},
     totalIdentified: 0,
     totalResolved: 0,
     stats: {
@@ -216,7 +229,7 @@ export async function resolveAllBlobUrls() {
   try {
     const reportRef = await adminDb.collection('blob_url_resolution_reports').add({
       ...reportData,
-      createdAt: firestore.FieldValue.serverTimestamp()
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
     
     console.log(`Blob URL resolution complete. Report saved with ID: ${reportRef.id}`);
