@@ -51,6 +51,7 @@ interface FixedUrl {
 }
 
 interface FixReport {
+  id?: string;          // Report ID (assigned after saving to Firestore)
   timestamp: string;
   createdAt: Timestamp;
   fixedUrls: FixedUrl[];
@@ -89,12 +90,31 @@ function toAbsoluteUrl(relativeUrl: string): string {
     return relativeUrl; // Don't modify if already absolute or empty
   }
   
-  // Special handling for placeholder images and videos
-  if (relativeUrl === '/yacht-placeholder.jpg' || relativeUrl.includes('placeholder')) {
+  // Special handling for placeholder images
+  if (relativeUrl === '/yacht-placeholder.jpg' || 
+      relativeUrl === '/image-placeholder.jpg' || 
+      relativeUrl.includes('placeholder') && (
+        relativeUrl.endsWith('.jpg') || 
+        relativeUrl.endsWith('.jpeg') || 
+        relativeUrl.endsWith('.png') || 
+        relativeUrl.endsWith('.webp') || 
+        relativeUrl.endsWith('.gif') ||
+        !relativeUrl.includes('.')  // No extension usually indicates an image
+      )
+     ) {
     return `${STORAGE_URL}/image-placeholder.jpg`;
   }
   
-  if (relativeUrl === '/video-placeholder.mp4' || (relativeUrl.includes('placeholder') && relativeUrl.endsWith('.mp4'))) {
+  // Special handling for placeholder videos
+  if (relativeUrl === '/video-placeholder.mp4' || 
+      (relativeUrl.includes('placeholder') && (
+        relativeUrl.endsWith('.mp4') || 
+        relativeUrl.endsWith('.webm') || 
+        relativeUrl.endsWith('.mov') || 
+        relativeUrl.endsWith('.avi') || 
+        relativeUrl.endsWith('.mkv')
+      ))
+     ) {
     return `${STORAGE_URL}/video-placeholder.mp4`;
   }
   
@@ -342,18 +362,31 @@ export async function fixRelativeUrls(): Promise<FixReport> {
   console.log(`- Collections with relative URLs: ${Object.keys(collectionStats).length}`);
   console.log(`- Total relative URLs found and fixed: ${allFixedUrls.length}`);
   
+  // Log if no relative URLs were found
+  if (allFixedUrls.length === 0) {
+    console.log(`[${endTime.toISOString()}] No relative URLs found, nothing to fix`);
+  }
+  
   if (errors.length > 0) {
     console.warn(`- Encountered ${errors.length} errors during processing`);
   }
   
   // Save the report to Firestore
   try {
-    const reportRef = await adminDb.collection('relative_url_fix_reports').add(report);
+    const reportRef = await adminDb.collection('relative_url_fix_reports').add({
+      ...report,
+      createdAt: admin.firestore.FieldValue.serverTimestamp() // Use server timestamp for consistency
+    });
     console.log(`[${new Date().toISOString()}] Relative URL fix report created with ID: ${reportRef.id}`);
+    // Add ID to the report
+    report.id = reportRef.id;
   } catch (error: any) {
     const errorMsg = `Error creating relative URL fix report: ${error.message || String(error)}`;
     console.error(`[${new Date().toISOString()}] ${errorMsg}`);
-    errors.push(errorMsg);
+    if (!report.errors) {
+      report.errors = [];
+    }
+    report.errors.push(errorMsg);
   }
   
   return report;
