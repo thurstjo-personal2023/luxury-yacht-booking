@@ -140,3 +140,52 @@ export interface PartnerEarnings {
   }[];
   addOnUsage?: AddOnUsage[];  // Usage statistics for partner's add-ons
 }
+
+/**
+ * Service analytics time series data point
+ */
+export interface ServiceTimeDataPoint {
+  period: string;    // Time period (date or month) formatted as string
+  count: number;     // Number of bookings/usages in this period
+}
+
+/**
+ * Service category popularity data
+ */
+export interface ServiceCategoryData {
+  category: string;
+  count: number;
+}
+
+/**
+ * Add-on specific popularity data
+ */
+export interface AddOnPopularityData {
+  id: string;
+  name: string;
+  category: string;
+  count: number;
+}
+
+/**
+ * Service analytics date range
+ */
+export interface ServiceAnalyticsDateRange {
+  startDate: string;
+  endDate: string;
+}
+
+/**
+ * Complete service analytics response
+ */
+export interface ServiceAnalyticsResponse {
+  analytics: {
+    timeSeriesData: ServiceTimeDataPoint[];
+    totalBookings: number;
+    totalUsage: number;
+    servicePopularity: ServiceCategoryData[];
+    addonPopularity: AddOnPopularityData[];
+    dateRange: ServiceAnalyticsDateRange;
+    aggregateBy: 'day' | 'week' | 'month';
+  };
+}
