@@ -83,8 +83,28 @@ const MediaValidationPanel: React.FC = () => {
       fetchValidationReports();
       fetchRepairReports();
       fetchBlobReports();
+      fetchMediaIssuesReports();
     }
   }, [isAuthorized]);
+  
+  // Fetch media issues repair reports
+  const fetchMediaIssuesReports = async () => {
+    try {
+      const response = await fetch('/api/admin/media-repair-reports');
+      const data = await response.json();
+      
+      if (data.reports && Array.isArray(data.reports)) {
+        setMediaIssuesReports(data.reports);
+      }
+    } catch (error) {
+      console.error('Error fetching media issues reports:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load media issues reports",
+        variant: "destructive"
+      });
+    }
+  };
   
   // Fetch validation reports from the API
   const fetchValidationReports = async () => {
@@ -272,6 +292,48 @@ const MediaValidationPanel: React.FC = () => {
     }
   };
   
+  // Fix all media issues (relative URLs and media type mismatches)
+  const fixMediaIssues = async () => {
+    try {
+      setIsFixingMediaIssues(true);
+      
+      const response = await fetch('/api/admin/fix-media-issues', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        toast({
+          title: "Media Issues Fixed",
+          description: `Fixed ${data.stats.relativeUrlsFixed} relative URLs and ${data.stats.mediaTypesFixed} media type mismatches`,
+        });
+        
+        // Refresh all reports
+        await fetchMediaIssuesReports();
+        await fetchValidationReports(); // Refresh validation reports after fixes
+      } else {
+        toast({
+          title: "Fix Failed",
+          description: data.error || "Failed to fix media issues",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error fixing media issues:', error);
+      toast({
+        title: "Error",
+        description: "An error occurred while fixing media issues",
+        variant: "destructive"
+      });
+    } finally {
+      setIsFixingMediaIssues(false);
+    }
+  };
+  
   // Format date string for display
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -397,7 +459,7 @@ const MediaValidationPanel: React.FC = () => {
       </Card>
       
       {/* Action Buttons */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Repair Broken URLs</CardTitle>
@@ -463,6 +525,39 @@ const MediaValidationPanel: React.FC = () => {
             </Button>
           </CardFooter>
         </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Fix Media Issues</CardTitle>
+            <CardDescription>
+              Fix relative URLs and video type mismatches.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-500 mb-4">
+              This operation will fix relative paths and correct video media types that are incorrectly identified as images.
+            </p>
+          </CardContent>
+          <CardFooter>
+            <Button 
+              onClick={fixMediaIssues}
+              disabled={isFixingMediaIssues}
+              className="w-full"
+            >
+              {isFixingMediaIssues ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Fixing Media Issues...
+                </>
+              ) : (
+                <>
+                  <Video className="mr-2 h-4 w-4" />
+                  Fix Media Issues
+                </>
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
       
       {/* Validation Progress */}
@@ -493,10 +588,11 @@ const MediaValidationPanel: React.FC = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="validation" onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="validation">Validation</TabsTrigger>
               <TabsTrigger value="repair">URL Repairs</TabsTrigger>
               <TabsTrigger value="blob">Blob Resolution</TabsTrigger>
+              <TabsTrigger value="mediaIssues">Media Issues</TabsTrigger>
             </TabsList>
             
             <TabsContent value="validation" className="pt-4">
@@ -582,6 +678,39 @@ const MediaValidationPanel: React.FC = () => {
               ) : (
                 <div className="text-center py-6">
                   <p className="text-gray-500">No blob resolution reports available.</p>
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="mediaIssues" className="pt-4">
+              {mediaIssuesReports.length > 0 ? (
+                <div className="space-y-4">
+                  {mediaIssuesReports.slice(0, 5).map((report) => (
+                    <div 
+                      key={report.id} 
+                      className="p-4 border rounded-md hover:bg-gray-50 cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium">Media Issues Fix #{report.id.slice(0, 8)}</span>
+                        <span className="text-sm text-gray-500">{formatDate(report.date)}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <Badge variant="secondary">
+                          {report.stats?.relativeUrlsFixed || 0} relative URLs fixed
+                        </Badge>
+                        <Badge variant="secondary">
+                          {report.stats?.mediaTypesFixed || 0} media types fixed
+                        </Badge>
+                        <Badge variant="outline">
+                          {report.collectionsScanned} collections scanned
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-gray-500">No media issues fix reports available.</p>
                 </div>
               )}
             </TabsContent>
