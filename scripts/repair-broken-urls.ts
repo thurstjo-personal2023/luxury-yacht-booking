@@ -107,8 +107,8 @@ async function findBrokenUrls(): Promise<BrokenUrlDetail[]> {
     }
     
     return brokenUrls;
-  } catch (error) {
-    console.error('Error finding broken URLs:', error);
+  } catch (error: any) {
+    console.error('Error finding broken URLs:', error.message || String(error));
     throw error;
   }
 }
@@ -262,7 +262,10 @@ async function repairBrokenUrl(
             // Make a deep copy of the array
             const updatedArray = JSON.parse(JSON.stringify(parentObj));
             // Update the specific index
-            updatedArray[lastKey] = placeholderUrl;
+            const idx = parseInt(lastKey);
+            if (!isNaN(idx) && idx >= 0 && idx < updatedArray.length) {
+              updatedArray[idx] = placeholderUrl;
+            }
             
             // Construct the update path for the parent array
             const parentPath = fieldParts.slice(0, -1).join('.');
@@ -274,12 +277,9 @@ async function repairBrokenUrl(
             
             return { success: true, newUrl: placeholderUrl };
           } else if (parentObj && typeof parentObj === 'object') {
-            // Update the specific property in the object
-            const updateObj = {};
-            updateObj[field] = placeholderUrl;
-            
+            // Update the specific property using the full field path as the document path
             await docRef.update({
-              ...updateObj,
+              [field]: placeholderUrl,
               lastUpdated: FieldValue.serverTimestamp()
             });
             
@@ -290,8 +290,8 @@ async function repairBrokenUrl(
     }
     
     return { success: false, newUrl: url };
-  } catch (error) {
-    console.error(`Error repairing broken URL for ${brokenUrl.docId}:`, error);
+  } catch (error: any) {
+    console.error(`Error repairing broken URL for ${brokenUrl.docId}:`, error.message || String(error));
     return { success: false, newUrl: brokenUrl.url };
   }
 }
@@ -339,7 +339,12 @@ export async function repairAllBrokenUrls(): Promise<RepairReport> {
       });
       
       report.stats.totalRepaired++;
-      report.stats.byCollection[brokenUrl.collection]++;
+      
+      // Use type assertion to handle collection stats
+      const collectionName = brokenUrl.collection as keyof typeof report.stats.byCollection;
+      if (typeof report.stats.byCollection[collectionName] === 'number') {
+        report.stats.byCollection[collectionName]++;
+      }
       
       // Update media type stats
       if (brokenUrl.mediaType === 'video') {
