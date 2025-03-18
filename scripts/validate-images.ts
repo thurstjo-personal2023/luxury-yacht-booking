@@ -427,9 +427,9 @@ async function main() {
   }
 }
 
-// If the script is run directly (not imported)
-if (require.main === module) {
-  main();
-}
+// For direct execution in ESM context
+main().catch(error => {
+  console.error('Error running validation:', error);
+});
 
 export default validateImageUrls;

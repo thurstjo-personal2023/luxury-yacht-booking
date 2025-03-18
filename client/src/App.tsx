@@ -48,6 +48,7 @@ const AdminUtils = lazy(() => import("@/pages/dashboard/producer/AdminUtils"));
 // Admin Pages
 const AdminDashboard = lazy(() => import("@/pages/admin"));
 const EmailTest = lazy(() => import("@/pages/admin/EmailTest"));
+const ImageValidator = lazy(() => import("@/pages/admin/ImageValidator"));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -184,6 +185,9 @@ function App() {
               </Route>
               <Route path="/admin/email-test">
                 <PrivateRoute component={EmailTest} />
+              </Route>
+              <Route path="/admin/image-validator">
+                <PrivateRoute component={ImageValidator} />
               </Route>
               
               {/* Debug Tools */}

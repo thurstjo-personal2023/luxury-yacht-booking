@@ -57,6 +57,9 @@ app.use((req, res, next) => {
     // Register email notification routes
     registerEmailRoutes(app);
     
+    // Register admin routes
+    registerAdminRoutes(app);
+    
     // Test Firebase Storage in production
     if (!USE_FIREBASE_EMULATORS) {
       log("Testing Firebase Storage in production...");
