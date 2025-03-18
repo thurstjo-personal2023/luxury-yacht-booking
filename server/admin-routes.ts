@@ -479,4 +479,43 @@ export function registerAdminRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to fetch media validation test reports' });
     }
   });
+  
+  /**
+   * Fix all media issues (relative URLs and media type mismatches)
+   * This is a comprehensive fix that addresses problems with both images and videos
+   */
+  app.post('/api/admin/fix-media-issues', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      console.log(`[${new Date().toISOString()}] Starting media issues repair via admin API...`);
+      
+      // Dynamic import to avoid initialization issues
+      const { fixMediaIssues, saveRepairResults } = await import('../scripts/fix-media-issues');
+      
+      // Run the repair
+      const results = await fixMediaIssues();
+      
+      // Save results to Firestore
+      const reportId = await saveRepairResults(results);
+      
+      // Return summary results
+      res.json({
+        success: true,
+        reportId,
+        timestamp: results.timestamp,
+        stats: {
+          documentsProcessed: results.stats.documentsProcessed,
+          relativeUrlsFixed: results.stats.relativeUrlsFixed,
+          mediaTypesFixed: results.stats.mediaTypesFixed,
+        },
+        message: `Fixed ${results.stats.relativeUrlsFixed} relative URLs and ${results.stats.mediaTypesFixed} media type mismatches`,
+        sampleFixes: {
+          relativeUrls: results.relativeUrlsFixed.slice(0, 5),
+          mediaTypes: results.mediaTypesFixed.slice(0, 5)
+        }
+      });
+    } catch (error) {
+      console.error('Error fixing media issues:', error);
+      res.status(500).json({ error: 'Failed to fix media issues' });
+    }
+  });
 }
