@@ -125,7 +125,7 @@ const MediaValidationPanel: React.FC = () => {
       setIsLoading(true);
       
       // Get authentication token
-      const token = await getIdToken();
+      const token = await user.getIdToken();
       
       // Call the Firebase Function endpoint
       const response = await axios.get(
@@ -162,7 +162,7 @@ const MediaValidationPanel: React.FC = () => {
       setIsLoading(true);
       
       // Get authentication token
-      const token = await getIdToken();
+      const token = await user.getIdToken();
       
       // Call the Firebase Function endpoint
       const response = await axios.get(
@@ -200,7 +200,7 @@ const MediaValidationPanel: React.FC = () => {
       setIsLoading(true);
       
       // Get authentication token
-      const token = await getIdToken();
+      const token = await user.getIdToken();
       
       // Call the Firebase Function endpoint
       const response = await axios.post(
@@ -247,7 +247,7 @@ const MediaValidationPanel: React.FC = () => {
       setIsRepairing(true);
       
       // Get authentication token
-      const token = await getIdToken();
+      const token = await user.getIdToken();
       
       // Call the admin endpoint to fix media issues
       const response = await axios.post(
