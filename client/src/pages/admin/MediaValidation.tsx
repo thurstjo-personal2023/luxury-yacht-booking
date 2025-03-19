@@ -1,79 +1,53 @@
 /**
- * Media Validation Admin Page
+ * Admin Media Validation Page
  * 
- * This page provides access to the media validation panel for administrators.
+ * This page renders the media validation panel for admin users.
  */
-
 import React from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import MediaValidationPanel from '@/components/MediaValidationPanel';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Link } from 'wouter';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useLocation } from 'wouter';
+import { Helmet } from 'react-helmet';
+import MediaValidationPanel from '@/components/admin/MediaValidationPanel';
+import AdminLayout from '@/components/layouts/AdminLayout';
 
 const MediaValidationPage: React.FC = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
+  const { toast } = useToast();
   
-  // If user is not logged in
-  if (!user) {
+  // Set up navigation
+  const [, setLocation] = useLocation();
+  
+  // Redirect non-admin users
+  if (!loading && (!user || !isAdmin)) {
+    toast({
+      title: 'Access Denied',
+      description: 'You must be an admin to access this page',
+      variant: 'destructive'
+    });
+    setLocation('/');
+    return null;
+  }
+  
+  // Show loading state if auth is still loading
+  if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Access Denied</CardTitle>
-            <CardDescription>
-              Please log in to access the media validation tools.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link href="/login">Go to Login</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
   
-  // If user is not authorized 
-  if (!(isAdmin || user.role === 'producer')) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Access Denied</CardTitle>
-            <CardDescription>
-              You do not have permission to access this page.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link href="/">Go to Home</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-  
-  // Render the media validation panel
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6 flex items-center gap-4">
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/admin">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Admin
-          </Link>
-        </Button>
-        <h1 className="text-2xl font-bold">Media Validation Tools</h1>
-      </div>
+    <>
+      <Helmet>
+        <title>Media Validation - Etoile Yachts Admin</title>
+      </Helmet>
       
-      <div className="grid gap-6">
+      <AdminLayout>
         <MediaValidationPanel />
-      </div>
-    </div>
+      </AdminLayout>
+    </>
   );
 };
 

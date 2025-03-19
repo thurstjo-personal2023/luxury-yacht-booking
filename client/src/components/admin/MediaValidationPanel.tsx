@@ -1,651 +1,675 @@
+/**
+ * Media Validation Panel
+ * 
+ * This component provides an admin interface for managing media validation,
+ * viewing validation reports, and fixing media issues.
+ */
 import React, { useState, useEffect } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
-import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import {
+  BarChart,
+  RefreshCcw,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Image,
+  Film,
+  FileWarning,
+  FileSearch
+} from 'lucide-react';
 import axios from 'axios';
-import { useAuth } from '@/hooks/use-auth';
+
+// Types for media validation
+interface MediaValidationReport {
+  id: string;
+  status: 'running' | 'completed' | 'error';
+  started: any; // Timestamp
+  completed?: any; // Timestamp
+  collections: Record<string, CollectionValidationStats>;
+  completedCollections: number;
+  totalCollections: number;
+  error?: string;
+}
+
+interface CollectionValidationStats {
+  processed: number;
+  fixed: number;
+  errors: number;
+  invalidUrls: number;
+  batchErrors: number;
+  started: any; // Timestamp
+  completed?: any; // Timestamp
+  batches?: number;
+}
+
+interface InvalidMediaUrl {
+  id: string;
+  collection: string;
+  documentId: string;
+  fieldPath: string;
+  url: string;
+  reason: string;
+  status?: string;
+  error?: string;
+  contentType?: string;
+  timestamp: any; // Timestamp
+}
+
+// Helper function to format timestamps
+const formatTimestamp = (timestamp: any): string => {
+  if (!timestamp) return 'N/A';
+  
+  // Handle Firestore timestamp
+  if (timestamp._seconds) {
+    return new Date(timestamp._seconds * 1000).toLocaleString();
+  }
+  
+  // Handle regular Date object
+  if (timestamp instanceof Date) {
+    return timestamp.toLocaleString();
+  }
+  
+  // Handle string date
+  return new Date(timestamp).toLocaleString();
+};
+
+// Helper function to format duration
+const formatDuration = (start: any, end: any): string => {
+  if (!start || !end) return 'N/A';
+  
+  // Convert to milliseconds
+  const startMs = start._seconds ? start._seconds * 1000 : new Date(start).getTime();
+  const endMs = end._seconds ? end._seconds * 1000 : new Date(end).getTime();
+  
+  // Calculate duration in seconds
+  const durationSec = Math.floor((endMs - startMs) / 1000);
+  
+  // Format as minutes and seconds
+  if (durationSec < 60) {
+    return `${durationSec} seconds`;
+  } else {
+    const minutes = Math.floor(durationSec / 60);
+    const seconds = durationSec % 60;
+    return `${minutes} min ${seconds} sec`;
+  }
+};
 
 /**
  * Media Validation Panel Component
- * 
- * This component provides a UI for running media validation and repair tools.
- * It's intended for use in the admin dashboard.
  */
 const MediaValidationPanel: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   
-  const [loading, setLoading] = useState<{
-    validation: boolean;
-    repair: boolean;
-    blobFix: boolean;
-    relativeFix: boolean;
-    test: boolean;
-  }>({
-    validation: false,
-    repair: false,
-    blobFix: false,
-    relativeFix: false,
-    test: false
-  });
+  // State for reports and UI
+  const [reports, setReports] = useState<MediaValidationReport[]>([]);
+  const [selectedReport, setSelectedReport] = useState<MediaValidationReport | null>(null);
+  const [invalidUrls, setInvalidUrls] = useState<InvalidMediaUrl[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isRepairing, setIsRepairing] = useState<boolean>(false);
   
-  const [results, setResults] = useState<{
-    validation: any;
-    repair: any;
-    blobFix: any;
-    relativeFix: any;
-    test: any;
-  }>({
-    validation: null,
-    repair: null,
-    blobFix: null,
-    relativeFix: null,
-    test: null
-  });
-  
-  const [reports, setReports] = useState<{
-    validation: any[];
-    repair: any[];
-    blobFix: any[];
-    relativeFix: any[];
-    test: any[];
-  }>({
-    validation: [],
-    repair: [],
-    blobFix: [],
-    relativeFix: [],
-    test: []
-  });
-  
-  // Check if user has admin privileges
-  const isAdmin = user?.role === 'producer'; // Currently using 'producer' as admin
-  
-  useEffect(() => {
-    // Load reports when component mounts
-    if (isAdmin) {
-      loadReports();
-    }
-  }, [isAdmin]);
-  
-  /**
-   * Load all report types
-   */
-  const loadReports = async () => {
+  // Fetch validation reports
+  const fetchReports = async () => {
+    if (!user) return;
+    
     try {
-      // Load media validation reports
-      const validationRes = await axios.get('/api/admin/media-validation-reports');
+      setIsLoading(true);
       
-      // Load URL repair reports
-      const repairRes = await axios.get('/api/admin/url-repair-reports');
+      // Get authentication token
+      const token = await getIdToken();
       
-      // Load blob URL resolution reports
-      const blobRes = await axios.get('/api/admin/blob-url-reports');
+      // Call the Firebase Function endpoint
+      const response = await axios.get(
+        'https://us-central1-etoile-yachts.cloudfunctions.net/mediaValidationStatus', 
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
       
-      // Load relative URL fix reports
-      const relativeRes = await axios.get('/api/admin/relative-url-reports');
-      
-      // Load test reports
-      const testRes = await axios.get('/api/admin/media-validation-tests');
-      
-      setReports({
-        validation: validationRes.data.reports || [],
-        repair: repairRes.data.reports || [],
-        blobFix: blobRes.data.reports || [],
-        relativeFix: relativeRes.data.reports || [],
-        test: testRes.data.tests || []
-      });
+      if (response.data.success) {
+        setReports(response.data.reports);
+      } else {
+        throw new Error(response.data.error || 'Failed to fetch reports');
+      }
     } catch (error) {
-      console.error('Error loading reports:', error);
+      console.error('Error fetching validation reports:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load validation reports',
-        variant: 'destructive'
-      });
-    }
-  };
-  
-  /**
-   * Run media validation
-   */
-  const runValidation = async () => {
-    try {
-      setLoading(prev => ({ ...prev, validation: true }));
-      
-      const response = await axios.get('/api/admin/validate-media');
-      
-      setResults(prev => ({ ...prev, validation: response.data }));
-      
-      toast({
-        title: 'Validation Complete',
-        description: `Media validation completed successfully.`,
-        variant: 'default'
-      });
-      
-      // Refresh reports
-      loadReports();
-    } catch (error) {
-      console.error('Error running validation:', error);
-      toast({
-        title: 'Validation Failed',
-        description: 'Failed to run media validation',
+        description: 'Failed to fetch validation reports',
         variant: 'destructive'
       });
     } finally {
-      setLoading(prev => ({ ...prev, validation: false }));
+      setIsLoading(false);
     }
   };
   
-  /**
-   * Run broken URL repair
-   */
-  const runRepair = async () => {
-    try {
-      setLoading(prev => ({ ...prev, repair: true }));
-      
-      const response = await axios.post('/api/admin/repair-broken-urls');
-      
-      setResults(prev => ({ ...prev, repair: response.data }));
-      
-      toast({
-        title: 'Repair Complete',
-        description: 'Broken URLs have been repaired successfully.',
-        variant: 'default'
-      });
-      
-      // Refresh reports
-      loadReports();
-    } catch (error) {
-      console.error('Error repairing URLs:', error);
-      toast({
-        title: 'Repair Failed',
-        description: 'Failed to repair broken URLs',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(prev => ({ ...prev, repair: false }));
-    }
-  };
-  
-  /**
-   * Run blob URL resolution
-   */
-  const runBlobResolution = async () => {
-    try {
-      setLoading(prev => ({ ...prev, blobFix: true }));
-      
-      const response = await axios.post('/api/admin/resolve-blob-urls');
-      
-      setResults(prev => ({ ...prev, blobFix: response.data }));
-      
-      toast({
-        title: 'Resolution Complete',
-        description: 'Blob URLs have been resolved successfully.',
-        variant: 'default'
-      });
-      
-      // Refresh reports
-      loadReports();
-    } catch (error) {
-      console.error('Error resolving blob URLs:', error);
-      toast({
-        title: 'Resolution Failed',
-        description: 'Failed to resolve blob URLs',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(prev => ({ ...prev, blobFix: false }));
-    }
-  };
-  
-  /**
-   * Run relative URL fix
-   */
-  const runRelativeFix = async () => {
-    try {
-      setLoading(prev => ({ ...prev, relativeFix: true }));
-      
-      const response = await axios.post('/api/admin/fix-relative-urls');
-      
-      setResults(prev => ({ ...prev, relativeFix: response.data }));
-      
-      toast({
-        title: 'Fix Complete',
-        description: 'Relative URLs have been fixed successfully.',
-        variant: 'default'
-      });
-      
-      // Refresh reports
-      loadReports();
-    } catch (error) {
-      console.error('Error fixing relative URLs:', error);
-      toast({
-        title: 'Fix Failed',
-        description: 'Failed to fix relative URLs',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(prev => ({ ...prev, relativeFix: false }));
-    }
-  };
-  
-  /**
-   * Run media validation test
-   */
-  const runTest = async () => {
-    try {
-      setLoading(prev => ({ ...prev, test: true }));
-      
-      const response = await axios.post('/api/admin/test-media-validation');
-      
-      setResults(prev => ({ ...prev, test: response.data }));
-      
-      toast({
-        title: 'Test Complete',
-        description: `Media validation test completed with ${response.data.results?.successRate || 0}% success rate.`,
-        variant: 'default'
-      });
-      
-      // Refresh reports
-      loadReports();
-    } catch (error) {
-      console.error('Error running test:', error);
-      toast({
-        title: 'Test Failed',
-        description: 'Failed to run media validation test',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(prev => ({ ...prev, test: false }));
-    }
-  };
-  
-  /**
-   * Format date for display
-   */
-  const formatDate = (timestamp: any) => {
-    if (!timestamp) return 'N/A';
+  // Fetch detailed report
+  const fetchReportDetails = async (reportId: string) => {
+    if (!user) return;
     
-    let date;
-    
-    if (timestamp._seconds) {
-      // Firestore timestamp
-      date = new Date(timestamp._seconds * 1000);
-    } else if (typeof timestamp === 'string') {
-      // ISO string
-      date = new Date(timestamp);
-    } else if (timestamp instanceof Date) {
-      date = timestamp;
-    } else {
-      return 'Invalid date';
+    try {
+      setIsLoading(true);
+      
+      // Get authentication token
+      const token = await getIdToken();
+      
+      // Call the Firebase Function endpoint
+      const response = await axios.get(
+        `https://us-central1-etoile-yachts.cloudfunctions.net/mediaValidationStatus?reportId=${reportId}`, 
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      
+      if (response.data.success) {
+        setSelectedReport(response.data.report);
+        setInvalidUrls(response.data.report.invalidUrls || []);
+      } else {
+        throw new Error(response.data.error || 'Failed to fetch report details');
+      }
+    } catch (error) {
+      console.error('Error fetching report details:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch report details',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
     }
-    
-    return date.toLocaleString();
   };
   
-  if (!isAdmin) {
+  // Trigger validation for all media
+  const triggerFullValidation = async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // Get authentication token
+      const token = await getIdToken();
+      
+      // Call the Firebase Function endpoint
+      const response = await axios.post(
+        'https://us-central1-etoile-yachts.cloudfunctions.net/validateSingleDocument',
+        {
+          collectionName: 'all',
+          documentId: 'all'
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      
+      if (response.data.success) {
+        toast({
+          title: 'Success',
+          description: 'Full media validation triggered successfully',
+        });
+        
+        // Fetch updated reports
+        setTimeout(fetchReports, 3000);
+      } else {
+        throw new Error(response.data.error || 'Failed to trigger validation');
+      }
+    } catch (error) {
+      console.error('Error triggering validation:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to trigger media validation',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Repair all media issues
+  const repairAllMediaIssues = async () => {
+    if (!user) return;
+    
+    try {
+      setIsRepairing(true);
+      
+      // Get authentication token
+      const token = await getIdToken();
+      
+      // Call the admin endpoint to fix media issues
+      const response = await axios.post(
+        '/api/admin/fix-media-issues',
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      
+      if (response.data.success) {
+        toast({
+          title: 'Success',
+          description: `Fixed ${response.data.fixedCount} media issues`,
+        });
+        
+        // Fetch updated reports
+        fetchReports();
+      } else {
+        throw new Error(response.data.error || 'Failed to repair media issues');
+      }
+    } catch (error) {
+      console.error('Error repairing media issues:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to repair media issues',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsRepairing(false);
+    }
+  };
+  
+  // Calculate overall completion percentage
+  const getCompletionPercentage = (report: MediaValidationReport): number => {
+    if (!report) return 0;
+    if (report.status === 'completed') return 100;
+    
+    return Math.floor((report.completedCollections / report.totalCollections) * 100);
+  };
+  
+  // Auto-fetch reports on component mount
+  useEffect(() => {
+    if (user) {
+      fetchReports();
+    }
+  }, [user]);
+  
+  // Render the validation status badge
+  const renderStatusBadge = (status: string) => {
+    switch (status) {
+      case 'running':
+        return <Badge variant="secondary" className="flex items-center gap-1"><Clock size={14} /> Running</Badge>;
+      case 'completed':
+        return <Badge variant="success" className="flex items-center gap-1"><CheckCircle2 size={14} /> Completed</Badge>;
+      case 'error':
+        return <Badge variant="destructive" className="flex items-center gap-1"><AlertCircle size={14} /> Error</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+  
+  // Render report list
+  const renderReportList = () => {
+    if (reports.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <FileSearch size={48} className="mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-semibold">No validation reports found</h3>
+          <p className="text-muted-foreground mb-6">
+            Run a validation to check for media issues
+          </p>
+          <Button onClick={triggerFullValidation} disabled={isLoading}>
+            {isLoading ? 'Triggering...' : 'Run Media Validation'}
+          </Button>
+        </div>
+      );
+    }
+    
     return (
-      <Alert>
-        <AlertTitle>Access Denied</AlertTitle>
-        <AlertDescription>
-          You do not have permission to access this page.
-        </AlertDescription>
-      </Alert>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>ID</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Started</TableHead>
+            <TableHead>Completed</TableHead>
+            <TableHead>Progress</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {reports.map(report => (
+            <TableRow key={report.id}>
+              <TableCell className="font-mono text-xs">{report.id}</TableCell>
+              <TableCell>{renderStatusBadge(report.status)}</TableCell>
+              <TableCell>{formatTimestamp(report.started)}</TableCell>
+              <TableCell>{formatTimestamp(report.completed)}</TableCell>
+              <TableCell>
+                <div className="w-full">
+                  <Progress value={getCompletionPercentage(report)} className="h-2" />
+                  <span className="text-xs text-muted-foreground">
+                    {report.completedCollections}/{report.totalCollections} collections
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => fetchReportDetails(report.id)}
+                >
+                  View Details
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     );
-  }
+  };
+  
+  // Render report details
+  const renderReportDetails = () => {
+    if (!selectedReport) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <FileSearch size={48} className="mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-semibold">No report selected</h3>
+          <p className="text-muted-foreground">
+            Select a report to view its details
+          </p>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-semibold">Report Details</h3>
+            <p className="text-sm text-muted-foreground">ID: {selectedReport.id}</p>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setSelectedReport(null);
+              setInvalidUrls([]);
+            }}
+          >
+            Close Details
+          </Button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{renderStatusBadge(selectedReport.status)}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {selectedReport.error && (
+                  <span className="text-destructive">{selectedReport.error}</span>
+                )}
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Duration</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {formatDuration(selectedReport.started, selectedReport.completed || new Date())}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Started: {formatTimestamp(selectedReport.started)}
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Collections</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {selectedReport.completedCollections}/{selectedReport.totalCollections}
+              </div>
+              <Progress 
+                value={getCompletionPercentage(selectedReport)} 
+                className="h-2 mt-2" 
+              />
+            </CardContent>
+          </Card>
+        </div>
+        
+        <Tabs defaultValue="collections">
+          <TabsList>
+            <TabsTrigger value="collections">Collection Results</TabsTrigger>
+            <TabsTrigger value="invalid-urls">Invalid URLs</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="collections" className="space-y-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Collection</TableHead>
+                  <TableHead>Processed</TableHead>
+                  <TableHead>Fixed</TableHead>
+                  <TableHead>Invalid URLs</TableHead>
+                  <TableHead>Errors</TableHead>
+                  <TableHead>Duration</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Object.entries(selectedReport.collections || {}).map(([name, stats]) => (
+                  <TableRow key={name}>
+                    <TableCell className="font-medium">{name}</TableCell>
+                    <TableCell>{stats.processed}</TableCell>
+                    <TableCell>{stats.fixed}</TableCell>
+                    <TableCell>
+                      {stats.invalidUrls > 0 ? (
+                        <Badge variant="destructive">{stats.invalidUrls}</Badge>
+                      ) : (
+                        stats.invalidUrls
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {stats.errors > 0 ? (
+                        <Badge variant="destructive">{stats.errors}</Badge>
+                      ) : (
+                        stats.errors
+                      )}
+                    </TableCell>
+                    <TableCell>{formatDuration(stats.started, stats.completed)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TabsContent>
+          
+          <TabsContent value="invalid-urls" className="space-y-4">
+            {invalidUrls.length === 0 ? (
+              <Alert>
+                <CheckCircle2 className="h-4 w-4" />
+                <AlertTitle>No invalid URLs found</AlertTitle>
+                <AlertDescription>
+                  All media URLs passed validation.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Collection</TableHead>
+                    <TableHead>Document ID</TableHead>
+                    <TableHead>Field</TableHead>
+                    <TableHead>URL</TableHead>
+                    <TableHead>Issue</TableHead>
+                    <TableHead>Type</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invalidUrls.map(item => (
+                    <TableRow key={item.id}>
+                      <TableCell>{item.collection}</TableCell>
+                      <TableCell className="font-mono text-xs">{item.documentId}</TableCell>
+                      <TableCell>{item.fieldPath}</TableCell>
+                      <TableCell className="font-mono text-xs max-w-xs truncate">
+                        {item.url}
+                      </TableCell>
+                      <TableCell>{item.reason}</TableCell>
+                      <TableCell>
+                        {item.contentType?.includes('video') ? (
+                          <Badge className="flex items-center gap-1" variant="secondary">
+                            <Film size={12} /> Video
+                          </Badge>
+                        ) : (
+                          <Badge className="flex items-center gap-1" variant="outline">
+                            <Image size={12} /> Image
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            
+            {invalidUrls.length > 0 && (
+              <div className="flex justify-end">
+                <Button
+                  onClick={repairAllMediaIssues}
+                  disabled={isRepairing}
+                  variant="destructive"
+                >
+                  {isRepairing ? 'Repairing...' : 'Repair All Media Issues'}
+                </Button>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  };
   
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-bold tracking-tight">Media Validation Tools</h2>
-      <p className="text-muted-foreground">
-        These tools help you validate and fix media URLs in your database.
-      </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Media Validation</h2>
+          <p className="text-muted-foreground">
+            Monitor and repair media URLs across all collections
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={fetchReports}
+            disabled={isLoading}
+          >
+            <RefreshCcw size={16} className="mr-2" />
+            Refresh
+          </Button>
+          
+          <Button 
+            size="sm" 
+            onClick={triggerFullValidation}
+            disabled={isLoading}
+          >
+            Run Validation
+          </Button>
+        </div>
+      </div>
       
-      <Tabs defaultValue="tools">
-        <TabsList>
-          <TabsTrigger value="tools">Validation Tools</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
-          <TabsTrigger value="test">Test Suite</TabsTrigger>
-        </TabsList>
+      <Separator />
+      
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
+            <FileSearch className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{reports.length}</div>
+            <p className="text-xs text-muted-foreground">
+              Validation report history
+            </p>
+          </CardContent>
+        </Card>
         
-        {/* Tools Tab */}
-        <TabsContent value="tools">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-            {/* Media Validation Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Media Validation</CardTitle>
-                <CardDescription>
-                  Validate all media URLs in the database
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm">
-                  This tool checks all image and video URLs in the database to ensure they are
-                  accessible and match their declared content type.
-                </p>
-                
-                {results.validation && (
-                  <Alert className="mt-4">
-                    <AlertTitle>Validation Complete</AlertTitle>
-                    <AlertDescription>
-                      <p>Validated {results.validation.stats?.totalUrls || 0} URLs</p>
-                      <p>Found {results.validation.stats?.invalidUrls || 0} invalid URLs</p>
-                      <p>Report ID: {results.validation.reportId || 'N/A'}</p>
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-              <CardFooter>
-                <Button 
-                  onClick={runValidation} 
-                  disabled={loading.validation}
-                  className="w-full"
-                >
-                  {loading.validation ? 'Running...' : 'Run Validation'}
-                </Button>
-              </CardFooter>
-            </Card>
-            
-            {/* Repair Broken URLs Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Repair Broken URLs</CardTitle>
-                <CardDescription>
-                  Fix broken or inaccessible URLs
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm">
-                  This tool replaces broken or inaccessible URLs with appropriate placeholders
-                  based on their expected content type.
-                </p>
-                
-                {results.repair && (
-                  <Alert className="mt-4">
-                    <AlertTitle>Repair Complete</AlertTitle>
-                    <AlertDescription>
-                      <p>Scanned {results.repair.stats?.totalDocs || 0} documents</p>
-                      <p>Repaired {results.repair.stats?.totalRepaired || 0} URLs</p>
-                      <p>Report ID: {results.repair.reportId || 'N/A'}</p>
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-              <CardFooter>
-                <Button 
-                  onClick={runRepair} 
-                  disabled={loading.repair}
-                  className="w-full"
-                >
-                  {loading.repair ? 'Running...' : 'Repair Broken URLs'}
-                </Button>
-              </CardFooter>
-            </Card>
-            
-            {/* Resolve Blob URLs Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Resolve Blob URLs</CardTitle>
-                <CardDescription>
-                  Replace blob:// URLs with placeholders
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm">
-                  This tool replaces blob:// URLs (which are client-side only) with appropriate
-                  placeholders to ensure they are accessible server-side.
-                </p>
-                
-                {results.blobFix && (
-                  <Alert className="mt-4">
-                    <AlertTitle>Resolution Complete</AlertTitle>
-                    <AlertDescription>
-                      <p>Scanned {results.blobFix.stats?.totalDocs || 0} documents</p>
-                      <p>Resolved {results.blobFix.stats?.totalResolved || 0} blob URLs</p>
-                      <p>Report ID: {results.blobFix.reportId || 'N/A'}</p>
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-              <CardFooter>
-                <Button 
-                  onClick={runBlobResolution} 
-                  disabled={loading.blobFix}
-                  className="w-full"
-                >
-                  {loading.blobFix ? 'Running...' : 'Resolve Blob URLs'}
-                </Button>
-              </CardFooter>
-            </Card>
-            
-            {/* Fix Relative URLs Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Fix Relative URLs</CardTitle>
-                <CardDescription>
-                  Convert relative URLs to absolute URLs
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm">
-                  This tool converts relative URLs (e.g., /images/photo.jpg) to absolute URLs
-                  that include the base domain, ensuring they are accessible from anywhere.
-                </p>
-                
-                {results.relativeFix && (
-                  <Alert className="mt-4">
-                    <AlertTitle>Fix Complete</AlertTitle>
-                    <AlertDescription>
-                      <p>Scanned {results.relativeFix.stats?.totalDocs || 0} documents</p>
-                      <p>Fixed {results.relativeFix.stats?.totalFixed || 0} relative URLs</p>
-                      <p>Report ID: {results.relativeFix.reportId || 'N/A'}</p>
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-              <CardFooter>
-                <Button 
-                  onClick={runRelativeFix} 
-                  disabled={loading.relativeFix}
-                  className="w-full"
-                >
-                  {loading.relativeFix ? 'Running...' : 'Fix Relative URLs'}
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
-        </TabsContent>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {reports.filter(r => r.status === 'running').length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Currently running validations
+            </p>
+          </CardContent>
+        </Card>
         
-        {/* Reports Tab */}
-        <TabsContent value="reports">
-          <div className="space-y-6 mt-6">
-            {/* Validation Reports */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Media Validation Reports</CardTitle>
-                <CardDescription>
-                  Recent media validation results
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {reports.validation.length > 0 ? (
-                  <div className="space-y-4">
-                    {reports.validation.map((report, index) => (
-                      <div key={report.id || index} className="border p-4 rounded-md">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-semibold">Report {index + 1}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {formatDate(report.timestamp || report.createdAt)}
-                            </p>
-                          </div>
-                          <Badge variant={
-                            report.invalidUrls > 0 ? 'destructive' : 'success'
-                          }>
-                            {report.invalidUrls > 0 ? 'Issues Found' : 'All Valid'}
-                          </Badge>
-                        </div>
-                        <Separator className="my-2" />
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <p>Total URLs: {report.totalUrls || 0}</p>
-                          <p>Valid: {report.validUrls || 0}</p>
-                          <p>Invalid: {report.invalidUrls || 0}</p>
-                          <p>Execution Time: {(report.executionTime / 1000).toFixed(2)}s</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-4">
-                    No validation reports available
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-            
-            {/* Repair Reports */}
-            <Card>
-              <CardHeader>
-                <CardTitle>URL Repair Reports</CardTitle>
-                <CardDescription>
-                  Recent URL repair results
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {reports.repair.length > 0 ? (
-                  <div className="space-y-4">
-                    {reports.repair.map((report, index) => (
-                      <div key={report.id || index} className="border p-4 rounded-md">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-semibold">Report {index + 1}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {formatDate(report.timestamp || report.createdAt)}
-                            </p>
-                          </div>
-                          <Badge variant={
-                            report.totalRepaired > 0 ? 'default' : 'outline'
-                          }>
-                            {report.totalRepaired > 0 ? `${report.totalRepaired} Fixed` : 'No Fixes'}
-                          </Badge>
-                        </div>
-                        <Separator className="my-2" />
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <p>Total Docs: {report.totalDocs || 0}</p>
-                          <p>Fixed URLs: {report.totalRepaired || 0}</p>
-                          <p>Failed: {report.totalFailed || 0}</p>
-                          <p>Execution Time: {(report.executionTime / 1000).toFixed(2)}s</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-4">
-                    No repair reports available
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Invalid Media</CardTitle>
+            <FileWarning className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {selectedReport 
+                ? invalidUrls.length 
+                : reports.reduce((count, report) => {
+                    // Sum invalid URLs across all collections
+                    if (report.collections) {
+                      Object.values(report.collections).forEach(stats => {
+                        count += stats.invalidUrls || 0;
+                      });
+                    }
+                    return count;
+                  }, 0)
+              }
+            </div>
+            <p className="text-xs text-muted-foreground">
+              URLs needing repair
+            </p>
+          </CardContent>
+        </Card>
         
-        {/* Test Suite Tab */}
-        <TabsContent value="test">
-          <div className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Media Validation Test Suite</CardTitle>
-                <CardDescription>
-                  Run a comprehensive test of all validation and repair tools
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm mb-4">
-                  This tool runs a comprehensive test of all media validation and repair tools
-                  using a test collection populated with various problematic media URLs.
-                </p>
-                
-                {results.test && (
-                  <div className="space-y-4">
-                    <Alert>
-                      <AlertTitle>Test Complete</AlertTitle>
-                      <AlertDescription>
-                        <p>Initial issues: {results.test.results?.initialIssues || 0}</p>
-                        <p>Issues fixed: {results.test.results?.fixedIssues || 0}</p>
-                        <p>Remaining issues: {results.test.results?.remainingIssues || 0}</p>
-                      </AlertDescription>
-                    </Alert>
-                    
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Success Rate</p>
-                      <Progress 
-                        value={results.test.results?.successRate || 0} 
-                        className="h-2"
-                      />
-                      <p className="text-sm text-right">{results.test.results?.successRate || 0}%</p>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Test Reports */}
-                {reports.test.length > 0 && (
-                  <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-4">Test Reports</h3>
-                    <div className="space-y-4">
-                      {reports.test.map((report, index) => (
-                        <div key={report.id || index} className="border p-4 rounded-md">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-semibold">Test {index + 1}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {formatDate(report.timestamp)}
-                              </p>
-                            </div>
-                            <Badge variant={
-                              report.successRate >= 80 ? 'success' : 
-                              report.successRate >= 50 ? 'default' : 'destructive'
-                            }>
-                              {report.successRate}% Success
-                            </Badge>
-                          </div>
-                          <Separator className="my-2" />
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <p>Initial issues: {report.initialIssues || 0}</p>
-                            <p>Fixed issues: {report.fixedIssues || 0}</p>
-                            <p>Remaining: {report.remainingIssues || 0}</p>
-                            <p>Test ID: {report.id}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-              <CardFooter>
-                <Button 
-                  onClick={runTest} 
-                  disabled={loading.test}
-                  className="w-full"
-                >
-                  {loading.test ? 'Running...' : 'Run Test Suite'}
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Last Run</CardTitle>
+            <BarChart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {reports.length > 0 
+                ? formatTimestamp(reports[0]?.started || 'Never') 
+                : 'Never'
+              }
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {reports.length > 0 && reports[0]?.status
+                ? `Status: ${reports[0]?.status}`
+                : 'No recent validations'
+              }
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {selectedReport ? renderReportDetails() : renderReportList()}
     </div>
   );
 };
