@@ -63,7 +63,7 @@ function getMediaValidation() {
       })),
       processMediaUrl: jest.fn(url => {
         let wasFixed = false;
-        let detectedType = undefined;
+        let detectedType: 'video' | undefined = undefined;
         let processedUrl = url;
         
         if (url.startsWith('/')) {
@@ -150,8 +150,8 @@ describe('Media Validation Service', () => {
       const result = processMediaArray(mediaArray);
       
       expect(result.wasFixed).toBe(true);
-      expect(result.mediaArray[0].url).not.toStartWith('/');
-      expect(result.mediaArray[1].url).not.toStartWith('blob:');
+      expect(result.mediaArray[0].url.startsWith('/')).toBe(false);
+      expect(result.mediaArray[1].url.startsWith('blob:')).toBe(false);
       expect(result.mediaArray[2].type).toBe('video');
       expect(result.mediaArray[3].url).toBe(mediaArray[3].url);
     });
@@ -168,10 +168,22 @@ describe('Media Validation Service', () => {
         data: TEST_DOCUMENT_WITH_MEDIA
       });
       
-      // Mock the Firestore collection
-      mockFirestore.collection.mockReturnValue({
-        doc: jest.fn(() => mockDoc.ref)
-      });
+      // Create a mock collection with the minimum required properties
+      const mockCollection = {
+        docs: [],
+        empty: false,
+        size: 1,
+        forEach: jest.fn(),
+        doc: jest.fn(() => mockDoc.ref),
+        add: jest.fn(),
+        get: jest.fn(),
+        where: jest.fn(),
+        orderBy: jest.fn(),
+        limit: jest.fn()
+      };
+      
+      // Mock the Firestore collection method
+      mockFirestore.collection.mockReturnValue(mockCollection);
       
       // Run the validation
       const result = await validateAndRepairMedia(
