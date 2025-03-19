@@ -4,11 +4,12 @@
 
 import { RulesTestEnvironment } from '@firebase/rules-unit-testing';
 
+// Global declarations for Firebase test environment
 declare global {
-  // Add the Firebase test environment to global namespace
+  // For Node.js environment
   var __FIREBASE_TEST_ENV__: RulesTestEnvironment;
   
-  // Add any other global types needed for testing
+  // For TypeScript in general
   namespace NodeJS {
     interface Global {
       __FIREBASE_TEST_ENV__: RulesTestEnvironment;
