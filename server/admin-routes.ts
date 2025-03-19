@@ -518,4 +518,44 @@ export function registerAdminRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to fix media issues' });
     }
   });
+  
+  /**
+   * Get list of media repair reports
+   * This endpoint retrieves the history of media fixes performed by the system
+   */
+  app.get('/api/admin/media-repair-reports', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      // Get the reports from Firestore, sorted by timestamp
+      const reportsSnapshot = await adminDb.collection('media_validation_reports')
+        .orderBy('timestamp', 'desc')
+        .limit(10)
+        .get();
+      
+      // Map to array of reports
+      const reports = reportsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          date: data.timestamp.toDate().toISOString(),
+          collection: data.collection,
+          documentId: data.documentId,
+          stats: {
+            relativeUrlsFixed: data.fixes?.relativeUrls?.length || 0,
+            mediaTypesFixed: data.fixes?.mediaTypes?.length || 0
+          },
+          collectionsScanned: 1, // Each report is for a single document
+          fixes: {
+            relativeUrls: data.fixes?.relativeUrls || [],
+            mediaTypes: data.fixes?.mediaTypes || []
+          }
+        };
+      });
+      
+      // Return the reports
+      res.json({ reports });
+    } catch (error) {
+      console.error('Error fetching media repair reports:', error);
+      res.status(500).json({ error: 'Failed to fetch media repair reports' });
+    }
+  });
 }
