@@ -95,8 +95,8 @@ describe('Authentication Service', () => {
     // Sign out after tests
     await signOut(auth).catch(() => {});
     
-    // Close Firebase app
-    await app.delete();
+    // In Firebase v9, we don't need to explicitly delete the app
+    // as it will be cleaned up when the tests complete
   });
   
   // Reset state before each test
