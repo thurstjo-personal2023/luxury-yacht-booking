@@ -1,677 +1,697 @@
 /**
- * Media Validation Panel
+ * Media Validation Panel Component
  * 
- * This component provides an admin interface for managing media validation,
- * viewing validation reports, and fixing media issues.
+ * This component provides an admin interface for managing media validation tasks,
+ * viewing validation reports, and initiating validation or repair operations.
  */
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/use-auth';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import {
-  BarChart,
-  RefreshCcw,
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-  Image,
-  Film,
-  FileWarning,
-  FileSearch
-} from 'lucide-react';
-import axios from 'axios';
+import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { AlertCircle, CheckCircle, Clock, FileImage, RefreshCw, Wrench } from 'lucide-react';
 
-// Types for media validation
-interface MediaValidationReport {
-  id: string;
-  status: 'running' | 'completed' | 'error';
-  started: any; // Timestamp
-  completed?: any; // Timestamp
-  collections: Record<string, CollectionValidationStats>;
-  completedCollections: number;
-  totalCollections: number;
+// Types for validation reports
+interface ValidationReport {
+  reportId: string;
+  startTime: any; // Timestamp
+  endTime?: any; // Timestamp
+  totalDocuments: number;
+  totalMediaItems: number;
+  validItems: number;
+  invalidItems: number;
+  missingItems: number;
+  collections: {
+    [collectionName: string]: {
+      totalUrls: number;
+      valid: number;
+      invalid: number;
+      missing: number;
+    }
+  };
+  invalidItemDetails?: {
+    collectionName: string;
+    documentId: string;
+    fieldPath: string;
+    url: string;
+    reason: string;
+    status?: number;
+    error?: string;
+  }[];
+  status: 'running' | 'completed' | 'failed';
   error?: string;
 }
 
-interface CollectionValidationStats {
-  processed: number;
-  fixed: number;
-  errors: number;
-  invalidUrls: number;
-  batchErrors: number;
-  started: any; // Timestamp
-  completed?: any; // Timestamp
-  batches?: number;
-}
-
-interface InvalidMediaUrl {
-  id: string;
-  collection: string;
-  documentId: string;
-  fieldPath: string;
-  url: string;
-  reason: string;
-  status?: string;
+// Types for URL fix reports
+interface UrlFixReport {
+  reportId: string;
+  startTime: any; // Timestamp
+  endTime?: any; // Timestamp
+  totalDocuments: number;
+  fixedDocuments: number;
+  totalFixedUrls: number;
+  collections: {
+    [collectionName: string]: {
+      totalDocuments: number;
+      fixedDocuments: number;
+      totalFixedUrls: number;
+    }
+  };
+  status: 'running' | 'completed' | 'failed';
   error?: string;
-  contentType?: string;
-  timestamp: any; // Timestamp
 }
 
-// Helper function to format timestamps
-const formatTimestamp = (timestamp: any): string => {
-  if (!timestamp) return 'N/A';
-  
-  // Handle Firestore timestamp
-  if (timestamp._seconds) {
-    return new Date(timestamp._seconds * 1000).toLocaleString();
-  }
-  
-  // Handle regular Date object
-  if (timestamp instanceof Date) {
-    return timestamp.toLocaleString();
-  }
-  
-  // Handle string date
-  return new Date(timestamp).toLocaleString();
-};
+// Types for validation tasks
+interface ValidationTask {
+  taskId: string;
+  type: 'validate-all' | 'validate-collection' | 'fix-relative-urls';
+  collectionName?: string;
+  documentId?: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  startTime?: any; // Timestamp
+  endTime?: any; // Timestamp
+  retryCount: number;
+  lastUpdate: any; // Timestamp
+  reportId?: string;
+}
 
-// Helper function to format duration
-const formatDuration = (start: any, end: any): string => {
-  if (!start || !end) return 'N/A';
-  
-  // Convert to milliseconds
-  const startMs = start._seconds ? start._seconds * 1000 : new Date(start).getTime();
-  const endMs = end._seconds ? end._seconds * 1000 : new Date(end).getTime();
-  
-  // Calculate duration in seconds
-  const durationSec = Math.floor((endMs - startMs) / 1000);
-  
-  // Format as minutes and seconds
-  if (durationSec < 60) {
-    return `${durationSec} seconds`;
-  } else {
-    const minutes = Math.floor(durationSec / 60);
-    const seconds = durationSec % 60;
-    return `${minutes} min ${seconds} sec`;
-  }
-};
+// Types for validation schedules
+interface ValidationSchedule {
+  id: string;
+  type: 'validate-all' | 'fix-relative-urls';
+  enabled: boolean;
+  lastRun?: any; // Timestamp
+  nextRun?: any; // Timestamp
+  intervalHours?: number;
+  status: 'active' | 'disabled' | 'failed';
+}
 
 /**
  * Media Validation Panel Component
  */
-const MediaValidationPanel: React.FC = () => {
-  const { user } = useAuth();
+export const MediaValidationPanel: React.FC = () => {
   const { toast } = useToast();
-  
-  // State for reports and UI
-  const [reports, setReports] = useState<MediaValidationReport[]>([]);
-  const [selectedReport, setSelectedReport] = useState<MediaValidationReport | null>(null);
-  const [invalidUrls, setInvalidUrls] = useState<InvalidMediaUrl[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isRepairing, setIsRepairing] = useState<boolean>(false);
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState('reports');
+  const [selectedCollection, setSelectedCollection] = useState<string>('');
   
   // Fetch validation reports
-  const fetchReports = async () => {
-    if (!user) return;
+  const {
+    data: validationReports,
+    isLoading: isLoadingReports,
+    error: reportsError
+  } = useQuery({
+    queryKey: ['/api/admin/media-validation-reports'],
+    enabled: activeTab === 'reports'
+  });
+  
+  // Fetch URL fix reports
+  const {
+    data: urlFixReports,
+    isLoading: isLoadingFixReports,
+    error: fixReportsError
+  } = useQuery({
+    queryKey: ['/api/admin/url-fix-reports'],
+    enabled: activeTab === 'reports'
+  });
+  
+  // Fetch active tasks
+  const {
+    data: activeTasks,
+    isLoading: isLoadingTasks,
+    error: tasksError
+  } = useQuery({
+    queryKey: ['/api/admin/validation-tasks'],
+    refetchInterval: 5000, // Refresh every 5 seconds
+    enabled: activeTab === 'tasks'
+  });
+  
+  // Fetch validation schedules
+  const {
+    data: schedules,
+    isLoading: isLoadingSchedules,
+    error: schedulesError
+  } = useQuery({
+    queryKey: ['/api/admin/schedules'],
+    enabled: activeTab === 'schedules'
+  });
+  
+  // Fetch available collections
+  const {
+    data: collections,
+    isLoading: isLoadingCollections
+  } = useQuery({
+    queryKey: ['/api/admin/collections']
+  });
+  
+  // Start validation mutation
+  const startValidation = useMutation({
+    mutationFn: () => apiRequest('/api/admin/validate-media', { method: 'POST' }),
+    onSuccess: (data) => {
+      toast({
+        title: 'Validation Started',
+        description: `Task ID: ${data.taskId}`,
+        duration: 3000
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/validation-tasks'] });
+      setActiveTab('tasks');
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error Starting Validation',
+        description: error.message || 'Unknown error',
+        variant: 'destructive',
+        duration: 5000
+      });
+    }
+  });
+  
+  // Validate collection mutation
+  const validateCollection = useMutation({
+    mutationFn: (collection: string) => apiRequest('/api/admin/validate-collection', {
+      method: 'POST',
+      body: { collection }
+    }),
+    onSuccess: (data) => {
+      toast({
+        title: 'Collection Validation Started',
+        description: `Validating: ${data.collection}`,
+        duration: 3000
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/validation-tasks'] });
+      setActiveTab('tasks');
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error Starting Collection Validation',
+        description: error.message || 'Unknown error',
+        variant: 'destructive',
+        duration: 5000
+      });
+    }
+  });
+  
+  // Fix relative URLs mutation
+  const fixRelativeUrls = useMutation({
+    mutationFn: () => apiRequest('/api/admin/fix-relative-urls', { method: 'POST' }),
+    onSuccess: (data) => {
+      toast({
+        title: 'URL Fix Started',
+        description: `Task ID: ${data.taskId}`,
+        duration: 3000
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/validation-tasks'] });
+      setActiveTab('tasks');
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error Starting URL Fix',
+        description: error.message || 'Unknown error',
+        variant: 'destructive',
+        duration: 5000
+      });
+    }
+  });
+  
+  // Update schedule mutation
+  const updateSchedule = useMutation({
+    mutationFn: (schedule: Partial<ValidationSchedule> & { id: string }) => 
+      apiRequest(`/api/admin/schedules/${schedule.id}`, {
+        method: 'PUT',
+        body: schedule
+      }),
+    onSuccess: () => {
+      toast({
+        title: 'Schedule Updated',
+        description: 'Validation schedule has been updated',
+        duration: 3000
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/schedules'] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error Updating Schedule',
+        description: error.message || 'Unknown error',
+        variant: 'destructive',
+        duration: 5000
+      });
+    }
+  });
+  
+  // Format timestamp
+  const formatTimestamp = (timestamp: any): string => {
+    if (!timestamp) return 'N/A';
     
     try {
-      setIsLoading(true);
-      
-      // Get authentication token
-      const token = await user.getIdToken();
-      
-      // Call the Firebase Function endpoint
-      const response = await axios.get(
-        'https://us-central1-etoile-yachts.cloudfunctions.net/mediaValidationStatus', 
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-      
-      if (response.data.success) {
-        setReports(response.data.reports);
-      } else {
-        throw new Error(response.data.error || 'Failed to fetch reports');
+      // Check if it's a Firestore timestamp
+      if (typeof timestamp.toDate === 'function') {
+        return timestamp.toDate().toLocaleString();
       }
+      
+      // Check if it's a seconds/nanoseconds object
+      if (timestamp._seconds) {
+        return new Date(timestamp._seconds * 1000).toLocaleString();
+      }
+      
+      // Regular Date
+      return new Date(timestamp).toLocaleString();
     } catch (error) {
-      console.error('Error fetching validation reports:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch validation reports',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsLoading(false);
+      return 'Invalid Date';
     }
   };
   
-  // Fetch detailed report
-  const fetchReportDetails = async (reportId: string) => {
-    if (!user) return;
-    
-    try {
-      setIsLoading(true);
-      
-      // Get authentication token
-      const token = await user.getIdToken();
-      
-      // Call the Firebase Function endpoint
-      const response = await axios.get(
-        `https://us-central1-etoile-yachts.cloudfunctions.net/mediaValidationStatus?reportId=${reportId}`, 
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-      
-      if (response.data.success) {
-        setSelectedReport(response.data.report);
-        setInvalidUrls(response.data.report.invalidUrls || []);
-      } else {
-        throw new Error(response.data.error || 'Failed to fetch report details');
-      }
-    } catch (error) {
-      console.error('Error fetching report details:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch report details',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Trigger validation for all media
-  const triggerFullValidation = async () => {
-    if (!user) return;
-    
-    try {
-      setIsLoading(true);
-      
-      // Get authentication token
-      const token = await user.getIdToken();
-      
-      // Call the Firebase Function endpoint
-      const response = await axios.post(
-        'https://us-central1-etoile-yachts.cloudfunctions.net/validateSingleDocument',
-        {
-          collectionName: 'all',
-          documentId: 'all'
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-      
-      if (response.data.success) {
-        toast({
-          title: 'Success',
-          description: 'Full media validation triggered successfully',
-        });
-        
-        // Fetch updated reports
-        setTimeout(fetchReports, 3000);
-      } else {
-        throw new Error(response.data.error || 'Failed to trigger validation');
-      }
-    } catch (error) {
-      console.error('Error triggering validation:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to trigger media validation',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Repair all media issues
-  const repairAllMediaIssues = async () => {
-    if (!user) return;
-    
-    try {
-      setIsRepairing(true);
-      
-      // Get authentication token
-      const token = await user.getIdToken();
-      
-      // Call the admin endpoint to fix media issues
-      const response = await axios.post(
-        '/api/admin/fix-media-issues',
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-      
-      if (response.data.success) {
-        toast({
-          title: 'Success',
-          description: `Fixed ${response.data.fixedCount} media issues`,
-        });
-        
-        // Fetch updated reports
-        fetchReports();
-      } else {
-        throw new Error(response.data.error || 'Failed to repair media issues');
-      }
-    } catch (error) {
-      console.error('Error repairing media issues:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to repair media issues',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsRepairing(false);
-    }
-  };
-  
-  // Calculate overall completion percentage
-  const getCompletionPercentage = (report: MediaValidationReport): number => {
-    if (!report) return 0;
+  // Calculate validation progress percentage
+  const calculateProgress = (report: ValidationReport): number => {
     if (report.status === 'completed') return 100;
+    if (report.status === 'failed') return 0;
     
-    return Math.floor((report.completedCollections / report.totalCollections) * 100);
+    // Calculate progress based on processed items
+    const totalItems = report.totalMediaItems;
+    if (totalItems === 0) return 0;
+    
+    const processedItems = report.validItems + report.invalidItems + report.missingItems;
+    return Math.min(Math.round((processedItems / totalItems) * 100), 99); // Cap at 99% until completed
   };
   
-  // Auto-fetch reports on component mount
-  useEffect(() => {
-    if (user) {
-      fetchReports();
-    }
-  }, [user]);
-  
-  // Render the validation status badge
-  const renderStatusBadge = (status: string) => {
+  // Get status color
+  const getStatusColor = (status: string): string => {
     switch (status) {
-      case 'running':
-        return <Badge variant="secondary" className="flex items-center gap-1"><Clock size={14} /> Running</Badge>;
       case 'completed':
-        return <Badge variant="success" className="flex items-center gap-1"><CheckCircle2 size={14} /> Completed</Badge>;
-      case 'error':
-        return <Badge variant="destructive" className="flex items-center gap-1"><AlertCircle size={14} /> Error</Badge>;
+        return 'text-green-500';
+      case 'failed':
+        return 'text-red-500';
+      case 'running':
+      case 'processing':
+        return 'text-blue-500';
+      case 'pending':
+        return 'text-yellow-500';
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return 'text-gray-500';
     }
   };
   
-  // Render report list
-  const renderReportList = () => {
-    if (reports.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <FileSearch size={48} className="mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold">No validation reports found</h3>
-          <p className="text-muted-foreground mb-6">
-            Run a validation to check for media issues
-          </p>
-          <Button onClick={triggerFullValidation} disabled={isLoading}>
-            {isLoading ? 'Triggering...' : 'Run Media Validation'}
-          </Button>
-        </div>
-      );
+  // Get status icon
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case 'failed':
+        return <AlertCircle className="h-5 w-5 text-red-500" />;
+      case 'running':
+      case 'processing':
+        return <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />;
+      case 'pending':
+        return <Clock className="h-5 w-5 text-yellow-500" />;
+      default:
+        return null;
     }
-    
-    return (
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>ID</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Started</TableHead>
-            <TableHead>Completed</TableHead>
-            <TableHead>Progress</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {reports.map(report => (
-            <TableRow key={report.id}>
-              <TableCell className="font-mono text-xs">{report.id}</TableCell>
-              <TableCell>{renderStatusBadge(report.status)}</TableCell>
-              <TableCell>{formatTimestamp(report.started)}</TableCell>
-              <TableCell>{formatTimestamp(report.completed)}</TableCell>
-              <TableCell>
-                <div className="w-full">
-                  <Progress value={getCompletionPercentage(report)} className="h-2" />
-                  <span className="text-xs text-muted-foreground">
-                    {report.completedCollections}/{report.totalCollections} collections
-                  </span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => fetchReportDetails(report.id)}
-                >
-                  View Details
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    );
   };
   
-  // Render report details
-  const renderReportDetails = () => {
-    if (!selectedReport) {
-      return (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <FileSearch size={48} className="mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold">No report selected</h3>
-          <p className="text-muted-foreground">
-            Select a report to view its details
-          </p>
-        </div>
-      );
+  // Handle start validation click
+  const handleStartValidation = () => {
+    startValidation.mutate();
+  };
+  
+  // Handle validate collection click
+  const handleValidateCollection = () => {
+    if (selectedCollection) {
+      validateCollection.mutate(selectedCollection);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Please select a collection to validate',
+        variant: 'destructive',
+        duration: 3000
+      });
     }
-    
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="text-lg font-semibold">Report Details</h3>
-            <p className="text-sm text-muted-foreground">ID: {selectedReport.id}</p>
-          </div>
-          <Button 
-            variant="outline" 
-            onClick={() => {
-              setSelectedReport(null);
-              setInvalidUrls([]);
-            }}
-          >
-            Close Details
-          </Button>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{renderStatusBadge(selectedReport.status)}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {selectedReport.error && (
-                  <span className="text-destructive">{selectedReport.error}</span>
-                )}
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Duration</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatDuration(selectedReport.started, selectedReport.completed || new Date())}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Started: {formatTimestamp(selectedReport.started)}
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Collections</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {selectedReport.completedCollections}/{selectedReport.totalCollections}
-              </div>
-              <Progress 
-                value={getCompletionPercentage(selectedReport)} 
-                className="h-2 mt-2" 
-              />
-            </CardContent>
-          </Card>
-        </div>
-        
-        <Tabs defaultValue="collections">
-          <TabsList>
-            <TabsTrigger value="collections">Collection Results</TabsTrigger>
-            <TabsTrigger value="invalid-urls">Invalid URLs</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="collections" className="space-y-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Collection</TableHead>
-                  <TableHead>Processed</TableHead>
-                  <TableHead>Fixed</TableHead>
-                  <TableHead>Invalid URLs</TableHead>
-                  <TableHead>Errors</TableHead>
-                  <TableHead>Duration</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Object.entries(selectedReport.collections || {}).map(([name, stats]) => (
-                  <TableRow key={name}>
-                    <TableCell className="font-medium">{name}</TableCell>
-                    <TableCell>{stats.processed}</TableCell>
-                    <TableCell>{stats.fixed}</TableCell>
-                    <TableCell>
-                      {stats.invalidUrls > 0 ? (
-                        <Badge variant="destructive">{stats.invalidUrls}</Badge>
-                      ) : (
-                        stats.invalidUrls
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {stats.errors > 0 ? (
-                        <Badge variant="destructive">{stats.errors}</Badge>
-                      ) : (
-                        stats.errors
-                      )}
-                    </TableCell>
-                    <TableCell>{formatDuration(stats.started, stats.completed)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TabsContent>
-          
-          <TabsContent value="invalid-urls" className="space-y-4">
-            {invalidUrls.length === 0 ? (
-              <Alert>
-                <CheckCircle2 className="h-4 w-4" />
-                <AlertTitle>No invalid URLs found</AlertTitle>
-                <AlertDescription>
-                  All media URLs passed validation.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Collection</TableHead>
-                    <TableHead>Document ID</TableHead>
-                    <TableHead>Field</TableHead>
-                    <TableHead>URL</TableHead>
-                    <TableHead>Issue</TableHead>
-                    <TableHead>Type</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invalidUrls.map(item => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.collection}</TableCell>
-                      <TableCell className="font-mono text-xs">{item.documentId}</TableCell>
-                      <TableCell>{item.fieldPath}</TableCell>
-                      <TableCell className="font-mono text-xs max-w-xs truncate">
-                        {item.url}
-                      </TableCell>
-                      <TableCell>{item.reason}</TableCell>
-                      <TableCell>
-                        {item.contentType?.includes('video') ? (
-                          <Badge className="flex items-center gap-1" variant="secondary">
-                            <Film size={12} /> Video
-                          </Badge>
-                        ) : (
-                          <Badge className="flex items-center gap-1" variant="outline">
-                            <Image size={12} /> Image
-                          </Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-            
-            {invalidUrls.length > 0 && (
-              <div className="flex justify-end">
-                <Button
-                  onClick={repairAllMediaIssues}
-                  disabled={isRepairing}
-                  variant="destructive"
-                >
-                  {isRepairing ? 'Repairing...' : 'Repair All Media Issues'}
-                </Button>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
-    );
+  };
+  
+  // Handle fix URLs click
+  const handleFixUrls = () => {
+    fixRelativeUrls.mutate();
+  };
+  
+  // Handle toggle schedule click
+  const handleToggleSchedule = (schedule: ValidationSchedule) => {
+    updateSchedule.mutate({
+      id: schedule.id,
+      enabled: !schedule.enabled
+    });
   };
   
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Media Validation</h2>
-          <p className="text-muted-foreground">
-            Monitor and repair media URLs across all collections
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={fetchReports}
-            disabled={isLoading}
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Media Validation</h2>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            onClick={handleStartValidation}
+            disabled={startValidation.isPending}
+            className="flex items-center gap-2"
           >
-            <RefreshCcw size={16} className="mr-2" />
-            Refresh
+            <FileImage className="h-4 w-4" />
+            {startValidation.isPending ? 'Starting...' : 'Validate All Media'}
           </Button>
+          <Button
+            size="sm"
+            onClick={handleFixUrls}
+            disabled={fixRelativeUrls.isPending}
+            className="flex items-center gap-2"
+          >
+            <Wrench className="h-4 w-4" />
+            {fixRelativeUrls.isPending ? 'Starting...' : 'Fix Relative URLs'}
+          </Button>
+        </div>
+      </div>
+      
+      <Tabs defaultValue="reports" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="reports">Validation Reports</TabsTrigger>
+          <TabsTrigger value="tasks">Active Tasks</TabsTrigger>
+          <TabsTrigger value="schedules">Schedules</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="reports" className="space-y-4 mt-4">
+          {isLoadingReports ? (
+            <div className="flex justify-center py-8">Loading reports...</div>
+          ) : reportsError ? (
+            <div className="bg-red-50 p-4 rounded-md text-red-800">
+              Error loading reports: {(reportsError as Error).message}
+            </div>
+          ) : validationReports?.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No validation reports found. Start a validation to generate reports.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {validationReports?.map((report: ValidationReport) => (
+                <Card key={report.reportId}>
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="text-lg">Report {report.reportId.substring(0, 8)}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(report.status)}
+                        <span className={getStatusColor(report.status)}>
+                          {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
+                        </span>
+                      </div>
+                    </div>
+                    <CardDescription>
+                      Started: {formatTimestamp(report.startTime)}
+                      {report.endTime && ` • Completed: ${formatTimestamp(report.endTime)}`}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pb-2">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Progress</span>
+                          <span>{calculateProgress(report)}%</span>
+                        </div>
+                        <Progress value={calculateProgress(report)} />
+                      </div>
+                      
+                      <div className="grid grid-cols-4 gap-2 text-center">
+                        <div>
+                          <div className="text-xl font-semibold">{report.totalDocuments}</div>
+                          <div className="text-xs text-muted-foreground">Documents</div>
+                        </div>
+                        <div>
+                          <div className="text-xl font-semibold">{report.totalMediaItems}</div>
+                          <div className="text-xs text-muted-foreground">Media Items</div>
+                        </div>
+                        <div>
+                          <div className="text-xl font-semibold text-green-500">{report.validItems}</div>
+                          <div className="text-xs text-muted-foreground">Valid</div>
+                        </div>
+                        <div>
+                          <div className="text-xl font-semibold text-red-500">{report.invalidItems}</div>
+                          <div className="text-xs text-muted-foreground">Invalid</div>
+                        </div>
+                      </div>
+                      
+                      {report.invalidItemDetails && report.invalidItemDetails.length > 0 && (
+                        <div className="mt-4">
+                          <div className="font-medium text-sm mb-2">Invalid Media Items:</div>
+                          <ScrollArea className="h-[150px] w-full rounded-md border p-2">
+                            <div className="space-y-2">
+                              {report.invalidItemDetails.slice(0, 10).map((item, index) => (
+                                <div key={index} className="text-xs border-b pb-2">
+                                  <div className="font-medium">{item.collectionName}/{item.documentId}</div>
+                                  <div className="text-muted-foreground">Field: {item.fieldPath}</div>
+                                  <div className="truncate max-w-full">URL: {item.url}</div>
+                                  <div className="text-red-500">{item.reason}: {item.error}</div>
+                                </div>
+                              ))}
+                              {report.invalidItemDetails.length > 10 && (
+                                <div className="text-xs text-muted-foreground text-center">
+                                  {report.invalidItemDetails.length - 10} more items not shown
+                                </div>
+                              )}
+                            </div>
+                          </ScrollArea>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <div className="flex justify-between items-center w-full text-xs text-muted-foreground">
+                      <div>ID: {report.reportId}</div>
+                      {report.error && (
+                        <div className="text-red-500">{report.error}</div>
+                      )}
+                    </div>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
           
-          <Button 
-            size="sm" 
-            onClick={triggerFullValidation}
-            disabled={isLoading}
-          >
-            Run Validation
-          </Button>
-        </div>
-      </div>
-      
-      <Separator />
-      
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
-            <FileSearch className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{reports.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Validation report history
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {reports.filter(r => r.status === 'running').length}
+          <h3 className="text-lg font-medium mt-8 mb-4">URL Fix Reports</h3>
+          
+          {isLoadingFixReports ? (
+            <div className="flex justify-center py-8">Loading URL fix reports...</div>
+          ) : fixReportsError ? (
+            <div className="bg-red-50 p-4 rounded-md text-red-800">
+              Error loading URL fix reports: {(fixReportsError as Error).message}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Currently running validations
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Invalid Media</CardTitle>
-            <FileWarning className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {selectedReport 
-                ? invalidUrls.length 
-                : reports.reduce((count, report) => {
-                    // Sum invalid URLs across all collections
-                    if (report.collections) {
-                      Object.values(report.collections).forEach(stats => {
-                        count += stats.invalidUrls || 0;
-                      });
-                    }
-                    return count;
-                  }, 0)
-              }
+          ) : !urlFixReports || urlFixReports.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No URL fix reports found. Fix relative URLs to generate reports.
             </div>
-            <p className="text-xs text-muted-foreground">
-              URLs needing repair
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Last Run</CardTitle>
-            <BarChart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {reports.length > 0 
-                ? formatTimestamp(reports[0]?.started || 'Never') 
-                : 'Never'
-              }
+          ) : (
+            <div className="space-y-4">
+              {urlFixReports.map((report: UrlFixReport) => (
+                <Card key={report.reportId}>
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="text-lg">URL Fix {report.reportId.substring(0, 8)}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(report.status)}
+                        <span className={getStatusColor(report.status)}>
+                          {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
+                        </span>
+                      </div>
+                    </div>
+                    <CardDescription>
+                      Started: {formatTimestamp(report.startTime)}
+                      {report.endTime && ` • Completed: ${formatTimestamp(report.endTime)}`}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pb-2">
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <div className="text-xl font-semibold">{report.totalDocuments}</div>
+                        <div className="text-xs text-muted-foreground">Documents Scanned</div>
+                      </div>
+                      <div>
+                        <div className="text-xl font-semibold">{report.fixedDocuments}</div>
+                        <div className="text-xs text-muted-foreground">Documents Fixed</div>
+                      </div>
+                      <div>
+                        <div className="text-xl font-semibold">{report.totalFixedUrls}</div>
+                        <div className="text-xs text-muted-foreground">URLs Fixed</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <div className="flex justify-between items-center w-full text-xs text-muted-foreground">
+                      <div>ID: {report.reportId}</div>
+                      {report.error && (
+                        <div className="text-red-500">{report.error}</div>
+                      )}
+                    </div>
+                  </CardFooter>
+                </Card>
+              ))}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {reports.length > 0 && reports[0]?.status
-                ? `Status: ${reports[0]?.status}`
-                : 'No recent validations'
-              }
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {selectedReport ? renderReportDetails() : renderReportList()}
+          )}
+        </TabsContent>
+        
+        <TabsContent value="tasks" className="space-y-4 mt-4">
+          <div className="flex gap-4 mb-6">
+            <div className="w-2/3">
+              <div className="flex gap-2 items-center">
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={selectedCollection}
+                  onChange={(e) => setSelectedCollection(e.target.value)}
+                  disabled={isLoadingCollections || !collections}
+                >
+                  <option value="">Select a collection</option>
+                  {collections?.map((collection: string) => (
+                    <option key={collection} value={collection}>
+                      {collection}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  onClick={handleValidateCollection}
+                  disabled={!selectedCollection || validateCollection.isPending}
+                >
+                  {validateCollection.isPending ? 'Starting...' : 'Validate Collection'}
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          {isLoadingTasks ? (
+            <div className="flex justify-center py-8">Loading tasks...</div>
+          ) : tasksError ? (
+            <div className="bg-red-50 p-4 rounded-md text-red-800">
+              Error loading tasks: {(tasksError as Error).message}
+            </div>
+          ) : !activeTasks || activeTasks.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No active validation tasks found.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {activeTasks.map((task: ValidationTask) => (
+                <Card key={task.taskId}>
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="text-lg">
+                        {task.type === 'validate-all' ? 'Validate All Media' :
+                          task.type === 'validate-collection' ? `Validate Collection: ${task.collectionName}` :
+                          'Fix Relative URLs'}
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(task.status)}
+                        <span className={getStatusColor(task.status)}>
+                          {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                        </span>
+                      </div>
+                    </div>
+                    <CardDescription>
+                      Task ID: {task.taskId.substring(0, 8)}
+                      {task.startTime && ` • Started: ${formatTimestamp(task.startTime)}`}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pb-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-sm font-medium">Status</div>
+                        <div className="text-sm">
+                          {task.status === 'pending' ? 'Waiting to be processed' :
+                           task.status === 'processing' ? 'Currently processing' :
+                           task.status === 'completed' ? 'Completed successfully' :
+                           'Failed to process'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium">Last Updated</div>
+                        <div className="text-sm">{formatTimestamp(task.lastUpdate)}</div>
+                      </div>
+                    </div>
+                    
+                    {task.reportId && (
+                      <div className="mt-4">
+                        <div className="text-sm font-medium">Report ID</div>
+                        <div className="text-sm">{task.reportId}</div>
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter>
+                    <div className="flex justify-between items-center w-full text-xs text-muted-foreground">
+                      <div>Retry Count: {task.retryCount}</div>
+                      {task.endTime && (
+                        <div>Completed: {formatTimestamp(task.endTime)}</div>
+                      )}
+                    </div>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="schedules" className="space-y-4 mt-4">
+          {isLoadingSchedules ? (
+            <div className="flex justify-center py-8">Loading schedules...</div>
+          ) : schedulesError ? (
+            <div className="bg-red-50 p-4 rounded-md text-red-800">
+              Error loading schedules: {(schedulesError as Error).message}
+            </div>
+          ) : !schedules || schedules.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No validation schedules found.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {schedules.map((schedule: ValidationSchedule) => (
+                <Card key={schedule.id}>
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="text-lg">
+                        {schedule.type === 'validate-all' ? 'Regular Media Validation' : 'Regular URL Fixing'}
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <span className={schedule.enabled ? 'text-green-500' : 'text-red-500'}>
+                          {schedule.enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                    </div>
+                    <CardDescription>
+                      Runs every {schedule.intervalHours} hours
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pb-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-sm font-medium">Last Run</div>
+                        <div className="text-sm">
+                          {schedule.lastRun ? formatTimestamp(schedule.lastRun) : 'Never'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium">Next Run</div>
+                        <div className="text-sm">
+                          {schedule.nextRun ? formatTimestamp(schedule.nextRun) : 'Not scheduled'}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button
+                      variant={schedule.enabled ? 'outline' : 'default'}
+                      onClick={() => handleToggleSchedule(schedule)}
+                      disabled={updateSchedule.isPending}
+                    >
+                      {schedule.enabled ? 'Disable Schedule' : 'Enable Schedule'}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
-
-export default MediaValidationPanel;
