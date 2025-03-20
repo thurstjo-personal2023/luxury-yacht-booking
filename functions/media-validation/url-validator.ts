@@ -1,238 +1,285 @@
 /**
  * URL Validator Module
  * 
- * This module provides URL validation functionality, with special handling for
- * media URLs (images and videos).
+ * This module provides functionality for validating URLs and checking their content types.
+ * It supports validation of both absolute and relative URLs, and detection of media types.
  */
-import axios, { AxiosRequestConfig } from 'axios';
+
+import fetch from 'node-fetch';
+import * as path from 'path';
 
 /**
- * Configuration options for the URL validator
+ * Media type constants
  */
-export interface URLValidatorOptions {
-  /**
-   * Logger function for errors
-   */
-  logError: (message: string, error?: any) => void;
-  
-  /**
-   * Logger function for informational messages
-   */
-  logInfo: (message: string) => void;
-  
-  /**
-   * Regular expression for identifying relative URLs
-   * Default is URLs starting with a single slash: /image.jpg
-   */
-  isRelativeUrlPattern?: RegExp;
-  
-  /**
-   * Request timeout in milliseconds
-   * Default is 5000 (5 seconds)
-   */
-  timeout?: number;
-  
-  /**
-   * User agent to use for requests
-   * Default is a standard browser user agent
-   */
-  userAgent?: string;
-}
+export const MEDIA_TYPES = {
+  IMAGE: 'image',
+  VIDEO: 'video',
+  UNKNOWN: 'unknown'
+};
 
 /**
- * Result of URL validation
+ * URL validation response interface
  */
 export interface URLValidationResult {
-  /**
-   * Original URL that was validated
-   */
   url: string;
-  
-  /**
-   * Whether the URL is valid
-   */
   isValid: boolean;
-  
-  /**
-   * Error message if not valid
-   */
+  isAbsolute: boolean;
+  mediaType: string;
   error?: string;
-  
-  /**
-   * HTTP status code if available
-   */
-  status?: number;
-  
-  /**
-   * Content type of the URL if available
-   */
+  statusCode?: number;
+  statusText?: string;
   contentType?: string;
-  
-  /**
-   * Content length if available
-   */
-  contentLength?: number;
-  
-  /**
-   * Whether the URL is a relative URL
-   */
-  isRelative?: boolean;
-  
-  /**
-   * Type of media ('image', 'video', 'other')
-   */
-  mediaType?: 'image' | 'video' | 'other';
 }
 
 /**
- * URL Validator class
- * 
- * Validates URLs and provides utilities for determining URL types and characteristics
+ * Validation options
  */
-export class URLValidator {
-  private options: Required<URLValidatorOptions>;
-  
-  /**
-   * Create a new URL validator
-   */
-  constructor(options: URLValidatorOptions) {
-    // Default options
-    this.options = {
-      logError: options.logError,
-      logInfo: options.logInfo,
-      isRelativeUrlPattern: options.isRelativeUrlPattern || /^\/[^\/].*/,
-      timeout: options.timeout || 5000,
-      userAgent: options.userAgent || 'Mozilla/5.0 (compatible; EtoileYachtsValidator/1.0)'
-    };
+export interface ValidationOptions {
+  validateContent?: boolean;
+  expectedType?: string;
+  timeout?: number;
+  headers?: Record<string, string>;
+}
+
+/**
+ * Default validation options
+ */
+const DEFAULT_OPTIONS: ValidationOptions = {
+  validateContent: true,
+  timeout: 10000,
+  headers: {
+    'User-Agent': 'EtoileYachts-MediaValidator/1.0'
+  }
+};
+
+/**
+ * Validates if a string is a valid URL
+ */
+export function isValidURL(url: string): boolean {
+  // Check for null or empty URLs
+  if (!url || url.trim() === '') {
+    return false;
   }
   
-  /**
-   * Validate a URL by making a HEAD request and checking the response
-   * 
-   * @param url The URL to validate
-   * @param expectedMediaType Optional media type to check against (e.g., 'image', 'video')
-   * @returns A validation result
-   */
-  async validateURL(url: string, expectedMediaType?: 'image' | 'video'): Promise<URLValidationResult> {
-    const result: URLValidationResult = {
-      url,
-      isValid: false,
-      isRelative: this.isRelativeURL(url)
-    };
+  // Handle relative URLs (starting with /)
+  if (url.startsWith('/')) {
+    // Basic check for relative URLs - must not have invalid characters
+    return !/[\s<>"]/.test(url);
+  }
+  
+  // Check if URL is valid using URL constructor
+  try {
+    new URL(url);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Checks if a URL is absolute (has protocol and domain)
+ */
+export function isAbsoluteURL(url: string): boolean {
+  if (!url) return false;
+  
+  // URL is absolute if it starts with http:// or https://
+  return /^https?:\/\//i.test(url);
+}
+
+/**
+ * Determine media type based on URL extension or content type
+ */
+export function getMediaTypeFromURL(url: string, contentType?: string): string {
+  // If content type is available, use it to determine media type
+  if (contentType) {
+    if (contentType.startsWith('image/')) {
+      return MEDIA_TYPES.IMAGE;
+    } else if (contentType.startsWith('video/')) {
+      return MEDIA_TYPES.VIDEO;
+    }
+  }
+  
+  // Otherwise, try to determine from file extension
+  const extension = path.extname(url).toLowerCase();
+  
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.ico', '.tiff'];
+  const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.wmv', '.m4v', '.mpg', '.mpeg'];
+  
+  if (imageExtensions.includes(extension)) {
+    return MEDIA_TYPES.IMAGE;
+  } else if (videoExtensions.includes(extension)) {
+    return MEDIA_TYPES.VIDEO;
+  }
+  
+  return MEDIA_TYPES.UNKNOWN;
+}
+
+/**
+ * Validate if a URL points to a valid resource with expected media type
+ */
+export async function validateURL(
+  url: string, 
+  options: ValidationOptions = DEFAULT_OPTIONS
+): Promise<URLValidationResult> {
+  const result: URLValidationResult = {
+    url,
+    isValid: false,
+    isAbsolute: isAbsoluteURL(url),
+    mediaType: MEDIA_TYPES.UNKNOWN
+  };
+  
+  // Combine default options with provided options
+  const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
+  
+  // Check if URL is formally valid
+  if (!isValidURL(url)) {
+    result.error = 'Invalid URL format';
+    return result;
+  }
+  
+  // For relative URLs, we can't validate content
+  if (!result.isAbsolute) {
+    result.error = 'Relative URL cannot be validated for content';
+    return result;
+  }
+  
+  // For blob URLs, mark as invalid
+  if (url.startsWith('blob:')) {
+    result.error = 'Blob URLs are not persistent and cannot be validated';
+    return result;
+  }
+  
+  // Skip content validation if not requested
+  if (!mergedOptions.validateContent) {
+    result.isValid = true;
+    result.mediaType = getMediaTypeFromURL(url);
+    return result;
+  }
+  
+  // Make HEAD request to validate URL
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), mergedOptions.timeout);
     
-    // Don't try to validate relative URLs
-    if (result.isRelative) {
-      result.error = 'Relative URL cannot be validated directly';
+    const response = await fetch(url, {
+      method: 'HEAD',
+      headers: mergedOptions.headers || {},
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    result.statusCode = response.status;
+    result.statusText = response.statusText;
+    
+    // Check if status is in 200-299 range
+    result.isValid = response.status >= 200 && response.status < 300;
+    
+    if (!result.isValid) {
+      result.error = `Request failed with status: ${response.status} ${response.statusText}`;
       return result;
     }
     
-    try {
-      // Set up request options
-      const requestOptions: AxiosRequestConfig = {
-        responseType: 'arraybuffer',
-        headers: {
-          'User-Agent': this.options.userAgent,
-          'Accept': 'image/*, video/*, */*'
-        },
-        validateStatus: (status) => true, // Accept any status to handle it ourselves
-        timeout: this.options.timeout
-      };
-      
-      // Make request
-      const response = await axios.get(url, requestOptions);
-      
-      // Set up result fields from response
-      result.status = response.status;
-      
-      // Handle HTTP errors
-      if (response.status >= 400) {
-        result.error = response.statusText;
-        return result;
-      }
-      
-      // Check content type
-      const contentType = response.headers['content-type'];
-      if (contentType) {
-        result.contentType = contentType;
-        
-        // Determine media type from content type
-        if (contentType.startsWith('image/')) {
-          result.mediaType = 'image';
-        } else if (contentType.startsWith('video/')) {
-          result.mediaType = 'video';
-        } else {
-          result.mediaType = 'other';
-        }
-        
-        // Check if content type matches expected media type
-        if (expectedMediaType) {
-          if (
-            (expectedMediaType === 'image' && !contentType.startsWith('image/')) ||
-            (expectedMediaType === 'video' && !contentType.startsWith('video/'))
-          ) {
-            result.error = `Expected ${expectedMediaType}, but got ${contentType}`;
-            return result;
-          }
-        }
-      }
-      
-      // Get content length if available
-      const contentLength = response.headers['content-length'];
-      if (contentLength) {
-        result.contentLength = parseInt(contentLength, 10);
-      }
-      
-      // If we made it this far, the URL is valid
-      result.isValid = true;
-    } catch (error: any) {
-      // Handle network and other errors
-      this.options.logError(`Error validating URL ${url}:`, error);
-      result.error = error.message;
+    // Get content type
+    const contentType = response.headers.get('content-type');
+    result.contentType = contentType || undefined;
+    
+    // Determine media type
+    result.mediaType = getMediaTypeFromURL(url, contentType || undefined);
+    
+    // If expected type is provided, validate against it
+    if (mergedOptions.expectedType && result.mediaType !== mergedOptions.expectedType) {
+      result.isValid = false;
+      result.error = `Expected ${mergedOptions.expectedType}, got ${result.mediaType}`;
+    }
+    
+    return result;
+  } catch (error) {
+    result.isValid = false;
+    result.error = error instanceof Error ? error.message : String(error);
+    
+    if (error.name === 'AbortError') {
+      result.error = `Request timed out after ${mergedOptions.timeout}ms`;
     }
     
     return result;
   }
-  
-  /**
-   * Check if a URL is a relative URL (starting with a /)
-   * 
-   * @param url The URL to check
-   * @returns true if relative, false otherwise
-   */
-  isRelativeURL(url: string): boolean {
-    if (!url) return false;
-    return this.options.isRelativeUrlPattern.test(url);
+}
+
+/**
+ * Convert a relative URL to an absolute URL using a base URL
+ */
+export function convertRelativeToAbsoluteURL(relativeURL: string, baseURL: string): string {
+  // If already absolute, return as is
+  if (isAbsoluteURL(relativeURL)) {
+    return relativeURL;
   }
   
-  /**
-   * Check if a URL is an absolute URL (starting with http:// or https://)
-   * 
-   * @param url The URL to check
-   * @returns true if absolute, false otherwise
-   */
-  isAbsoluteURL(url: string): boolean {
-    if (!url) return false;
-    return /^https?:\/\//.test(url);
+  // Ensure baseURL ends with /
+  const normalizedBase = baseURL.endsWith('/') ? baseURL : `${baseURL}/`;
+  
+  // Remove leading / from relativeURL if present
+  const normalizedRelative = relativeURL.startsWith('/') ? relativeURL.substring(1) : relativeURL;
+  
+  return `${normalizedBase}${normalizedRelative}`;
+}
+
+/**
+ * Replace a relative URL with an absolute URL or placeholder
+ */
+export function fixRelativeURL(
+  relativeURL: string, 
+  baseURL: string, 
+  placeholder?: string
+): string {
+  // If already absolute, return as is
+  if (isAbsoluteURL(relativeURL)) {
+    return relativeURL;
   }
   
-  /**
-   * If URL is relative, convert it to absolute using the base URL
-   * Otherwise, return the URL unchanged
-   * 
-   * @param url The URL to normalize
-   * @param baseUrl The base URL to use for relative URLs
-   * @returns The normalized URL
-   */
-  normalizePotentialRelativeURL(url: string, baseUrl: string): string {
-    if (!url) return url;
+  // If placeholder is provided and URL doesn't look like a valid path, use placeholder
+  if (placeholder && !relativeURL.startsWith('/')) {
+    return placeholder;
+  }
+  
+  return convertRelativeToAbsoluteURL(relativeURL, baseURL);
+}
+
+/**
+ * Get media type from content type header
+ */
+export function getMediaTypeFromContentType(contentType: string): string {
+  if (!contentType) return MEDIA_TYPES.UNKNOWN;
+  
+  if (contentType.startsWith('image/')) {
+    return MEDIA_TYPES.IMAGE;
+  }
+  
+  if (contentType.startsWith('video/')) {
+    return MEDIA_TYPES.VIDEO;
+  }
+  
+  return MEDIA_TYPES.UNKNOWN;
+}
+
+/**
+ * Batch validate an array of URLs
+ */
+export async function batchValidateURLs(
+  urls: string[],
+  options: ValidationOptions = DEFAULT_OPTIONS
+): Promise<URLValidationResult[]> {
+  const results: URLValidationResult[] = [];
+  
+  // Process URLs in batches to avoid overwhelming network
+  const batchSize = 10;
+  for (let i = 0; i < urls.length; i += batchSize) {
+    const batch = urls.slice(i, i + batchSize);
+    const batchPromises = batch.map(url => validateURL(url, options));
     
-    // Check if it's a relative URL
-    if (this.isRelativeURL(url)) {
-      // Remove trailing slash from baseUrl if present
-      const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-      return `${cleanBaseUrl}${url}`;
-    }
-    
-    return url;
+    const batchResults = await Promise.all(batchPromises);
+    results.push(...batchResults);
   }
+  
+  return results;
 }

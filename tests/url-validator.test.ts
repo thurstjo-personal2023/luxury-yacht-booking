@@ -3,143 +3,264 @@
  * 
  * This file contains tests for the URL validation functionality.
  */
-import axios from 'axios';
-import { URLValidator } from '../functions/media-validation/url-validator';
+import {
+  isValidURL,
+  isAbsoluteURL,
+  getMediaTypeFromURL,
+  validateURL,
+  convertRelativeToAbsoluteURL,
+  fixRelativeURL,
+  getMediaTypeFromContentType,
+  MEDIA_TYPES,
+  URLValidationResult
+} from '../functions/media-validation/url-validator';
 
-// Mock axios
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+// Mock fetch for testing
+jest.mock('node-fetch');
+import fetch from 'node-fetch';
+const { Response } = jest.requireActual('node-fetch');
 
-// Helper function to get a URL validator instance with mocked dependencies
-function getUrlValidator() {
-  return new URLValidator({
-    logError: jest.fn(),
-    logInfo: jest.fn(),
-    isRelativeUrlPattern: /^\/[^\/].*/  // Matches URLs starting with a single slash
-  });
-}
-
-describe('URLValidator', () => {
+describe('URL Validator', () => {
+  // Reset mocks before each test
   beforeEach(() => {
     jest.clearAllMocks();
   });
-
+  
+  describe('isValidURL', () => {
+    it('should validate absolute URLs', () => {
+      expect(isValidURL('https://example.com')).toBe(true);
+      expect(isValidURL('http://localhost:3000')).toBe(true);
+      expect(isValidURL('https://storage.googleapis.com/my-bucket/image.jpg')).toBe(true);
+    });
+    
+    it('should validate relative URLs', () => {
+      expect(isValidURL('/images/yacht.jpg')).toBe(true);
+      expect(isValidURL('/yacht-placeholder.jpg')).toBe(true);
+    });
+    
+    it('should reject invalid URLs', () => {
+      expect(isValidURL('')).toBe(false);
+      expect(isValidURL(null as any)).toBe(false);
+      expect(isValidURL(undefined as any)).toBe(false);
+      expect(isValidURL('not a url')).toBe(false);
+      expect(isValidURL('http:/missing-slash')).toBe(false);
+    });
+    
+    it('should reject relative URLs with invalid characters', () => {
+      expect(isValidURL('/ spaced.jpg')).toBe(false);
+      expect(isValidURL('/<script>.jpg')).toBe(false);
+      expect(isValidURL('/"quoted".jpg')).toBe(false);
+    });
+  });
+  
+  describe('isAbsoluteURL', () => {
+    it('should detect absolute URLs', () => {
+      expect(isAbsoluteURL('https://example.com')).toBe(true);
+      expect(isAbsoluteURL('http://localhost:3000')).toBe(true);
+    });
+    
+    it('should detect relative URLs', () => {
+      expect(isAbsoluteURL('/images/yacht.jpg')).toBe(false);
+      expect(isAbsoluteURL('yacht.jpg')).toBe(false);
+    });
+    
+    it('should handle edge cases', () => {
+      expect(isAbsoluteURL('')).toBe(false);
+      expect(isAbsoluteURL(null as any)).toBe(false);
+      expect(isAbsoluteURL('https:')).toBe(false);
+      expect(isAbsoluteURL('//example.com/image.jpg')).toBe(false);
+    });
+  });
+  
+  describe('getMediaTypeFromURL', () => {
+    it('should detect image types from extension', () => {
+      expect(getMediaTypeFromURL('https://example.com/image.jpg')).toBe(MEDIA_TYPES.IMAGE);
+      expect(getMediaTypeFromURL('https://example.com/image.png')).toBe(MEDIA_TYPES.IMAGE);
+      expect(getMediaTypeFromURL('https://example.com/image.webp')).toBe(MEDIA_TYPES.IMAGE);
+      expect(getMediaTypeFromURL('/images/yacht.jpeg')).toBe(MEDIA_TYPES.IMAGE);
+    });
+    
+    it('should detect video types from extension', () => {
+      expect(getMediaTypeFromURL('https://example.com/video.mp4')).toBe(MEDIA_TYPES.VIDEO);
+      expect(getMediaTypeFromURL('https://example.com/video.webm')).toBe(MEDIA_TYPES.VIDEO);
+      expect(getMediaTypeFromURL('/videos/yacht-tour.mov')).toBe(MEDIA_TYPES.VIDEO);
+    });
+    
+    it('should return unknown for other extensions', () => {
+      expect(getMediaTypeFromURL('https://example.com/file.pdf')).toBe(MEDIA_TYPES.UNKNOWN);
+      expect(getMediaTypeFromURL('https://example.com/file.txt')).toBe(MEDIA_TYPES.UNKNOWN);
+      expect(getMediaTypeFromURL('https://example.com/page.html')).toBe(MEDIA_TYPES.UNKNOWN);
+    });
+    
+    it('should use content type over extension when provided', () => {
+      expect(getMediaTypeFromURL('https://example.com/file', 'image/jpeg')).toBe(MEDIA_TYPES.IMAGE);
+      expect(getMediaTypeFromURL('https://example.com/file.txt', 'image/png')).toBe(MEDIA_TYPES.IMAGE);
+      expect(getMediaTypeFromURL('https://example.com/file', 'video/mp4')).toBe(MEDIA_TYPES.VIDEO);
+    });
+  });
+  
+  describe('getMediaTypeFromContentType', () => {
+    it('should detect image content types', () => {
+      expect(getMediaTypeFromContentType('image/jpeg')).toBe(MEDIA_TYPES.IMAGE);
+      expect(getMediaTypeFromContentType('image/png')).toBe(MEDIA_TYPES.IMAGE);
+      expect(getMediaTypeFromContentType('image/svg+xml')).toBe(MEDIA_TYPES.IMAGE);
+    });
+    
+    it('should detect video content types', () => {
+      expect(getMediaTypeFromContentType('video/mp4')).toBe(MEDIA_TYPES.VIDEO);
+      expect(getMediaTypeFromContentType('video/webm')).toBe(MEDIA_TYPES.VIDEO);
+      expect(getMediaTypeFromContentType('video/ogg')).toBe(MEDIA_TYPES.VIDEO);
+    });
+    
+    it('should return unknown for other content types', () => {
+      expect(getMediaTypeFromContentType('application/pdf')).toBe(MEDIA_TYPES.UNKNOWN);
+      expect(getMediaTypeFromContentType('text/html')).toBe(MEDIA_TYPES.UNKNOWN);
+      expect(getMediaTypeFromContentType('')).toBe(MEDIA_TYPES.UNKNOWN);
+      expect(getMediaTypeFromContentType(null as any)).toBe(MEDIA_TYPES.UNKNOWN);
+    });
+  });
+  
+  describe('convertRelativeToAbsoluteURL', () => {
+    it('should convert relative URLs to absolute URLs', () => {
+      expect(convertRelativeToAbsoluteURL('/images/yacht.jpg', 'https://example.com')).toBe('https://example.com/images/yacht.jpg');
+      expect(convertRelativeToAbsoluteURL('images/yacht.jpg', 'https://example.com/')).toBe('https://example.com/images/yacht.jpg');
+    });
+    
+    it('should handle base URLs with and without trailing slashes', () => {
+      expect(convertRelativeToAbsoluteURL('/yacht.jpg', 'https://example.com')).toBe('https://example.com/yacht.jpg');
+      expect(convertRelativeToAbsoluteURL('/yacht.jpg', 'https://example.com/')).toBe('https://example.com/yacht.jpg');
+    });
+    
+    it('should return absolute URLs unchanged', () => {
+      expect(convertRelativeToAbsoluteURL('https://other.com/image.jpg', 'https://example.com')).toBe('https://other.com/image.jpg');
+    });
+  });
+  
+  describe('fixRelativeURL', () => {
+    it('should convert relative URLs to absolute URLs', () => {
+      expect(fixRelativeURL('/images/yacht.jpg', 'https://example.com')).toBe('https://example.com/images/yacht.jpg');
+    });
+    
+    it('should use placeholder for non-path relative URLs when provided', () => {
+      expect(fixRelativeURL('yacht.jpg', 'https://example.com', 'https://placeholder.com/image.jpg')).toBe('https://placeholder.com/image.jpg');
+    });
+    
+    it('should convert path-like URLs even when placeholder is provided', () => {
+      expect(fixRelativeURL('/images/yacht.jpg', 'https://example.com', 'https://placeholder.com/image.jpg')).toBe('https://example.com/images/yacht.jpg');
+    });
+    
+    it('should return absolute URLs unchanged', () => {
+      expect(fixRelativeURL('https://other.com/image.jpg', 'https://example.com', 'https://placeholder.com/image.jpg')).toBe('https://other.com/image.jpg');
+    });
+  });
+  
   describe('validateURL', () => {
-    it('should validate a good image URL', async () => {
-      // Setup
-      const validator = getUrlValidator();
-      mockedAxios.get.mockResolvedValueOnce({
-        status: 200,
-        headers: { 'content-type': 'image/jpeg' }
-      });
-
-      // Test
-      const result = await validator.validateURL('https://example.com/image.jpg');
-
-      // Verify
+    it('should validate a good URL', async () => {
+      // Mock successful response
+      (fetch as jest.Mock).mockResolvedValueOnce(
+        new Response(null, {
+          status: 200,
+          headers: { 'content-type': 'image/jpeg' }
+        })
+      );
+      
+      const result = await validateURL('https://example.com/image.jpg');
+      
       expect(result.isValid).toBe(true);
-      expect(result.status).toBe(200);
+      expect(result.mediaType).toBe(MEDIA_TYPES.IMAGE);
+      expect(result.isAbsolute).toBe(true);
       expect(result.contentType).toBe('image/jpeg');
-      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
-      expect(mockedAxios.get).toHaveBeenCalledWith('https://example.com/image.jpg', {
-        responseType: 'arraybuffer',
-        headers: expect.any(Object),
-        validateStatus: expect.any(Function),
-        timeout: expect.any(Number),
-      });
     });
-
-    it('should invalidate non-image content types', async () => {
-      // Setup
-      const validator = getUrlValidator();
-      mockedAxios.get.mockResolvedValueOnce({
-        status: 200,
-        headers: { 'content-type': 'video/mp4' }
-      });
-
-      // Test
-      const result = await validator.validateURL('https://example.com/video.mp4');
-
-      // Verify
+    
+    it('should detect invalid URLs', async () => {
+      const result = await validateURL('not-a-url');
+      
       expect(result.isValid).toBe(false);
-      expect(result.error).toContain('Expected image');
-      expect(result.status).toBe(200);
-      expect(result.contentType).toBe('video/mp4');
+      expect(result.error).toBe('Invalid URL format');
     });
-
+    
+    it('should detect relative URLs', async () => {
+      const result = await validateURL('/images/yacht.jpg');
+      
+      expect(result.isValid).toBe(false);
+      expect(result.isAbsolute).toBe(false);
+      expect(result.error).toBe('Relative URL cannot be validated for content');
+    });
+    
+    it('should detect blob URLs', async () => {
+      const result = await validateURL('blob:https://example.com/123-456-789');
+      
+      expect(result.isValid).toBe(false);
+      expect(result.error).toBe('Blob URLs are not persistent and cannot be validated');
+    });
+    
+    it('should handle failed requests', async () => {
+      // Mock failed response
+      (fetch as jest.Mock).mockResolvedValueOnce(
+        new Response(null, { status: 404 })
+      );
+      
+      const result = await validateURL('https://example.com/not-found.jpg');
+      
+      expect(result.isValid).toBe(false);
+      expect(result.statusCode).toBe(404);
+      expect(result.error).toContain('Request failed with status');
+    });
+    
     it('should handle network errors', async () => {
-      // Setup
-      const validator = getUrlValidator();
-      mockedAxios.get.mockRejectedValueOnce(new Error('Network error'));
-
-      // Test
-      const result = await validator.validateURL('https://example.com/broken-image.jpg');
-
-      // Verify
+      // Mock network error
+      (fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+      
+      const result = await validateURL('https://example.com/error.jpg');
+      
       expect(result.isValid).toBe(false);
       expect(result.error).toBe('Network error');
-      expect(result.status).toBeUndefined();
     });
-
-    it('should handle HTTP errors', async () => {
-      // Setup
-      const validator = getUrlValidator();
-      mockedAxios.get.mockResolvedValueOnce({
-        status: 404,
-        statusText: 'Not Found'
+    
+    it('should handle timeouts', async () => {
+      // Mock timeout
+      (fetch as jest.Mock).mockImplementationOnce(() => {
+        return new Promise((_, reject) => {
+          setTimeout(() => {
+            const error = new Error('Timeout');
+            error.name = 'AbortError';
+            reject(error);
+          }, 10);
+        });
       });
-
-      // Test
-      const result = await validator.validateURL('https://example.com/missing-image.jpg');
-
-      // Verify
+      
+      const result = await validateURL('https://example.com/timeout.jpg', { timeout: 5 });
+      
       expect(result.isValid).toBe(false);
-      expect(result.error).toBe('Not Found');
-      expect(result.status).toBe(404);
+      expect(result.error).toContain('Request timed out');
     });
-  });
-
-  describe('isRelativeURL', () => {
-    it('should identify relative URLs', () => {
-      const validator = getUrlValidator();
+    
+    it('should validate media type when expected type is provided', async () => {
+      // Mock image response for video URL
+      (fetch as jest.Mock).mockResolvedValueOnce(
+        new Response(null, {
+          status: 200,
+          headers: { 'content-type': 'video/mp4' }
+        })
+      );
       
-      // Valid relative URLs
-      expect(validator.isRelativeURL('/images/logo.png')).toBe(true);
-      expect(validator.isRelativeURL('/assets/photos/beach.jpg')).toBe(true);
+      const result = await validateURL('https://example.com/video.mp4', {
+        expectedType: MEDIA_TYPES.IMAGE
+      });
       
-      // Invalid relative URLs (not starting with a single slash)
-      expect(validator.isRelativeURL('//cdn.example.com/image.jpg')).toBe(false);
-      expect(validator.isRelativeURL('https://example.com/image.jpg')).toBe(false);
-      expect(validator.isRelativeURL('image.jpg')).toBe(false);
+      expect(result.isValid).toBe(false);
+      expect(result.mediaType).toBe(MEDIA_TYPES.VIDEO);
+      expect(result.error).toContain('Expected image, got video');
     });
-  });
-
-  describe('isAbsoluteURL', () => {
-    it('should identify absolute URLs', () => {
-      const validator = getUrlValidator();
+    
+    it('should skip content validation when validateContent is false', async () => {
+      const result = await validateURL('https://example.com/image.jpg', {
+        validateContent: false
+      });
       
-      // Valid absolute URLs
-      expect(validator.isAbsoluteURL('https://example.com/image.jpg')).toBe(true);
-      expect(validator.isAbsoluteURL('http://subdomain.example.org/assets/logo.png')).toBe(true);
-      
-      // Invalid absolute URLs
-      expect(validator.isAbsoluteURL('/images/logo.png')).toBe(false);
-      expect(validator.isAbsoluteURL('image.jpg')).toBe(false);
-    });
-  });
-
-  describe('normalizePotentialRelativeURL', () => {
-    it('should convert relative URLs to absolute', () => {
-      const validator = getUrlValidator();
-      const baseUrl = 'https://example.com';
-      
-      // Convert relative to absolute
-      expect(validator.normalizePotentialRelativeURL('/images/logo.png', baseUrl))
-        .toBe('https://example.com/images/logo.png');
-      
-      // Leave absolute URLs unchanged
-      expect(validator.normalizePotentialRelativeURL('https://cdn.example.org/logo.png', baseUrl))
-        .toBe('https://cdn.example.org/logo.png');
+      expect(result.isValid).toBe(true);
+      expect(result.mediaType).toBe(MEDIA_TYPES.IMAGE);
+      expect(fetch).not.toHaveBeenCalled();
     });
   });
 });
