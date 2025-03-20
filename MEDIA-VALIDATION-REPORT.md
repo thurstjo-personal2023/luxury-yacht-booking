@@ -1,120 +1,157 @@
-# Media Validation System Documentation
+# Media Validation and Repair System
+
+This document provides an overview of the media validation and repair system for the Etoile Yachts platform.
 
 ## Overview
 
-The Media Validation System is a comprehensive solution for detecting and repairing invalid media URLs across the Etoile Yachts platform. It provides automated validation, reporting, and repair capabilities for images and videos referenced in the Firestore database.
+The media validation system identifies and repairs issues with media URLs in the Firestore database, including:
 
-## Key Components
+1. **Relative URLs**: Converts relative URLs (e.g., `/yacht-placeholder.jpg`) to absolute URLs
+2. **Blob URLs**: Replaces blob URLs (e.g., `blob://...`) with appropriate placeholders
+3. **Media Type Mismatches**: Detects when videos are incorrectly labeled as images
 
-### 1. URL Validator
-Located in `functions/media-validation/url-validator.ts`, this module provides utilities to validate URLs and check if they are accessible. It can detect various issues:
-- Invalid URL formats
-- Missing resources (404 errors)
-- Server errors
-- Media type mismatches (e.g., video content in image fields)
-- Relative URLs that won't resolve properly
+## Implementation
 
-### 2. Media Validation Service
-Located in `functions/media-validation/media-validation.ts`, this service validates media URLs in documents and generates reports. Features include:
-- Document validation that extracts and checks all media URLs
-- Report generation with detailed statistics by collection
-- URL fixing capabilities that replace invalid URLs with placeholders
+The system consists of several components:
 
-### 3. Worker Process
-Located in `functions/media-validation/worker.ts`, the worker provides functionality to process validation tasks in batches:
-- Processes documents in configurable batch sizes
-- Validates and optionally fixes media URLs across collections
-- Saves validation reports to Firestore for later reference
+### 1. Cloud Functions
 
-### 4. Scheduler
-Located in `functions/media-validation/scheduler.ts`, the scheduler manages periodic validation tasks:
-- Supports interval-based scheduling
-- Configurable concurrency limits
-- Task management with status tracking
+- **scheduledMediaValidation**: Runs every 4 hours to check for media URL issues
+- **processMediaValidation**: Processes batches of documents for validation
 
-### 5. Admin Interface
-The admin interface includes:
-- `MediaValidationPanel` component for visualization and control
-- `useMediaValidation` hook for interacting with the validation API
-- Dashboard with validation statistics and controls
-- Results view with detailed error information
-- History view for past validation reports
+### 2. URL Validation Logic
 
-## Test Coverage
+The core validation logic:
 
-The system includes comprehensive test coverage:
+```javascript
+function processMediaUrl(url, declaredType) {
+  // Skip empty URLs
+  if (!url) {
+    return {url, wasFixed: false};
+  }
 
-### 1. URL Validator Tests
-Tests in `tests/url-validator.test.ts` verify:
-- Validation of valid and invalid URLs
-- Detection of incorrect media types
-- Handling of network errors and timeouts
-- URL extraction from complex documents
+  let wasFixed = false;
+  let detectedType;
+  let processedUrl = url;
 
-### 2. Media Validation Service Tests
-Tests in `tests/media-validation.test.ts` verify:
-- Document validation across different document types
-- Report generation with accurate statistics
-- URL fixing logic
-- Handling of nested fields and arrays
+  // Fix relative URLs
+  if (url.startsWith("/")) {
+    // Convert to absolute URL with the correct base
+    const baseUrl = "https://491f404d-c45b-465e-abd0-1bf1a522988f-00-1vx2q8nj9olr6.janeway.replit.dev/";
+    processedUrl = `${baseUrl}${url.substring(1)}`;
+    wasFixed = true;
+  }
 
-### 3. Worker Tests
-Tests in `tests/worker.test.ts` verify:
-- Batch processing of documents
-- Error handling during processing
-- Report generation and storage
-- Task management and progress tracking
+  // Fix blob URLs
+  if (url.startsWith("blob:")) {
+    // Replace with placeholder
+    processedUrl = "https://491f404d-c45b-465e-abd0-1bf1a522988f-00-1vx2q8nj9olr6.janeway.replit.dev/yacht-placeholder.jpg";
+    wasFixed = true;
+  }
 
-### 4. Hook Tests
-Tests in `tests/use-media-validation.test.tsx` verify:
-- Loading validation reports
-- Running validation tasks
-- Fixing invalid URLs
-- Error handling in the UI layer
+  // Detect if this should be a video based on URL patterns
+  if (declaredType === "image" && isLikelyVideo(url)) {
+    detectedType = "video";
+    wasFixed = true;
+  }
 
-## Current Validation Results
+  return {url: processedUrl, wasFixed, detectedType};
+}
+```
 
-The system has already identified several invalid URLs in the database:
+### 3. Video Detection Patterns
 
-1. **Relative URLs**: Several documents contain relative URL paths like `/yacht-placeholder.jpg` that cannot be directly resolved.
-2. **Media Type Mismatches**: Several fields labeled as images actually contain video URLs.
+The system uses these patterns to identify videos that may be incorrectly labeled as images:
 
-These issues are now being tracked in Firestore and can be repaired through the admin interface.
+```javascript
+const VIDEO_PATTERNS = [
+  "-SBV-",
+  "Dynamic motion",
+  ".mp4",
+  ".mov",
+  ".avi",
+  ".webm",
+  "video/",
+];
+```
 
-## Implementation Status
+## Validation Reports
 
-- ✅ Core validation functionality
-- ✅ Worker for batch processing
-- ✅ Scheduler for periodic validation
-- ✅ Admin interface for visualization and control
-- ✅ Test coverage for key components
+Validation results are stored in the `media_validation_reports` collection in Firestore. Each report includes:
 
-## Next Steps
+- Collection name and document ID
+- Timestamp of the validation
+- List of fixed URLs (relative to absolute)
+- List of fixed media types (image to video)
 
-1. **Integration with Firebase Functions**: Deploy the validation system as scheduled Cloud Functions.
-2. **Email Notifications**: Implement email alerts for critical media issues.
-3. **Advanced Repair Options**: Add custom repair rules for different collections.
-4. **Validation History**: Implement trend analysis for URL health over time.
-5. **Performance Optimization**: Implement caching for frequently validated URLs.
+## Manual Validation Tools
 
-## Usage Guide
+Several scripts are provided to manually manage the validation process:
 
-### Running a Validation
+### 1. Trigger Media Validation
 
-1. Navigate to the Media Administration page
-2. Click "Run Validation" to start a validation task
-3. Wait for the validation to complete
-4. View results in the "Validation Results" tab
+```
+node scripts/trigger-media-validation.js [--collection=collection_name]
+```
 
-### Fixing Invalid URLs
+This script uses the Firebase Admin SDK to publish validation tasks to Pub/Sub, triggering the validation process.
 
-1. Navigate to the Media Administration page
-2. View validation results
-3. Click "Fix All Issues" to replace invalid URLs with placeholders
-4. Confirm the operation
+### 2. Trigger Validation (CLI Version)
 
-### Viewing Validation History
+```
+node scripts/trigger-validation-cli.js [--collection=collection_name]
+```
 
-1. Navigate to the Media Administration page
-2. Select the "History" tab
-3. View past validation runs and their results
+A simpler alternative that uses the Firebase CLI to trigger the validation process.
+
+### 3. HTTP Trigger
+
+```
+node scripts/trigger-http-validation.js [--collection=collection_name] [--token=firebase_id_token]
+```
+
+Triggers validation via direct HTTP calls to the Cloud Function.
+
+### 4. Check Validation Reports
+
+```
+node scripts/check-validation-reports.js [--limit=10]
+```
+
+Checks recent validation reports to see what has been fixed.
+
+### 5. Run Media Repair
+
+```
+node scripts/run-media-repair.js [--collection=collection_name] [--dry-run]
+```
+
+Directly runs the repair process locally, with an option for a dry run that shows what would be changed without making actual changes.
+
+## Validation Status
+
+The latest validation run found several issues that need to be addressed:
+
+1. Relative URLs in various collections (`/yacht-placeholder.jpg`)
+2. Media type mismatches (videos incorrectly labeled as images)
+
+After fixing the validation logic to use the correct base URL, these issues can be resolved by:
+
+1. Running the Cloud Function to process all collections
+2. Using the manual repair script for immediate fixes
+
+## Best Practices
+
+1. Always run validation after importing new data
+2. Periodically check validation reports to ensure media integrity
+3. Use the `--dry-run` option with the repair script to preview changes
+4. Update the base URL in the validation logic if the hosting domain changes
+
+## Troubleshooting
+
+If media still appears broken after validation:
+
+1. Check that the correct base URL is being used in the validation logic
+2. Verify that the Cloud Function has been redeployed with the latest code
+3. Run the manual validation process to ensure immediate fixes
+4. Check validation reports for any unexpected errors
