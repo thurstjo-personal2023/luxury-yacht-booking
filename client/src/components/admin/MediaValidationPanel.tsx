@@ -1,428 +1,423 @@
-/**
- * Media Validation Panel Component
- * 
- * This component provides an administration interface for media validation
- * in the Etoile Yachts platform. It includes functionality to:
- * - View validation reports
- * - Trigger validation tasks
- * - Fix invalid URLs
- * - Monitor validation progress
- */
-
 import React, { useState, useEffect } from 'react';
+import { useMediaValidation } from '@/hooks/use-media-validation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Check, AlertTriangle, Search, RefreshCw, Loader2 } from "lucide-react";
-import { useMediaValidation } from "@/hooks/use-media-validation";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { useAuth } from "@/hooks/use-auth";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { AlertCircle, CheckCircle, Clock, FileWarning, RefreshCw, Wrench } from 'lucide-react';
 
-/**
- * Format a date for display
- * 
- * @param dateString ISO date string
- * @returns Formatted date string
- */
-const formatDate = (dateString: string) => {
-  if (!dateString) return "N/A";
-  const date = new Date(dateString);
-  return date.toLocaleString();
-};
+type ValidationStatus = 'idle' | 'validating' | 'repairing' | 'complete' | 'error';
 
-/**
- * Format a duration in milliseconds to a human-readable string
- * 
- * @param ms Duration in milliseconds
- * @returns Formatted duration string
- */
-const formatDuration = (ms: number) => {
-  if (!ms) return "N/A";
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return `${minutes}m ${remainingSeconds}s`;
-};
+interface ValidationResult {
+  field: string;
+  url: string;
+  isValid: boolean;
+  status?: number;
+  statusText?: string;
+  error?: string;
+  collection: string;
+  documentId: string;
+}
 
-/**
- * Media Validation Panel Component
- */
-export function MediaValidationPanel() {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<string>("reports");
-  const [selectedCollection, setSelectedCollection] = useState<string>("all");
-  
+interface CollectionSummary {
+  collection: string;
+  totalUrls: number;
+  validUrls: number;
+  invalidUrls: number;
+  missingUrls: number;
+  validPercent: number;
+  invalidPercent: number;
+  missingPercent: number;
+}
+
+interface ValidationReport {
+  id: string;
+  startTime: Date;
+  endTime: Date;
+  duration: number;
+  totalDocuments: number;
+  totalFields: number;
+  validUrls: number;
+  invalidUrls: number;
+  missingUrls: number;
+  collectionSummaries: CollectionSummary[];
+  invalidResults: ValidationResult[];
+}
+
+const MediaValidationPanel = () => {
+  const [activeTab, setActiveTab] = useState('reports');
   const { 
     reports, 
-    tasks, 
-    isLoading, 
-    error, 
-    triggerValidation, 
-    fixDocumentUrls,
-    selectedReport,
-    setSelectedReport,
-    invalidResults,
-    isTriggeringValidation,
-    isFixingUrls
+    latestReport, 
+    isValidating, 
+    validationProgress, 
+    isRepairing, 
+    repairProgress, 
+    startValidation, 
+    startRepair, 
+    error
   } = useMediaValidation();
-  
-  // Collections available for validation
-  const collections = [
-    { id: "all", name: "All Collections" },
-    { id: "unified_yacht_experiences", name: "Yacht Experiences" },
-    { id: "yacht_profiles", name: "Yacht Profiles" },
-    { id: "products_add_ons", name: "Products & Add-ons" },
-    { id: "promotions_and_offers", name: "Promotions & Offers" },
-    { id: "articles_and_guides", name: "Articles & Guides" },
-    { id: "event_announcements", name: "Event Announcements" },
-    { id: "user_profiles_service_provider", name: "Service Provider Profiles" },
-    { id: "user_profiles_tourist", name: "Tourist Profiles" }
-  ];
-  
-  // Check if user is authorized to access this panel
-  const isAuthorized = user && (
-    user.role === "producer" || 
-    user.email?.includes("@etoile-yachts.com") || 
-    user.email === "admin@example.com"
-  );
-  
-  // Handle triggering validation
-  const handleTriggerValidation = async () => {
-    const collectionsToValidate = selectedCollection === "all" ? 
-      undefined : 
-      [selectedCollection];
-      
-    await triggerValidation({
-      autoFix: true,
-      collections: collectionsToValidate
-    });
+
+  const [status, setStatus] = useState<ValidationStatus>('idle');
+
+  useEffect(() => {
+    if (isValidating) {
+      setStatus('validating');
+    } else if (isRepairing) {
+      setStatus('repairing');
+    } else if (error) {
+      setStatus('error');
+    } else if (latestReport) {
+      setStatus('complete');
+    } else {
+      setStatus('idle');
+    }
+  }, [isValidating, isRepairing, error, latestReport]);
+
+  const handleValidateMedia = () => {
+    startValidation();
   };
-  
-  // Handle fixing URLs for a specific document
-  const handleFixUrls = async (collection: string, documentId: string) => {
-    await fixDocumentUrls(collection, documentId);
+
+  const handleRepairMedia = () => {
+    startRepair();
   };
-  
-  if (!isAuthorized) {
+
+  const formatTimestamp = (date: Date) => {
+    return new Date(date).toLocaleString();
+  };
+
+  const formatDuration = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    
+    return `${hours ? hours + 'h ' : ''}${minutes % 60}m ${seconds % 60}s`;
+  };
+
+  const renderStatusBadge = (status: ValidationStatus) => {
+    switch (status) {
+      case 'validating':
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300"><Clock className="w-3 h-3 mr-1" /> Validating</Badge>;
+      case 'repairing':
+        return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300"><Wrench className="w-3 h-3 mr-1" /> Repairing</Badge>;
+      case 'complete':
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300"><CheckCircle className="w-3 h-3 mr-1" /> Complete</Badge>;
+      case 'error':
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300"><AlertCircle className="w-3 h-3 mr-1" /> Error</Badge>;
+      default:
+        return <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300">Ready</Badge>;
+    }
+  };
+
+  const renderActionPanel = () => {
     return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle>Media Validation</CardTitle>
-          <CardDescription>Administrator access required</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Access Denied</AlertTitle>
-            <AlertDescription>
-              You do not have permission to access the media validation panel.
-              Please contact an administrator for assistance.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
-  
-  return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Media Validation Panel</CardTitle>
-        <CardDescription>
-          Manage and monitor media validation across Etoile Yachts platform
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        
-        <div className="mb-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <Select value={selectedCollection} onValueChange={setSelectedCollection}>
-              <SelectTrigger className="w-[240px]">
-                <SelectValue placeholder="Select Collection" />
-              </SelectTrigger>
-              <SelectContent>
-                {collections.map(collection => (
-                  <SelectItem key={collection.id} value={collection.id}>
-                    {collection.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      <div className="flex flex-col space-y-4">
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>Media Validation</CardTitle>
+              {renderStatusBadge(status)}
+            </div>
+            <CardDescription>
+              Validate and repair media URLs across all collections
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {status === 'validating' && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Validation in progress</span>
+                  <span>{validationProgress.processed} / {validationProgress.total}</span>
+                </div>
+                <Progress value={(validationProgress.processed / validationProgress.total) * 100} />
+              </div>
+            )}
             
-            <Button onClick={handleTriggerValidation} disabled={isTriggeringValidation}>
-              {isTriggeringValidation ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Triggering...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Trigger Validation
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-        
-        <Tabs defaultValue="reports" value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="reports">Validation Reports</TabsTrigger>
-            <TabsTrigger value="tasks">Validation Tasks</TabsTrigger>
-            {selectedReport && <TabsTrigger value="issues">Invalid URLs</TabsTrigger>}
-          </TabsList>
-          
-          {/* Reports Tab */}
-          <TabsContent value="reports">
-            {isLoading ? (
-              <div className="flex justify-center items-center p-8">
-                <Loader2 className="h-8 w-8 animate-spin mr-2" />
-                <span>Loading reports...</span>
+            {status === 'repairing' && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Repair in progress</span>
+                  <span>{repairProgress.processed} / {repairProgress.total}</span>
+                </div>
+                <Progress value={(repairProgress.processed / repairProgress.total) * 100} />
               </div>
-            ) : reports.length === 0 ? (
-              <div className="text-center p-8 text-muted-foreground">
-                No validation reports found
-              </div>
-            ) : (
-              <Table>
-                <TableCaption>Media validation reports</TableCaption>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Report ID</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Documents</TableHead>
-                    <TableHead>Valid URLs</TableHead>
-                    <TableHead>Invalid URLs</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reports.map((report) => (
-                    <TableRow key={report.id}>
-                      <TableCell className="font-mono text-xs">{report.id}</TableCell>
-                      <TableCell>{formatDate(report.createdAt)}</TableCell>
-                      <TableCell>{report.totalDocuments}</TableCell>
-                      <TableCell>
-                        <span className="text-green-600">{report.validUrls}</span>
-                        {" "}
-                        <span className="text-xs text-muted-foreground">
-                          ({Math.round((report.validUrls / (report.validUrls + report.invalidUrls + report.missingUrls)) * 100)}%)
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-red-600">{report.invalidUrls + report.missingUrls}</span>
-                        {" "}
-                        <span className="text-xs text-muted-foreground">
-                          ({Math.round(((report.invalidUrls + report.missingUrls) / (report.validUrls + report.invalidUrls + report.missingUrls)) * 100)}%)
-                        </span>
-                      </TableCell>
-                      <TableCell>{formatDuration(report.duration)}</TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => {
-                            setSelectedReport(report.id);
-                            setActiveTab("issues");
-                          }}
-                        >
-                          <Search className="h-4 w-4 mr-1" /> 
-                          View Issues
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
             )}
-          </TabsContent>
-          
-          {/* Tasks Tab */}
-          <TabsContent value="tasks">
-            {isLoading ? (
-              <div className="flex justify-center items-center p-8">
-                <Loader2 className="h-8 w-8 animate-spin mr-2" />
-                <span>Loading tasks...</span>
-              </div>
-            ) : tasks.length === 0 ? (
-              <div className="text-center p-8 text-muted-foreground">
-                No validation tasks found
-              </div>
-            ) : (
-              <Table>
-                <TableCaption>Media validation tasks</TableCaption>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Task ID</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Queued At</TableHead>
-                    <TableHead>Started At</TableHead>
-                    <TableHead>Completed At</TableHead>
-                    <TableHead>Trigger Type</TableHead>
-                    <TableHead>Report</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tasks.map((task) => (
-                    <TableRow key={task.taskId}>
-                      <TableCell className="font-mono text-xs">{task.taskId}</TableCell>
-                      <TableCell>
-                        {task.status === 'completed' ? (
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                            <Check className="h-3 w-3 mr-1" /> Completed
-                          </Badge>
-                        ) : task.status === 'running' ? (
-                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                            <Loader2 className="h-3 w-3 animate-spin mr-1" /> Running
-                          </Badge>
-                        ) : task.status === 'failed' ? (
-                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                            <AlertTriangle className="h-3 w-3 mr-1" /> Failed
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                            Queued
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{formatDate(task.queuedAt)}</TableCell>
-                      <TableCell>{formatDate(task.startedAt)}</TableCell>
-                      <TableCell>{formatDate(task.completedAt)}</TableCell>
-                      <TableCell>
-                        {task.metadata?.triggerType === 'manual' ? 'Manual' : 'Scheduled'}
-                        {task.metadata?.triggeredBy && (
-                          <span className="block text-xs text-muted-foreground">
-                            by {task.metadata.triggeredBy}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {task.reportId ? (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => {
-                              setSelectedReport(task.reportId);
-                              setActiveTab("issues");
-                            }}
-                          >
-                            <Search className="h-4 w-4 mr-1" /> 
-                            View Report
-                          </Button>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            
+            {status === 'error' && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>
+                  {error}
+                </AlertDescription>
+              </Alert>
             )}
-          </TabsContent>
-          
-          {/* Invalid URLs Tab */}
-          <TabsContent value="issues">
-            {!selectedReport ? (
-              <div className="text-center p-8 text-muted-foreground">
-                Select a report to view issues
-              </div>
-            ) : isLoading ? (
-              <div className="flex justify-center items-center p-8">
-                <Loader2 className="h-8 w-8 animate-spin mr-2" />
-                <span>Loading issues...</span>
-              </div>
-            ) : invalidResults.length === 0 ? (
-              <div className="text-center p-8 text-muted-foreground">
-                No invalid URLs found in this report
-              </div>
-            ) : (
-              <>
-                <div className="mb-4">
-                  <Badge variant="outline" className="mb-2">
-                    Report: {selectedReport}
-                  </Badge>
-                  
-                  <Alert>
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Found {invalidResults.length} invalid URLs</AlertTitle>
-                    <AlertDescription>
-                      You can fix these issues by clicking the "Fix URL" button for each document.
-                    </AlertDescription>
-                  </Alert>
+            
+            {(status === 'idle' || status === 'complete') && latestReport && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-green-50 p-3 rounded-md">
+                    <p className="text-sm text-gray-500">Valid</p>
+                    <p className="text-2xl font-semibold text-green-700">{latestReport.validUrls}</p>
+                  </div>
+                  <div className="bg-red-50 p-3 rounded-md">
+                    <p className="text-sm text-gray-500">Invalid</p>
+                    <p className="text-2xl font-semibold text-red-700">{latestReport.invalidUrls}</p>
+                  </div>
+                  <div className="bg-amber-50 p-3 rounded-md">
+                    <p className="text-sm text-gray-500">Missing</p>
+                    <p className="text-2xl font-semibold text-amber-700">{latestReport.missingUrls}</p>
+                  </div>
                 </div>
                 
-                <Table>
-                  <TableCaption>Invalid URLs in selected report</TableCaption>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Collection</TableHead>
-                      <TableHead>Document ID</TableHead>
-                      <TableHead>Field</TableHead>
-                      <TableHead>URL</TableHead>
-                      <TableHead>Error</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {invalidResults.map((result, index) => (
-                      <TableRow key={`${result.collection}-${result.documentId}-${index}`}>
-                        <TableCell>{result.collection}</TableCell>
-                        <TableCell className="font-mono text-xs">{result.documentId}</TableCell>
-                        <TableCell className="font-mono text-xs">{result.field}</TableCell>
-                        <TableCell>
-                          <div className="max-w-xs truncate font-mono text-xs">
-                            {result.url}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-red-500 text-sm">
-                          {result.error}
-                        </TableCell>
-                        <TableCell>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleFixUrls(result.collection, result.documentId)}
-                            disabled={isFixingUrls}
-                          >
-                            {isFixingUrls ? (
-                              <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                            ) : (
-                              <Check className="h-4 w-4 mr-1" />
-                            )}
-                            Fix URL
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </>
+                <div className="text-sm text-gray-500">
+                  <p>Last scan: {formatTimestamp(latestReport.endTime)}</p>
+                  <p>Duration: {formatDuration(latestReport.duration)}</p>
+                  <p>Documents scanned: {latestReport.totalDocuments}</p>
+                </div>
+              </div>
             )}
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-      <CardFooter className="text-xs text-muted-foreground flex justify-between">
-        <div>Last updated: {new Date().toLocaleString()}</div>
-        <div>Media Validation v1.0</div>
-      </CardFooter>
-    </Card>
+            
+            {(status === 'idle' || status === 'complete') && !latestReport && (
+              <div className="py-4 text-center text-gray-500">
+                <FileWarning className="mx-auto h-12 w-12 text-gray-400" />
+                <p className="mt-2">No validation reports available</p>
+                <p className="text-sm">Run a validation to check your media</p>
+              </div>
+            )}
+          </CardContent>
+          <CardFooter className="flex justify-between">
+            <Button 
+              variant="outline" 
+              onClick={handleValidateMedia} 
+              disabled={isValidating || isRepairing}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Validate Media
+            </Button>
+            <Button 
+              variant="default" 
+              onClick={handleRepairMedia} 
+              disabled={isValidating || isRepairing || !latestReport || latestReport.invalidUrls === 0}
+            >
+              <Wrench className="mr-2 h-4 w-4" />
+              Repair Issues
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  };
+
+  const renderReportsPanel = () => {
+    if (!reports || reports.length === 0) {
+      return (
+        <div className="py-8 text-center text-gray-500">
+          <FileWarning className="mx-auto h-12 w-12 text-gray-400" />
+          <p className="mt-2">No validation reports available</p>
+          <p className="text-sm">Run a validation to generate reports</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {reports.map((report) => (
+          <Card key={report.id}>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-base">
+                  Report {report.id.substring(0, 8)}
+                </CardTitle>
+                <Badge 
+                  variant="outline" 
+                  className={
+                    report.invalidUrls === 0 
+                      ? "bg-green-50 text-green-700 border-green-300" 
+                      : "bg-amber-50 text-amber-700 border-amber-300"
+                  }
+                >
+                  {report.invalidUrls === 0 ? "All Valid" : `${report.invalidUrls} Issues`}
+                </Badge>
+              </div>
+              <CardDescription>
+                {formatTimestamp(report.startTime)} • {formatDuration(report.duration)}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="p-2">
+                  <p className="text-xs text-gray-500">Valid</p>
+                  <p className="text-xl font-semibold text-green-700">{report.validUrls}</p>
+                </div>
+                <div className="p-2">
+                  <p className="text-xs text-gray-500">Invalid</p>
+                  <p className="text-xl font-semibold text-red-700">{report.invalidUrls}</p>
+                </div>
+                <div className="p-2">
+                  <p className="text-xs text-gray-500">Missing</p>
+                  <p className="text-xl font-semibold text-amber-700">{report.missingUrls}</p>
+                </div>
+              </div>
+              
+              {report.invalidResults.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Issues</p>
+                  <ScrollArea className="h-32 rounded-md border p-2">
+                    {report.invalidResults.slice(0, 5).map((result, idx) => (
+                      <div key={idx} className="mb-2">
+                        <p className="text-xs font-medium">{result.collection} • {result.documentId.substring(0, 8)}...</p>
+                        <p className="text-xs text-gray-500 truncate">{result.field}: {result.url}</p>
+                        <p className="text-xs text-red-500">{result.error}</p>
+                        <Separator className="my-2" />
+                      </div>
+                    ))}
+                    {report.invalidResults.length > 5 && (
+                      <p className="text-xs text-gray-500 text-center">
+                        +{report.invalidResults.length - 5} more issues
+                      </p>
+                    )}
+                  </ScrollArea>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
+  const renderSummaryPanel = () => {
+    if (!latestReport) {
+      return (
+        <div className="py-8 text-center text-gray-500">
+          <FileWarning className="mx-auto h-12 w-12 text-gray-400" />
+          <p className="mt-2">No validation data available</p>
+          <p className="text-sm">Run a validation to see collection summaries</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {latestReport.collectionSummaries.map((summary) => (
+          <Card key={summary.collection}>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-base">
+                  {summary.collection}
+                </CardTitle>
+                <Badge 
+                  variant="outline" 
+                  className={
+                    summary.invalidUrls === 0 
+                      ? "bg-green-50 text-green-700 border-green-300" 
+                      : "bg-amber-50 text-amber-700 border-amber-300"
+                  }
+                >
+                  {summary.validPercent.toFixed(0)}% Valid
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-2 text-center mb-2">
+                <div>
+                  <p className="text-xs text-gray-500">Total</p>
+                  <p className="font-medium">{summary.totalUrls}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Valid</p>
+                  <p className="font-medium text-green-700">{summary.validUrls}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Invalid</p>
+                  <p className="font-medium text-red-700">{summary.invalidUrls}</p>
+                </div>
+              </div>
+              
+              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-green-500 rounded-full" 
+                  style={{ width: `${summary.validPercent}%` }}
+                ></div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      {renderActionPanel()}
+      
+      <Tabs defaultValue="reports" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="reports">Validation Reports</TabsTrigger>
+          <TabsTrigger value="collections">Collection Summary</TabsTrigger>
+        </TabsList>
+        <TabsContent value="reports" className="pt-4">
+          {isValidating ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-3 w-1/4" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                      {[1, 2, 3].map((j) => (
+                        <div key={j} className="p-2">
+                          <Skeleton className="h-3 w-1/2 mb-1" />
+                          <Skeleton className="h-5 w-1/3" />
+                        </div>
+                      ))}
+                    </div>
+                    <Skeleton className="h-32 w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            renderReportsPanel()
+          )}
+        </TabsContent>
+        <TabsContent value="collections" className="pt-4">
+          {isValidating ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <Skeleton className="h-4 w-1/3" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-2 text-center mb-2">
+                      {[1, 2, 3].map((j) => (
+                        <div key={j}>
+                          <Skeleton className="h-3 w-1/2 mx-auto mb-1" />
+                          <Skeleton className="h-4 w-1/3 mx-auto" />
+                        </div>
+                      ))}
+                    </div>
+                    <Skeleton className="h-2 w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            renderSummaryPanel()
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
   );
-}
+};
+
+export default MediaValidationPanel;
