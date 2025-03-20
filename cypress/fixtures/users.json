@@ -1,0 +1,31 @@
+{
+  "consumer": {
+    "email": "test-consumer@example.com",
+    "password": "password123",
+    "name": "Test Consumer",
+    "role": "consumer",
+    "phone": "1234567890"
+  },
+  "producer": {
+    "email": "test-producer@example.com",
+    "password": "password123",
+    "name": "Test Producer",
+    "role": "producer",
+    "phone": "9876543210",
+    "businessName": "Test Yacht Company"
+  },
+  "partner": {
+    "email": "test-partner@example.com",
+    "password": "password123",
+    "name": "Test Partner",
+    "role": "partner",
+    "phone": "5551234567",
+    "businessName": "Partner Services Co."
+  },
+  "admin": {
+    "email": "admin@example.com",
+    "password": "admin123",
+    "name": "Admin User",
+    "role": "admin"
+  }
+}
