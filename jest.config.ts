@@ -65,6 +65,15 @@ const config: Config.InitialOptions = {
       testMatch: ['<rootDir>/functions/**/*.test.{js,ts}'],
       testEnvironment: 'node',
       setupFilesAfterEnv: ['<rootDir>/tests/setup-node.ts'],
+    },
+    {
+      displayName: 'emulator',
+      testMatch: [
+        '<rootDir>/tests/auth.test.ts',
+        '<rootDir>/tests/firestore.test.ts'
+      ],
+      testEnvironment: 'node',
+      setupFilesAfterEnv: ['<rootDir>/tests/setup-emulator.ts'],
     }
   ],
   globals: {
