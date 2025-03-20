@@ -1,86 +1,50 @@
-import React from 'react';
-import { Helmet } from 'react-helmet';
-import MediaValidationPanel from '@/components/admin/MediaValidationPanel';
-import { useAuth } from '@/hooks/use-auth';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Link } from 'wouter';
-
 /**
  * Media Admin Page
  * 
- * This page hosts the media validation panel and other media management tools.
- * It's accessible only to users with admin privileges.
+ * This page serves as the central hub for media-related administrative tasks.
  */
-const MediaAdmin: React.FC = () => {
-  const { user, loading } = useAuth();
-  
-  // Check if user has admin privileges
-  const isAdmin = user?.role === 'producer'; // Currently using 'producer' as admin
-  
-  if (loading) {
-    return (
-      <div className="container mx-auto py-8">
-        <div className="flex items-center justify-center h-48">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </div>
-    );
-  }
-  
-  if (!user) {
-    return (
-      <div className="container mx-auto py-8">
-        <Alert>
-          <AlertTitle>Authentication Required</AlertTitle>
-          <AlertDescription>
-            You need to be logged in to access this page.
-          </AlertDescription>
-        </Alert>
-        <div className="mt-4 flex justify-center">
-          <Button asChild>
-            <Link href="/login">Go to Login</Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-  
-  if (!isAdmin) {
-    return (
-      <div className="container mx-auto py-8">
-        <Alert>
-          <AlertTitle>Access Denied</AlertTitle>
-          <AlertDescription>
-            You do not have permission to access this page.
-          </AlertDescription>
-        </Alert>
-        <div className="mt-4 flex justify-center">
-          <Button asChild>
-            <Link href="/">Go to Home</Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-  
-  return (
-    <>
-      <Helmet>
-        <title>Media Administration | Etoile Yachts</title>
-      </Helmet>
-      
-      <div className="container mx-auto py-8">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-4xl font-bold mb-8">Media Administration</h1>
-          
-          <div className="grid grid-cols-1 gap-8">
-            <MediaValidationPanel />
-          </div>
-        </div>
-      </div>
-    </>
-  );
-};
+import React from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import MediaValidationPanel from '@/components/admin/MediaValidationPanel';
 
-export default MediaAdmin;
+export default function MediaAdmin() {
+  return (
+    <div className="container mx-auto py-8">
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Media Administration</CardTitle>
+          <CardDescription>
+            Manage media assets and validation across the platform
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="validation">
+            <TabsList>
+              <TabsTrigger value="validation">Media Validation</TabsTrigger>
+              <TabsTrigger value="management">Media Management</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="validation">
+              <MediaValidationPanel />
+            </TabsContent>
+            
+            <TabsContent value="management">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Media Management</CardTitle>
+                  <CardDescription>Manage media assets across the platform</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">
+                    Media management tools will be available in a future update.
+                  </p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

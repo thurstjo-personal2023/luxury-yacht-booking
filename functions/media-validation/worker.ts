@@ -1,249 +1,271 @@
 /**
  * Media Validation Worker
  * 
- * This module implements a worker for background media validation tasks.
- * It can process Firestore collections and documents, validating image URLs,
- * detecting broken links, and fixing relative URLs.
+ * This module provides functionality to process media validation tasks
+ * in batches. It can validate and fix media URLs across collections.
  */
-import { MediaValidationService, MediaValidationOptions, MediaValidationReport, UrlFixResult } from './media-validation';
-import { Firestore } from '@google-cloud/firestore';
+
+import { MediaValidationService, MediaValidationOptions, ValidationReport, UrlFixResult } from './media-validation';
+import { getFirestore, collection, query, limit, startAfter, getDocs, doc, getDoc, setDoc, updateDoc, Firestore } from 'firebase/firestore';
 
 /**
- * Configuration for the media validation worker
+ * Media validation worker configuration
  */
 export interface MediaValidationWorkerConfig {
-  /**
-   * Base URL of the application
-   */
-  baseUrl: string;
-  
-  /**
-   * Collections to validate
-   */
-  collectionsToValidate: string[];
-  
-  /**
-   * Maximum number of documents to process per batch
-   */
   batchSize?: number;
-  
-  /**
-   * Maximum concurrent validation operations
-   */
-  concurrency?: number;
-  
-  /**
-   * Timeout for each validation operation (ms)
-   */
-  timeout?: number;
-  
-  /**
-   * Firestore instance
-   */
-  firestore: Firestore;
-  
-  /**
-   * Logger function for errors
-   */
-  logError: (message: string, error?: any) => void;
-  
-  /**
-   * Logger function for information messages
-   */
-  logInfo: (message: string) => void;
-  
-  /**
-   * Logger function for debug messages
-   */
-  logDebug?: (message: string) => void;
+  maxItems?: number;
+  fixInvalidUrls?: boolean;
+  collections?: string[];
+  onProgress?: (progress: number, total: number) => void;
+  onComplete?: (report: ValidationReport) => void;
+  onError?: (error: Error) => void;
 }
 
 /**
  * Media validation worker class
- * 
- * Handles background processing of media validation tasks
  */
 export class MediaValidationWorker {
+  private service: MediaValidationService;
+  private db: Firestore;
   private config: MediaValidationWorkerConfig;
-  private validationService: MediaValidationService;
-  
+  private isRunning: boolean = false;
+  private lastProcessedDoc: any = null;
+  private processedItems: number = 0;
+  private totalProcessed: number = 0;
+  private results: any[] = [];
+  private startTime: Date = new Date();
+  private stopped: boolean = false;
+
   /**
-   * Create a new media validation worker
+   * Constructor
+   * 
+   * @param db Firestore instance
+   * @param config Media validation worker configuration
    */
-  constructor(config: MediaValidationWorkerConfig) {
-    this.config = config;
-    
-    // Create validation service
-    this.validationService = new MediaValidationService({
-      baseUrl: config.baseUrl,
-      concurrency: config.concurrency,
-      timeout: config.timeout,
-      logInfo: config.logInfo,
-      logError: config.logError,
-      logDebug: config.logDebug,
-      firestore: config.firestore  // Pass Firestore instance to validation service
+  constructor(db: Firestore, config: MediaValidationWorkerConfig = {}) {
+    this.db = db;
+    this.config = {
+      batchSize: config.batchSize || 50,
+      maxItems: config.maxItems || 1000,
+      fixInvalidUrls: config.fixInvalidUrls || false,
+      collections: config.collections || [],
+      onProgress: config.onProgress || (() => {}),
+      onComplete: config.onComplete || (() => {}),
+      onError: config.onError || (() => {})
+    };
+
+    // Create media validation service
+    this.service = new MediaValidationService({
+      batchSize: this.config.batchSize,
+      maxItems: this.config.maxItems,
+      fixInvalidUrls: this.config.fixInvalidUrls,
+      collections: this.config.collections
     });
   }
-  
+
   /**
-   * Validate all configured collections
-   * 
-   * @returns A validation report with results from all collections
+   * Start validation process
    */
-  async validateAllCollections(): Promise<MediaValidationReport> {
-    try {
-      this.config.logInfo(`Starting validation of ${this.config.collectionsToValidate.length} collections`);
-      
-      const results = await this.validationService.validateAllCollections(
-        this.config.collectionsToValidate, 
-        this.config.batchSize || 50
-      );
-      
-      this.config.logInfo(`Completed validation of ${this.config.collectionsToValidate.length} collections`);
-      
-      return results;
-    } catch (error: any) {
-      this.config.logError('Error validating collections:', error);
-      throw error;
+  async start(): Promise<ValidationReport> {
+    if (this.isRunning) {
+      throw new Error('Validation already running');
     }
-  }
-  
-  /**
-   * Validate a specific collection
-   * 
-   * @param collectionName The name of the collection to validate
-   * @param batchSize Optional batch size override
-   * @returns A validation report for the collection
-   */
-  async validateCollection(collectionName: string, batchSize?: number): Promise<MediaValidationReport> {
+
     try {
-      this.config.logInfo(`Starting validation of collection: ${collectionName}`);
-      
-      const results = await this.validationService.validateCollection(
-        collectionName, 
-        batchSize || this.config.batchSize || 50
-      );
-      
-      this.config.logInfo(`Completed validation of collection: ${collectionName}`);
-      
-      return results;
-    } catch (error: any) {
-      this.config.logError(`Error validating collection ${collectionName}:`, error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Fix relative URLs in all collections
-   * 
-   * @returns A fix report with results from all collections
-   */
-  async fixRelativeUrls(): Promise<UrlFixResult> {
-    try {
-      this.config.logInfo(`Starting fix of relative URLs in ${this.config.collectionsToValidate.length} collections`);
-      
-      const results = await this.validationService.fixAllRelativeUrls(
-        this.config.collectionsToValidate,
-        this.config.batchSize || 50
-      );
-      
-      this.config.logInfo(`Completed fixing relative URLs in ${this.config.collectionsToValidate.length} collections`);
-      
-      return results;
-    } catch (error: any) {
-      this.config.logError('Error fixing relative URLs:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Fix relative URLs in a specific collection
-   * 
-   * @param collectionName The name of the collection to fix
-   * @param batchSize Optional batch size override
-   * @returns A fix report for the collection
-   */
-  async fixCollectionRelativeUrls(collectionName: string, batchSize?: number): Promise<UrlFixResult> {
-    try {
-      this.config.logInfo(`Starting fix of relative URLs in collection: ${collectionName}`);
-      
-      const results = await this.validationService.fixCollectionRelativeUrls(
-        collectionName,
-        batchSize || this.config.batchSize || 50
-      );
-      
-      this.config.logInfo(`Completed fixing relative URLs in collection: ${collectionName}`);
-      
-      return results;
-    } catch (error: any) {
-      this.config.logError(`Error fixing relative URLs in collection ${collectionName}:`, error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Save validation results to Firestore
-   * 
-   * @param results The validation results to save
-   * @returns The ID of the saved report document
-   */
-  async saveValidationResults(results: MediaValidationReport): Promise<string> {
-    try {
-      const reportRef = this.config.firestore.collection('media_validation_reports').doc();
-      
-      // Add metadata
-      const reportData = {
-        ...results,
-        id: reportRef.id,
-        createdAt: new Date(),
-        metadata: {
-          collectionsValidated: this.config.collectionsToValidate,
-          baseUrl: this.config.baseUrl
+      this.isRunning = true;
+      this.stopped = false;
+      this.lastProcessedDoc = null;
+      this.processedItems = 0;
+      this.totalProcessed = 0;
+      this.results = [];
+      this.startTime = new Date();
+
+      // Process all collections
+      for (const collectionName of this.config.collections || []) {
+        if (this.stopped) break;
+        
+        try {
+          await this.processCollection(collectionName);
+        } catch (error) {
+          console.error(`Error processing collection ${collectionName}:`, error);
         }
-      };
+      }
+
+      // Generate report
+      const report = this.service.generateReport(
+        this.results,
+        this.startTime,
+        new Date()
+      );
+
+      // Save report to database
+      const reportId = await this.saveReport(report);
+      report.id = reportId;
+
+      // Notify completion
+      if (this.config.onComplete) {
+        this.config.onComplete(report);
+      }
+
+      this.isRunning = false;
+      return report;
+    } catch (error) {
+      this.isRunning = false;
+      const err = error instanceof Error ? error : new Error(String(error));
       
-      // Save to Firestore
-      await reportRef.set(reportData);
+      if (this.config.onError) {
+        this.config.onError(err);
+      }
       
-      this.config.logInfo(`Saved validation report with ID: ${reportRef.id}`);
-      
-      return reportRef.id;
-    } catch (error: any) {
-      this.config.logError('Error saving validation results:', error);
-      throw error;
+      throw err;
     }
   }
-  
+
   /**
-   * Save URL fix results to Firestore
-   * 
-   * @param results The fix results to save
-   * @returns The ID of the saved report document
+   * Stop validation process
    */
-  async saveFixResults(results: UrlFixResult): Promise<string> {
-    try {
-      const reportRef = this.config.firestore.collection('url_fix_reports').doc();
-      
-      // Add metadata
-      const reportData = {
-        ...results,
-        id: reportRef.id,
-        createdAt: new Date(),
-        metadata: {
-          collectionsFixed: this.config.collectionsToValidate,
-          baseUrl: this.config.baseUrl
+  stop(): void {
+    this.stopped = true;
+  }
+
+  /**
+   * Process a collection
+   * 
+   * @param collectionName Collection name
+   */
+  private async processCollection(collectionName: string): Promise<void> {
+    let lastDoc: any = null;
+    let processed = 0;
+    const batchSize = this.config.batchSize || 50;
+    const maxItems = this.config.maxItems || 1000;
+
+    while (!this.stopped && processed < maxItems) {
+      // Get a batch of documents
+      const q = lastDoc
+        ? query(collection(this.db, collectionName), startAfter(lastDoc), limit(batchSize))
+        : query(collection(this.db, collectionName), limit(batchSize));
+
+      const querySnapshot = await getDocs(q);
+
+      // Stop if no more documents
+      if (querySnapshot.empty) {
+        break;
+      }
+
+      // Process each document
+      const batchPromises = [];
+      querySnapshot.forEach(docSnapshot => {
+        const docData = docSnapshot.data();
+        if (docData) {
+          batchPromises.push(this.processDocument(docData, docSnapshot.id, collectionName));
         }
+        lastDoc = docSnapshot;
+      });
+
+      // Wait for all documents in the batch to be processed
+      await Promise.all(batchPromises);
+
+      // Update progress
+      processed += querySnapshot.size;
+      this.processedItems += querySnapshot.size;
+      this.totalProcessed += querySnapshot.size;
+
+      if (this.config.onProgress) {
+        this.config.onProgress(this.processedItems, this.totalProcessed);
+      }
+
+      // Check if we've reached the end of the collection
+      if (querySnapshot.size < batchSize) {
+        break;
+      }
+    }
+  }
+
+  /**
+   * Process a document
+   * 
+   * @param document Document data
+   * @param id Document ID
+   * @param collectionName Collection name
+   */
+  private async processDocument(document: any, id: string, collectionName: string): Promise<void> {
+    try {
+      // Validate document
+      const validationResult = await this.service.validateDocument(document, id, collectionName);
+      this.results.push(validationResult);
+
+      // Fix invalid URLs if enabled
+      if (this.config.fixInvalidUrls && validationResult.invalidUrls > 0) {
+        const { updatedDocument, fixes } = this.service.fixInvalidUrls(document, validationResult);
+        
+        // Save updated document
+        if (fixes.length > 0) {
+          await this.saveFixedDocument(updatedDocument, id, collectionName, fixes);
+        }
+      }
+    } catch (error) {
+      console.error(`Error processing document ${collectionName}/${id}:`, error);
+    }
+  }
+
+  /**
+   * Save fixed document
+   * 
+   * @param document Document data
+   * @param id Document ID
+   * @param collectionName Collection name
+   * @param fixes URL fix results
+   */
+  private async saveFixedDocument(
+    document: any, 
+    id: string, 
+    collectionName: string, 
+    fixes: UrlFixResult[]
+  ): Promise<void> {
+    try {
+      // Update document in Firestore
+      const docRef = doc(this.db, collectionName, id);
+      await updateDoc(docRef, document);
+
+      // Save fix record
+      const fixRecord = {
+        documentId: id,
+        collection: collectionName,
+        timestamp: new Date(),
+        fixes
       };
+
+      // Add to fix history collection
+      await setDoc(doc(this.db, 'media_fix_history', `${id}-${Date.now()}`), fixRecord);
+    } catch (error) {
+      console.error(`Error saving fixed document ${collectionName}/${id}:`, error);
+    }
+  }
+
+  /**
+   * Save validation report
+   * 
+   * @param report Validation report
+   * @returns Report ID
+   */
+  private async saveReport(report: ValidationReport): Promise<string> {
+    try {
+      // Create a new document in the validation_reports collection
+      const reportId = `report-${Date.now()}`;
+      const reportRef = doc(this.db, 'validation_reports', reportId);
       
-      // Save to Firestore
-      await reportRef.set(reportData);
+      // Save report data
+      await setDoc(reportRef, {
+        ...report,
+        startTime: report.startTime.toISOString(),
+        endTime: report.endTime.toISOString(),
+        createdAt: new Date()
+      });
       
-      this.config.logInfo(`Saved URL fix report with ID: ${reportRef.id}`);
-      
-      return reportRef.id;
-    } catch (error: any) {
-      this.config.logError('Error saving URL fix results:', error);
-      throw error;
+      return reportId;
+    } catch (error) {
+      console.error('Error saving validation report:', error);
+      return `error-${Date.now()}`;
     }
   }
 }

@@ -1,59 +1,37 @@
 /**
  * Media Validation Service
  * 
- * This module provides functionality to validate media URLs in Firestore documents.
- * It can identify invalid URLs, mismatched media types, and generate validation reports.
+ * This module provides functionality to validate media URLs in documents.
+ * It can validate image and video URLs, detect missing or broken links,
+ * and fix invalid URLs.
  */
 
-import { validateImageUrl, validateVideoUrl, getPlaceholderUrl, ValidationResult } from './url-validator';
+import { extractUrls, isImageUrl, isVideoUrl, validateImageUrl, validateUrl, validateVideoUrl, ValidationResult } from './url-validator';
+import get from 'lodash/get';
+import set from 'lodash/set';
 
 /**
- * Media validation configuration
+ * Media validation options
  */
 export interface MediaValidationOptions {
-  collections?: string[];
   batchSize?: number;
   maxItems?: number;
   fixInvalidUrls?: boolean;
-}
-
-/**
- * Media validation field result
- */
-export interface FieldValidationResult {
-  field: string;
-  url: string;
-  isValid: boolean;
-  contentType?: string;
-  status?: number;
-  statusText?: string;
-  reason?: string;
-  error?: string;
-}
-
-/**
- * Document validation result
- */
-export interface DocumentValidationResult {
-  id: string;
-  collection: string;
-  totalUrls: number;
-  validUrls: number;
-  invalidUrls: number;
-  results: FieldValidationResult[];
+  collections?: string[];
+  onProgress?: (progress: number, total: number) => void;
 }
 
 /**
  * Collection validation summary
  */
-export interface CollectionSummary {
+export interface CollectionValidationSummary {
   collection: string;
   totalUrls: number;
   validUrls: number;
   invalidUrls: number;
   missingUrls: number;
-  invalidPercent: number;
   validPercent: number;
+  invalidPercent: number;
   missingPercent: number;
 }
 
@@ -70,21 +48,44 @@ export interface ValidationReport {
   validUrls: number;
   invalidUrls: number;
   missingUrls: number;
-  collectionSummaries: CollectionSummary[];
-  invalidResults: FieldValidationResult[];
+  collectionSummaries: CollectionValidationSummary[];
+  invalidResults: Array<UrlValidationResult & { field: string; collection?: string; documentId?: string }>;
 }
 
 /**
- * URL Fix Result
+ * URL validation result
  */
-export interface UrlFixResult {
+export interface UrlValidationResult {
+  field: string;
+  url: string;
+  isValid: boolean;
+  status?: number;
+  statusText?: string;
+  contentType?: string;
+  reason?: string;
+  error?: string;
+}
+
+/**
+ * Document validation result
+ */
+export interface DocumentValidationResult {
   id: string;
   collection: string;
+  totalUrls: number;
+  validUrls: number;
+  invalidUrls: number;
+  results: UrlValidationResult[];
+}
+
+/**
+ * URL fix result
+ */
+export interface UrlFixResult {
   field: string;
   originalUrl: string;
   newUrl: string;
   fixed: boolean;
-  error?: string;
 }
 
 /**
@@ -92,7 +93,7 @@ export interface UrlFixResult {
  */
 export class MediaValidationService {
   private options: MediaValidationOptions;
-
+  
   /**
    * Constructor
    * 
@@ -100,321 +101,167 @@ export class MediaValidationService {
    */
   constructor(options: MediaValidationOptions = {}) {
     this.options = {
-      collections: options.collections || [],
       batchSize: options.batchSize || 50,
       maxItems: options.maxItems || 1000,
-      fixInvalidUrls: options.fixInvalidUrls || false
+      fixInvalidUrls: options.fixInvalidUrls || false,
+      collections: options.collections || [],
+      onProgress: options.onProgress
     };
   }
-
+  
   /**
-   * Set media validation options
+   * Validate a document
    * 
-   * @param options Media validation options
-   */
-  setOptions(options: MediaValidationOptions) {
-    this.options = {
-      ...this.options,
-      ...options
-    };
-  }
-
-  /**
-   * Validate media URLs in a document
-   * 
-   * @param document Firestore document data
+   * @param document Document data
    * @param id Document ID
    * @param collection Collection name
-   * @returns Promise resolving to document validation result
+   * @returns Document validation result
    */
   async validateDocument(document: any, id: string, collection: string): Promise<DocumentValidationResult> {
-    const results: FieldValidationResult[] = [];
-    const mediaFields = this.findMediaFields(document);
+    // Extract URLs from document
+    const urls = extractUrls(document);
     
-    let totalUrls = 0;
-    let validUrls = 0;
-    let invalidUrls = 0;
+    // Track validation results
+    const results: UrlValidationResult[] = [];
+    let validCount = 0;
+    let invalidCount = 0;
     
-    for (const field of mediaFields) {
-      const validationResult = await this.validateField(document, field);
+    // Validate each URL
+    for (const [field, url] of urls) {
+      let result: ValidationResult;
       
-      if (validationResult) {
-        results.push(validationResult);
-        totalUrls++;
-        
-        if (validationResult.isValid) {
-          validUrls++;
-        } else {
-          invalidUrls++;
-        }
+      // Validate based on field type and URL pattern
+      if (this.isImageField(field)) {
+        result = await validateImageUrl(url);
+      } else if (this.isVideoField(field)) {
+        result = await validateVideoUrl(url);
+      } else if (isImageUrl(url)) {
+        result = await validateImageUrl(url);
+      } else if (isVideoUrl(url)) {
+        result = await validateVideoUrl(url);
+      } else {
+        result = await validateUrl(url);
       }
+      
+      // Create validation result
+      const urlResult: UrlValidationResult = {
+        field,
+        url,
+        isValid: result.isValid,
+        status: result.status,
+        statusText: result.statusText,
+        contentType: result.contentType,
+        reason: result.reason,
+        error: result.error
+      };
+      
+      // Update counters
+      if (result.isValid) {
+        validCount++;
+      } else {
+        invalidCount++;
+      }
+      
+      // Add to results
+      results.push(urlResult);
     }
     
+    // Return document validation result
     return {
       id,
       collection,
-      totalUrls,
-      validUrls,
-      invalidUrls,
+      totalUrls: urls.length,
+      validUrls: validCount,
+      invalidUrls: invalidCount,
       results
     };
   }
-
+  
   /**
-   * Validate a media field in a document
+   * Generate validation report from results
    * 
-   * @param document Firestore document data
-   * @param field Field path
-   * @returns Promise resolving to field validation result or undefined
-   */
-  private async validateField(document: any, field: string): Promise<FieldValidationResult | undefined> {
-    try {
-      const value = this.getFieldValue(document, field);
-      
-      if (!value || typeof value !== 'string') {
-        return undefined;
-      }
-      
-      const url = value;
-      const expectedType = this.getExpectedMediaType(field);
-      
-      let validationResult: ValidationResult;
-      
-      if (expectedType === 'image') {
-        validationResult = await validateImageUrl(url);
-      } else if (expectedType === 'video') {
-        validationResult = await validateVideoUrl(url);
-      } else {
-        validationResult = {
-          isValid: false,
-          url,
-          error: 'Unknown media type'
-        };
-      }
-      
-      return {
-        field,
-        url,
-        isValid: validationResult.isValid,
-        contentType: validationResult.contentType,
-        status: validationResult.status,
-        statusText: validationResult.statusText,
-        reason: validationResult.isValid ? undefined : 'Request failed',
-        error: validationResult.error
-      };
-    } catch (error) {
-      return {
-        field,
-        url: '',
-        isValid: false,
-        reason: 'Error processing field',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
-  }
-
-  /**
-   * Find all media fields in a document
-   * 
-   * @param document Firestore document data
-   * @param prefix Field prefix for nested fields
-   * @returns Array of field paths
-   */
-  private findMediaFields(document: any, prefix = ''): string[] {
-    const fields: string[] = [];
-    
-    if (!document || typeof document !== 'object') {
-      return fields;
-    }
-    
-    for (const key in document) {
-      const value = document[key];
-      const field = prefix ? `${prefix}.${key}` : key;
-      
-      if (this.isMediaField(field, value)) {
-        fields.push(field);
-      } else if (Array.isArray(value)) {
-        // Handle arrays of objects that might contain media
-        for (let i = 0; i < value.length; i++) {
-          if (typeof value[i] === 'object' && value[i] !== null) {
-            const arrayFields = this.findMediaFields(value[i], `${field}.[${i}]`);
-            fields.push(...arrayFields);
-          } else if (this.isMediaField(`${field}.[${i}]`, value[i])) {
-            fields.push(`${field}.[${i}]`);
-          }
-        }
-      } else if (typeof value === 'object' && value !== null) {
-        // Recursively check nested objects
-        const nestedFields = this.findMediaFields(value, field);
-        fields.push(...nestedFields);
-      }
-    }
-    
-    return fields;
-  }
-
-  /**
-   * Check if a field is a media field
-   * 
-   * @param field Field path
-   * @param value Field value
-   * @returns True if field is a media field, false otherwise
-   */
-  private isMediaField(field: string, value: any): boolean {
-    if (typeof value !== 'string') {
-      return false;
-    }
-    
-    // Check if field path contains image or media indicators
-    const lowerField = field.toLowerCase();
-    const containsImageIndicator = lowerField.includes('image') || 
-                                 lowerField.includes('media') || 
-                                 lowerField.includes('photo') || 
-                                 lowerField.includes('picture') ||
-                                 lowerField.includes('url') ||
-                                 lowerField.endsWith('.url');
-    
-    // Check if value looks like a URL
-    const looksLikeUrl = (value.startsWith('http') || value.startsWith('/')) && 
-                         (value.endsWith('.jpg') || 
-                          value.endsWith('.jpeg') || 
-                          value.endsWith('.png') || 
-                          value.endsWith('.gif') || 
-                          value.endsWith('.webp') ||
-                          value.endsWith('.mp4') ||
-                          value.endsWith('.webm') ||
-                          value.endsWith('.mov'));
-    
-    return containsImageIndicator && looksLikeUrl;
-  }
-
-  /**
-   * Get the expected media type for a field
-   * 
-   * @param field Field path
-   * @returns Expected media type ('image' or 'video')
-   */
-  private getExpectedMediaType(field: string): 'image' | 'video' {
-    const lowerField = field.toLowerCase();
-    
-    if (lowerField.includes('video') || 
-        field.endsWith('.mp4') || 
-        field.endsWith('.webm') || 
-        field.endsWith('.mov')) {
-      return 'video';
-    }
-    
-    return 'image';
-  }
-
-  /**
-   * Get a field value from a document using a path
-   * 
-   * @param document Firestore document data
-   * @param field Field path
-   * @returns Field value or undefined
-   */
-  private getFieldValue(document: any, field: string): any {
-    try {
-      let current = document;
-      const parts = field.split('.');
-      
-      for (const part of parts) {
-        if (part.startsWith('[') && part.endsWith(']')) {
-          // Handle array index
-          const index = parseInt(part.substring(1, part.length - 1), 10);
-          if (Array.isArray(current) && !isNaN(index) && index >= 0 && index < current.length) {
-            current = current[index];
-          } else {
-            return undefined;
-          }
-        } else {
-          // Handle object property
-          if (current && typeof current === 'object' && part in current) {
-            current = current[part];
-          } else {
-            return undefined;
-          }
-        }
-      }
-      
-      return current;
-    } catch (error) {
-      return undefined;
-    }
-  }
-
-  /**
-   * Generate a report from validation results
-   * 
-   * @param results Array of document validation results
-   * @param startTime Validation start time
-   * @param endTime Validation end time
+   * @param results Document validation results
+   * @param startTime Start time
+   * @param endTime End time
    * @returns Validation report
    */
-  generateReport(
-    results: DocumentValidationResult[], 
-    startTime: Date, 
-    endTime: Date
-  ): ValidationReport {
-    const collectionMap = new Map<string, CollectionSummary>();
-    const invalidResults: FieldValidationResult[] = [];
-    
-    let totalDocuments = 0;
+  generateReport(results: DocumentValidationResult[], startTime: Date, endTime: Date): ValidationReport {
+    // Track report statistics
+    let totalDocuments = results.length;
     let totalFields = 0;
     let validUrls = 0;
     let invalidUrls = 0;
     let missingUrls = 0;
     
-    // Process results
+    // Track collection summaries
+    const collectionMap = new Map<string, {
+      totalUrls: number;
+      validUrls: number;
+      invalidUrls: number;
+      missingUrls: number;
+    }>();
+    
+    // Extract invalid results for reporting
+    const invalidResults: Array<UrlValidationResult & { field: string; collection?: string; documentId?: string }> = [];
+    
+    // Process document results
     for (const result of results) {
-      totalDocuments++;
+      // Update document counters
       totalFields += result.totalUrls;
       validUrls += result.validUrls;
       invalidUrls += result.invalidUrls;
       
-      // Add invalid URLs to report
-      for (const fieldResult of result.results) {
-        if (!fieldResult.isValid) {
+      // Update collection counters
+      const collectionStats = collectionMap.get(result.collection) || {
+        totalUrls: 0,
+        validUrls: 0,
+        invalidUrls: 0,
+        missingUrls: 0
+      };
+      
+      collectionStats.totalUrls += result.totalUrls;
+      collectionStats.validUrls += result.validUrls;
+      collectionStats.invalidUrls += result.invalidUrls;
+      
+      collectionMap.set(result.collection, collectionStats);
+      
+      // Add invalid results to report
+      for (const urlResult of result.results) {
+        if (!urlResult.isValid) {
           invalidResults.push({
-            ...fieldResult,
-            field: `${result.collection} (${result.id}): ${fieldResult.field}`
+            ...urlResult,
+            collection: result.collection,
+            documentId: result.id,
+            field: `${result.collection} (${result.id}): ${urlResult.field}`
           });
         }
       }
-      
-      // Update collection summary
-      if (!collectionMap.has(result.collection)) {
-        collectionMap.set(result.collection, {
-          collection: result.collection,
-          totalUrls: 0,
-          validUrls: 0,
-          invalidUrls: 0,
-          missingUrls: 0,
-          validPercent: 0,
-          invalidPercent: 0,
-          missingPercent: 0
-        });
-      }
-      
-      const summary = collectionMap.get(result.collection)!;
-      summary.totalUrls += result.totalUrls;
-      summary.validUrls += result.validUrls;
-      summary.invalidUrls += result.invalidUrls;
     }
     
-    // Calculate percentages for each collection
-    for (const summary of collectionMap.values()) {
-      if (summary.totalUrls > 0) {
-        summary.validPercent = Math.round((summary.validUrls / summary.totalUrls) * 100);
-        summary.invalidPercent = Math.round((summary.invalidUrls / summary.totalUrls) * 100);
-        summary.missingPercent = Math.round((summary.missingUrls / summary.totalUrls) * 100);
-      }
+    // Calculate collection summaries
+    const collectionSummaries: CollectionValidationSummary[] = [];
+    for (const [collection, stats] of collectionMap.entries()) {
+      const totalUrls = stats.totalUrls;
+      const validPercent = totalUrls > 0 ? Math.round((stats.validUrls / totalUrls) * 100) : 0;
+      const invalidPercent = totalUrls > 0 ? Math.round((stats.invalidUrls / totalUrls) * 100) : 0;
+      const missingPercent = totalUrls > 0 ? Math.round((stats.missingUrls / totalUrls) * 100) : 0;
+      
+      collectionSummaries.push({
+        collection,
+        totalUrls,
+        validUrls: stats.validUrls,
+        invalidUrls: stats.invalidUrls,
+        missingUrls: stats.missingUrls,
+        validPercent,
+        invalidPercent,
+        missingPercent
+      });
     }
     
-    // Sort invalid results by collection and document ID
-    invalidResults.sort((a, b) => a.field.localeCompare(b.field));
+    // Sort collection summaries by total URLs (descending)
+    collectionSummaries.sort((a, b) => b.totalUrls - a.totalUrls);
     
+    // Return report
     return {
       startTime,
       endTime,
@@ -424,115 +271,86 @@ export class MediaValidationService {
       validUrls,
       invalidUrls,
       missingUrls,
-      collectionSummaries: Array.from(collectionMap.values()),
+      collectionSummaries,
       invalidResults
     };
   }
-
+  
   /**
    * Fix invalid URLs in a document
    * 
-   * @param document Firestore document data
+   * @param document Document to fix
    * @param validation Document validation result
-   * @returns Object with updated document and array of fix results
+   * @returns Updated document and list of fixes
    */
-  fixInvalidUrls(document: any, validation: DocumentValidationResult): { 
-    updatedDocument: any; 
-    fixes: UrlFixResult[];
-  } {
+  fixInvalidUrls(document: any, validation: DocumentValidationResult): { updatedDocument: any; fixes: UrlFixResult[] } {
+    // Clone document to avoid modifying original
     const updatedDocument = JSON.parse(JSON.stringify(document));
     const fixes: UrlFixResult[] = [];
     
+    // Fix each invalid URL
     for (const result of validation.results) {
       if (!result.isValid) {
-        try {
-          const field = result.field;
-          const expectedType = this.getExpectedMediaType(field);
-          const placeholderUrl = getPlaceholderUrl(result.url, expectedType);
-          
-          // Update the document with placeholder URL
-          this.updateFieldValue(updatedDocument, field, placeholderUrl);
-          
-          fixes.push({
-            id: validation.id,
-            collection: validation.collection,
-            field,
-            originalUrl: result.url,
-            newUrl: placeholderUrl,
-            fixed: true
-          });
-        } catch (error) {
-          fixes.push({
-            id: validation.id,
-            collection: validation.collection,
-            field: result.field,
-            originalUrl: result.url,
-            newUrl: '',
-            fixed: false,
-            error: error instanceof Error ? error.message : 'Unknown error'
-          });
+        // Get current value
+        const currentValue = get(updatedDocument, result.field);
+        
+        // Skip if value not found
+        if (currentValue === undefined) {
+          continue;
         }
+        
+        // Replace URL with placeholder based on field type
+        let newUrl: string;
+        
+        if (this.isVideoField(result.field) || isVideoUrl(result.url)) {
+          newUrl = '/yacht-video-placeholder.mp4';
+        } else {
+          newUrl = '/yacht-placeholder.jpg';
+        }
+        
+        // Update document
+        set(updatedDocument, result.field, newUrl);
+        
+        // Add fix result
+        fixes.push({
+          field: result.field,
+          originalUrl: result.url,
+          newUrl,
+          fixed: true
+        });
       }
     }
     
-    return { updatedDocument, fixes };
+    // Return updated document and fixes
+    return {
+      updatedDocument,
+      fixes
+    };
   }
-
+  
   /**
-   * Update a field value in a document using a path
+   * Check if a field is likely an image field
    * 
-   * @param document Firestore document data
-   * @param field Field path
-   * @param value New field value
+   * @param field Field name
+   * @returns True if field is likely an image field
    */
-  private updateFieldValue(document: any, field: string, value: any): void {
-    try {
-      const parts = field.split('.');
-      let current = document;
-      
-      // Navigate to the parent object of the field
-      for (let i = 0; i < parts.length - 1; i++) {
-        const part = parts[i];
-        
-        if (part.startsWith('[') && part.endsWith(']')) {
-          // Handle array index
-          const index = parseInt(part.substring(1, part.length - 1), 10);
-          if (Array.isArray(current) && !isNaN(index) && index >= 0 && index < current.length) {
-            current = current[index];
-          } else {
-            throw new Error(`Invalid array index: ${part}`);
-          }
-        } else {
-          // Handle object property
-          if (current && typeof current === 'object' && part in current) {
-            current = current[part];
-          } else {
-            throw new Error(`Property not found: ${part}`);
-          }
-        }
-      }
-      
-      // Get the last part (property or array index)
-      const lastPart = parts[parts.length - 1];
-      
-      if (lastPart.startsWith('[') && lastPart.endsWith(']')) {
-        // Update array element
-        const index = parseInt(lastPart.substring(1, lastPart.length - 1), 10);
-        if (Array.isArray(current) && !isNaN(index) && index >= 0 && index < current.length) {
-          current[index] = value;
-        } else {
-          throw new Error(`Invalid array index: ${lastPart}`);
-        }
-      } else {
-        // Update object property
-        if (current && typeof current === 'object') {
-          current[lastPart] = value;
-        } else {
-          throw new Error(`Cannot update property: ${lastPart}`);
-        }
-      }
-    } catch (error) {
-      throw new Error(`Failed to update field ${field}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+  private isImageField(field: string): boolean {
+    const imagePatterns = ['image', 'photo', 'thumbnail', 'avatar', 'icon', 'logo', 'banner', 'cover'];
+    const fieldLower = field.toLowerCase();
+    
+    return imagePatterns.some(pattern => fieldLower.includes(pattern));
+  }
+  
+  /**
+   * Check if a field is likely a video field
+   * 
+   * @param field Field name
+   * @returns True if field is likely a video field
+   */
+  private isVideoField(field: string): boolean {
+    const videoPatterns = ['video', 'movie', 'clip', 'recording'];
+    const fieldLower = field.toLowerCase();
+    
+    return videoPatterns.some(pattern => fieldLower.includes(pattern));
   }
 }

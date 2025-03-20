@@ -5,301 +5,269 @@
  * It demonstrates how to use our hook testing utilities with React 18.
  */
 import React from 'react';
-import { renderHookWithProviders } from './hook-test-utils';
-import { useMediaValidation, ValidationReport, ValidationTask } from '../client/src/hooks/use-media-validation';
-import { act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
+import { 
+  ValidationReport, 
+  useMediaValidation 
+} from '../client/src/hooks/use-media-validation';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// Mock fetch globally
+// Mock the fetch API
 global.fetch = jest.fn();
 
-describe('useMediaValidation', () => {
-  // Set up fetch mock before each test
+// Mock the toast function
+jest.mock('../client/src/hooks/use-toast', () => ({
+  toast: jest.fn()
+}));
+
+// Create a wrapper with the necessary providers
+const createWrapper = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+  
+  return ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  );
+};
+
+describe('useMediaValidation Hook', () => {
+  const mockReports: ValidationReport[] = [
+    {
+      id: 'report1',
+      startTime: new Date('2025-03-01T10:00:00Z'),
+      endTime: new Date('2025-03-01T10:05:00Z'),
+      duration: 300000,
+      totalDocuments: 100,
+      totalFields: 250,
+      validUrls: 200,
+      invalidUrls: 50,
+      missingUrls: 0,
+      collectionSummaries: [
+        {
+          collection: 'collection1',
+          totalUrls: 150,
+          validUrls: 120,
+          invalidUrls: 30,
+          missingUrls: 0,
+          validPercent: 80,
+          invalidPercent: 20,
+          missingPercent: 0
+        },
+        {
+          collection: 'collection2',
+          totalUrls: 100,
+          validUrls: 80,
+          invalidUrls: 20,
+          missingUrls: 0,
+          validPercent: 80,
+          invalidPercent: 20,
+          missingPercent: 0
+        }
+      ],
+      invalidResults: [
+        {
+          field: 'imageUrl',
+          url: 'https://example.com/not-found.jpg',
+          isValid: false,
+          status: 404,
+          statusText: 'Not Found',
+          error: 'HTTP error: 404 Not Found',
+          collection: 'collection1',
+          documentId: 'doc1'
+        }
+      ]
+    },
+    {
+      id: 'report2',
+      startTime: new Date('2025-02-28T10:00:00Z'),
+      endTime: new Date('2025-02-28T10:03:00Z'),
+      duration: 180000,
+      totalDocuments: 90,
+      totalFields: 220,
+      validUrls: 180,
+      invalidUrls: 40,
+      missingUrls: 0,
+      collectionSummaries: [
+        {
+          collection: 'collection1',
+          totalUrls: 130,
+          validUrls: 100,
+          invalidUrls: 30,
+          missingUrls: 0,
+          validPercent: 77,
+          invalidPercent: 23,
+          missingPercent: 0
+        },
+        {
+          collection: 'collection2',
+          totalUrls: 90,
+          validUrls: 80,
+          invalidUrls: 10,
+          missingUrls: 0,
+          validPercent: 89,
+          invalidPercent: 11,
+          missingPercent: 0
+        }
+      ],
+      invalidResults: []
+    }
+  ];
+  
   beforeEach(() => {
-    // Reset mocks
     jest.clearAllMocks();
     
-    // Mock validation reports endpoint
-    (fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url === '/api/admin/media-validation-reports') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({
-            reports: [
-              {
-                id: 'report-1',
-                timestamp: 1616161616,
-                stats: {
-                  documentCount: 100,
-                  fieldCount: 300,
-                  invalidFieldCount: 10,
-                  relativeUrlCount: 5,
-                  imageCount: 250,
-                  videoCount: 50,
-                  byCollection: {
-                    collection1: {
-                      documentCount: 50,
-                      invalidCount: 5,
-                      relativeCount: 2
-                    },
-                    collection2: {
-                      documentCount: 50,
-                      invalidCount: 5,
-                      relativeCount: 3
-                    }
-                  },
-                  validationTimeMs: 2000
-                },
-                invalid: [{ url: 'https://example.com/bad.jpg', error: 'Not found' }],
-                relative: [{ url: '/images/relative.jpg' }]
-              }
-            ]
-          })
-        });
-      } else if (url === '/api/admin/url-repair-reports') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({
-            reports: [
-              {
-                id: 'fix-1',
-                timestamp: 1616161617,
-                stats: {
-                  documentCount: 50,
-                  fixedDocumentCount: 20,
-                  fixedFieldCount: 25,
-                  byCollection: {
-                    collection1: {
-                      documentCount: 25,
-                      fixedCount: 15
-                    },
-                    collection2: {
-                      documentCount: 25,
-                      fixedCount: 10
-                    }
-                  },
-                  fixTimeMs: 1500
-                },
-                fixes: []
-              }
-            ]
-          })
-        });
-      } else if (url === '/api/admin/active-validation-tasks') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({
-            tasks: []
-          })
-        });
-      } else if (url === '/api/admin/collections') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({
-            collections: {
-              collection1: {
-                documentCount: 50,
-                mediaCount: 150,
-                issueCount: 5,
-                lastValidated: 1616161616
-              },
-              collection2: {
-                documentCount: 50,
-                mediaCount: 150,
-                issueCount: 5,
-                lastValidated: 1616161616
-              }
-            }
-          })
-        });
-      } else if (url === '/api/admin/validation-schedules') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({
-            schedules: [
-              {
-                id: 'schedule-1',
-                name: 'Daily Validation',
-                enabled: true,
-                intervalHours: 24,
-                collections: [],
-                fixRelativeUrls: true,
-                lastRunTime: 1616161616,
-                lastStatus: 'success'
-              }
-            ]
-          })
-        });
-      } else if (url.startsWith('/api/admin/media-validation/')) {
-        const reportId = url.split('/').pop();
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({
-            id: reportId,
-            timestamp: 1616161616,
-            stats: {
-              documentCount: 100,
-              fieldCount: 300,
-              invalidFieldCount: 10,
-              relativeUrlCount: 5,
-              imageCount: 250,
-              videoCount: 50,
-              byCollection: {},
-              validationTimeMs: 2000
-            },
-            invalid: [{ url: 'https://example.com/bad.jpg', error: 'Not found' }],
-            relative: [{ url: '/images/relative.jpg' }]
-          })
-        });
-      }
-      
-      // Default response
-      return Promise.resolve({
-        ok: false,
-        status: 404,
-        json: () => Promise.resolve({ error: 'Not found' })
-      });
-    });
+    // Reset the fetch mock
+    (global.fetch as jest.Mock).mockReset();
   });
   
   it('should load validation reports', async () => {
-    // Render the hook with providers
-    const { result } = renderHookWithProviders(() => useMediaValidation());
-    
-    // First, it should be loading
-    expect(result.current.isLoading).toBe(true);
-    
-    // Wait for data to load
-    await act(async () => {
-      // Wait for promises to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
+    // Mock the fetch response
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce(mockReports)
     });
     
-    // Now data should be loaded
-    expect(result.current.validationReports).toBeDefined();
-    expect(result.current.validationReports?.length).toBe(1);
-    expect(result.current.validationReports?.[0].id).toBe('report-1');
-  });
-  
-  it('should load URL fix reports', async () => {
-    // Render the hook with providers
-    const { result } = renderHookWithProviders(() => useMediaValidation());
-    
-    // Wait for data to load
-    await act(async () => {
-      // Wait for promises to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
+    const { result } = renderHook(() => useMediaValidation(), {
+      wrapper: createWrapper()
     });
     
-    // Check fix reports
-    expect(result.current.urlFixReports).toBeDefined();
-    expect(result.current.urlFixReports?.length).toBe(1);
-    expect(result.current.urlFixReports?.[0].id).toBe('fix-1');
+    expect(result.current.reports).toBeUndefined();
+    expect(result.current.isLoadingReports).toBe(false);
+    
+    // Load reports
+    await act(async () => {
+      await result.current.loadReports();
+    });
+    
+    // Verify reports were loaded
+    expect(global.fetch).toHaveBeenCalledWith('/api/admin/media-validation-reports');
+    expect(result.current.reports).toEqual(mockReports);
+    expect(result.current.lastValidationReport).toEqual(mockReports[0]);
   });
   
-  it('should run validation', async () => {
-    // Mock the POST endpoint
-    (fetch as jest.Mock).mockImplementation((url: string, options: any) => {
-      if (url === '/api/admin/validate-media' && options.method === 'POST') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({
-            success: true,
-            taskId: 'task-123'
-          })
-        });
+  it('should handle fetch errors', async () => {
+    // Mock a failed fetch
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: 'Server Error'
+    });
+    
+    const { result } = renderHook(() => useMediaValidation(), {
+      wrapper: createWrapper()
+    });
+    
+    // Load reports
+    await act(async () => {
+      try {
+        await result.current.loadReports();
+      } catch (error) {
+        // Expected to throw
       }
-      
-      // Default to original mock
-      return global.fetch(url);
     });
     
-    // Render the hook with providers
-    const { result } = renderHookWithProviders(() => useMediaValidation());
+    // Verify fetch was called but no reports were loaded
+    expect(global.fetch).toHaveBeenCalledWith('/api/admin/media-validation-reports');
+    expect(result.current.reports).toBeUndefined();
+  });
+  
+  it('should run validation successfully', async () => {
+    // Mock the fetch response for validation
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce({ success: true, reportId: 'report1' })
+    });
     
-    // Wait for data to load
-    await act(async () => {
-      // Wait for promises to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
+    // Mock the fetch response for loadReports
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce(mockReports)
+    });
+    
+    const { result } = renderHook(() => useMediaValidation(), {
+      wrapper: createWrapper()
     });
     
     // Run validation
-    let response;
     await act(async () => {
-      response = await result.current.runValidation();
+      result.current.runValidation();
     });
     
-    // Check response
-    expect(response).toEqual({ taskId: 'task-123' });
-    
-    // Verify fetch was called
-    expect(fetch).toHaveBeenCalledWith('/api/admin/validate-media', { method: 'POST' });
-  });
-  
-  it('should fix broken URLs', async () => {
-    // Mock the POST endpoint
-    (fetch as jest.Mock).mockImplementation((url: string, options: any) => {
-      if (url === '/api/admin/fix-relative-urls' && options.method === 'POST') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({
-            success: true,
-            taskId: 'task-456'
-          })
-        });
-      }
-      
-      // Default to original mock
-      return global.fetch(url);
-    });
-    
-    // Render the hook with providers
-    const { result } = renderHookWithProviders(() => useMediaValidation());
-    
-    // Wait for data to load
-    await act(async () => {
-      // Wait for promises to resolve
-      await new Promise(resolve => setTimeout(resolve, 0));
-    });
-    
-    // Fix broken URLs
-    let response;
-    await act(async () => {
-      response = await result.current.fixBrokenUrls();
-    });
-    
-    // Check response
-    expect(response).toEqual({ taskId: 'task-456' });
-    
-    // Verify fetch was called
-    expect(fetch).toHaveBeenCalledWith('/api/admin/fix-relative-urls', { method: 'POST' });
-  });
-  
-  it('should calculate progress correctly', () => {
-    // Render the hook with providers
-    const { result } = renderHookWithProviders(() => useMediaValidation());
-    
-    // Create a sample report
-    const report: ValidationReport = {
-      id: 'report-1',
-      timestamp: 1616161616,
-      stats: {
-        documentCount: 100,
-        fieldCount: 50,
-        invalidFieldCount: 10,
-        relativeUrlCount: 5,
-        imageCount: 40,
-        videoCount: 10,
-        byCollection: {},
-        validationTimeMs: 1000
+    // Verify fetch was called with the right parameters
+    expect(global.fetch).toHaveBeenCalledWith('/api/admin/validate-media', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      invalid: [],
-      relative: []
-    };
+      body: JSON.stringify({})
+    });
     
-    // Calculate progress
-    const progress = result.current.calculateProgress(report);
+    // Verify status is updated
+    expect(result.current.validationStatus).toBe('Validation complete.');
+  });
+  
+  it('should fix invalid URLs successfully', async () => {
+    // Mock the fetch response for fixing URLs
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce({ success: true, fixCount: 10 })
+    });
     
-    // Should be 50%
-    expect(progress).toBe(50);
+    // Mock the fetch response for loadReports
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce(mockReports)
+    });
+    
+    const { result } = renderHook(() => useMediaValidation(), {
+      wrapper: createWrapper()
+    });
+    
+    // Fix invalid URLs
+    await act(async () => {
+      result.current.fixInvalidUrls();
+    });
+    
+    // Verify fetch was called with the right parameters
+    expect(global.fetch).toHaveBeenCalledWith('/api/admin/fix-media-issues', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({})
+    });
+    
+    // Verify status is updated
+    expect(result.current.repairStatus).toBe('Repairs complete.');
+  });
+  
+  it('should get specific validation results by ID', async () => {
+    // Mock the fetch response
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce(mockReports)
+    });
+    
+    const { result } = renderHook(() => useMediaValidation(), {
+      wrapper: createWrapper()
+    });
+    
+    // Load reports
+    await act(async () => {
+      await result.current.loadReports();
+    });
+    
+    // Get results for a specific report
+    const report = result.current.validationResults('report2');
+    
+    // Verify the right report was returned
+    expect(report).toEqual(mockReports[1]);
   });
 });
