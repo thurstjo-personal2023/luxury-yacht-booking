@@ -1,0 +1,153 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2821
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw16840\paperh23820\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 exports.mediaValidationWorker = async (message) => \{\
+  try \{\
+    // Parse the message data\
+    const task = JSON.parse(Buffer.from(message.data, "base64").toString());\
+\
+    logger.info(\
+        `Processing media validation task for $\{task.collection\}, ` +\
+        `batch $\{task.batchIndex + 1\}/$\{task.totalBatches\}`,\
+    );\
+\
+    // Extract task parameters\
+    const \{collection, batchSize, startIndex\} = task;\
+\
+    // Get a batch of documents from the collection\
+    const query = admin\
+        .firestore()\
+        .collection(collection)\
+        .orderBy("__name__") // Order by document ID for consistent pagination\
+        .limit(batchSize);\
+\
+    // If we have a start index, add a startAfter clause\
+    let snapshot;\
+    if (startIndex > 0) \{\
+      // Get the document ID at the previous batch's last position\
+      const previousBatchQuery = admin\
+          .firestore()\
+          .collection(collection)\
+          .orderBy("__name__")\
+          .limit(1)\
+          .offset(startIndex - 1);\
+\
+      const previousBatchSnapshot = await previousBatchQuery.get();\
+\
+      if (!previousBatchSnapshot.empty) \{\
+        const lastDoc = previousBatchSnapshot.docs[0];\
+        snapshot = await query.startAfter(lastDoc).get();\
+      \} else \{\
+        snapshot = await query.get();\
+      \}\
+    \} else \{\
+      snapshot = await query.get();\
+    \}\
+\
+    // Process each document in the batch\
+    const results = \{\
+      processed: 0,\
+      fixed: 0,\
+      errors: 0,\
+    \};\
+\
+    for (const doc of snapshot.docs) \{\
+      try \{\
+        const data = doc.data();\
+        results.processed++;\
+\
+        // Only process documents with media fields\
+        if (hasMediaFields(data)) \{\
+          const \{fixed\} = await validateAndRepairMedia(\
+              collection,\
+              doc.id,\
+              data,\
+          );\
+          if (fixed) \{\
+            results.fixed++;\
+          \}\
+        \}\
+      \} catch (error) \{\
+        logger.error(\
+            `Error processing document $\{doc.id\} in $\{collection\}:`,\
+            error,\
+        );\
+        results.errors++;\
+      \}\
+    \}\
+\
+    // Log results\
+    logger.info(\
+        `Completed batch $\{task.batchIndex + 1\}/$\{task.totalBatches\} ` +\
+        `for $\{collection\}:`,\
+    );\
+    logger.info(`- Documents processed: $\{results.processed\}`);\
+    logger.info(`- Media items fixed: $\{results.fixed\}`);\
+    logger.info(`- Errors: $\{results.errors\}`);\
+\
+    // Save the results to Firestore for reporting\
+    await saveWorkerResults(collection, task, results);\
+  \} catch (error) \{\
+    logger.error("Error processing media validation task:", error);\
+    throw error; // Re-throw to trigger Pub/Sub retry\
+  \}\
+\};\
+\
+/**\
+ * Check if a document has media fields that need validation.\
+ *\
+ * @param \{object\} data - The document data to check for media fields.\
+ * @return \{boolean\} - Returns true if the document has media fields,\
+ * otherwise false.\
+ */\
+function hasMediaFields(data) \{\
+  // Check for common media field patterns\
+  if (data.media && Array.isArray(data.media)) \{\
+    return true;\
+  \}\
+\
+  if (data.imageUrl || data.coverImageUrl || data.thumbnailUrl) \{\
+    return true;\
+  \}\
+\
+  // Check for nested media fields like virtualTour.scenes[].imageUrl\
+  if (\
+    data.virtualTour &&\
+    data.virtualTour.scenes &&\
+    Array.isArray(data.virtualTour.scenes)\
+  ) \{\
+    return data.virtualTour.scenes.some(\
+        (scene) => scene.imageUrl || scene.thumbnailUrl,\
+    );\
+  \}\
+\
+  return false;\
+\}\
+\
+/**\
+ * Save worker results to Firestore for reporting\
+ *\
+ * @param \{string\} collection - The name of the Firestore collection.\
+ * @param \{object\} task - The task object containing batch details.\
+ * @param \{object\} results - The results of the worker's processing.\
+ * @param \{number\} results.processed - Number of documents processed.\
+ * @param \{number\} results.fixed - Number of media items fixed.\
+ * @param \{number\} results.errors - Number of errors encountered.\
+ */\
+async function saveWorkerResults(collection, task, results) \{\
+  const timestamp = admin.firestore.Timestamp.now();\
+\
+  await admin.firestore().collection("media_validation_worker_logs").add(\{\
+    collection,\
+    batch: task.batchIndex + 1,\
+    totalBatches: task.totalBatches,\
+    results,\
+    timestamp,\
+    taskId: task.timestamp,\
+  \});\
+\}\
+}

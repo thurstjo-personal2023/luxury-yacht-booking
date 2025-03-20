@@ -1,0 +1,353 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2821
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw16840\paperh23820\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 // Use centralized Firebase Admin initialization\
+const admin = require("../src/utils/firebaseAdmin");\
+const \{logger\} = require("../src/utils/logging");\
+\
+// Collection for storing validation reports\
+const REPORT_COLLECTION = "media_validation_reports";\
+\
+// Media type patterns for identifying video content\
+const VIDEO_PATTERNS = [\
+  "-SBV-",\
+  "Dynamic motion",\
+  ".mp4",\
+  ".mov",\
+  ".avi",\
+  ".webm",\
+  "video/",\
+];\
+\
+/**\
+ * Validate and repair media in a document\
+ *\
+ * @param \{string\} collection - The name of the Firestore collection.\
+ * @param \{string\} documentId - The ID of the document to validate and repair.\
+ * @param \{Object\} data - The data of the document to validate and repair.\
+ * @return \{Promise<Object>\} An object indicating whether the media was fixed.\
+ */\
+async function validateAndRepairMedia(collection, documentId, data) \{\
+  let fixed = false;\
+  const updatedData = \{...data\};\
+\
+  // Process top-level media array\
+  fixed = processTopLevelMedia(data, updatedData) || fixed;\
+\
+  // Process common image URL fields\
+  fixed = processImageFields(data, updatedData) || fixed;\
+\
+  // Process virtual tour scenes\
+  fixed = processVirtualTourScenes(data, updatedData) || fixed;\
+\
+  // Update document if media was fixed\
+  if (fixed) \{\
+    try \{\
+      await admin\
+          .firestore()\
+          .collection(collection)\
+          .doc(documentId)\
+          .update(updatedData);\
+      logger.info(`Fixed media in $\{collection\}/$\{documentId\}`);\
+\
+      // Record this fix in the validation reports\
+      await recordMediaFix(collection, documentId, data, updatedData);\
+    \} catch (error) \{\
+      logger.error(\
+          `Error updating document $\{collection\}/$\{documentId\}:`, error,\
+      );\
+      fixed = false;\
+    \}\
+  \}\
+\
+  return \{fixed\};\
+\}\
+\
+// eslint-disable-next-line require-jsdoc\
+function processTopLevelMedia(data, updatedData) \{\
+  if (data.media && Array.isArray(data.media)) \{\
+    const \{mediaArray, wasFixed\} = processMediaArray(data.media);\
+    if (wasFixed) \{\
+      updatedData.media = mediaArray;\
+      return true;\
+    \}\
+  \}\
+  return false;\
+\}\
+\
+// eslint-disable-next-line require-jsdoc\
+function processImageFields(data, updatedData) \{\
+  const imageFields = [\
+    "imageUrl",\
+    "coverImageUrl",\
+    "thumbnailUrl",\
+    "profilePhoto",\
+  ];\
+  let fixed = false;\
+  for (const field of imageFields) \{\
+    if (data[field] && typeof data[field] === "string") \{\
+      const \{url, wasFixed\} = processMediaUrl(data[field], "image");\
+      if (wasFixed) \{\
+        updatedData[field] = url;\
+        fixed = true;\
+      \}\
+    \}\
+  \}\
+  return fixed;\
+\}\
+\
+// eslint-disable-next-line require-jsdoc\
+function processVirtualTourScenes(data, updatedData) \{\
+  if (data.virtualTour &&\
+      data.virtualTour.scenes &&\
+      Array.isArray(data.virtualTour.scenes)) \{\
+    let scenesFixed = false;\
+    const updatedScenes = data.virtualTour.scenes.map((scene) => \{\
+      const updatedScene = \{...scene\};\
+\
+      // Process scene image URL\
+      if (scene.imageUrl && typeof scene.imageUrl === "string") \{\
+        const \{url, wasFixed\} = processMediaUrl(scene.imageUrl, "image");\
+        if (wasFixed) \{\
+          updatedScene.imageUrl = url;\
+          scenesFixed = true;\
+        \}\
+      \}\
+\
+      // Process scene thumbnail URL\
+      if (scene.thumbnailUrl && typeof scene.thumbnailUrl === "string") \{\
+        const \{url, wasFixed\} = processMediaUrl(scene.thumbnailUrl, "image");\
+        if (wasFixed) \{\
+          updatedScene.thumbnailUrl = url;\
+          scenesFixed = true;\
+        \}\
+      \}\
+\
+      return updatedScene;\
+    \});\
+\
+    if (scenesFixed) \{\
+      updatedData.virtualTour = \{\
+        ...data.virtualTour,\
+        scenes: updatedScenes,\
+      \};\
+      return true;\
+    \}\
+  \}\
+  return false;\
+\}\
+\
+/**\
+ * Process an array of media items.\
+ *\
+ * @param \{Array<Object>\} mediaArray - The array of media items to process.\
+ * @return \{Object\} An object containing the updated media array and a flag\
+ * indicating if any fixes were applied.\
+ */\
+function processMediaArray(mediaArray) \{\
+  let wasFixed = false;\
+\
+  const updatedMedia = mediaArray.map((item) => \{\
+    // Skip items without URL\
+    if (!item.url) return item;\
+\
+    // Process the URL\
+    const \{url, wasFixed: urlFixed, detectedType\} = processMediaUrl(\
+        item.url,\
+        item.type || "image",\
+    );\
+\
+    // Return updated item if needed\
+    if (urlFixed || (detectedType && detectedType !== item.type)) \{\
+      wasFixed = true;\
+      return \{\
+        ...item,\
+        url: url,\
+        type: detectedType || item.type,\
+      \};\
+    \}\
+\
+    return item;\
+  \});\
+\
+  return \{mediaArray: updatedMedia, wasFixed\};\
+\}\
+\
+/**\
+ * Process a media URL, fixing relative paths and detecting media types.\
+ *\
+ * @param \{string\} url - The media URL to process.\
+ * @param \{string\} declaredType - The declared type of the media\
+ * (e.g., "image" or "video").\
+ * @return \{Object\} An object containing the processed URL,\
+ * a flag indicating if it was fixed,\
+ * and the detected media type (if applicable).\
+ */\
+function processMediaUrl(url, declaredType) \{\
+  // Skip empty URLs\
+  if (!url) \{\
+    return \{url, wasFixed: false\};\
+  \}\
+\
+  let wasFixed = false;\
+  let detectedType;\
+  let processedUrl = url;\
+\
+  // Fix relative URLs\
+  if (url.startsWith("/")) \{\
+    // Convert to absolute URL with placeholder base\
+    const baseUrl = "https://etoile-yachts.firebasestorage.app";\
+    processedUrl = `$\{baseUrl\}$\{url\}`;\
+    wasFixed = true;\
+  \}\
+\
+  // Fix blob URLs\
+  if (url.startsWith("blob:")) \{\
+    // Replace with placeholder\
+    processedUrl = "https://etoile-yachts.firebasestorage.app/yacht-placeholder.jpg";\
+    wasFixed = true;\
+  \}\
+\
+  // Detect if this should be a video based on URL patterns\
+  if (declaredType === "image" && isLikelyVideo(url)) \{\
+    detectedType = "video";\
+    wasFixed = true;\
+  \}\
+\
+  return \{url: processedUrl, wasFixed, detectedType\};\
+\}\
+\
+/**\
+ * Check if a URL is likely a video based on known patterns.\
+ *\
+ * @param \{string\} url - The URL to check.\
+ * @return \{boolean\} True if the URL is likely a video, false otherwise.\
+ */\
+function isLikelyVideo(url) \{\
+  const lowerUrl = url.toLowerCase();\
+  return VIDEO_PATTERNS.some((pattern) =>\
+    lowerUrl.includes(pattern.toLowerCase()),\
+  );\
+\}\
+\
+/**\
+ * Record a media fix in the validation reports collection\
+ *\
+ * @param \{string\} collection - The name of the Firestore collection.\
+ * @param \{string\} documentId - The ID of the document being fixed.\
+ * @param \{Object\} originalData - The original data before the fix.\
+ * @param \{Object\} updatedData - The updated data after the fix.\
+ */\
+async function recordMediaFix(\
+    collection, documentId, originalData, updatedData,\
+) \{\
+  try \{\
+    const timestamp = admin.firestore.Timestamp.now();\
+    const reportRef = admin.firestore().collection(REPORT_COLLECTION).doc();\
+\
+    await reportRef.set(\{\
+      collection,\
+      documentId,\
+      timestamp,\
+      fixes: \{\
+        relativeUrls: findFixedRelativeUrls(originalData, updatedData),\
+        mediaTypes: findFixedMediaTypes(originalData, updatedData),\
+      \},\
+    \});\
+  \} catch (error) \{\
+    logger.error("Error recording media fix:", error);\
+  \}\
+\}\
+\
+\
+/**\
+ * Find URLs that were fixed from relative to absolute.\
+ *\
+ * @param \{Object\} original - The original data object before fixes.\
+ * @param \{Object\} updated - The updated data object after fixes.\
+ * @return \{Array<Object>\} An array of objects describing the fixed URLs.\
+ */\
+function findFixedRelativeUrls(original, updated) \{\
+  const fixes = [];\
+\
+  // Helper to compare and find fixed URLs\
+  // eslint-disable-next-line require-jsdoc\
+  function compareUrls(originalUrl, updatedUrl, path) \{ // Added JSDoc\
+    if (originalUrl && originalUrl.startsWith("/") &&\
+        updatedUrl && !updatedUrl.startsWith("/")) \{\
+      fixes.push(\{\
+        path,\
+        original: originalUrl,\
+        updated: updatedUrl,\
+      \});\
+    \}\
+  \}\
+\
+\
+  // Check media array\
+  if (original.media && updated.media &&\
+        Array.isArray(original.media) && Array.isArray(updated.media)) \{\
+    for (let i = 0; i < original.media.length; i++) \{\
+      if (original.media[i] && updated.media[i]) \{\
+        compareUrls(\
+            original.media[i].url,\
+            updated.media[i].url,\
+            `media[$\{i\}].url`,\
+        );\
+      \}\
+    \}\
+  \}\
+\
+  // Check common image fields\
+  [\
+    "imageUrl",\
+    "coverImageUrl",\
+    "thumbnailUrl",\
+    "profilePhoto",\
+  ].forEach((field) => \{\
+    if (original[field] && updated[field]) \{\
+      compareUrls(original[field], updated[field], field);\
+    \}\
+  \});\
+\
+  return fixes;\
+\}\
+\
+\
+/**\
+ * Find media items that had their type fixed.\
+ *\
+ * @param \{Object\} original - The original data object before fixes.\
+ * @param \{Object\} updated - The updated data object after fixes.\
+ * @return \{Array<Object>\} An array of objects describing the fixed media types.\
+ */\
+function findFixedMediaTypes(original, updated) \{\
+  const fixes = [];\
+\
+  // Check media array\
+  if (original.media && updated.media &&\
+      Array.isArray(original.media) && Array.isArray(updated.media)) \{\
+    for (let i = 0; i < original.media.length; i++) \{\
+      if (original.media[i] && updated.media[i] &&\
+          original.media[i].type !== updated.media[i].type) \{\
+        fixes.push(\{\
+          path: `media[$\{i\}].type`,\
+          original: original.media[i].type,\
+          updated: updated.media[i].type,\
+          url: updated.media[i].url,\
+        \});\
+      \}\
+    \}\
+  \}\
+\
+  return fixes;\
+\}\
+\
+module.exports = \{\
+  validateAndRepairMedia,\
+\};\
+}
