@@ -1,337 +1,471 @@
 /**
  * Media Validation Hook
  * 
- * This hook provides functionality for validating and fixing media URLs.
- * It's designed to be used with the MediaValidationPanel component.
+ * This hook provides functionality for interacting with the media validation API.
+ * It allows components to run validations, view reports, and fix issues.
  */
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from './use-auth';
 
-// Types for validation reports
-interface ValidationReport {
-  reportId: string;
-  startTime: any; // Timestamp
-  endTime?: any; // Timestamp
-  totalDocuments: number;
-  totalMediaItems: number;
-  validItems: number;
-  invalidItems: number;
-  missingItems: number;
-  collections: {
-    [collectionName: string]: {
-      totalUrls: number;
-      valid: number;
-      invalid: number;
-      missing: number;
-    }
+// Type definitions
+export interface ValidationReport {
+  id: string;
+  timestamp: number;
+  stats: {
+    documentCount: number;
+    fieldCount: number;
+    invalidFieldCount: number;
+    relativeUrlCount: number;
+    imageCount: number;
+    videoCount: number;
+    byCollection: Record<string, {
+      documentCount: number;
+      invalidCount: number;
+      relativeCount: number;
+    }>;
+    validationTimeMs: number;
   };
-  invalidItemDetails?: {
-    collectionName: string;
-    documentId: string;
-    fieldPath: string;
-    url: string;
-    reason: string;
-    status?: number;
-    error?: string;
-  }[];
-  status: 'running' | 'completed' | 'failed';
-  error?: string;
+  invalid: any[];
+  relative: any[];
+  invalidItemDetails?: any[];
 }
 
-// Types for validation tasks
-interface ValidationTask {
-  taskId: string;
-  type: 'validate-all' | 'validate-collection' | 'fix-relative-urls';
-  collectionName?: string;
-  documentId?: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  startTime?: any; // Timestamp
-  endTime?: any; // Timestamp
-  retryCount: number;
-  lastUpdate: any; // Timestamp
+export interface UrlFixReport {
+  id: string;
+  timestamp: number;
+  stats: {
+    documentCount: number;
+    fixedDocumentCount: number;
+    fixedFieldCount: number;
+    byCollection: Record<string, {
+      documentCount: number;
+      fixedCount: number;
+    }>;
+    fixTimeMs: number;
+  };
+  fixes: any[];
+}
+
+export interface ValidationTask {
+  id: string;
+  type: 'validation' | 'fix';
+  collection?: string;
+  status: 'running' | 'completed' | 'failed';
+  progress?: number;
+  startTime: number;
+  endTime?: number;
   reportId?: string;
 }
 
+export interface ValidationSchedule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  intervalHours: number;
+  collections: string[];
+  fixRelativeUrls: boolean;
+  lastRunTime?: number;
+  lastStatus?: 'success' | 'error' | 'running';
+}
+
+export interface CollectionStats {
+  documentCount: number;
+  mediaCount: number;
+  issueCount?: number;
+  lastValidated?: number;
+}
+
 /**
- * Hook for media validation operations
+ * Custom hook for media validation functionality
  */
 export const useMediaValidation = () => {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<string>('reports');
+  const { user } = useAuth();
   
-  // Fetch validation reports
-  const {
-    data: validationReports,
-    isLoading: isLoadingReports,
-    error: reportsError
-  } = useQuery<ValidationReport[]>({
-    queryKey: ['/api/admin/media-validation-reports'],
-    enabled: activeTab === 'reports',
-    refetchInterval: activeTab === 'reports' ? 30000 : false // Refresh every 30 seconds when viewing reports
-  });
+  // State for validation data
+  const [validationReports, setValidationReports] = useState<ValidationReport[]>();
+  const [urlFixReports, setUrlFixReports] = useState<UrlFixReport[]>();
+  const [activeTasks, setActiveTasks] = useState<ValidationTask[]>();
+  const [schedules, setSchedules] = useState<ValidationSchedule[]>();
+  const [collections, setCollections] = useState<Record<string, CollectionStats>>();
+  const [isLoading, setIsLoading] = useState(true);
+  const [reportDetails, setReportDetails] = useState<ValidationReport>();
   
-  // Fetch URL fix reports
-  const {
-    data: urlFixReports,
-    isLoading: isLoadingFixReports,
-    error: fixReportsError
-  } = useQuery({
-    queryKey: ['/api/admin/url-fix-reports'],
-    enabled: activeTab === 'reports'
-  });
+  /**
+   * Calculate progress percentage for a running task
+   */
+  const calculateProgress = useCallback((report: ValidationReport) => {
+    if (!report || !report.stats) return 0;
+    
+    const { documentCount, fieldCount } = report.stats;
+    const total = documentCount > 0 ? documentCount : 100;
+    const processed = fieldCount > 0 ? fieldCount : 0;
+    
+    return Math.min(Math.round((processed / total) * 100), 99);
+  }, []);
   
-  // Fetch active tasks
-  const {
-    data: activeTasks,
-    isLoading: isLoadingTasks,
-    error: tasksError
-  } = useQuery<ValidationTask[]>({
-    queryKey: ['/api/admin/validation-tasks'],
-    refetchInterval: activeTab === 'tasks' ? 5000 : false, // Refresh every 5 seconds when viewing tasks
-    enabled: activeTab === 'tasks'
-  });
+  /**
+   * Check if a task is currently running
+   */
+  const isTaskRunning = useCallback(() => {
+    if (!activeTasks) return false;
+    return activeTasks.some(task => task.status === 'running');
+  }, [activeTasks]);
   
-  // Fetch validation schedules
-  const {
-    data: schedules,
-    isLoading: isLoadingSchedules,
-    error: schedulesError
-  } = useQuery({
-    queryKey: ['/api/admin/schedules'],
-    enabled: activeTab === 'schedules'
-  });
+  /**
+   * Fetch validation reports
+   */
+  const fetchValidationReports = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch('/api/admin/media-validation-reports');
+      const data = await response.json();
+      
+      if (data.reports) {
+        setValidationReports(data.reports);
+      }
+    } catch (error) {
+      console.error('Error fetching validation reports:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch validation reports',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
   
-  // Fetch available collections
-  const {
-    data: collections,
-    isLoading: isLoadingCollections
-  } = useQuery({
-    queryKey: ['/api/admin/collections']
-  });
+  /**
+   * Fetch URL fix reports
+   */
+  const fetchUrlFixReports = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch('/api/admin/url-repair-reports');
+      const data = await response.json();
+      
+      if (data.reports) {
+        setUrlFixReports(data.reports);
+      }
+    } catch (error) {
+      console.error('Error fetching URL fix reports:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch URL fix reports',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
   
-  // Start validation mutation
-  const validateMediaMutation = useMutation({
-    mutationFn: () => 
-      apiRequest('/api/admin/validate-media', { 
+  /**
+   * Fetch active tasks
+   */
+  const fetchActiveTasks = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/active-validation-tasks');
+      const data = await response.json();
+      
+      if (data.tasks) {
+        setActiveTasks(data.tasks);
+      }
+    } catch (error) {
+      console.error('Error fetching active tasks:', error);
+    }
+  }, []);
+  
+  /**
+   * Run validation on all collections
+   */
+  const runValidation = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/validate-media', { 
         method: 'POST' 
-      }) as Promise<{ taskId: string }>,
-    onSuccess: (data) => {
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
       toast({
         title: 'Validation Started',
-        description: `Task ID: ${data.taskId}`,
-        duration: 3000
+        description: 'Media validation has been started. Check back soon for results.',
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/validation-tasks'] });
-      setActiveTab('tasks');
-    },
-    onError: (error: any) => {
+      
+      // Refresh data after a short delay
+      setTimeout(() => {
+        fetchActiveTasks();
+        fetchValidationReports();
+      }, 2000);
+      
+      return { taskId: data.taskId };
+    } catch (error) {
+      console.error('Error running validation:', error);
       toast({
-        title: 'Error Starting Validation',
-        description: error.message || 'Unknown error',
-        variant: 'destructive',
-        duration: 5000
+        title: 'Error',
+        description: 'Failed to start validation',
+        variant: 'destructive'
       });
+      throw error;
     }
-  });
+  }, [toast, fetchActiveTasks, fetchValidationReports]);
   
-  // Validate collection mutation
-  const validateCollectionMutation = useMutation({
-    mutationFn: (collection: string) => 
-      apiRequest('/api/admin/validate-collection', {
+  /**
+   * Run validation on a specific collection
+   */
+  const runCollectionValidation = useCallback(async (collection: string) => {
+    try {
+      const response = await fetch('/api/admin/validate-collection', {
         method: 'POST',
-        body: { collection }
-      }) as Promise<{ taskId: string; collection: string }>,
-    onSuccess: (data) => {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ collection })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
       toast({
         title: 'Collection Validation Started',
-        description: `Validating: ${data.collection}`,
-        duration: 3000
+        description: `Validation for ${collection} has been started.`,
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/validation-tasks'] });
-      setActiveTab('tasks');
-    },
-    onError: (error: any) => {
+      
+      // Refresh data after a short delay
+      setTimeout(() => {
+        fetchActiveTasks();
+        fetchValidationReports();
+      }, 2000);
+      
+      return { taskId: data.taskId, collection: data.collection };
+    } catch (error) {
+      console.error('Error running collection validation:', error);
       toast({
-        title: 'Error Starting Collection Validation',
-        description: error.message || 'Unknown error',
-        variant: 'destructive',
-        duration: 5000
+        title: 'Error',
+        description: `Failed to validate collection ${collection}`,
+        variant: 'destructive'
       });
+      throw error;
     }
-  });
+  }, [toast, fetchActiveTasks, fetchValidationReports]);
   
-  // Fix relative URLs mutation
-  const fixRelativeUrlsMutation = useMutation({
-    mutationFn: () => 
-      apiRequest('/api/admin/fix-relative-urls', { 
+  /**
+   * Fix broken URLs
+   */
+  const fixBrokenUrls = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/fix-relative-urls', { 
         method: 'POST' 
-      }) as Promise<{ taskId: string }>,
-    onSuccess: (data) => {
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
       toast({
         title: 'URL Fix Started',
-        description: `Task ID: ${data.taskId}`,
-        duration: 3000
+        description: 'Fixing relative URLs has been started. Check back soon for results.',
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/validation-tasks'] });
-      setActiveTab('tasks');
-    },
-    onError: (error: any) => {
+      
+      // Refresh data after a short delay
+      setTimeout(() => {
+        fetchActiveTasks();
+        fetchUrlFixReports();
+      }, 2000);
+      
+      return { taskId: data.taskId };
+    } catch (error) {
+      console.error('Error fixing broken URLs:', error);
       toast({
-        title: 'Error Starting URL Fix',
-        description: error.message || 'Unknown error',
-        variant: 'destructive',
-        duration: 5000
+        title: 'Error',
+        description: 'Failed to start URL fix',
+        variant: 'destructive'
       });
+      throw error;
     }
-  });
+  }, [toast, fetchActiveTasks, fetchUrlFixReports]);
   
-  // Update schedule mutation
-  const updateScheduleMutation = useMutation({
-    mutationFn: (schedule: { id: string; enabled?: boolean; intervalHours?: number }) => 
-      apiRequest(`/api/admin/schedules/${schedule.id}`, {
-        method: 'PUT',
-        body: schedule
-      }),
-    onSuccess: () => {
+  /**
+   * Update a validation schedule
+   */
+  const updateSchedule = useCallback(async (id: string, updates: Partial<ValidationSchedule>) => {
+    try {
+      const response = await fetch('/api/admin/update-validation-schedule', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id, ...updates })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
       toast({
         title: 'Schedule Updated',
-        description: 'Validation schedule has been updated',
-        duration: 3000
+        description: 'Validation schedule has been updated.',
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/schedules'] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Error Updating Schedule',
-        description: error.message || 'Unknown error',
-        variant: 'destructive',
-        duration: 5000
-      });
-    }
-  });
-  
-  // Format timestamp for display
-  const formatTimestamp = (timestamp: any): string => {
-    if (!timestamp) return 'N/A';
-    
-    try {
-      // Check if it's a Firestore timestamp
-      if (typeof timestamp.toDate === 'function') {
-        return timestamp.toDate().toLocaleString();
-      }
       
-      // Check if it's a seconds/nanoseconds object
-      if (timestamp._seconds) {
-        return new Date(timestamp._seconds * 1000).toLocaleString();
-      }
+      // Update local state
+      setSchedules(prev => 
+        prev?.map(schedule => 
+          schedule.id === id ? { ...schedule, ...updates } : schedule
+        )
+      );
       
-      // Regular Date
-      return new Date(timestamp).toLocaleString();
+      return data;
     } catch (error) {
-      return 'Invalid Date';
-    }
-  };
-  
-  // Calculate validation progress percentage
-  const calculateProgress = (report: ValidationReport): number => {
-    if (report.status === 'completed') return 100;
-    if (report.status === 'failed') return 0;
-    
-    // Calculate progress based on processed items
-    const totalItems = report.totalMediaItems;
-    if (totalItems === 0) return 0;
-    
-    const processedItems = report.validItems + report.invalidItems + report.missingItems;
-    return Math.min(Math.round((processedItems / totalItems) * 100), 99); // Cap at 99% until completed
-  };
-  
-  // Start a validation for all collections
-  const startValidation = () => {
-    validateMediaMutation.mutate();
-  };
-  
-  // Validate a specific collection
-  const validateCollection = (collectionName: string) => {
-    if (!collectionName) {
+      console.error('Error updating schedule:', error);
       toast({
         title: 'Error',
-        description: 'Please select a collection to validate',
-        variant: 'destructive',
-        duration: 3000
+        description: 'Failed to update schedule',
+        variant: 'destructive'
       });
-      return;
+      throw error;
     }
-    
-    validateCollectionMutation.mutate(collectionName);
-  };
+  }, [toast]);
   
-  // Fix relative URLs
-  const fixRelativeUrls = () => {
-    fixRelativeUrlsMutation.mutate();
-  };
-  
-  // Toggle schedule enabled status
-  const toggleSchedule = (scheduleId: string, enabled: boolean) => {
-    updateScheduleMutation.mutate({
-      id: scheduleId,
-      enabled: !enabled
-    });
-  };
-  
-  // Update schedule interval
-  const updateScheduleInterval = (scheduleId: string, intervalHours: number) => {
-    if (intervalHours < 1) {
+  /**
+   * Get detailed report information
+   */
+  const getReportDetails = useCallback(async (reportId: string) => {
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch(`/api/admin/media-validation/${reportId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      setReportDetails(data);
+      
+      return data;
+    } catch (error) {
+      console.error('Error fetching report details:', error);
       toast({
         title: 'Error',
-        description: 'Interval must be at least 1 hour',
-        variant: 'destructive',
-        duration: 3000
+        description: 'Failed to fetch report details',
+        variant: 'destructive'
       });
-      return;
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
+  }, [toast]);
+  
+  /**
+   * Fetch collection metadata
+   */
+  const fetchCollections = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/collections');
+      
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.collections) {
+        setCollections(data.collections);
+      }
+    } catch (error) {
+      console.error('Error fetching collections:', error);
+    }
+  }, []);
+  
+  /**
+   * Fetch validation schedules
+   */
+  const fetchSchedules = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/validation-schedules');
+      
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.schedules) {
+        setSchedules(data.schedules);
+      }
+    } catch (error) {
+      console.error('Error fetching schedules:', error);
+    }
+  }, []);
+  
+  /**
+   * Initialize data
+   */
+  const initializeData = useCallback(() => {
+    if (!user) return;
     
-    updateScheduleMutation.mutate({
-      id: scheduleId,
-      intervalHours
+    Promise.all([
+      fetchValidationReports(),
+      fetchUrlFixReports(),
+      fetchActiveTasks(),
+      fetchCollections(),
+      fetchSchedules()
+    ]).catch(error => {
+      console.error('Error initializing data:', error);
     });
-  };
+    
+    // Set up polling for active tasks
+    const intervalId = setInterval(() => {
+      if (isTaskRunning()) {
+        fetchActiveTasks();
+      }
+    }, 5000);
+    
+    return () => clearInterval(intervalId);
+  }, [
+    user,
+    fetchValidationReports, 
+    fetchUrlFixReports, 
+    fetchActiveTasks, 
+    fetchCollections, 
+    fetchSchedules,
+    isTaskRunning
+  ]);
+  
+  // Initialize data on mount and when user changes
+  useEffect(() => {
+    const cleanup = initializeData();
+    return cleanup;
+  }, [initializeData]);
   
   return {
-    // Data
     validationReports,
     urlFixReports,
     activeTasks,
     schedules,
     collections,
-    
-    // Loading states
-    isLoading: isLoadingReports || isLoadingFixReports || isLoadingTasks || isLoadingSchedules || isLoadingCollections,
-    isValidating: validateMediaMutation.isPending || validateCollectionMutation.isPending,
-    isFixing: fixRelativeUrlsMutation.isPending,
-    isUpdatingSchedule: updateScheduleMutation.isPending,
-    
-    // Errors
-    reportsError,
-    fixReportsError,
-    tasksError,
-    schedulesError,
-    
-    // Actions
-    startValidation,
-    validateCollection,
-    fixRelativeUrls,
-    toggleSchedule,
-    updateScheduleInterval,
-    
-    // UI state
-    activeTab,
-    setActiveTab,
-    
-    // Helper functions
-    formatTimestamp,
+    reportDetails,
+    isLoading,
+    isTaskRunning: isTaskRunning(),
+    runValidation,
+    runCollectionValidation,
+    fixBrokenUrls,
+    updateSchedule,
+    getReportDetails,
     calculateProgress
   };
 };
