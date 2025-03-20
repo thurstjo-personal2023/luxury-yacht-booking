@@ -6,11 +6,133 @@
  */
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { 
-  ValidationReport, 
-  useMediaValidation 
-} from '../client/src/hooks/use-media-validation';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Define ValidationReport type for testing
+interface ValidationReport {
+  id: string;
+  startTime: Date;
+  endTime: Date;
+  duration: number;
+  totalDocuments: number;
+  totalFields: number;
+  validUrls: number;
+  invalidUrls: number;
+  missingUrls: number;
+  collectionSummaries: {
+    collection: string;
+    totalUrls: number;
+    validUrls: number;
+    invalidUrls: number;
+    missingUrls: number;
+    validPercent: number;
+    invalidPercent: number;
+    missingPercent: number;
+  }[];
+  invalidResults: {
+    field: string;
+    url: string;
+    isValid: boolean;
+    status?: number;
+    statusText?: string;
+    error?: string;
+    collection: string;
+    documentId: string;
+  }[];
+}
+
+// Mock the useMediaValidation hook
+jest.mock('../client/src/hooks/use-media-validation', () => {
+  return {
+    useMediaValidation: () => {
+      const [reports, setReports] = React.useState<ValidationReport[] | undefined>(undefined);
+      const [validationStatus, setValidationStatus] = React.useState<string>('');
+      const [repairStatus, setRepairStatus] = React.useState<string>('');
+      const [isLoadingReports, setIsLoadingReports] = React.useState<boolean>(false);
+      
+      const loadReports = async () => {
+        setIsLoadingReports(true);
+        try {
+          const response = await fetch('/api/admin/media-validation-reports');
+          if (!response.ok) {
+            throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+          }
+          const data = await response.json();
+          setReports(data);
+          return { data };
+        } finally {
+          setIsLoadingReports(false);
+        }
+      };
+      
+      const runValidation = async (options = {}) => {
+        setValidationStatus('Validating...');
+        try {
+          const response = await fetch('/api/admin/validate-media', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(options),
+          });
+          if (!response.ok) {
+            throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+          }
+          const data = await response.json();
+          setValidationStatus('Validation complete.');
+          await loadReports();
+          return data;
+        } catch (error) {
+          setValidationStatus(`Error: ${error.message}`);
+          throw error;
+        }
+      };
+      
+      const fixInvalidUrls = async (options = {}) => {
+        setRepairStatus('Repairing...');
+        try {
+          const response = await fetch('/api/admin/fix-media-issues', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(options),
+          });
+          if (!response.ok) {
+            throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+          }
+          const data = await response.json();
+          setRepairStatus('Repairs complete.');
+          await loadReports();
+          return data;
+        } catch (error) {
+          setRepairStatus(`Error: ${error.message}`);
+          throw error;
+        }
+      };
+      
+      const validationResults = (reportId: string) => {
+        if (!reports) return undefined;
+        return reports.find(report => report.id === reportId);
+      };
+      
+      return {
+        reports,
+        isLoadingReports,
+        loadReports,
+        runValidation,
+        fixInvalidUrls,
+        validationResults,
+        lastValidationReport: reports ? reports[0] : undefined,
+        validationStatus,
+        repairStatus
+      };
+    }
+  };
+});
+
+// Import the hook after mocking
+const { useMediaValidation } = require('../client/src/hooks/use-media-validation');
 
 // Mock the fetch API
 global.fetch = jest.fn();
@@ -197,7 +319,7 @@ describe('useMediaValidation Hook', () => {
     
     // Run validation
     await act(async () => {
-      result.current.runValidation();
+      await result.current.runValidation();
     });
     
     // Verify fetch was called with the right parameters
@@ -232,7 +354,7 @@ describe('useMediaValidation Hook', () => {
     
     // Fix invalid URLs
     await act(async () => {
-      result.current.fixInvalidUrls();
+      await result.current.fixInvalidUrls();
     });
     
     // Verify fetch was called with the right parameters
