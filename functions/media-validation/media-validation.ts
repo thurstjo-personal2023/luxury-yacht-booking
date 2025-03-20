@@ -1,12 +1,58 @@
 /**
  * Media Validation Service
  * 
- * This module provides functionality for validating media URLs in the Etoile Yachts platform.
- * It checks for broken URLs, validates media type consistency, and provides repair suggestions.
+ * This module provides a service for validating media URLs in Firestore documents.
+ * It identifies invalid or broken URLs and provides recommendations for fixing them.
  */
 
-import { UrlValidator, UrlValidationResult } from './url-validator';
-import { Timestamp } from 'firebase-admin/firestore';
+import { UrlValidator, UrlValidationResult, ExtractedUrl } from './url-validator';
+
+/**
+ * Media validation service configuration
+ */
+export interface MediaValidationServiceConfig {
+  baseUrl: string;
+  concurrency?: number;
+  timeout?: number;
+  placeholderImage: string;
+  placeholderVideo: string;
+}
+
+/**
+ * Default media validation service configuration
+ */
+export const DEFAULT_SERVICE_CONFIG: MediaValidationServiceConfig = {
+  baseUrl: 'https://etoile-yachts.web.app',
+  concurrency: 5,
+  timeout: 10000,
+  placeholderImage: '/assets/placeholder-image.jpg',
+  placeholderVideo: '/assets/placeholder-video.mp4'
+};
+
+/**
+ * Document with fields to validate
+ */
+export interface DocumentWithFields {
+  id: string;
+  collection: string;
+  data: any;
+}
+
+/**
+ * Field validation result
+ */
+export interface FieldValidationResult {
+  field: string;
+  url: string;
+  isValid: boolean;
+  status?: number;
+  statusText?: string;
+  error?: string;
+  isImage?: boolean;
+  isVideo?: boolean;
+  collection: string;
+  documentId: string;
+}
 
 /**
  * Document validation result
@@ -18,27 +64,21 @@ export interface DocumentValidationResult {
   validFields: number;
   invalidFields: number;
   missingFields: number;
-  results: FieldValidationResult[];
+  fieldResults: FieldValidationResult[];
 }
 
 /**
- * Field validation result
+ * Collection validation summary
  */
-export interface FieldValidationResult {
-  id: string;
+export interface CollectionValidationSummary {
   collection: string;
-  documentId: string;
-  field: string;
-  url: string;
-  isValid: boolean;
-  status?: number;
-  statusText?: string;
-  error?: string;
-  contentType?: string;
-  isImage?: boolean;
-  isVideo?: boolean;
-  mediaType?: 'image' | 'video' | 'unknown';
-  expectedMediaType?: 'image' | 'video';
+  totalUrls: number;
+  validUrls: number;
+  invalidUrls: number;
+  missingUrls: number;
+  validPercent: number;
+  invalidPercent: number;
+  missingPercent: number;
 }
 
 /**
@@ -54,67 +94,9 @@ export interface ValidationReport {
   validUrls: number;
   invalidUrls: number;
   missingUrls: number;
-  collectionSummaries: CollectionSummary[];
+  collectionSummaries: CollectionValidationSummary[];
   invalidResults: FieldValidationResult[];
 }
-
-/**
- * Collection summary
- */
-export interface CollectionSummary {
-  collection: string;
-  totalUrls: number;
-  validUrls: number;
-  invalidUrls: number;
-  missingUrls: number;
-  validPercent: number;
-  invalidPercent: number;
-  missingPercent: number;
-}
-
-/**
- * Document with fields to validate
- */
-export interface DocumentWithFields {
-  id: string;
-  collection: string;
-  data: any;
-}
-
-/**
- * Field to validate
- */
-export interface FieldToValidate {
-  documentId: string;
-  collection: string;
-  field: string;
-  url: string;
-  expectedMediaType?: 'image' | 'video';
-}
-
-/**
- * Media validation service configuration
- */
-export interface MediaValidationServiceConfig {
-  baseUrl: string;
-  concurrency: number;
-  timeout: number;
-  ignoreKeywords: string[];
-  placeholderImage: string;
-  placeholderVideo: string;
-}
-
-/**
- * Default media validation service configuration
- */
-export const DEFAULT_VALIDATION_CONFIG: MediaValidationServiceConfig = {
-  baseUrl: 'https://etoile-yachts.web.app',
-  concurrency: 5,
-  timeout: 10000,
-  ignoreKeywords: ['data:', 'blob:', 'firebase-emulator'],
-  placeholderImage: '/assets/placeholder-image.jpg',
-  placeholderVideo: '/assets/placeholder-video.mp4'
-};
 
 /**
  * Media Validation Service
@@ -129,292 +111,127 @@ export class MediaValidationService {
    * @param config Configuration options
    */
   constructor(config: Partial<MediaValidationServiceConfig> = {}) {
-    this.config = { ...DEFAULT_VALIDATION_CONFIG, ...config };
+    this.config = { ...DEFAULT_SERVICE_CONFIG, ...config };
     
-    // Create URL validator with matching configuration
+    // Create URL validator
     this.urlValidator = new UrlValidator({
       baseUrl: this.config.baseUrl,
       concurrency: this.config.concurrency,
-      timeout: this.config.timeout,
-      ignoreKeywords: this.config.ignoreKeywords
+      timeout: this.config.timeout
     });
   }
   
   /**
-   * Extract fields to validate from documents
+   * Validate a document's media URLs
    * 
-   * @param documents Array of documents to extract fields from
-   * @returns Array of fields to validate
+   * @param documents Documents to validate
+   * @returns Promise resolving to validation results
    */
-  extractFieldsToValidate(documents: DocumentWithFields[]): FieldToValidate[] {
-    const fields: FieldToValidate[] = [];
+  async validateDocuments(documents: DocumentWithFields[]): Promise<DocumentValidationResult[]> {
+    const results: DocumentValidationResult[] = [];
     
+    // Process documents one by one to avoid overwhelming the system
     for (const document of documents) {
-      const { id, collection, data } = document;
-      
-      // Extract URLs from document
-      const extractedUrls = this.urlValidator.extractUrls(data);
-      
-      // Convert to fields to validate
-      for (const extracted of extractedUrls) {
-        // Skip empty URLs
-        if (!extracted.url || extracted.url.trim() === '') {
+      try {
+        // Extract URLs from document
+        const extractedUrls = this.urlValidator.extractUrls(document.data);
+        
+        // Create document validation result
+        const result: DocumentValidationResult = {
+          id: document.id,
+          collection: document.collection,
+          totalFields: extractedUrls.length,
+          validFields: 0,
+          invalidFields: 0,
+          missingFields: 0,
+          fieldResults: []
+        };
+        
+        // If no URLs were found, add empty result
+        if (extractedUrls.length === 0) {
+          results.push(result);
           continue;
         }
         
-        const field: FieldToValidate = {
-          documentId: id,
-          collection,
-          field: extracted.path,
-          url: extracted.url
-        };
+        // Validate each URL
+        const urls = extractedUrls.map(extractedUrl => extractedUrl.url);
+        const validationResults = await this.urlValidator.validateUrls(urls);
         
-        // Try to determine expected media type based on field path
-        if (field.field.includes('media')) {
-          // Check if there's a media type specified in the data
-          const pathParts = field.field.split('.');
-          const mediaIndex = pathParts.findIndex(part => part === 'media' || part.startsWith('media['));
+        // Map validation results to field results
+        const fieldResults: FieldValidationResult[] = [];
+        
+        for (let i = 0; i < extractedUrls.length; i++) {
+          const extractedUrl = extractedUrls[i];
+          const validationResult = validationResults.find(result => result.url === extractedUrl.url);
           
-          if (mediaIndex >= 0 && mediaIndex < pathParts.length - 1) {
-            // Try to extract the media item to check its type property
-            let mediaItem: any = data;
-            
-            for (let i = 0; i <= mediaIndex; i++) {
-              const part = pathParts[i];
-              
-              if (part.startsWith('media[') && part.endsWith(']')) {
-                // Extract the index from media[N]
-                const index = parseInt(part.substring(6, part.length - 1), 10);
-                
-                if (!isNaN(index) && Array.isArray(mediaItem.media) && index < mediaItem.media.length) {
-                  mediaItem = mediaItem.media[index];
-                } else {
-                  mediaItem = null;
-                  break;
-                }
-              } else if (mediaItem[part]) {
-                mediaItem = mediaItem[part];
-              } else {
-                mediaItem = null;
-                break;
-              }
-            }
-            
-            // If we found the media item, check its type
-            if (mediaItem && typeof mediaItem === 'object' && mediaItem.type) {
-              field.expectedMediaType = mediaItem.type as 'image' | 'video';
-            }
+          if (!validationResult) {
+            // URL was not validated, count as missing
+            result.missingFields++;
+            fieldResults.push({
+              field: extractedUrl.path,
+              url: extractedUrl.url,
+              isValid: false,
+              error: 'URL was not validated',
+              collection: document.collection,
+              documentId: document.id
+            });
+            continue;
           }
-        } else if (field.field.includes('image') || field.field.endsWith('Img') || field.field.endsWith('Photo')) {
-          field.expectedMediaType = 'image';
-        } else if (field.field.includes('video') || field.field.endsWith('Video')) {
-          field.expectedMediaType = 'video';
+          
+          // Create field validation result
+          const fieldResult: FieldValidationResult = {
+            field: extractedUrl.path,
+            url: extractedUrl.url,
+            isValid: validationResult.isValid,
+            status: validationResult.status,
+            statusText: validationResult.statusText,
+            error: validationResult.error,
+            isImage: validationResult.isImage,
+            isVideo: validationResult.isVideo,
+            collection: document.collection,
+            documentId: document.id
+          };
+          
+          // Add field result to list
+          fieldResults.push(fieldResult);
+          
+          // Update counts
+          if (validationResult.isValid) {
+            result.validFields++;
+          } else {
+            result.invalidFields++;
+          }
         }
         
-        fields.push(field);
-      }
-    }
-    
-    return fields;
-  }
-  
-  /**
-   * Validate a list of fields
-   * 
-   * @param fields Array of fields to validate
-   * @returns Promise resolving to array of field validation results
-   */
-  async validateFields(fields: FieldToValidate[]): Promise<FieldValidationResult[]> {
-    // Extract unique URLs to validate
-    const urls = fields.map(field => field.url);
-    const uniqueUrls = [...new Set(urls)];
-    
-    // Validate unique URLs
-    const urlResults = await this.urlValidator.validateUrls(uniqueUrls);
-    
-    // Create a map of URL to validation result for quick lookup
-    const urlResultMap = new Map<string, UrlValidationResult>();
-    for (const result of urlResults) {
-      urlResultMap.set(result.url, result);
-    }
-    
-    // Create field validation results
-    const results: FieldValidationResult[] = [];
-    
-    for (const field of fields) {
-      const urlResult = urlResultMap.get(field.url);
-      
-      if (!urlResult) {
-        // This should never happen, but just in case
+        // Add field results to document result
+        result.fieldResults = fieldResults;
+        
+        // Add document result to list
+        results.push(result);
+      } catch (error) {
+        console.error(`Error validating document ${document.collection}/${document.id}:`, error);
+        
+        // Add error result
         results.push({
-          id: `${field.collection}-${field.documentId}-${field.field}`,
-          collection: field.collection,
-          documentId: field.documentId,
-          field: field.field,
-          url: field.url,
-          isValid: false,
-          error: 'URL validation result not found'
+          id: document.id,
+          collection: document.collection,
+          totalFields: 0,
+          validFields: 0,
+          invalidFields: 0,
+          missingFields: 0,
+          fieldResults: [{
+            field: 'error',
+            url: 'error',
+            isValid: false,
+            error: error instanceof Error ? error.message : String(error),
+            collection: document.collection,
+            documentId: document.id
+          }]
         });
-        continue;
       }
-      
-      // Determine media type from content type
-      const mediaType = urlResult.isImage ? 'image' : (urlResult.isVideo ? 'video' : 'unknown');
-      
-      // Check if media type matches expected type
-      let isValid = urlResult.isValid;
-      let error = urlResult.error;
-      
-      if (isValid && field.expectedMediaType && mediaType !== 'unknown' && mediaType !== field.expectedMediaType) {
-        isValid = false;
-        error = `Media type mismatch: expected ${field.expectedMediaType}, got ${mediaType}`;
-      }
-      
-      // Create field validation result
-      results.push({
-        id: `${field.collection}-${field.documentId}-${field.field}`,
-        collection: field.collection,
-        documentId: field.documentId,
-        field: field.field,
-        url: field.url,
-        isValid,
-        status: urlResult.status,
-        statusText: urlResult.statusText,
-        error,
-        contentType: urlResult.contentType,
-        isImage: urlResult.isImage,
-        isVideo: urlResult.isVideo,
-        mediaType,
-        expectedMediaType: field.expectedMediaType
-      });
     }
     
     return results;
-  }
-  
-  /**
-   * Validate documents
-   * 
-   * @param documents Array of documents to validate
-   * @returns Promise resolving to array of document validation results
-   */
-  async validateDocuments(documents: DocumentWithFields[]): Promise<DocumentValidationResult[]> {
-    // Extract fields to validate
-    const fields = this.extractFieldsToValidate(documents);
-    
-    // Validate fields
-    const fieldResults = await this.validateFields(fields);
-    
-    // Group field results by document
-    const resultsByDocument = new Map<string, FieldValidationResult[]>();
-    
-    for (const result of fieldResults) {
-      const key = `${result.collection}-${result.documentId}`;
-      
-      if (!resultsByDocument.has(key)) {
-        resultsByDocument.set(key, []);
-      }
-      
-      resultsByDocument.get(key)!.push(result);
-    }
-    
-    // Create document validation results
-    const results: DocumentValidationResult[] = [];
-    
-    for (const document of documents) {
-      const key = `${document.collection}-${document.id}`;
-      const docResults = resultsByDocument.get(key) || [];
-      
-      const totalFields = docResults.length;
-      const validFields = docResults.filter(r => r.isValid).length;
-      const invalidFields = totalFields - validFields;
-      const missingFields = docResults.filter(r => r.error === 'URL is empty').length;
-      
-      results.push({
-        id: document.id,
-        collection: document.collection,
-        totalFields,
-        validFields,
-        invalidFields,
-        missingFields,
-        results: docResults
-      });
-    }
-    
-    return results;
-  }
-  
-  /**
-   * Generate a validation report from document validation results
-   * 
-   * @param results Array of document validation results
-   * @param startTime Start time of validation
-   * @param endTime End time of validation
-   * @returns Validation report
-   */
-  generateReport(
-    results: DocumentValidationResult[],
-    startTime: Date,
-    endTime: Date
-  ): ValidationReport {
-    // Calculate totals
-    const totalDocuments = results.length;
-    const totalFields = results.reduce((sum, doc) => sum + doc.totalFields, 0);
-    const validUrls = results.reduce((sum, doc) => sum + doc.validFields, 0);
-    const invalidUrls = results.reduce((sum, doc) => sum + doc.invalidFields, 0);
-    const missingUrls = results.reduce((sum, doc) => sum + doc.missingFields, 0);
-    
-    // Get invalid field results
-    const invalidResults: FieldValidationResult[] = [];
-    for (const doc of results) {
-      invalidResults.push(...doc.results.filter(r => !r.isValid));
-    }
-    
-    // Calculate collection summaries
-    const collections = [...new Set(results.map(r => r.collection))];
-    const collectionSummaries: CollectionSummary[] = [];
-    
-    for (const collection of collections) {
-      const collectionDocs = results.filter(r => r.collection === collection);
-      const totalUrls = collectionDocs.reduce((sum, doc) => sum + doc.totalFields, 0);
-      const validUrlsInCollection = collectionDocs.reduce((sum, doc) => sum + doc.validFields, 0);
-      const invalidUrlsInCollection = collectionDocs.reduce((sum, doc) => sum + doc.invalidFields, 0);
-      const missingUrlsInCollection = collectionDocs.reduce((sum, doc) => sum + doc.missingFields, 0);
-      
-      collectionSummaries.push({
-        collection,
-        totalUrls,
-        validUrls: validUrlsInCollection,
-        invalidUrls: invalidUrlsInCollection,
-        missingUrls: missingUrlsInCollection,
-        validPercent: totalUrls > 0 ? (validUrlsInCollection / totalUrls) * 100 : 0,
-        invalidPercent: totalUrls > 0 ? (invalidUrlsInCollection / totalUrls) * 100 : 0,
-        missingPercent: totalUrls > 0 ? (missingUrlsInCollection / totalUrls) * 100 : 0
-      });
-    }
-    
-    // Sort collection summaries by invalid URL count in descending order
-    collectionSummaries.sort((a, b) => b.invalidUrls - a.invalidUrls);
-    
-    // Calculate duration
-    const duration = endTime.getTime() - startTime.getTime();
-    
-    // Generate report ID
-    const reportId = `report-${startTime.getTime()}`;
-    
-    return {
-      id: reportId,
-      startTime,
-      endTime,
-      duration,
-      totalDocuments,
-      totalFields,
-      validUrls,
-      invalidUrls,
-      missingUrls,
-      collectionSummaries,
-      invalidResults
-    };
   }
   
   /**
@@ -425,105 +242,53 @@ export class MediaValidationService {
    * @returns Fixed document data
    */
   fixInvalidUrls(document: DocumentWithFields, validationResult: DocumentValidationResult): any {
-    // Clone document data to avoid modifying the original
-    const fixedData = JSON.parse(JSON.stringify(document.data));
+    // Create copy of document data
+    const fixedData: any = { ...document.data };
     
-    // Get invalid fields
-    const invalidFields = validationResult.results.filter(r => !r.isValid);
-    
-    for (const field of invalidFields) {
-      // Skip fields with no errors or ignored URLs
-      if (!field.error || field.error === 'URL is special and was not validated') {
+    // Fix each invalid URL
+    for (const fieldResult of validationResult.fieldResults) {
+      if (fieldResult.isValid) {
         continue;
       }
       
-      // Get path parts to traverse the document
-      const pathParts = field.field.split('.');
-      let current = fixedData;
-      let parent: any = null;
-      let lastPart: string | null = null;
-      
-      // Traverse to the field
-      for (let i = 0; i < pathParts.length; i++) {
-        const part = pathParts[i];
+      try {
+        // Get path to field
+        const path = fieldResult.field;
         
-        // Handle array index in path (e.g., media[0])
-        if (part.includes('[') && part.includes(']')) {
-          const arrayName = part.substring(0, part.indexOf('['));
-          const index = parseInt(part.substring(part.indexOf('[') + 1, part.indexOf(']')), 10);
+        // Handle special case of array paths
+        if (path.includes('.[')) {
+          // Extract array path components
+          const arrayPathMatch = path.match(/(.+)\.(?:\[(\d+)\])(?:\.(.+))?/);
           
-          if (!current[arrayName] || !Array.isArray(current[arrayName]) || index >= current[arrayName].length) {
-            // Array or index not found, skip this field
-            current = null;
-            break;
+          if (arrayPathMatch) {
+            const [_, arrayPath, indexStr, remainingPath] = arrayPathMatch;
+            const index = parseInt(indexStr, 10);
+            
+            if (arrayPath && !isNaN(index)) {
+              // Get array
+              const array = getValueByPath(fixedData, arrayPath);
+              
+              if (Array.isArray(array) && index < array.length) {
+                if (remainingPath) {
+                  // Handle nested object in array
+                  const item = array[index];
+                  if (typeof item === 'object' && item !== null) {
+                    // Set field in object
+                    setValueByPath(item, remainingPath, this.getReplacementUrl(fieldResult));
+                  }
+                } else {
+                  // Handle string in array
+                  array[index] = this.getReplacementUrl(fieldResult);
+                }
+              }
+            }
           }
-          
-          parent = current;
-          lastPart = arrayName;
-          current = current[arrayName][index];
         } else {
-          // Regular property access
-          if (i === pathParts.length - 1) {
-            // Last part, store parent and part name
-            parent = current;
-            lastPart = part;
-          } else if (current[part] === undefined || current[part] === null) {
-            // Property not found, skip this field
-            current = null;
-            break;
-          } else {
-            // Continue traversing
-            current = current[part];
-          }
+          // Regular path
+          setValueByPath(fixedData, path, this.getReplacementUrl(fieldResult));
         }
-      }
-      
-      // If we couldn't traverse to the field, skip it
-      if (current === null || parent === null || lastPart === null) {
-        continue;
-      }
-      
-      // Determine placeholder URL to use
-      let placeholderUrl: string;
-      
-      if (field.expectedMediaType === 'video' || field.mediaType === 'video') {
-        placeholderUrl = this.config.placeholderVideo;
-      } else {
-        placeholderUrl = this.config.placeholderImage;
-      }
-      
-      // Fix relative URLs by converting to absolute URLs
-      if (field.error === 'URL is relative and was converted to absolute') {
-        // If the URL starts with /, it's a relative URL
-        if (field.url.startsWith('/')) {
-          // Replace with the fixed absolute URL
-          const absoluteUrl = this.urlValidator.fixRelativeUrl(field.url);
-          
-          // The field could be part of a media object with type
-          if (parent[lastPart] && typeof parent[lastPart] === 'object' && parent[lastPart].url) {
-            parent[lastPart].url = absoluteUrl;
-          } else {
-            parent[lastPart] = absoluteUrl;
-          }
-        }
-      } 
-      // Fix media type mismatches
-      else if (field.error && field.error.startsWith('Media type mismatch')) {
-        // Use a placeholder of the correct type
-        if (parent[lastPart] && typeof parent[lastPart] === 'object' && parent[lastPart].url) {
-          parent[lastPart].url = placeholderUrl;
-        } else {
-          parent[lastPart] = placeholderUrl;
-        }
-      }
-      // Fix invalid URLs (404, timeout, etc.)
-      else if (!field.isValid) {
-        // Use a placeholder URL
-        if (parent[lastPart] && typeof parent[lastPart] === 'object' && parent[lastPart].url) {
-          parent[lastPart].url = placeholderUrl;
-        } else {
-          parent[lastPart] = placeholderUrl;
-        }
+      } catch (error) {
+        console.error(`Error fixing URL in field ${fieldResult.field}:`, error);
       }
     }
     
@@ -531,33 +296,218 @@ export class MediaValidationService {
   }
   
   /**
-   * Create a Firestore-compatible report object
+   * Get appropriate replacement URL for invalid URL
    * 
-   * @param report Validation report
-   * @returns Firestore-compatible report object
+   * @param fieldResult Field validation result
+   * @returns Replacement URL
    */
-  createFirestoreReport(report: ValidationReport): any {
-    return {
-      id: report.id,
-      startTime: Timestamp.fromDate(report.startTime),
-      endTime: Timestamp.fromDate(report.endTime),
-      createdAt: Timestamp.now(),
-      duration: report.duration,
-      totalDocuments: report.totalDocuments,
-      totalFields: report.totalFields,
-      validUrls: report.validUrls,
-      invalidUrls: report.invalidUrls,
-      missingUrls: report.missingUrls,
-      collectionSummaries: report.collectionSummaries,
-      // Limit the number of invalid results to save in Firestore
-      invalidResults: report.invalidResults.slice(0, 1000)
-    };
+  private getReplacementUrl(fieldResult: FieldValidationResult): string {
+    // Return original URL if valid
+    if (fieldResult.isValid) {
+      return fieldResult.url;
+    }
+    
+    // Fix relative URLs
+    if (fieldResult.url.startsWith('/')) {
+      return this.urlValidator.fixRelativeUrl(fieldResult.url);
+    }
+    
+    // Use appropriate placeholder based on content type
+    if (fieldResult.isVideo) {
+      return this.config.placeholderVideo;
+    } else {
+      return this.config.placeholderImage;
+    }
   }
   
   /**
-   * Clear the URL validation cache
+   * Generate a report from validation results
+   * 
+   * @param results Validation results
+   * @param startTime Start time of validation
+   * @param endTime End time of validation
+   * @returns Validation report
    */
-  clearCache(): void {
-    this.urlValidator.clearCache();
+  generateReport(results: DocumentValidationResult[], startTime: Date, endTime: Date): ValidationReport {
+    // Calculate duration
+    const duration = endTime.getTime() - startTime.getTime();
+    
+    // Calculate totals
+    let totalDocuments = 0;
+    let totalFields = 0;
+    let validUrls = 0;
+    let invalidUrls = 0;
+    let missingUrls = 0;
+    
+    // Collect invalid results
+    const invalidResults: FieldValidationResult[] = [];
+    
+    // Process results
+    for (const result of results) {
+      totalDocuments++;
+      totalFields += result.totalFields;
+      validUrls += result.validFields;
+      invalidUrls += result.invalidFields;
+      missingUrls += result.missingFields;
+      
+      // Collect invalid field results
+      for (const fieldResult of result.fieldResults) {
+        if (!fieldResult.isValid) {
+          invalidResults.push(fieldResult);
+        }
+      }
+    }
+    
+    // Calculate collection summaries
+    const collectionMap = new Map<string, CollectionValidationSummary>();
+    
+    for (const result of results) {
+      const collection = result.collection;
+      
+      // Get or create collection summary
+      let summary = collectionMap.get(collection);
+      
+      if (!summary) {
+        summary = {
+          collection,
+          totalUrls: 0,
+          validUrls: 0,
+          invalidUrls: 0,
+          missingUrls: 0,
+          validPercent: 0,
+          invalidPercent: 0,
+          missingPercent: 0
+        };
+        collectionMap.set(collection, summary);
+      }
+      
+      // Update collection summary
+      summary.totalUrls += result.totalFields;
+      summary.validUrls += result.validFields;
+      summary.invalidUrls += result.invalidFields;
+      summary.missingUrls += result.missingFields;
+    }
+    
+    // Calculate percentages
+    for (const summary of collectionMap.values()) {
+      if (summary.totalUrls > 0) {
+        summary.validPercent = Math.round((summary.validUrls / summary.totalUrls) * 100);
+        summary.invalidPercent = Math.round((summary.invalidUrls / summary.totalUrls) * 100);
+        summary.missingPercent = Math.round((summary.missingUrls / summary.totalUrls) * 100);
+      }
+    }
+    
+    // Create report ID
+    const id = generateReportId();
+    
+    // Create report
+    const report: ValidationReport = {
+      id,
+      startTime,
+      endTime,
+      duration,
+      totalDocuments,
+      totalFields,
+      validUrls,
+      invalidUrls,
+      missingUrls,
+      collectionSummaries: Array.from(collectionMap.values()),
+      invalidResults
+    };
+    
+    return report;
   }
+  
+  /**
+   * Create a Firestore-compatible version of a validation report
+   * 
+   * @param report Validation report
+   * @returns Firestore-compatible report
+   */
+  createFirestoreReport(report: ValidationReport): any {
+    // Convert dates to ISO strings
+    const firestoreReport: any = {
+      ...report,
+      startTime: report.startTime.toISOString(),
+      endTime: report.endTime.toISOString(),
+      timestamp: new Date().toISOString()
+    };
+    
+    return firestoreReport;
+  }
+}
+
+/**
+ * Get a value by path from an object
+ * 
+ * @param obj Object to get value from
+ * @param path Path to value
+ * @returns Value at path
+ */
+function getValueByPath(obj: any, path: string): any {
+  // Handle empty path
+  if (!path) {
+    return obj;
+  }
+  
+  // Split path into parts
+  const parts = path.split('.');
+  
+  // Traverse object
+  let value = obj;
+  
+  for (const part of parts) {
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+    
+    value = value[part];
+  }
+  
+  return value;
+}
+
+/**
+ * Set a value by path in an object
+ * 
+ * @param obj Object to set value in
+ * @param path Path to value
+ * @param value Value to set
+ */
+function setValueByPath(obj: any, path: string, value: any): void {
+  // Handle empty path
+  if (!path) {
+    return;
+  }
+  
+  // Split path into parts
+  const parts = path.split('.');
+  
+  // Get parent object
+  let current = obj;
+  
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    
+    if (current[part] === undefined) {
+      // Create missing objects
+      current[part] = {};
+    }
+    
+    current = current[part];
+  }
+  
+  // Set value
+  const lastPart = parts[parts.length - 1];
+  current[lastPart] = value;
+}
+
+/**
+ * Generate a random report ID
+ * 
+ * @returns Random report ID
+ */
+function generateReportId(): string {
+  return Math.random().toString(36).substring(2, 15) + 
+         Math.random().toString(36).substring(2, 15);
 }

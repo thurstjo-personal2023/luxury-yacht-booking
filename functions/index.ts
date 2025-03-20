@@ -1,369 +1,366 @@
 /**
  * Firebase Cloud Functions Entry Point
  * 
- * This file defines Firebase Cloud Functions for the media validation system.
- * It includes functions to handle scheduled tasks and manual triggers.
+ * This file defines the Firebase Cloud Functions for the Etoile Yachts platform,
+ * including media validation functions and scheduled tasks.
  */
 
-import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import { MediaValidationWorker, MediaValidationWorkerConfig } from './media-validation/worker';
-import { MediaValidationScheduler, MediaValidationTask } from './media-validation/scheduler';
+import * as functions from 'firebase-functions';
+import { PubSub } from '@google-cloud/pubsub';
+import { 
+  MediaValidationService,
+  DocumentWithFields
+} from './media-validation/media-validation';
+import { 
+  MediaValidationWorker,
+  ProgressInfo 
+} from './media-validation/worker';
+import {
+  MediaValidationScheduler,
+  TaskStatus
+} from './media-validation/scheduler';
 
 // Initialize Firebase Admin SDK
-const app = admin.initializeApp();
-const firestore = admin.firestore();
-const pubsub = admin.pubsub();
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
+// Create PubSub client
+const pubsub = new PubSub();
+
+// Create a MediaValidationScheduler instance
+const scheduler = new MediaValidationScheduler(
+  () => admin.firestore(),
+  () => pubsub,
+  {
+    // Override default configuration as needed
+    scheduleName: 'media-validation-daily',
+    topicName: 'media-validation-tasks',
+    subscriptionName: 'media-validation-tasks-subscription',
+    cronSchedule: '0 2 * * *', // 2 AM every day
+    timezone: 'UTC',
+    description: 'Daily media validation job',
+    taskCollection: 'validation_tasks',
+    workerConfig: {
+      autoFix: true,
+      fixRelativeUrls: true,
+      fixMediaType: true,
+      saveValidationResults: true,
+      validationResultsCollection: 'validation_results',
+      placeholderImage: '/assets/images/placeholder-image.jpg',
+      placeholderVideo: '/assets/videos/placeholder-video.mp4'
+    }
+  }
+);
 
 /**
- * Configuration for media validation
+ * Initialize the scheduler when the function is deployed
  */
-const VALIDATION_CONFIG: Partial<MediaValidationWorkerConfig> = {
-  baseUrl: 'https://etoile-yachts.web.app',
-  collectionsToValidate: [
-    'unified_yacht_experiences',
-    'yacht_profiles',
-    'products_add_ons',
-    'promotions_and_offers',
-    'articles_and_guides',
-    'event_announcements',
-    'user_profiles_service_provider',
-    'user_profiles_tourist'
-  ],
-  collectionsToFix: [
-    'unified_yacht_experiences',
-    'yacht_profiles',
-    'products_add_ons'
-  ],
-  autoFix: true,
-  batchSize: 50,
-  maxDocumentsToProcess: 1000,
-  saveValidationResults: true,
-  logProgress: true
-};
+export const initializeMediaValidation = functions.https.onRequest(async (req, res) => {
+  try {
+    await scheduler.initialize();
+    res.status(200).send('Media validation scheduler initialized');
+  } catch (error) {
+    console.error('Error initializing media validation scheduler:', error);
+    res.status(500).send(`Error initializing media validation scheduler: ${error.message}`);
+  }
+});
 
 /**
- * Schedule validation to run weekly
+ * Schedule media validation to run on a regular basis
  */
 export const scheduleMediaValidation = functions.pubsub
-  .schedule('every monday 00:00')
-  .timeZone('UTC')
-  .onRun(async () => {
-    // Create scheduler with firebase instances
-    const scheduler = new MediaValidationScheduler(
-      () => firestore,
-      () => pubsub,
-      {
-        scheduleExpression: 'every monday 00:00',
-        timeZone: 'UTC',
-        taskTopic: 'media-validation-tasks',
-        maxConcurrentTasks: 1,
-        validationConfig: VALIDATION_CONFIG
-      }
-    );
-
-    // Schedule immediate task
-    const taskId = await scheduler.scheduleImmediateTask();
-    
-    console.log(`Scheduled media validation task: ${taskId}`);
-    return null;
-  });
-
-/**
- * Handle media validation tasks published to Pub/Sub
- */
-export const processMediaValidationTask = functions.pubsub
-  .topic('media-validation-tasks')
-  .onPublish(async (message) => {
+  .schedule(scheduler.config.cronSchedule)
+  .timeZone(scheduler.config.timezone)
+  .onRun(async (context) => {
     try {
-      // Parse task data from message
-      const taskData: MediaValidationTask = message.json;
+      const messageId = await scheduler.triggerValidation({
+        scheduledBy: 'cron',
+        scheduledAt: new Date().toISOString(),
+        description: 'Scheduled media validation run'
+      });
       
-      // Log task information
-      console.log(`Processing media validation task: ${taskData.taskId}`);
-      
-      // Create scheduler to process task
-      const scheduler = new MediaValidationScheduler(
-        () => firestore,
-        () => pubsub
-      );
-      
-      // Process the task
-      await scheduler.processTask(taskData);
-      
-      console.log(`Completed media validation task: ${taskData.taskId}`);
+      console.log(`Scheduled media validation triggered: ${messageId}`);
       return null;
     } catch (error) {
-      console.error('Error processing media validation task:', error);
+      console.error('Error triggering scheduled media validation:', error);
       throw error;
     }
   });
 
 /**
- * HTTP endpoint to manually trigger media validation
+ * Manually trigger media validation
  */
 export const triggerMediaValidation = functions.https.onRequest(async (req, res) => {
   try {
-    // Check if user is authenticated as admin
-    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    const metadata = {
+      scheduledBy: 'manual',
+      scheduledAt: new Date().toISOString(),
+      description: 'Manual media validation run',
+      requestIp: req.ip,
+      requestMethod: req.method,
+      requestPath: req.path,
+      requestQuery: req.query
+    };
     
-    if (!idToken) {
-      res.status(401).json({ error: 'Unauthorized: No token provided' });
-      return;
-    }
+    const messageId = await scheduler.triggerValidation(metadata);
     
-    // Verify token
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    
-    // Check admin claim or admin email
-    const isAdmin = decodedToken.admin === true || 
-      (decodedToken.email && (
-        decodedToken.email.endsWith('@etoile-yachts.com') || 
-        decodedToken.email === 'admin@example.com'
-      ));
-    
-    if (!isAdmin) {
-      res.status(403).json({ error: 'Forbidden: Admin access required' });
-      return;
-    }
-    
-    // Create scheduler
-    const scheduler = new MediaValidationScheduler(
-      () => firestore,
-      () => pubsub,
-      {
-        taskTopic: 'media-validation-tasks',
-        validationConfig: {
-          ...VALIDATION_CONFIG,
-          // Override config with query parameters
-          autoFix: req.query.autoFix === 'true',
-          collectionsToValidate: req.query.collections ? 
-            (req.query.collections as string).split(',') : 
-            VALIDATION_CONFIG.collectionsToValidate
-        }
-      }
-    );
-    
-    // Schedule immediate task
-    const taskId = await scheduler.scheduleImmediateTask(
-      {
-        autoFix: req.query.autoFix === 'true',
-        collectionsToValidate: req.query.collections ? 
-          (req.query.collections as string).split(',') : 
-          VALIDATION_CONFIG.collectionsToValidate
-      },
-      {
-        triggeredBy: decodedToken.email || decodedToken.uid,
-        triggerTime: new Date().toISOString(),
-        triggerType: 'manual'
-      }
-    );
-    
-    // Return task ID
-    res.status(200).json({ 
-      message: 'Media validation triggered successfully',
-      taskId
+    res.status(200).json({
+      success: true,
+      messageId,
+      message: 'Media validation triggered'
     });
   } catch (error) {
     console.error('Error triggering media validation:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error'
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'Error triggering media validation'
     });
   }
 });
 
 /**
- * HTTP endpoint to get validation reports
+ * Handle validation tasks published to the Pub/Sub topic
  */
-export const getValidationReports = functions.https.onRequest(async (req, res) => {
+export const handleMediaValidationTask = functions.pubsub
+  .topic(scheduler.config.topicName)
+  .onPublish(async (message, context) => {
+    try {
+      await scheduler.handleValidationTask(message);
+      return null;
+    } catch (error) {
+      console.error('Error handling media validation task:', error);
+      throw error;
+    }
+  });
+
+/**
+ * Get a list of validation tasks
+ */
+export const getMediaValidationTasks = functions.https.onRequest(async (req, res) => {
   try {
-    // Check if user is authenticated as admin
-    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    const limit = req.query.limit ? parseInt(req.query.limit.toString(), 10) : 10;
+    const tasks = await scheduler.getValidationTasks(limit);
     
-    if (!idToken) {
-      res.status(401).json({ error: 'Unauthorized: No token provided' });
-      return;
-    }
-    
-    // Verify token
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    
-    // Check admin claim or admin email
-    const isAdmin = decodedToken.admin === true || 
-      (decodedToken.email && (
-        decodedToken.email.endsWith('@etoile-yachts.com') || 
-        decodedToken.email === 'admin@example.com'
-      ));
-    
-    if (!isAdmin) {
-      res.status(403).json({ error: 'Forbidden: Admin access required' });
-      return;
-    }
-    
-    // Get validation reports
-    const snapshot = await firestore.collection('validation_reports')
-      .orderBy('createdAt', 'desc')
-      .limit(10)
-      .get();
-    
-    // Extract report data
-    const reports = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    
-    // Return reports
-    res.status(200).json({ reports });
+    res.status(200).json({
+      success: true,
+      tasks
+    });
   } catch (error) {
-    console.error('Error getting validation reports:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error'
+    console.error('Error getting media validation tasks:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'Error getting media validation tasks'
     });
   }
 });
 
 /**
- * HTTP endpoint to get validation tasks
+ * Get a validation task by ID
  */
-export const getValidationTasks = functions.https.onRequest(async (req, res) => {
+export const getMediaValidationTask = functions.https.onRequest(async (req, res) => {
   try {
-    // Check if user is authenticated as admin
-    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    const taskId = req.query.taskId?.toString();
     
-    if (!idToken) {
-      res.status(401).json({ error: 'Unauthorized: No token provided' });
+    if (!taskId) {
+      res.status(400).json({
+        success: false,
+        message: 'Task ID is required'
+      });
       return;
     }
     
-    // Verify token
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const task = await scheduler.getValidationTask(taskId);
     
-    // Check admin claim or admin email
-    const isAdmin = decodedToken.admin === true || 
-      (decodedToken.email && (
-        decodedToken.email.endsWith('@etoile-yachts.com') || 
-        decodedToken.email === 'admin@example.com'
-      ));
-    
-    if (!isAdmin) {
-      res.status(403).json({ error: 'Forbidden: Admin access required' });
+    if (!task) {
+      res.status(404).json({
+        success: false,
+        message: `Task ${taskId} not found`
+      });
       return;
     }
     
-    // Get validation tasks
-    const snapshot = await firestore.collection('validation_tasks')
-      .orderBy('queuedAt', 'desc')
-      .limit(10)
-      .get();
-    
-    // Extract task data
-    const tasks = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    
-    // Return tasks
-    res.status(200).json({ tasks });
+    res.status(200).json({
+      success: true,
+      task
+    });
   } catch (error) {
-    console.error('Error getting validation tasks:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error'
+    console.error('Error getting media validation task:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'Error getting media validation task'
     });
   }
 });
 
 /**
- * HTTP endpoint to fix image URLs in a specific document
+ * Get validation report for a task
  */
-export const fixDocumentUrls = functions.https.onRequest(async (req, res) => {
+export const getMediaValidationReport = functions.https.onRequest(async (req, res) => {
   try {
-    // Check if user is authenticated as admin
-    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    const taskId = req.query.taskId?.toString();
     
-    if (!idToken) {
-      res.status(401).json({ error: 'Unauthorized: No token provided' });
+    if (!taskId) {
+      res.status(400).json({
+        success: false,
+        message: 'Task ID is required'
+      });
       return;
     }
     
-    // Verify token
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const report = await scheduler.getValidationReport(taskId);
     
-    // Check admin claim or admin email
-    const isAdmin = decodedToken.admin === true || 
-      (decodedToken.email && (
-        decodedToken.email.endsWith('@etoile-yachts.com') || 
-        decodedToken.email === 'admin@example.com'
-      ));
-    
-    if (!isAdmin) {
-      res.status(403).json({ error: 'Forbidden: Admin access required' });
+    if (!report) {
+      res.status(404).json({
+        success: false,
+        message: `Report for task ${taskId} not found`
+      });
       return;
     }
     
-    // Extract collection and document ID from request
-    const { collection, documentId } = req.query;
+    res.status(200).json({
+      success: true,
+      report
+    });
+  } catch (error) {
+    console.error('Error getting media validation report:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'Error getting media validation report'
+    });
+  }
+});
+
+/**
+ * Directly validate a single document
+ */
+export const validateDocument = functions.https.onRequest(async (req, res) => {
+  try {
+    // Extract parameters from request
+    const collection = req.query.collection?.toString();
+    const documentId = req.query.documentId?.toString();
     
     if (!collection || !documentId) {
-      res.status(400).json({ error: 'Bad request: collection and documentId are required' });
+      res.status(400).json({
+        success: false,
+        message: 'Collection and document ID are required'
+      });
       return;
     }
     
-    // Create worker
+    // Get document from Firestore
+    const db = admin.firestore();
+    const documentRef = db.collection(collection).doc(documentId);
+    const documentSnapshot = await documentRef.get();
+    
+    if (!documentSnapshot.exists) {
+      res.status(404).json({
+        success: false,
+        message: `Document ${collection}/${documentId} not found`
+      });
+      return;
+    }
+    
+    // Create document with fields
+    const document: DocumentWithFields = {
+      id: documentId,
+      collection,
+      data: documentSnapshot.data()
+    };
+    
+    // Create worker and validate document
     const worker = new MediaValidationWorker(
-      () => firestore,
+      () => db,
       {
-        autoFix: true,
-        saveValidationResults: true
+        autoFix: req.query.autoFix === 'true',
+        fixRelativeUrls: req.query.fixRelativeUrls !== 'false',
+        fixMediaType: req.query.fixMediaType !== 'false'
       }
     );
     
-    // Get document
-    const docRef = firestore.collection(collection as string).doc(documentId as string);
-    const docSnapshot = await docRef.get();
-    
-    if (!docSnapshot.exists) {
-      res.status(404).json({ error: `Document not found: ${collection}/${documentId}` });
-      return;
-    }
-    
     // Validate document
-    const validationResult = await worker.validateDocument({
-      collection: collection as string,
-      id: documentId as string,
-      data: docSnapshot.data()
-    });
+    const result = await worker.validateDocument(document);
     
-    // Fix document if needed
-    if (validationResult.invalidFields > 0) {
-      const fixedData = worker.fixInvalidUrls({
-        collection: collection as string,
-        id: documentId as string,
-        data: docSnapshot.data()
-      }, validationResult);
-      
-      // Update document
-      await docRef.update(fixedData);
-      
-      res.status(200).json({ 
-        message: 'Document URLs fixed successfully',
-        invalidFields: validationResult.invalidFields,
-        fixedFields: validationResult.results.length
-      });
-    } else {
-      res.status(200).json({ 
-        message: 'Document has no invalid URLs',
-        invalidFields: 0,
-        fixedFields: 0
-      });
+    // Fix document if requested
+    if (req.query.autoFix === 'true' && result.invalidFields > 0) {
+      const fixedData = worker.fixDocument(document, result);
+      await documentRef.update(fixedData);
+      console.log(`Fixed document ${collection}/${documentId} (${result.invalidFields} fields)`);
     }
+    
+    // Return result
+    res.status(200).json({
+      success: true,
+      result
+    });
   } catch (error) {
-    console.error('Error fixing document URLs:', error);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error'
+    console.error('Error validating document:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'Error validating document'
+    });
+  }
+});
+
+/**
+ * Run a media validation test
+ */
+export const testMediaValidation = functions.https.onRequest(async (req, res) => {
+  try {
+    // Create validation service
+    const validationService = new MediaValidationService();
+    
+    // Create test document
+    const testDocument: DocumentWithFields = {
+      id: 'test-document',
+      collection: 'test-collection',
+      data: {
+        title: 'Test Document',
+        description: 'This is a test document for media validation',
+        image: '/test-image.jpg',
+        video: '/test-video.mp4',
+        media: [
+          {
+            type: 'image',
+            url: 'https://example.com/image.jpg'
+          },
+          {
+            type: 'video',
+            url: 'https://example.com/video.mp4'
+          },
+          {
+            type: 'image',
+            url: '/relative-image.jpg'
+          }
+        ]
+      }
+    };
+    
+    // Validate test document
+    const results = await validationService.validateDocuments([testDocument]);
+    
+    // Generate report
+    const startTime = new Date();
+    const endTime = new Date();
+    const report = validationService.generateReport(results, startTime, endTime);
+    
+    // Return report
+    res.status(200).json({
+      success: true,
+      report
+    });
+  } catch (error) {
+    console.error('Error testing media validation:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'Error testing media validation'
     });
   }
 });

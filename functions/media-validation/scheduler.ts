@@ -1,282 +1,395 @@
 /**
  * Media Validation Scheduler
  * 
- * This module handles scheduling of media validation tasks at regular intervals.
- * It leverages Firebase Cloud Functions to trigger scheduled tasks using Pub/Sub,
- * providing a robust scheduling mechanism.
+ * This module provides functionality for scheduling media validation tasks.
+ * It uses Cloud Pub/Sub to run background jobs.
  */
 
-import { MediaValidationWorker, MediaValidationWorkerConfig } from './worker';
+import { Firestore } from 'firebase-admin/firestore';
+import { PubSub, Message } from '@google-cloud/pubsub';
+import { 
+  MediaValidationWorker, 
+  MediaValidationWorkerConfig, 
+  DEFAULT_WORKER_CONFIG 
+} from './worker';
+import { ValidationReport } from './media-validation';
 
 /**
- * Configuration for the scheduler
+ * Task status enumeration
  */
-export interface SchedulerConfig {
-  // Time-based settings
-  scheduleExpression: string;    // Cron expression for the schedule
-  timeZone: string;              // Time zone for the schedule
-  
-  // Task execution settings
-  taskTopic: string;             // Pub/Sub topic for tasks
-  maxConcurrentTasks: number;    // Maximum number of concurrent tasks
-  
-  // Validation configuration
-  validationConfig: Partial<MediaValidationWorkerConfig>;
+export enum TaskStatus {
+  QUEUED = 'queued',
+  RUNNING = 'running',
+  COMPLETED = 'completed',
+  FAILED = 'failed'
+}
+
+/**
+ * Validation task
+ */
+export interface MediaValidationTask {
+  id: string;
+  scheduledBy: string;
+  scheduledAt: Date | string;
+  startedAt?: Date | string;
+  completedAt?: Date | string;
+  status: TaskStatus;
+  workerConfig: Partial<MediaValidationWorkerConfig>;
+  metadata?: any;
+  error?: string;
+  reportId?: string;
+}
+
+/**
+ * Scheduler configuration
+ */
+export interface MediaValidationSchedulerConfig {
+  scheduleName: string;
+  topicName: string;
+  subscriptionName: string;
+  cronSchedule: string;
+  timezone: string;
+  description: string;
+  taskCollection: string;
+  workerConfig: Partial<MediaValidationWorkerConfig>;
 }
 
 /**
  * Default scheduler configuration
  */
-export const DEFAULT_SCHEDULER_CONFIG: SchedulerConfig = {
-  scheduleExpression: '0 0 * * 0',      // Run at midnight every Sunday
-  timeZone: 'Etc/UTC',                  // UTC time zone
-  taskTopic: 'media-validation-tasks',  // Pub/Sub topic
-  maxConcurrentTasks: 1,                // Run one task at a time
-  validationConfig: {
-    collectionsToValidate: [
-      'unified_yacht_experiences',
-      'yacht_profiles',
-      'products_add_ons',
-      'promotions_and_offers'
-    ],
-    collectionsToFix: [
-      'unified_yacht_experiences',
-      'yacht_profiles',
-      'products_add_ons'
-    ],
-    autoFix: true,
-    batchSize: 50,
-    maxDocumentsToProcess: 1000,
-    saveValidationResults: true,
-    logProgress: true
+export const DEFAULT_SCHEDULER_CONFIG: MediaValidationSchedulerConfig = {
+  scheduleName: 'media-validation-scheduler',
+  topicName: 'media-validation-tasks',
+  subscriptionName: 'media-validation-tasks-subscription',
+  cronSchedule: '0 3 * * *', // 3 AM every day
+  timezone: 'UTC',
+  description: 'Schedule media validation jobs',
+  taskCollection: 'validation_tasks',
+  workerConfig: {
+    ...DEFAULT_WORKER_CONFIG,
+    autoFix: true
   }
 };
 
 /**
- * Media validation task data
- */
-export interface MediaValidationTask {
-  taskId: string;
-  startTime: string;
-  config: Partial<MediaValidationWorkerConfig>;
-  metadata?: Record<string, any>;
-}
-
-/**
  * Media Validation Scheduler
- * Handles scheduling and execution of media validation tasks
  */
 export class MediaValidationScheduler {
-  private config: SchedulerConfig;
-  private firestoreProvider: () => any;
-  private pubSubProvider: () => any;
-  private taskStatus: Map<string, {
-    status: 'queued' | 'running' | 'completed' | 'failed';
-    startTime: Date;
-    endTime?: Date;
-    error?: string;
-  }> = new Map();
-
+  private config: MediaValidationSchedulerConfig;
+  private firestoreGetter: () => Firestore;
+  private pubsubGetter: () => PubSub;
+  
   /**
    * Create a new media validation scheduler
    * 
-   * @param firestoreProvider Function that returns a Firestore instance
-   * @param pubSubProvider Function that returns a PubSub instance
+   * @param firestoreGetter Function that returns a Firestore instance
+   * @param pubsubGetter Function that returns a PubSub instance
    * @param config Scheduler configuration
    */
   constructor(
-    firestoreProvider: () => any,
-    pubSubProvider: () => any,
-    config: Partial<SchedulerConfig> = {}
+    firestoreGetter: () => Firestore,
+    pubsubGetter: () => PubSub,
+    config: Partial<MediaValidationSchedulerConfig> = {}
   ) {
+    this.firestoreGetter = firestoreGetter;
+    this.pubsubGetter = pubsubGetter;
     this.config = { ...DEFAULT_SCHEDULER_CONFIG, ...config };
-    this.firestoreProvider = firestoreProvider;
-    this.pubSubProvider = pubSubProvider;
   }
-
+  
   /**
-   * Schedule a validation task for immediate execution
+   * Initialize the scheduler
+   * This sets up the required Pub/Sub topic and subscription
    * 
-   * @param customConfig Optional custom configuration for this task
-   * @param metadata Optional metadata to attach to the task
-   * @returns Task ID
+   * @returns Promise resolving when initialization is complete
    */
-  async scheduleImmediateTask(
-    customConfig: Partial<MediaValidationWorkerConfig> = {},
-    metadata: Record<string, any> = {}
-  ): Promise<string> {
-    const taskId = `task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    
-    const task: MediaValidationTask = {
-      taskId,
-      startTime: new Date().toISOString(),
-      config: { ...this.config.validationConfig, ...customConfig },
-      metadata
-    };
-    
-    await this.publishTask(task);
-    
-    this.taskStatus.set(taskId, {
-      status: 'queued',
-      startTime: new Date()
-    });
-    
-    return taskId;
-  }
-
-  /**
-   * Publish a task to the Pub/Sub topic
-   * 
-   * @param task Task to publish
-   */
-  private async publishTask(task: MediaValidationTask): Promise<void> {
-    const pubsub = this.pubSubProvider();
+  async initialize(): Promise<void> {
+    const pubsub = this.pubsubGetter();
     
     try {
-      const topic = pubsub.topic(this.config.taskTopic);
+      // Create topic if it doesn't exist
+      try {
+        await pubsub.createTopic(this.config.topicName);
+        console.log(`Created topic: ${this.config.topicName}`);
+      } catch (error) {
+        if (error.code === 6) { // ALREADY_EXISTS
+          console.log(`Topic ${this.config.topicName} already exists`);
+        } else {
+          throw error;
+        }
+      }
       
-      // Create a JSON string of the message data
-      const data = JSON.stringify(task);
+      // Create subscription if it doesn't exist
+      try {
+        await pubsub.topic(this.config.topicName).createSubscription(
+          this.config.subscriptionName,
+          {
+            ackDeadlineSeconds: 600, // 10 minutes
+            expirationPolicy: {} // Never expire
+          }
+        );
+        console.log(`Created subscription: ${this.config.subscriptionName}`);
+      } catch (error) {
+        if (error.code === 6) { // ALREADY_EXISTS
+          console.log(`Subscription ${this.config.subscriptionName} already exists`);
+        } else {
+          throw error;
+        }
+      }
       
-      // Publish the message
-      await topic.publish(Buffer.from(data));
-      
-      console.log(`Published task ${task.taskId} to topic ${this.config.taskTopic}`);
-      
-      // Save task to Firestore for tracking
-      await this.saveTaskToFirestore(task);
+      console.log('Media validation scheduler initialized');
     } catch (error) {
-      console.error('Error publishing task:', error);
+      console.error('Error initializing scheduler:', error);
       throw error;
     }
   }
-
+  
   /**
-   * Save a task to Firestore for tracking
+   * Trigger validation manually
    * 
-   * @param task Task to save
+   * @param metadata Optional metadata for the task
+   * @returns Promise resolving to message ID
    */
-  private async saveTaskToFirestore(task: MediaValidationTask): Promise<void> {
-    const firestore = this.firestoreProvider();
+  async triggerValidation(metadata: any = {}): Promise<string> {
+    const pubsub = this.pubsubGetter();
+    const db = this.firestoreGetter();
     
     try {
-      await firestore.collection('validation_tasks').doc(task.taskId).set({
+      // Create task ID
+      const taskId = `manual-${Date.now()}`;
+      
+      // Create task
+      const task: MediaValidationTask = {
+        id: taskId,
+        scheduledBy: 'manual',
+        scheduledAt: new Date().toISOString(),
+        status: TaskStatus.QUEUED,
+        workerConfig: this.config.workerConfig,
+        metadata
+      };
+      
+      // Save task to Firestore
+      await db.collection(this.config.taskCollection).doc(taskId).set({
         ...task,
-        status: 'queued',
-        queuedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        scheduledAt: new Date() // Convert to Firestore timestamp
       });
+      
+      // Publish message to Pub/Sub
+      const messageData = Buffer.from(JSON.stringify({
+        taskId,
+        action: 'validate',
+        scheduledAt: new Date().toISOString(),
+        workerConfig: this.config.workerConfig,
+        metadata
+      }));
+      
+      const messageId = await pubsub
+        .topic(this.config.topicName)
+        .publish(messageData);
+      
+      console.log(`Triggered validation with task ID: ${taskId}`);
+      
+      return messageId;
     } catch (error) {
-      console.error('Error saving task to Firestore:', error);
+      console.error('Error triggering validation:', error);
+      throw error;
     }
   }
-
+  
   /**
-   * Process a validation task
+   * Handle a validation task from Pub/Sub
    * 
-   * @param task Task to process
-   * @returns Promise resolving when task is complete
+   * @param message Pub/Sub message
+   * @returns Promise resolving when task is handled
    */
-  async processTask(task: MediaValidationTask): Promise<void> {
-    const firestore = this.firestoreProvider();
+  async handleValidationTask(message: Message): Promise<void> {
+    const db = this.firestoreGetter();
     
     try {
-      // Update task status to running
-      this.taskStatus.set(task.taskId, {
-        status: 'running',
-        startTime: new Date(task.startTime)
+      // Parse message data
+      const data = JSON.parse(message.data.toString());
+      const { taskId, action, workerConfig, metadata } = data;
+      
+      console.log(`Handling validation task ${taskId}`);
+      
+      // Check if task exists
+      const taskRef = db.collection(this.config.taskCollection).doc(taskId);
+      const taskDoc = await taskRef.get();
+      
+      if (!taskDoc.exists) {
+        console.error(`Task ${taskId} not found`);
+        return;
+      }
+      
+      // Update task status
+      await taskRef.update({
+        status: TaskStatus.RUNNING,
+        startedAt: new Date()
       });
       
-      // Update task in Firestore
-      await firestore.collection('validation_tasks').doc(task.taskId).update({
-        status: 'running',
-        startedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-      
-      // Create worker with task configuration
+      // Create media validation worker
       const worker = new MediaValidationWorker(
-        this.firestoreProvider,
-        task.config
+        () => db,
+        {
+          ...this.config.workerConfig,
+          ...workerConfig
+        },
+        // Progress callback
+        (progress) => {
+          console.log(`Progress: ${progress.processedDocuments}/${progress.totalDocuments} documents (${progress.percentage}%)`);
+        },
+        // Error callback
+        (error) => {
+          console.error(`Error in validation worker: ${error.message}`);
+        },
+        // Complete callback
+        async (report) => {
+          console.log(`Validation completed: ${report.id}`);
+          
+          // Update task status
+          await taskRef.update({
+            status: TaskStatus.COMPLETED,
+            completedAt: new Date(),
+            reportId: report.id
+          });
+        }
       );
       
-      // Set up completion handler
-      worker.onCompleted(async (report) => {
-        // Update task status
-        this.taskStatus.set(task.taskId, {
-          status: 'completed',
-          startTime: new Date(task.startTime),
-          endTime: new Date()
-        });
-        
-        // Update task in Firestore
-        await firestore.collection('validation_tasks').doc(task.taskId).update({
-          status: 'completed',
-          completedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          reportId: report.id,
-          result: {
-            totalDocuments: report.totalDocuments,
-            validUrls: report.validUrls,
-            invalidUrls: report.invalidUrls,
-            missingUrls: report.missingUrls,
-            duration: report.duration
-          }
-        });
-      });
+      // Run validation
+      const report = await worker.runValidation();
       
-      // Run the worker
-      await worker.start();
+      // Update task status if not already updated
+      const updatedTaskDoc = await taskRef.get();
+      const updatedTask = updatedTaskDoc.data() as MediaValidationTask;
+      
+      if (updatedTask.status !== TaskStatus.COMPLETED) {
+        await taskRef.update({
+          status: TaskStatus.COMPLETED,
+          completedAt: new Date(),
+          reportId: report.id
+        });
+      }
+      
+      // Acknowledge message
+      message.ack();
     } catch (error) {
-      // Update task status
-      this.taskStatus.set(task.taskId, {
-        status: 'failed',
-        startTime: new Date(task.startTime),
-        endTime: new Date(),
-        error: error instanceof Error ? error.message : String(error)
-      });
+      console.error('Error handling validation task:', error);
       
-      // Update task in Firestore
-      await firestore.collection('validation_tasks').doc(task.taskId).update({
-        status: 'failed',
-        failedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        error: error instanceof Error ? error.message : String(error)
-      }).catch(console.error);
+      // Update task status if taskId is available
+      try {
+        const data = JSON.parse(message.data.toString());
+        const { taskId } = data;
+        
+        if (taskId) {
+          await db.collection(this.config.taskCollection).doc(taskId).update({
+            status: TaskStatus.FAILED,
+            error: error.message || 'Unknown error',
+            completedAt: new Date()
+          });
+        }
+      } catch (updateError) {
+        console.error('Error updating task status:', updateError);
+      }
       
-      console.error(`Task ${task.taskId} failed:`, error);
+      // Acknowledge message to prevent redelivery
+      message.ack();
+      
+      throw error;
     }
   }
-
+  
   /**
-   * Get the status of a task
+   * Get a list of validation tasks
+   * 
+   * @param limit Maximum number of tasks to retrieve
+   * @returns Promise resolving to list of tasks
+   */
+  async getValidationTasks(limit: number = 10): Promise<MediaValidationTask[]> {
+    const db = this.firestoreGetter();
+    
+    try {
+      const snapshot = await db.collection(this.config.taskCollection)
+        .orderBy('scheduledAt', 'desc')
+        .limit(limit)
+        .get();
+      
+      if (snapshot.empty) {
+        return [];
+      }
+      
+      const tasks: MediaValidationTask[] = [];
+      
+      snapshot.forEach(doc => {
+        const task = doc.data() as MediaValidationTask;
+        tasks.push(task);
+      });
+      
+      return tasks;
+    } catch (error) {
+      console.error('Error getting validation tasks:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get a validation task by ID
    * 
    * @param taskId Task ID
-   * @returns Task status or null if not found
+   * @returns Promise resolving to task
    */
-  getTaskStatus(taskId: string): {
-    status: 'queued' | 'running' | 'completed' | 'failed';
-    startTime: Date;
-    endTime?: Date;
-    error?: string;
-  } | null {
-    return this.taskStatus.get(taskId) || null;
+  async getValidationTask(taskId: string): Promise<MediaValidationTask | null> {
+    const db = this.firestoreGetter();
+    
+    try {
+      const doc = await db.collection(this.config.taskCollection).doc(taskId).get();
+      
+      if (!doc.exists) {
+        return null;
+      }
+      
+      return doc.data() as MediaValidationTask;
+    } catch (error) {
+      console.error(`Error getting validation task ${taskId}:`, error);
+      throw error;
+    }
   }
-
+  
   /**
-   * Get a list of active tasks
+   * Get validation report for a task
    * 
-   * @returns Map of task IDs to task status
+   * @param taskId Task ID
+   * @returns Promise resolving to validation report
    */
-  getActiveTasks(): Map<string, {
-    status: 'queued' | 'running' | 'completed' | 'failed';
-    startTime: Date;
-    endTime?: Date;
-    error?: string;
-  }> {
-    return new Map(
-      Array.from(this.taskStatus.entries())
-        .filter(([_, status]) => status.status === 'queued' || status.status === 'running')
-    );
+  async getValidationReport(taskId: string): Promise<ValidationReport | null> {
+    const db = this.firestoreGetter();
+    
+    try {
+      // Get task
+      const taskDoc = await db.collection(this.config.taskCollection).doc(taskId).get();
+      
+      if (!taskDoc.exists) {
+        return null;
+      }
+      
+      const task = taskDoc.data() as MediaValidationTask;
+      
+      if (!task.reportId) {
+        return null;
+      }
+      
+      // Get report
+      const reportDoc = await db
+        .collection(this.config.workerConfig.validationResultsCollection || 'validation_results')
+        .doc(task.reportId)
+        .get();
+      
+      if (!reportDoc.exists) {
+        return null;
+      }
+      
+      return reportDoc.data() as ValidationReport;
+    } catch (error) {
+      console.error(`Error getting validation report for task ${taskId}:`, error);
+      throw error;
+    }
   }
 }

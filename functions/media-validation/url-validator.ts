@@ -1,11 +1,12 @@
 /**
- * URL Validator Module
+ * URL Validator
  * 
- * This module provides utilities for validating URLs and detecting issues
- * with media URLs in the Etoile Yachts platform.
+ * This module provides functionality for validating URLs in the Etoile Yachts platform.
+ * It checks for broken links, validates content types, and provides repair suggestions.
  */
 
-import { createHash } from 'crypto';
+import fetch from 'node-fetch';
+import { AbortController } from 'node-abort-controller';
 
 /**
  * URL validation result
@@ -15,22 +16,27 @@ export interface UrlValidationResult {
   isValid: boolean;
   status?: number;
   statusText?: string;
-  error?: string;
-  validationTime?: number;
   contentType?: string;
   isImage?: boolean;
   isVideo?: boolean;
-  fileSize?: number;
-  hash?: string;
+  error?: string;
+}
+
+/**
+ * Extracted URL information
+ */
+export interface ExtractedUrl {
+  path: string;
+  url: string;
 }
 
 /**
  * URL validator configuration
  */
 export interface UrlValidatorConfig {
-  timeout: number;
-  concurrency: number;
   baseUrl: string;
+  concurrency: number;
+  timeout: number;
   ignoreKeywords: string[];
 }
 
@@ -38,22 +44,18 @@ export interface UrlValidatorConfig {
  * Default URL validator configuration
  */
 export const DEFAULT_VALIDATOR_CONFIG: UrlValidatorConfig = {
-  timeout: 10000,
-  concurrency: 5,
   baseUrl: 'https://etoile-yachts.web.app',
+  concurrency: 5,
+  timeout: 10000,
   ignoreKeywords: ['data:', 'blob:', 'firebase-emulator']
 };
 
 /**
- * Cache of URL validation results to avoid re-validating the same URLs
- */
-const validationCache = new Map<string, UrlValidationResult>();
-
-/**
- * URL Validator class
+ * URL Validator
  */
 export class UrlValidator {
   private config: UrlValidatorConfig;
+  private cache: Map<string, UrlValidationResult>;
   
   /**
    * Create a new URL validator
@@ -62,175 +64,137 @@ export class UrlValidator {
    */
   constructor(config: Partial<UrlValidatorConfig> = {}) {
     this.config = { ...DEFAULT_VALIDATOR_CONFIG, ...config };
+    this.cache = new Map<string, UrlValidationResult>();
   }
   
   /**
-   * Validate a URL
+   * Check if a URL is valid by making a request to it
    * 
    * @param url URL to validate
    * @returns Promise resolving to validation result
    */
   async validateUrl(url: string): Promise<UrlValidationResult> {
     // Check cache first
-    const cachedResult = validationCache.get(url);
-    if (cachedResult) {
-      return cachedResult;
+    if (this.cache.has(url)) {
+      return this.cache.get(url)!;
     }
     
-    // Default response structure
+    // Create validation result
     const result: UrlValidationResult = {
       url,
       isValid: false
     };
     
     try {
-      // Handle empty URLs
+      // Check for special URLs or empty URLs
       if (!url || url.trim() === '') {
         result.error = 'URL is empty';
+        this.cache.set(url, result);
         return result;
       }
       
-      // Handle special URLs (data URLs, blob URLs)
-      if (this.shouldIgnoreUrl(url)) {
-        result.isValid = true;
-        result.error = 'URL is special and was not validated';
-        return result;
+      // Check for ignored URLs
+      for (const keyword of this.config.ignoreKeywords) {
+        if (url.includes(keyword)) {
+          result.isValid = true;
+          result.error = 'URL is special and was not validated';
+          this.cache.set(url, result);
+          return result;
+        }
       }
       
-      // Handle relative URLs
+      // Fix relative URLs
+      let requestUrl = url;
       if (url.startsWith('/')) {
-        const absoluteUrl = `${this.config.baseUrl}${url}`;
-        result.url = absoluteUrl;
+        requestUrl = this.fixRelativeUrl(url);
         result.error = 'URL is relative and was converted to absolute';
       }
       
-      // Start timer for performance measurement
-      const startTime = Date.now();
-      
-      // Make the request with timeout
+      // Create abort controller for timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+      const timeout = setTimeout(() => {
+        controller.abort();
+      }, this.config.timeout);
       
-      try {
-        const response = await fetch(result.url, {
-          method: 'HEAD',
-          redirect: 'follow',
-          // Avoid security issues by not sending credentials
-          credentials: 'omit',
-          // Add signal for timeout
-          signal: controller.signal,
-          timeout: this.config.timeout
-        });
-        
-        // Clear timeout
-        clearTimeout(timeoutId);
-        
-        // If response is not OK (200-299), the URL is invalid
-        result.isValid = response.ok;
-        result.status = response.status;
-        result.statusText = response.statusText;
-        
-        // For non-HEAD supporting servers, try GET request
-        if (result.status === 405) { // Method Not Allowed
-          try {
-            const getResponse = await fetch(result.url, {
-              method: 'GET',
-              redirect: 'follow',
-              credentials: 'omit',
-              signal: controller.signal,
-              timeout: this.config.timeout
-            });
-            
-            result.isValid = getResponse.ok;
-            result.status = getResponse.status;
-            result.statusText = getResponse.statusText;
-            
-            // Get content type to determine if it's an image or video
-            const contentType = getResponse.headers.get('content-type');
-            if (contentType) {
-              result.contentType = contentType;
-              result.isImage = contentType.startsWith('image/');
-              result.isVideo = contentType.startsWith('video/');
-            }
-            
-            // Get file size
-            const contentLength = getResponse.headers.get('content-length');
-            if (contentLength) {
-              result.fileSize = parseInt(contentLength, 10);
-            }
-          } catch (error) {
-            result.isValid = false;
-            result.error = error instanceof Error ? error.message : String(error);
-          }
-        } else {
-          // Get content type to determine if it's an image or video
-          const contentType = response.headers.get('content-type');
-          if (contentType) {
-            result.contentType = contentType;
-            result.isImage = contentType.startsWith('image/');
-            result.isVideo = contentType.startsWith('video/');
-          }
-          
-          // Get file size
-          const contentLength = response.headers.get('content-length');
-          if (contentLength) {
-            result.fileSize = parseInt(contentLength, 10);
-          }
+      // Make fetch request
+      const response = await fetch(requestUrl, {
+        method: 'HEAD',
+        redirect: 'follow',
+        signal: controller.signal as any,
+        timeout: this.config.timeout
+      }).catch(async error => {
+        // If HEAD request fails, try GET request
+        if (error.name !== 'AbortError') {
+          return await fetch(requestUrl, {
+            method: 'GET',
+            redirect: 'follow',
+            signal: controller.signal as any,
+            timeout: this.config.timeout
+          }).catch(getError => {
+            // Both HEAD and GET failed
+            throw getError;
+          });
         }
-      } catch (error) {
-        // Clear timeout
-        clearTimeout(timeoutId);
-        
-        result.isValid = false;
-        
-        if (error instanceof Error) {
-          // Handle specific error types for better error messages
-          if (error.name === 'AbortError') {
-            result.error = `Request timed out after ${this.config.timeout}ms`;
-          } else {
-            result.error = error.message;
-          }
-        } else {
-          result.error = String(error);
-        }
+        throw error;
+      });
+      
+      // Clear timeout
+      clearTimeout(timeout);
+      
+      // Set status and content type
+      result.status = response.status;
+      result.statusText = response.statusText;
+      result.contentType = response.headers.get('content-type') || undefined;
+      
+      // Check if URL is valid based on status
+      result.isValid = response.ok;
+      
+      // Determine if URL is image or video
+      if (result.contentType) {
+        result.isImage = result.contentType.startsWith('image/');
+        result.isVideo = result.contentType.startsWith('video/') || 
+                         result.contentType.includes('mp4') ||
+                         result.contentType.includes('mpeg');
       }
       
-      // Calculate validation time
-      result.validationTime = Date.now() - startTime;
+      // Cache result
+      this.cache.set(url, result);
+      
+      return result;
     } catch (error) {
-      result.isValid = false;
-      result.error = error instanceof Error ? error.message : String(error);
+      // Handle errors
+      if (error.name === 'AbortError') {
+        result.error = 'Request timed out';
+      } else {
+        result.error = error.message || 'Request failed';
+      }
+      
+      // Cache result
+      this.cache.set(url, result);
+      
+      return result;
     }
-    
-    // Cache the result
-    validationCache.set(url, result);
-    
-    return result;
   }
   
   /**
-   * Validate multiple URLs in parallel
+   * Validate multiple URLs concurrently
    * 
    * @param urls Array of URLs to validate
    * @returns Promise resolving to array of validation results
    */
   async validateUrls(urls: string[]): Promise<UrlValidationResult[]> {
-    // Deduplicate URLs
+    const results: UrlValidationResult[] = [];
     const uniqueUrls = [...new Set(urls)];
     
-    // Create batches of URLs to process in parallel
-    const batches: string[][] = [];
+    // Process URLs in batches to limit concurrency
+    const batches = [];
     for (let i = 0; i < uniqueUrls.length; i += this.config.concurrency) {
       batches.push(uniqueUrls.slice(i, i + this.config.concurrency));
     }
     
-    // Process batches sequentially
-    const results: UrlValidationResult[] = [];
     for (const batch of batches) {
-      // Process URLs in batch in parallel
-      const batchResults = await Promise.all(
-        batch.map(url => this.validateUrl(url))
-      );
+      const promises = batch.map(url => this.validateUrl(url));
+      const batchResults = await Promise.all(promises);
       results.push(...batchResults);
     }
     
@@ -241,45 +205,46 @@ export class UrlValidator {
    * Extract URLs from an object
    * 
    * @param obj Object to extract URLs from
-   * @param path Current object path
-   * @returns Array of URL entries with their paths
+   * @param basePath Base path for keys
+   * @returns Array of extracted URLs
    */
-  extractUrls(obj: any, path = ''): { url: string; path: string }[] {
-    const urls: { url: string; path: string }[] = [];
+  extractUrls(obj: any, basePath = ''): ExtractedUrl[] {
+    const urls: ExtractedUrl[] = [];
     
     if (!obj || typeof obj !== 'object') {
       return urls;
     }
     
-    // Check if object has a 'url' property that is a string
-    if (obj.url && typeof obj.url === 'string') {
-      urls.push({ url: obj.url, path: path ? `${path}.url` : 'url' });
-    }
-    
-    // Special handling for arrays of media objects
-    if (obj.media && Array.isArray(obj.media)) {
-      obj.media.forEach((mediaItem: any, index: number) => {
-        if (mediaItem && typeof mediaItem === 'object' && mediaItem.url) {
-          urls.push({
-            url: mediaItem.url,
-            path: path ? `${path}.media[${index}].url` : `media[${index}].url`
-          });
-        }
-      });
-    }
-    
-    // Recursively search for URLs in nested objects
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        const value = obj[key];
-        const newPath = path ? `${path}.${key}` : key;
+    // Handle arrays
+    if (Array.isArray(obj)) {
+      for (let i = 0; i < obj.length; i++) {
+        const item = obj[i];
+        const itemPath = basePath ? `${basePath}.[${i}]` : `[${i}]`;
         
-        if (typeof value === 'string' && this.isUrlLike(value)) {
-          // Found a string that looks like a URL
-          urls.push({ url: value, path: newPath });
-        } else if (typeof value === 'object') {
-          // Recursively search nested objects and arrays
-          urls.push(...this.extractUrls(value, newPath));
+        if (typeof item === 'string' && this.looksLikeUrl(item)) {
+          urls.push({ path: itemPath, url: item });
+        } else if (typeof item === 'object' && item !== null) {
+          urls.push(...this.extractUrls(item, itemPath));
+        }
+      }
+    } 
+    // Handle special case of media objects
+    else if (obj.type && (obj.type === 'image' || obj.type === 'video') && obj.url && typeof obj.url === 'string') {
+      const path = basePath ? `${basePath}.url` : 'url';
+      urls.push({ path, url: obj.url });
+    }
+    // Handle normal objects
+    else {
+      for (const key in obj) {
+        const value = obj[key];
+        const path = basePath ? `${basePath}.${key}` : key;
+        
+        if (typeof value === 'string') {
+          if (this.looksLikeUrl(value) || (key.includes('url') || key.includes('Url') || key.includes('URL'))) {
+            urls.push({ path, url: value });
+          }
+        } else if (typeof value === 'object' && value !== null) {
+          urls.push(...this.extractUrls(value, path));
         }
       }
     }
@@ -293,69 +258,58 @@ export class UrlValidator {
    * @param str String to check
    * @returns True if string looks like a URL
    */
-  isUrlLike(str: string): boolean {
-    // Check if string is a URL
+  looksLikeUrl(str: string): boolean {
     if (!str || typeof str !== 'string') {
       return false;
     }
     
-    // Simple URL patterns
-    const urlPatterns = [
-      /^https?:\/\//i,    // http:// or https://
-      /^\/[a-zA-Z0-9]/,   // starts with / followed by alphanumeric
-      /^data:image\//i,   // data:image/ (inline images)
-      /^blob:/i           // blob: (blob URLs)
-    ];
-    
-    return urlPatterns.some(pattern => pattern.test(str));
-  }
-  
-  /**
-   * Check if a URL should be ignored during validation
-   * 
-   * @param url URL to check
-   * @returns True if URL should be ignored
-   */
-  shouldIgnoreUrl(url: string): boolean {
-    if (!url || typeof url !== 'string') {
+    // Check if string starts with common URL prefixes
+    if (str.startsWith('http://') || 
+        str.startsWith('https://') || 
+        str.startsWith('/') ||
+        str.startsWith('data:') ||
+        str.startsWith('blob:')) {
       return true;
     }
     
-    return this.config.ignoreKeywords.some(keyword => url.includes(keyword));
+    // Check if string has a file extension
+    const fileExtensions = [
+      '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.bmp', '.ico',
+      '.mp4', '.webm', '.mov', '.avi', '.wmv', '.flv', '.mkv', '.m4v'
+    ];
+    
+    for (const ext of fileExtensions) {
+      if (str.includes(ext)) {
+        return true;
+      }
+    }
+    
+    return false;
   }
   
   /**
-   * Generate a hash for a URL
+   * Fix a relative URL by prepending the base URL
    * 
-   * @param url URL to hash
-   * @returns Hash of URL
-   */
-  hashUrl(url: string): string {
-    return createHash('md5').update(url).digest('hex');
-  }
-  
-  /**
-   * Fix a relative URL by converting it to an absolute URL
-   * 
-   * @param url URL to fix
-   * @returns Fixed URL
+   * @param url Relative URL to fix
+   * @returns Absolute URL
    */
   fixRelativeUrl(url: string): string {
-    if (!url || typeof url !== 'string') {
+    if (!url.startsWith('/')) {
       return url;
     }
     
-    if (url.startsWith('/')) {
-      return `${this.config.baseUrl}${url}`;
-    }
+    // Remove trailing slash from base URL if present
+    const baseUrl = this.config.baseUrl.endsWith('/') 
+      ? this.config.baseUrl.slice(0, -1) 
+      : this.config.baseUrl;
     
-    return url;
+    return `${baseUrl}${url}`;
   }
   
   /**
    * Clear the validation cache
    */
   clearCache(): void {
-    validationCache.clear();
+    this.cache.clear();
   }
 }
