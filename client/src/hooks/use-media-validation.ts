@@ -1,193 +1,282 @@
 /**
  * Media Validation Hook
  * 
- * This hook provides functionality to interact with the media validation API.
- * It handles loading reports, running validation, and fixing invalid URLs.
+ * This hook provides a way to interact with the media validation functions
+ * in the Etoile Yachts platform. It includes functionality to:
+ * - Fetch validation reports
+ * - Fetch validation tasks
+ * - Trigger validation
+ * - Fix invalid URLs
+ * - View validation results
  */
-import { useState, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from '@/hooks/use-toast';
 
-// Types
-export interface ValidationReport {
-  id?: string;
-  startTime: string | Date;
-  endTime: string | Date;
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import axios from 'axios';
+import { useToast } from './use-toast';
+
+/**
+ * Validation report interface
+ */
+interface ValidationReport {
+  id: string;
+  startTime: string;
+  endTime: string;
+  createdAt: string;
   duration: number;
   totalDocuments: number;
   totalFields: number;
   validUrls: number;
   invalidUrls: number;
   missingUrls: number;
-  collectionSummaries: {
-    collection: string;
-    totalUrls: number;
+  collectionSummaries: CollectionSummary[];
+}
+
+/**
+ * Collection summary interface
+ */
+interface CollectionSummary {
+  collection: string;
+  totalUrls: number;
+  validUrls: number;
+  invalidUrls: number;
+  missingUrls: number;
+  validPercent: number;
+  invalidPercent: number;
+  missingPercent: number;
+}
+
+/**
+ * Validation task interface
+ */
+interface ValidationTask {
+  taskId: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  queuedAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  failedAt?: string;
+  reportId?: string;
+  result?: {
+    totalDocuments: number;
     validUrls: number;
     invalidUrls: number;
     missingUrls: number;
-    validPercent: number;
-    invalidPercent: number;
-    missingPercent: number;
-  }[];
-  invalidResults: Array<{
-    field: string;
-    url: string;
-    isValid: boolean;
-    status?: number;
-    statusText?: string;
-    contentType?: string;
-    reason?: string;
-    error?: string;
-    collection?: string;
-    documentId?: string;
-  }>;
+    duration: number;
+  };
+  metadata?: {
+    triggerType: 'manual' | 'scheduled';
+    triggeredBy?: string;
+    triggerTime?: string;
+  };
 }
 
-export interface ValidationOptions {
+/**
+ * Invalid URL result interface
+ */
+interface InvalidUrlResult {
+  collection: string;
+  documentId: string;
+  field: string;
+  url: string;
+  error: string;
+  status?: number;
+  statusText?: string;
+  isValid: boolean;
+}
+
+/**
+ * Validation options interface
+ */
+interface ValidationOptions {
+  autoFix?: boolean;
   collections?: string[];
-  batchSize?: number;
-  maxItems?: number;
 }
 
-export interface FixOptions {
-  reportId?: string;
-  collections?: string[];
-}
-
-// Hook implementation
+/**
+ * Media validation hook
+ * 
+ * @returns Media validation related functions and state
+ */
 export function useMediaValidation() {
-  const queryClient = useQueryClient();
-  const [validationStatus, setValidationStatus] = useState('Preparing validation...');
-  const [repairStatus, setRepairStatus] = useState('Preparing repairs...');
+  const { toast } = useToast();
+  const [selectedReport, setSelectedReport] = useState<string | null>(null);
+  const [invalidResults, setInvalidResults] = useState<InvalidUrlResult[]>([]);
   
   // Fetch validation reports
   const { 
-    data: reports,
+    data: reportsData,
     isLoading: isLoadingReports,
-    refetch: loadReports
+    error: reportsError,
+    refetch: refetchReports
   } = useQuery({
-    queryKey: ['/api/admin/media-validation-reports'],
+    queryKey: ['validation-reports'],
     queryFn: async () => {
-      const response = await fetch('/api/admin/media-validation-reports');
-      if (!response.ok) {
-        throw new Error('Failed to fetch validation reports');
+      try {
+        const response = await axios.get('/api/admin/validate-reports');
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching validation reports:', error);
+        throw error;
       }
-      return await response.json() as ValidationReport[];
     },
-    enabled: false, // Don't fetch automatically on mount
+    enabled: false // Don't fetch automatically
   });
   
-  // Latest validation report
-  const lastValidationReport = reports && reports.length > 0 
-    ? reports[0] 
-    : undefined;
-  
-  // Start a validation run
+  // Fetch validation tasks
   const { 
-    mutate: runValidation,
-    isPending: isValidating
-  } = useMutation({
-    mutationFn: async (options?: ValidationOptions) => {
-      setValidationStatus('Starting validation...');
-      
-      const response = await fetch('/api/admin/validate-media', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(options || {})
-      });
-      
-      if (!response.ok) {
-        throw new Error('Validation failed');
+    data: tasksData,
+    isLoading: isLoadingTasks,
+    error: tasksError,
+    refetch: refetchTasks
+  } = useQuery({
+    queryKey: ['validation-tasks'],
+    queryFn: async () => {
+      try {
+        const response = await axios.get('/api/admin/validate-tasks');
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching validation tasks:', error);
+        throw error;
       }
-      
-      setValidationStatus('Validation complete.');
-      return await response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/media-validation-reports'] });
-      loadReports();
+    enabled: false // Don't fetch automatically
+  });
+  
+  // Fetch invalid results for a report
+  const { 
+    data: invalidResultsData,
+    isLoading: isLoadingInvalidResults,
+    error: invalidResultsError,
+    refetch: refetchInvalidResults
+  } = useQuery({
+    queryKey: ['validation-invalid-results', selectedReport],
+    queryFn: async () => {
+      if (!selectedReport) return { invalidResults: [] };
+      
+      try {
+        const response = await axios.get(`/api/admin/validate-reports/${selectedReport}/invalid-results`);
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching invalid results:', error);
+        throw error;
+      }
+    },
+    enabled: !!selectedReport // Only fetch when a report is selected
+  });
+  
+  // Trigger validation mutation
+  const { 
+    mutate: triggerValidationMutate,
+    isPending: isTriggeringValidation,
+    error: triggerError
+  } = useMutation({
+    mutationFn: async (options: ValidationOptions = {}) => {
+      try {
+        const response = await axios.post('/api/admin/trigger-validation', options);
+        return response.data;
+      } catch (error) {
+        console.error('Error triggering validation:', error);
+        throw error;
+      }
+    },
+    onSuccess: (data) => {
       toast({
-        title: 'Validation Complete',
-        description: 'Media validation finished successfully',
+        title: "Validation triggered",
+        description: `Task ID: ${data.taskId}`,
       });
+      
+      // Refetch tasks after triggering validation
+      refetchTasks();
     },
     onError: (error) => {
       toast({
-        title: 'Validation Failed',
-        description: String(error),
-        variant: 'destructive',
+        title: "Error triggering validation",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
       });
     }
   });
   
-  // Fix invalid URLs
-  const {
-    mutate: fixInvalidUrls,
-    isPending: isRepairing
+  // Fix document URLs mutation
+  const { 
+    mutate: fixDocumentUrlsMutate,
+    isPending: isFixingUrls,
+    error: fixError
   } = useMutation({
-    mutationFn: async (options?: FixOptions) => {
-      setRepairStatus('Starting repairs...');
-      
-      const response = await fetch('/api/admin/fix-media-issues', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(options || {})
-      });
-      
-      if (!response.ok) {
-        throw new Error('Fix operation failed');
+    mutationFn: async ({ collection, documentId }: { collection: string, documentId: string }) => {
+      try {
+        const response = await axios.post('/api/admin/fix-urls', { collection, documentId });
+        return response.data;
+      } catch (error) {
+        console.error('Error fixing document URLs:', error);
+        throw error;
       }
-      
-      setRepairStatus('Repairs complete.');
-      return await response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/media-validation-reports'] });
-      loadReports();
+    onSuccess: (data) => {
       toast({
-        title: 'Repairs Complete',
-        description: 'Invalid media URLs have been fixed',
+        title: "Document URLs fixed",
+        description: `Fixed ${data.fixedFields} invalid URLs`,
       });
+      
+      // Refetch invalid results after fixing URLs
+      if (selectedReport) {
+        refetchInvalidResults();
+      }
     },
     onError: (error) => {
       toast({
-        title: 'Repair Failed',
-        description: String(error),
-        variant: 'destructive',
+        title: "Error fixing URLs",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
       });
     }
   });
   
-  const validationResults = useCallback((reportId?: string) => {
-    // If specific report ID is provided, find that report
-    if (reportId && reports) {
-      return reports.find(r => r.id === reportId);
+  // Update invalid results when data changes
+  useEffect(() => {
+    if (invalidResultsData?.invalidResults) {
+      setInvalidResults(invalidResultsData.invalidResults);
     }
-    
-    // Otherwise, return the latest report
-    return lastValidationReport;
-  }, [reports, lastValidationReport]);
+  }, [invalidResultsData]);
+  
+  // Initial data fetch
+  useEffect(() => {
+    refetchReports();
+    refetchTasks();
+  }, [refetchReports, refetchTasks]);
+  
+  // Trigger validation function
+  const triggerValidation = (options: ValidationOptions = {}) => {
+    triggerValidationMutate(options);
+  };
+  
+  // Fix document URLs function
+  const fixDocumentUrls = (collection: string, documentId: string) => {
+    fixDocumentUrlsMutate({ collection, documentId });
+  };
   
   return {
-    // Reports
-    reports,
-    isLoadingReports,
-    loadReports,
-    lastValidationReport,
-    validationResults,
+    // Data
+    reports: reportsData?.reports || [],
+    tasks: tasksData?.tasks || [],
+    invalidResults,
+    selectedReport,
+    setSelectedReport,
     
-    // Validation
-    runValidation,
-    isValidating,
-    validationStatus,
+    // Loading states
+    isLoading: isLoadingReports || isLoadingTasks || isLoadingInvalidResults,
+    isTriggeringValidation,
+    isFixingUrls,
     
-    // Repairs
-    fixInvalidUrls,
-    isRepairing,
-    repairStatus,
+    // Errors
+    error: reportsError || tasksError || invalidResultsError || triggerError || fixError,
+    
+    // Actions
+    triggerValidation,
+    fixDocumentUrls,
+    refetchReports,
+    refetchTasks,
+    refetchInvalidResults
   };
 }
