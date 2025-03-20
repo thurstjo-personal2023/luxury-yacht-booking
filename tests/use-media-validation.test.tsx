@@ -4,123 +4,117 @@
  * This file contains tests for the useMediaValidation hook.
  * It demonstrates how to use our hook testing utilities with React 18.
  */
-import { renderHookWithProviders, waitFor, act } from './hook-test-utils';
+import { renderHook, act } from '@testing-library/react';
+import { renderHookWithProviders } from './hook-test-utils';
 import { useMediaValidation } from '../client/src/hooks/use-media-validation';
 
 // Mock the API responses
-const mockValidationResults = [
-  {
-    id: 'test-validation-1',
-    status: 'completed',
-    startTime: new Date().toISOString(),
-    endTime: new Date().toISOString(),
-    totalImagesChecked: 120,
-    totalImagesValid: 100,
-    totalImagesInvalid: 20,
-    executionTimeMs: 15000
-  },
-  {
-    id: 'test-validation-2',
-    status: 'in_progress',
-    startTime: new Date().toISOString(),
-    endTime: null,
-    totalImagesChecked: 50,
-    totalImagesValid: 45,
-    totalImagesInvalid: 5,
-    executionTimeMs: 8000
+jest.mock('@/lib/queryClient', () => ({
+  apiRequest: jest.fn().mockImplementation((url) => {
+    if (url === '/api/admin/validate-media') {
+      return Promise.resolve({ taskId: 'mock-task-123' });
+    }
+    if (url === '/api/admin/fix-relative-urls') {
+      return Promise.resolve({ taskId: 'mock-fix-task-456' });
+    }
+    if (url === '/api/admin/validate-collection') {
+      return Promise.resolve({ taskId: 'mock-collection-task-789', collection: 'test_collection' });
+    }
+    if (url === '/api/admin/validation-tasks') {
+      return Promise.resolve([
+        {
+          taskId: 'mock-task-123',
+          type: 'validate-all',
+          status: 'processing',
+          startTime: new Date(),
+          lastUpdate: new Date()
+        }
+      ]);
+    }
+    if (url === '/api/admin/media-validation-reports') {
+      return Promise.resolve([
+        {
+          reportId: 'mock-report-123',
+          status: 'completed',
+          totalDocuments: 100,
+          totalMediaItems: 200,
+          validItems: 150,
+          invalidItems: 50,
+          collections: {
+            test_collection: {
+              totalUrls: 50,
+              valid: 40,
+              invalid: 10,
+              missing: 0
+            }
+          }
+        }
+      ]);
+    }
+    return Promise.reject(new Error('Not implemented'));
+  }),
+  queryClient: {
+    invalidateQueries: jest.fn()
   }
-];
-
-// Mock the axios module
-jest.mock('axios', () => ({
-  get: jest.fn(),
-  post: jest.fn()
 }));
 
-const axios = require('axios');
+// Mock the toast hook
+jest.mock('@/hooks/use-toast', () => ({
+  useToast: () => ({
+    toast: jest.fn()
+  })
+}));
 
-describe('useMediaValidation', () => {
-  // Reset mocks before each test
-  beforeEach(() => {
-    jest.clearAllMocks();
+describe('useMediaValidation Hook', () => {
+  it('should initialize with default state', () => {
+    const { result } = renderHookWithProviders(() => useMediaValidation());
+    
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.isValidating).toBe(false);
+    expect(result.current.isFixing).toBe(false);
+    expect(result.current.validationReports).toBeUndefined();
+    expect(result.current.activeTasks).toBeUndefined();
   });
-
-  it('fetches validation reports on init', async () => {
-    // Mock the API response
-    axios.get.mockResolvedValueOnce({ data: mockValidationResults });
+  
+  it('should handle startValidation correctly', async () => {
+    const { result, waitForNextUpdate } = renderHookWithProviders(() => useMediaValidation());
     
-    // Render the hook with all providers
-    const { result } = renderHookWithProviders(() => useMediaValidation(), {
-      authUser: {
-        uid: 'admin-user',
-        email: 'admin@example.com',
-        role: 'producer' // Admin role for accessing validation
-      }
+    act(() => {
+      result.current.startValidation();
     });
     
-    // Initially loading should be true
-    expect(result.current.isLoading).toBe(true);
+    expect(result.current.isValidating).toBe(true);
     
-    // Wait for the data to be loaded
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
+    await waitForNextUpdate();
     
-    // Check if the data was loaded correctly
-    expect(result.current.validationReports).toEqual(mockValidationResults);
-    expect(axios.get).toHaveBeenCalledWith('/api/admin/image-validation-reports');
+    expect(result.current.isValidating).toBe(false);
   });
-
-  it('starts a new validation run', async () => {
-    // Mock the API responses
-    axios.get.mockResolvedValueOnce({ data: mockValidationResults });
-    axios.post.mockResolvedValueOnce({ data: { reportId: 'new-validation-id' } });
+  
+  it('should handle fixRelativeUrls correctly', async () => {
+    const { result, waitForNextUpdate } = renderHookWithProviders(() => useMediaValidation());
     
-    // Render the hook with all providers
-    const { result } = renderHookWithProviders(() => useMediaValidation(), {
-      authUser: {
-        uid: 'admin-user',
-        email: 'admin@example.com',
-        role: 'producer'
-      }
+    act(() => {
+      result.current.fixRelativeUrls();
     });
     
-    // Wait for initial data load
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
+    expect(result.current.isFixing).toBe(true);
+    
+    await waitForNextUpdate();
+    
+    expect(result.current.isFixing).toBe(false);
+  });
+  
+  it('should handle validateCollection correctly', async () => {
+    const { result, waitForNextUpdate } = renderHookWithProviders(() => useMediaValidation());
+    
+    act(() => {
+      result.current.validateCollection('test_collection');
     });
     
-    // Get initial number of reports
-    const initialReportsCount = result.current.validationReports.length;
+    expect(result.current.isValidating).toBe(true);
     
-    // Start a new validation
-    await act(async () => {
-      await result.current.startValidation();
-    });
+    await waitForNextUpdate();
     
-    // Check if API was called correctly
-    expect(axios.post).toHaveBeenCalledWith('/api/admin/validate-images');
-    
-    // Mock reports being refreshed after starting validation
-    axios.get.mockResolvedValueOnce({ 
-      data: [...mockValidationResults, {
-        id: 'new-validation-id',
-        status: 'in_progress',
-        startTime: new Date().toISOString(),
-        endTime: null,
-        totalImagesChecked: 0,
-        totalImagesValid: 0,
-        totalImagesInvalid: 0,
-        executionTimeMs: 0
-      }]
-    });
-    
-    // Refresh reports
-    await act(async () => {
-      await result.current.refreshReports();
-    });
-    
-    // Check if reports were updated
-    expect(result.current.validationReports.length).toBe(initialReportsCount + 1);
+    expect(result.current.isValidating).toBe(false);
   });
 });

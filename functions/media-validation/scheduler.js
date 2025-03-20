@@ -1,206 +1,228 @@
 /**
  * Media Validation Scheduler
  * 
- * This module handles scheduling media validation jobs:
- * 1. Creates and manages Pub/Sub topics for media validation
- * 2. Schedules periodic validation jobs
- * 3. Triggers immediate validation when requested
+ * This module implements a scheduler for periodic media validation tasks.
+ * It manages validation schedules and triggers validation tasks at the configured intervals.
  */
 
 const admin = require('firebase-admin');
-const { PubSub } = require('@google-cloud/pubsub');
-
-// Constants for scheduler operation
-const VALIDATION_TOPIC = 'media-validation';
-const DEFAULT_SCHEDULE = '0 0 * * *'; // Daily at midnight
+const functions = require('firebase-functions');
 
 /**
- * Initialize the Pub/Sub topic for media validation
+ * Get active validation schedules from Firestore
  * 
- * @returns {Promise<Object>} - Information about the created/existing topic
+ * @returns Array of active schedules
  */
-async function initializeValidationTopic() {
-  try {
-    const pubsub = new PubSub();
+async function getActiveSchedules() {
+  // Get schedules from Firestore
+  const snapshot = await admin.firestore()
+    .collection('media_validation_schedules')
+    .where('enabled', '==', true)
+    .get();
     
-    // Check if topic exists
-    const [topics] = await pubsub.getTopics();
-    const topicExists = topics.some(topic => 
-      topic.name.endsWith(`/${VALIDATION_TOPIC}`)
-    );
-    
-    // Create topic if it doesn't exist
-    if (!topicExists) {
-      const [topic] = await pubsub.createTopic(VALIDATION_TOPIC);
-      console.log(`Media validation topic ${topic.name} created.`);
-      return { 
-        success: true, 
-        message: `Topic ${topic.name} created`,
-        topicName: topic.name
-      };
-    } else {
-      console.log(`Media validation topic ${VALIDATION_TOPIC} already exists.`);
-      return { 
-        success: true, 
-        message: `Topic ${VALIDATION_TOPIC} already exists`,
-        topicName: VALIDATION_TOPIC
-      };
-    }
-  } catch (error) {
-    console.error('Error initializing validation topic:', error);
-    return { 
-      success: false, 
-      error: error.message 
-    };
-  }
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
 }
 
 /**
- * Schedule a media validation job
+ * Check if a schedule is due to run
  * 
- * @param {Object} options - Scheduling options
- * @returns {Promise<Object>} - Information about the scheduled job
+ * @param schedule The schedule to check
+ * @returns true if the schedule should run now
  */
-async function scheduleValidationJob(options = {}) {
-  const {
-    schedule = DEFAULT_SCHEDULE,
-    collections = null,
-    description = 'Scheduled media validation',
-    immediate = false
-  } = options;
+function isScheduleDue(schedule) {
+  // Get current time
+  const now = Date.now();
   
-  try {
-    const db = admin.firestore();
-    const pubsub = new PubSub();
-    
-    // Make sure topic exists
-    await initializeValidationTopic();
-    
-    // Create a scheduled job record if not immediate
-    let jobId = null;
-    
-    if (!immediate) {
-      const jobRef = db.collection('media_validation_jobs').doc();
-      jobId = jobRef.id;
-      
-      await jobRef.set({
-        schedule,
-        collections,
-        description,
-        status: 'scheduled',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-    }
-    
-    // Create job payload
-    const data = {
-      jobId,
-      collections,
-      timestamp: Date.now(),
-      scheduled: !immediate
-    };
-    
-    // Publish message to topic
-    const dataBuffer = Buffer.from(JSON.stringify(data));
-    const messageId = await pubsub.topic(VALIDATION_TOPIC).publish(dataBuffer);
-    
-    // Update job record with message ID if not immediate
-    if (!immediate) {
-      await db.collection('media_validation_jobs').doc(jobId).update({
-        messageId,
-        status: 'published',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-    }
-    
-    return {
-      success: true,
-      jobId,
-      messageId,
-      immediate
-    };
-  } catch (error) {
-    console.error('Error scheduling validation job:', error);
-    return {
-      success: false,
-      error: error.message
-    };
+  // If no last run time, schedule is due
+  if (!schedule.lastRunTime) {
+    return true;
   }
+  
+  // Calculate next run time
+  const lastRunTime = schedule.lastRunTime.toMillis ? 
+    schedule.lastRunTime.toMillis() : 
+    new Date(schedule.lastRunTime).getTime();
+  
+  const intervalMs = (schedule.intervalHours || 24) * 60 * 60 * 1000;
+  const nextRunTime = lastRunTime + intervalMs;
+  
+  // Check if next run time has passed
+  return now >= nextRunTime;
 }
 
 /**
- * Request immediate validation for a specific document
+ * Update the last run time for a schedule
  * 
- * @param {string} collectionName - Collection containing the document
- * @param {string} documentId - ID of the document to validate
- * @returns {Promise<Object>} - Result of the validation request
+ * @param scheduleId ID of the schedule to update
  */
-async function requestImmediateValidation(collectionName, documentId) {
-  try {
-    const pubsub = new PubSub();
-    
-    // Make sure topic exists
-    await initializeValidationTopic();
-    
-    // Create job payload for single document validation
-    const data = {
-      validateSingle: true,
-      collectionName,
-      documentId,
-      timestamp: Date.now()
-    };
-    
-    // Publish message to topic
-    const dataBuffer = Buffer.from(JSON.stringify(data));
-    const messageId = await pubsub.topic(VALIDATION_TOPIC).publish(dataBuffer);
-    
-    return {
-      success: true,
-      messageId,
-      collectionName,
-      documentId
-    };
-  } catch (error) {
-    console.error('Error requesting immediate validation:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
-
-/**
- * Process the daily scheduled validation
- * 
- * @returns {Promise<Object>} - Result of scheduling the daily validation
- */
-async function processDailyValidation() {
-  try {
-    // Schedule validation for all collections
-    const result = await scheduleValidationJob({
-      description: 'Daily scheduled media validation',
-      immediate: true
+async function updateScheduleLastRunTime(scheduleId) {
+  await admin.firestore()
+    .collection('media_validation_schedules')
+    .doc(scheduleId)
+    .update({
+      lastRunTime: admin.firestore.FieldValue.serverTimestamp(),
+      lastStatus: 'running'
     });
-    
-    console.log('Daily media validation triggered:', result);
-    
-    return {
-      success: true,
-      result
-    };
-  } catch (error) {
-    console.error('Error processing daily validation:', error);
-    return {
-      success: false,
-      error: error.message
-    };
+}
+
+/**
+ * Update the status of a schedule
+ * 
+ * @param scheduleId ID of the schedule to update
+ * @param status New status ('success', 'error')
+ * @param resultId Optional ID of the result document
+ * @param error Optional error message
+ */
+async function updateScheduleStatus(scheduleId, status, resultId, error) {
+  const updateData = {
+    lastStatus: status,
+    lastCompleteTime: admin.firestore.FieldValue.serverTimestamp()
+  };
+  
+  if (resultId) {
+    updateData.lastResultId = resultId;
   }
+  
+  if (error) {
+    updateData.lastError = error;
+  }
+  
+  await admin.firestore()
+    .collection('media_validation_schedules')
+    .doc(scheduleId)
+    .update(updateData);
+}
+
+/**
+ * Schedule and execute a validation task
+ * 
+ * @param pubsub The Cloud Pub/Sub client
+ * @param schedule The schedule to execute
+ */
+async function executeSchedule(pubsub, schedule) {
+  try {
+    console.log(`Executing schedule ${schedule.id} - ${schedule.name}`);
+    
+    // Update last run time
+    await updateScheduleLastRunTime(schedule.id);
+    
+    // Publish a message to trigger validation
+    const topicName = 'media-validation';
+    const messageData = {
+      scheduleId: schedule.id,
+      validateUrls: true,
+      fixRelativeUrls: schedule.fixRelativeUrls === true,
+      collections: schedule.collections || [],
+      taskId: `scheduled-${schedule.id}-${Date.now()}`
+    };
+    
+    // Convert object to base64 string for pub/sub
+    const dataBuffer = Buffer.from(JSON.stringify(messageData));
+    
+    // Publish message
+    await pubsub.topic(topicName).publish(dataBuffer);
+    
+    console.log(`Published validation task for schedule ${schedule.id}`);
+  } catch (error) {
+    console.error(`Error executing schedule ${schedule.id}:`, error);
+    
+    // Update schedule status
+    await updateScheduleStatus(
+      schedule.id, 
+      'error',
+      null, 
+      error.message
+    );
+  }
+}
+
+/**
+ * Check for due schedules and execute them
+ * 
+ * @param pubsub The Cloud Pub/Sub client
+ */
+async function checkAndExecuteSchedules(pubsub) {
+  try {
+    console.log('Checking for due validation schedules...');
+    
+    // Get active schedules
+    const schedules = await getActiveSchedules();
+    console.log(`Found ${schedules.length} active schedules`);
+    
+    // Check which schedules are due
+    const dueSchedules = schedules.filter(isScheduleDue);
+    console.log(`Found ${dueSchedules.length} due schedules`);
+    
+    // Execute due schedules
+    for (const schedule of dueSchedules) {
+      await executeSchedule(pubsub, schedule);
+    }
+  } catch (error) {
+    console.error('Error checking and executing schedules:', error);
+  }
+}
+
+/**
+ * Create a Cloud Function to periodically check validation schedules
+ * 
+ * @returns Cloud Function that checks schedules
+ */
+function createScheduleCheckerFunction() {
+  // Run every 10 minutes
+  return functions.pubsub.schedule('every 10 minutes').onRun(async (context) => {
+    try {
+      const pubsub = admin.pubsub();
+      await checkAndExecuteSchedules(pubsub);
+      return null;
+    } catch (error) {
+      console.error('Error in schedule checker function:', error);
+      return null;
+    }
+  });
+}
+
+/**
+ * Create a Cloud Function to handle validation completion
+ * 
+ * @returns Cloud Function that handles validation completion events
+ */
+function createValidationCompletionHandler() {
+  return functions.firestore
+    .document('media_validation_reports/{reportId}')
+    .onCreate(async (snapshot, context) => {
+      try {
+        const report = snapshot.data();
+        const { scheduleId } = report.metadata || {};
+        
+        // If this report wasn't from a schedule, skip
+        if (!scheduleId) {
+          return null;
+        }
+        
+        console.log(`Handling validation completion for schedule ${scheduleId}`);
+        
+        // Update schedule status
+        await updateScheduleStatus(
+          scheduleId,
+          'success',
+          snapshot.id
+        );
+        
+        return null;
+      } catch (error) {
+        console.error('Error handling validation completion:', error);
+        return null;
+      }
+    });
 }
 
 module.exports = {
-  initializeValidationTopic,
-  scheduleValidationJob,
-  requestImmediateValidation,
-  processDailyValidation
+  getActiveSchedules,
+  isScheduleDue,
+  checkAndExecuteSchedules,
+  createScheduleCheckerFunction,
+  createValidationCompletionHandler
 };

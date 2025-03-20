@@ -1,351 +1,249 @@
 /**
  * Media Validation Worker
  * 
- * This module provides a background worker that processes media validation tasks.
- * It's designed to run either as a Cloud Function triggered by Pub/Sub events
- * or as a scheduled task.
+ * This module implements a worker for background media validation tasks.
+ * It can process Firestore collections and documents, validating image URLs,
+ * detecting broken links, and fixing relative URLs.
  */
-import * as admin from 'firebase-admin';
-import { MediaValidationService } from './media-validation';
-import { PubSub } from '@google-cloud/pubsub';
+import { MediaValidationService, MediaValidationOptions, MediaValidationReport, UrlFixResult } from './media-validation';
+import { Firestore } from '@google-cloud/firestore';
 
-// Worker configuration type
-export interface WorkerConfig {
-  firestore: admin.firestore.Firestore;
-  projectId: string;
-  topicName: string;
-  collectionNames: string[];
+/**
+ * Configuration for the media validation worker
+ */
+export interface MediaValidationWorkerConfig {
+  /**
+   * Base URL of the application
+   */
   baseUrl: string;
-  enablePubSub?: boolean;
-  maxRetries?: number;
-  taskTimeoutSeconds?: number;
-}
-
-// Task type
-export interface ValidationTask {
-  taskId: string;
-  type: 'validate-all' | 'validate-collection' | 'fix-relative-urls' | 'custom';
-  collectionName?: string;
-  documentId?: string;
-  parameters?: Record<string, any>;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  startTime?: admin.firestore.Timestamp;
-  endTime?: admin.firestore.Timestamp;
-  result?: any;
-  error?: string;
-  retryCount: number;
-  lastUpdate: admin.firestore.Timestamp;
-  reportId?: string;
+  
+  /**
+   * Collections to validate
+   */
+  collectionsToValidate: string[];
+  
+  /**
+   * Maximum number of documents to process per batch
+   */
+  batchSize?: number;
+  
+  /**
+   * Maximum concurrent validation operations
+   */
+  concurrency?: number;
+  
+  /**
+   * Timeout for each validation operation (ms)
+   */
+  timeout?: number;
+  
+  /**
+   * Firestore instance
+   */
+  firestore: Firestore;
+  
+  /**
+   * Logger function for errors
+   */
+  logError: (message: string, error?: any) => void;
+  
+  /**
+   * Logger function for information messages
+   */
+  logInfo: (message: string) => void;
+  
+  /**
+   * Logger function for debug messages
+   */
+  logDebug?: (message: string) => void;
 }
 
 /**
- * Media Validation Worker
+ * Media validation worker class
+ * 
+ * Handles background processing of media validation tasks
  */
 export class MediaValidationWorker {
+  private config: MediaValidationWorkerConfig;
   private validationService: MediaValidationService;
-  private pubsub: PubSub | null = null;
-  private readonly maxRetries: number;
-  private readonly taskTimeoutSeconds: number;
   
-  constructor(private config: WorkerConfig) {
-    // Initialize validation service
+  /**
+   * Create a new media validation worker
+   */
+  constructor(config: MediaValidationWorkerConfig) {
+    this.config = config;
+    
+    // Create validation service
     this.validationService = new MediaValidationService({
-      firestore: config.firestore,
-      collectionNames: config.collectionNames,
       baseUrl: config.baseUrl,
-      logInfo: (message) => console.log(`[Worker] ${message}`),
-      logError: (message, error) => console.error(`[Worker] ${message}`, error),
-      logWarning: (message) => console.warn(`[Worker] ${message}`)
+      concurrency: config.concurrency,
+      timeout: config.timeout,
+      logInfo: config.logInfo,
+      logError: config.logError,
+      logDebug: config.logDebug,
+      firestore: config.firestore  // Pass Firestore instance to validation service
     });
-    
-    // Initialize Pub/Sub if enabled
-    if (config.enablePubSub) {
-      this.pubsub = new PubSub({ projectId: config.projectId });
-    }
-    
-    // Set configuration values with defaults
-    this.maxRetries = config.maxRetries || 3;
-    this.taskTimeoutSeconds = config.taskTimeoutSeconds || 300; // 5 minutes
   }
   
   /**
-   * Process a validation task
-   * @param task The task to process
+   * Validate all configured collections
+   * 
+   * @returns A validation report with results from all collections
    */
-  public async processTask(task: ValidationTask): Promise<ValidationTask> {
-    console.log(`[Worker] Processing task ${task.taskId} of type ${task.type}`);
-    
-    // Update task status to processing
-    const taskRef = this.config.firestore.collection('validation_tasks').doc(task.taskId);
-    await taskRef.update({
-      status: 'processing',
-      startTime: admin.firestore.Timestamp.now(),
-      lastUpdate: admin.firestore.Timestamp.now()
-    });
-    
-    // Update task object
-    task.status = 'processing';
-    task.startTime = admin.firestore.Timestamp.now();
-    task.lastUpdate = admin.firestore.Timestamp.now();
-    
+  async validateAllCollections(): Promise<MediaValidationReport> {
     try {
-      let result: any;
+      this.config.logInfo(`Starting validation of ${this.config.collectionsToValidate.length} collections`);
       
-      // Process task based on type
-      switch (task.type) {
-        case 'validate-all':
-          result = await this.validationService.validateAllCollections();
-          break;
-          
-        case 'validate-collection':
-          if (!task.collectionName) {
-            throw new Error('Collection name is required for validate-collection tasks');
-          }
-          result = await this.validationService.validateCollection(task.collectionName);
-          break;
-          
-        case 'fix-relative-urls':
-          if (task.collectionName && task.documentId) {
-            // Fix a specific document
-            const docRef = this.config.firestore.collection(task.collectionName).doc(task.documentId);
-            const doc = await docRef.get();
-            
-            if (!doc.exists) {
-              throw new Error(`Document ${task.documentId} not found in ${task.collectionName}`);
-            }
-            
-            result = await this.validationService.fixRelativeUrls(
-              task.collectionName,
-              task.documentId,
-              doc.data()
-            );
-          } else if (task.collectionName) {
-            // Fix an entire collection
-            result = await this.validationService.fixCollectionRelativeUrls(task.collectionName);
-          } else {
-            // Fix all collections
-            result = await this.validationService.fixAllRelativeUrls();
-          }
-          break;
-          
-        case 'custom':
-          // Custom task types can be added here
-          throw new Error(`Custom task processing not implemented yet`);
-          
-        default:
-          throw new Error(`Unknown task type: ${task.type}`);
-      }
+      const results = await this.validationService.validateAllCollections(
+        this.config.collectionsToValidate, 
+        this.config.batchSize || 50
+      );
       
-      // Update task with result
-      const updatedTask: Partial<ValidationTask> = {
-        status: 'completed',
-        endTime: admin.firestore.Timestamp.now(),
-        lastUpdate: admin.firestore.Timestamp.now(),
-        result
-      };
+      this.config.logInfo(`Completed validation of ${this.config.collectionsToValidate.length} collections`);
       
-      // If the result includes a reportId, store it
-      if (result && result.reportId) {
-        updatedTask.reportId = result.reportId;
-      }
-      
-      await taskRef.update(updatedTask);
-      
-      // Update task object
-      return {
-        ...task,
-        ...updatedTask
-      } as ValidationTask;
-      
-    } catch (error) {
-      console.error(`[Worker] Error processing task ${task.taskId}:`, error);
-      
-      // Check if we should retry
-      const shouldRetry = task.retryCount < this.maxRetries;
-      const nextStatus = shouldRetry ? 'pending' : 'failed';
-      
-      // Update task with error
-      const updatedTask: Partial<ValidationTask> = {
-        status: nextStatus,
-        error: error.message || 'Unknown error',
-        retryCount: shouldRetry ? task.retryCount + 1 : task.retryCount,
-        lastUpdate: admin.firestore.Timestamp.now()
-      };
-      
-      // If this is a failure (no more retries), set the end time
-      if (nextStatus === 'failed') {
-        updatedTask.endTime = admin.firestore.Timestamp.now();
-      }
-      
-      await taskRef.update(updatedTask);
-      
-      // Update task object
-      return {
-        ...task,
-        ...updatedTask
-      } as ValidationTask;
+      return results;
+    } catch (error: any) {
+      this.config.logError('Error validating collections:', error);
+      throw error;
     }
   }
   
   /**
-   * Process the next available task
+   * Validate a specific collection
+   * 
+   * @param collectionName The name of the collection to validate
+   * @param batchSize Optional batch size override
+   * @returns A validation report for the collection
    */
-  public async processNextTask(): Promise<ValidationTask | null> {
-    const timeoutCutoff = admin.firestore.Timestamp.fromMillis(
-      Date.now() - (this.taskTimeoutSeconds * 1000)
-    );
-    
-    const tasksRef = this.config.firestore.collection('validation_tasks');
-    
-    // Start a transaction to claim a task
-    return this.config.firestore.runTransaction(async (transaction) => {
-      // Query for pending tasks or stuck processing tasks
-      const pendingQuery = tasksRef
-        .where('status', '==', 'pending')
-        .orderBy('lastUpdate')
-        .limit(1);
+  async validateCollection(collectionName: string, batchSize?: number): Promise<MediaValidationReport> {
+    try {
+      this.config.logInfo(`Starting validation of collection: ${collectionName}`);
       
-      const timeoutQuery = tasksRef
-        .where('status', '==', 'processing')
-        .where('lastUpdate', '<', timeoutCutoff)
-        .orderBy('lastUpdate')
-        .limit(1);
+      const results = await this.validationService.validateCollection(
+        collectionName, 
+        batchSize || this.config.batchSize || 50
+      );
       
-      // Check for pending tasks first
-      const pendingSnapshot = await transaction.get(pendingQuery);
+      this.config.logInfo(`Completed validation of collection: ${collectionName}`);
       
-      // If no pending tasks, check for timed out tasks
-      if (pendingSnapshot.empty) {
-        const timeoutSnapshot = await transaction.get(timeoutQuery);
-        
-        if (timeoutSnapshot.empty) {
-          // No tasks to process
-          return null;
+      return results;
+    } catch (error: any) {
+      this.config.logError(`Error validating collection ${collectionName}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Fix relative URLs in all collections
+   * 
+   * @returns A fix report with results from all collections
+   */
+  async fixRelativeUrls(): Promise<UrlFixResult> {
+    try {
+      this.config.logInfo(`Starting fix of relative URLs in ${this.config.collectionsToValidate.length} collections`);
+      
+      const results = await this.validationService.fixAllRelativeUrls(
+        this.config.collectionsToValidate,
+        this.config.batchSize || 50
+      );
+      
+      this.config.logInfo(`Completed fixing relative URLs in ${this.config.collectionsToValidate.length} collections`);
+      
+      return results;
+    } catch (error: any) {
+      this.config.logError('Error fixing relative URLs:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Fix relative URLs in a specific collection
+   * 
+   * @param collectionName The name of the collection to fix
+   * @param batchSize Optional batch size override
+   * @returns A fix report for the collection
+   */
+  async fixCollectionRelativeUrls(collectionName: string, batchSize?: number): Promise<UrlFixResult> {
+    try {
+      this.config.logInfo(`Starting fix of relative URLs in collection: ${collectionName}`);
+      
+      const results = await this.validationService.fixCollectionRelativeUrls(
+        collectionName,
+        batchSize || this.config.batchSize || 50
+      );
+      
+      this.config.logInfo(`Completed fixing relative URLs in collection: ${collectionName}`);
+      
+      return results;
+    } catch (error: any) {
+      this.config.logError(`Error fixing relative URLs in collection ${collectionName}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Save validation results to Firestore
+   * 
+   * @param results The validation results to save
+   * @returns The ID of the saved report document
+   */
+  async saveValidationResults(results: MediaValidationReport): Promise<string> {
+    try {
+      const reportRef = this.config.firestore.collection('media_validation_reports').doc();
+      
+      // Add metadata
+      const reportData = {
+        ...results,
+        id: reportRef.id,
+        createdAt: new Date(),
+        metadata: {
+          collectionsValidated: this.config.collectionsToValidate,
+          baseUrl: this.config.baseUrl
         }
-        
-        // Found a timed out task
-        const taskDoc = timeoutSnapshot.docs[0];
-        const task = taskDoc.data() as ValidationTask;
-        
-        console.log(`[Worker] Found timed out task ${taskDoc.id} last updated at ${task.lastUpdate.toDate()}`);
-        
-        // Process the timed out task
-        return this.processTask(task);
-      }
+      };
       
-      // Found a pending task
-      const taskDoc = pendingSnapshot.docs[0];
-      const task = taskDoc.data() as ValidationTask;
+      // Save to Firestore
+      await reportRef.set(reportData);
       
-      console.log(`[Worker] Found pending task ${taskDoc.id}`);
+      this.config.logInfo(`Saved validation report with ID: ${reportRef.id}`);
       
-      // Process the pending task
-      return this.processTask(task);
-    });
-  }
-  
-  /**
-   * Create a new validation task
-   */
-  public async createTask(
-    type: ValidationTask['type'],
-    options: {
-      collectionName?: string;
-      documentId?: string;
-      parameters?: Record<string, any>;
-    } = {}
-  ): Promise<string> {
-    const taskId = this.config.firestore.collection('validation_tasks').doc().id;
-    
-    const task: ValidationTask = {
-      taskId,
-      type,
-      collectionName: options.collectionName,
-      documentId: options.documentId,
-      parameters: options.parameters,
-      status: 'pending',
-      retryCount: 0,
-      lastUpdate: admin.firestore.Timestamp.now()
-    };
-    
-    await this.config.firestore.collection('validation_tasks').doc(taskId).set(task);
-    
-    // If Pub/Sub is enabled, publish a message
-    if (this.pubsub) {
-      try {
-        const topic = this.pubsub.topic(this.config.topicName);
-        const messageData = Buffer.from(JSON.stringify({ taskId }));
-        await topic.publish(messageData);
-        
-        console.log(`[Worker] Published task ${taskId} to Pub/Sub topic ${this.config.topicName}`);
-      } catch (error) {
-        console.error(`[Worker] Error publishing task to Pub/Sub:`, error);
-        // Continue even if Pub/Sub fails - task can be picked up by scheduler
-      }
+      return reportRef.id;
+    } catch (error: any) {
+      this.config.logError('Error saving validation results:', error);
+      throw error;
     }
-    
-    return taskId;
   }
   
   /**
-   * Run the worker process
-   * This can be called by a Cloud Function or a scheduled task
+   * Save URL fix results to Firestore
+   * 
+   * @param results The fix results to save
+   * @returns The ID of the saved report document
    */
-  public async run(options: { processLimit?: number } = {}): Promise<number> {
-    const { processLimit = 10 } = options;
-    let processedCount = 0;
-    
-    console.log(`[Worker] Starting media validation worker with limit of ${processLimit} tasks`);
-    
-    // Process tasks until limit is reached or no more tasks
-    for (let i = 0; i < processLimit; i++) {
-      const task = await this.processNextTask();
-      
-      if (!task) {
-        console.log(`[Worker] No more tasks to process`);
-        break;
-      }
-      
-      processedCount++;
-    }
-    
-    console.log(`[Worker] Processed ${processedCount} tasks`);
-    return processedCount;
-  }
-  
-  /**
-   * Handle a Pub/Sub message
-   * This is designed to be called by a Cloud Function
-   */
-  public async handlePubSubMessage(message: { json: any; data?: string }): Promise<void> {
+  async saveFixResults(results: UrlFixResult): Promise<string> {
     try {
-      // Parse message data
-      const data = message.json || (message.data ? JSON.parse(Buffer.from(message.data, 'base64').toString()) : null);
+      const reportRef = this.config.firestore.collection('url_fix_reports').doc();
       
-      if (!data || !data.taskId) {
-        console.error(`[Worker] Invalid Pub/Sub message:`, data);
-        return;
-      }
+      // Add metadata
+      const reportData = {
+        ...results,
+        id: reportRef.id,
+        createdAt: new Date(),
+        metadata: {
+          collectionsFixed: this.config.collectionsToValidate,
+          baseUrl: this.config.baseUrl
+        }
+      };
       
-      // Get the task
-      const taskRef = this.config.firestore.collection('validation_tasks').doc(data.taskId);
-      const taskDoc = await taskRef.get();
+      // Save to Firestore
+      await reportRef.set(reportData);
       
-      if (!taskDoc.exists) {
-        console.error(`[Worker] Task ${data.taskId} not found`);
-        return;
-      }
+      this.config.logInfo(`Saved URL fix report with ID: ${reportRef.id}`);
       
-      const task = taskDoc.data() as ValidationTask;
-      
-      // Only process if the task is still pending
-      if (task.status === 'pending' || task.status === 'processing') {
-        await this.processTask(task);
-      } else {
-        console.log(`[Worker] Task ${data.taskId} is already ${task.status}, skipping processing`);
-      }
-    } catch (error) {
-      console.error(`[Worker] Error handling Pub/Sub message:`, error);
+      return reportRef.id;
+    } catch (error: any) {
+      this.config.logError('Error saving URL fix results:', error);
+      throw error;
     }
   }
 }
