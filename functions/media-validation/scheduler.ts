@@ -1,294 +1,302 @@
 /**
  * Media Validation Scheduler
  * 
- * This module provides a scheduler for media validation tasks.
- * It runs at regular intervals to check for pending tasks and 
- * initiates validation processes based on configured schedules.
+ * This module provides functionality to schedule media validation tasks
+ * to run at regular intervals or at specific times.
  */
-import * as admin from 'firebase-admin';
-import { MediaValidationWorker } from './worker';
 
-// Scheduler configuration type
-export interface SchedulerConfig {
-  firestore: admin.firestore.Firestore;
-  projectId: string;
-  topicName: string;
-  collectionNames: string[];
-  baseUrl: string;
-  schedules: {
-    validateAll?: {
-      enabled: boolean;
-      cronExpression?: string;
-      intervalHours?: number;
-    };
-    fixRelativeUrls?: {
-      enabled: boolean;
-      cronExpression?: string;
-      intervalHours?: number;
-    };
-  };
+import { MediaValidationWorker, MediaValidationWorkerConfig } from './worker';
+import { ValidationReport } from './media-validation';
+import { Firestore } from 'firebase/firestore';
+
+/**
+ * Task schedule configuration
+ */
+export interface TaskScheduleConfig {
+  type: 'interval' | 'cron';
+  value: number | string; // Interval in milliseconds or cron expression
 }
 
-// Schedule status
-export interface ScheduleStatus {
+/**
+ * Media validation scheduler configuration
+ */
+export interface MediaValidationSchedulerConfig {
+  worker: MediaValidationWorkerConfig;
+  schedule: TaskScheduleConfig;
+  enabled?: boolean;
+  maxConcurrentTasks?: number;
+  onStart?: (taskId: string) => void;
+  onComplete?: (taskId: string, report: ValidationReport) => void;
+  onError?: (taskId: string, error: Error) => void;
+}
+
+/**
+ * Task status
+ */
+export enum TaskStatus {
+  PENDING = 'pending',
+  RUNNING = 'running',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CANCELLED = 'cancelled'
+}
+
+/**
+ * Scheduled task
+ */
+export interface ScheduledTask {
   id: string;
-  type: 'validate-all' | 'fix-relative-urls' | 'custom';
-  enabled: boolean;
-  lastRun?: admin.firestore.Timestamp;
-  nextRun?: admin.firestore.Timestamp;
-  cronExpression?: string;
-  intervalHours?: number;
-  status: 'active' | 'disabled' | 'failed';
+  status: TaskStatus;
+  startTime?: Date;
+  endTime?: Date;
+  config: MediaValidationWorkerConfig;
+  report?: ValidationReport;
   error?: string;
 }
 
 /**
- * Media Validation Scheduler
+ * Media validation scheduler
  */
 export class MediaValidationScheduler {
+  private db: Firestore;
+  private config: MediaValidationSchedulerConfig;
+  private tasks: Map<string, ScheduledTask> = new Map();
   private worker: MediaValidationWorker;
-  
-  constructor(private config: SchedulerConfig) {
-    // Initialize the worker
-    this.worker = new MediaValidationWorker({
-      firestore: config.firestore,
-      projectId: config.projectId,
-      topicName: config.topicName,
-      collectionNames: config.collectionNames,
-      baseUrl: config.baseUrl,
-      enablePubSub: true
-    });
-  }
-  
+  private schedulerId: string;
+  private intervalId?: NodeJS.Timeout;
+  private isRunning: boolean = false;
+  private runningTasks: number = 0;
+
   /**
-   * Initialize schedules in Firestore
+   * Constructor
+   * 
+   * @param db Firestore instance
+   * @param config Media validation scheduler configuration
    */
-  public async initializeSchedules(): Promise<void> {
-    const schedulesCollection = this.config.firestore.collection('validation_schedules');
+  constructor(db: Firestore, config: MediaValidationSchedulerConfig) {
+    this.db = db;
+    this.config = {
+      ...config,
+      enabled: config.enabled !== false,
+      maxConcurrentTasks: config.maxConcurrentTasks || 1
+    };
     
-    // Check if schedules already exist
-    const snapshot = await schedulesCollection.get();
+    this.worker = new MediaValidationWorker(db, config.worker);
+    this.schedulerId = `scheduler-${Date.now()}`;
+  }
+
+  /**
+   * Start scheduler
+   */
+  start(): void {
+    if (this.isRunning) {
+      throw new Error('Scheduler already running');
+    }
     
-    if (snapshot.empty) {
-      console.log(`[Scheduler] Initializing schedules in Firestore`);
-      
-      // Create validate-all schedule
-      if (this.config.schedules.validateAll?.enabled) {
-        await schedulesCollection.doc('validate-all').set({
-          id: 'validate-all',
-          type: 'validate-all',
-          enabled: true,
-          intervalHours: this.config.schedules.validateAll.intervalHours || 24,
-          cronExpression: this.config.schedules.validateAll.cronExpression,
-          status: 'active',
-          createdAt: admin.firestore.Timestamp.now()
-        });
+    this.isRunning = true;
+    
+    // Start scheduling based on configuration
+    if (this.config.schedule.type === 'interval') {
+      const interval = Number(this.config.schedule.value);
+      if (isNaN(interval) || interval <= 0) {
+        throw new Error('Invalid interval value');
       }
       
-      // Create fix-relative-urls schedule
-      if (this.config.schedules.fixRelativeUrls?.enabled) {
-        await schedulesCollection.doc('fix-relative-urls').set({
-          id: 'fix-relative-urls',
-          type: 'fix-relative-urls',
-          enabled: true,
-          intervalHours: this.config.schedules.fixRelativeUrls.intervalHours || 24 * 7, // Weekly by default
-          cronExpression: this.config.schedules.fixRelativeUrls.cronExpression,
-          status: 'active',
-          createdAt: admin.firestore.Timestamp.now()
-        });
-      }
+      // Schedule at regular intervals
+      this.intervalId = setInterval(() => {
+        this.scheduleTasks();
+      }, interval);
+      
+      // Run immediately
+      this.scheduleTasks();
+    } else if (this.config.schedule.type === 'cron') {
+      throw new Error('Cron scheduling not implemented yet');
     } else {
-      console.log(`[Scheduler] Schedules already exist in Firestore`);
+      throw new Error('Invalid schedule type');
     }
   }
-  
+
   /**
-   * Check if a schedule should run based on its last run time and interval
+   * Stop scheduler
    */
-  private shouldRunSchedule(schedule: ScheduleStatus): boolean {
-    if (!schedule.enabled) {
-      return false;
+  stop(): void {
+    if (!this.isRunning) {
+      return;
     }
     
-    // If there's no last run, or no next run, schedule should run
-    if (!schedule.lastRun || !schedule.nextRun) {
-      return true;
-    }
+    this.isRunning = false;
     
-    // Check if next run time has passed
-    const now = admin.firestore.Timestamp.now();
-    return now.toMillis() >= schedule.nextRun.toMillis();
+    // Clear interval
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = undefined;
+    }
   }
-  
+
   /**
-   * Calculate the next run time for a schedule
+   * Schedule tasks based on configuration
    */
-  private calculateNextRunTime(schedule: ScheduleStatus): admin.firestore.Timestamp {
-    // If using cron expression, would need to calculate next time from cron
-    // For simplicity, just using interval hours
-    if (schedule.intervalHours) {
-      const now = new Date();
-      const nextRun = new Date(now.getTime() + (schedule.intervalHours * 60 * 60 * 1000));
-      return admin.firestore.Timestamp.fromDate(nextRun);
+  private scheduleTasks(): void {
+    // Check if we can run more tasks
+    if (!this.config.enabled || this.runningTasks >= (this.config.maxConcurrentTasks || 1)) {
+      return;
     }
     
-    // Default to 24 hours from now
-    const now = new Date();
-    const nextRun = new Date(now.getTime() + (24 * 60 * 60 * 1000));
-    return admin.firestore.Timestamp.fromDate(nextRun);
+    // Create a new task
+    const taskId = this.createTaskId();
+    const task: ScheduledTask = {
+      id: taskId,
+      status: TaskStatus.PENDING,
+      config: { ...this.config.worker }
+    };
+    
+    // Store task
+    this.tasks.set(taskId, task);
+    
+    // Start task
+    this.startTask(taskId);
   }
-  
+
   /**
-   * Process a scheduled task
+   * Start a task
+   * 
+   * @param taskId Task ID
    */
-  private async processSchedule(schedule: ScheduleStatus): Promise<string | null> {
+  private async startTask(taskId: string): Promise<void> {
+    // Get task
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      return;
+    }
+    
     try {
-      console.log(`[Scheduler] Processing schedule ${schedule.id} of type ${schedule.type}`);
+      // Update task status
+      task.status = TaskStatus.RUNNING;
+      task.startTime = new Date();
+      this.runningTasks++;
       
-      // Create appropriate task based on schedule type
-      let taskId: string;
-      
-      switch (schedule.type) {
-        case 'validate-all':
-          taskId = await this.worker.createTask('validate-all');
-          break;
-          
-        case 'fix-relative-urls':
-          taskId = await this.worker.createTask('fix-relative-urls');
-          break;
-          
-        default:
-          throw new Error(`Unknown schedule type: ${schedule.type}`);
+      // Notify start
+      if (this.config.onStart) {
+        this.config.onStart(taskId);
       }
       
-      // Update schedule status
-      const now = admin.firestore.Timestamp.now();
-      const nextRun = this.calculateNextRunTime(schedule);
-      
-      await this.config.firestore.collection('validation_schedules').doc(schedule.id).update({
-        lastRun: now,
-        nextRun,
-        lastTaskId: taskId
-      });
-      
-      console.log(`[Scheduler] Schedule ${schedule.id} processed successfully, created task ${taskId}`);
-      
-      return taskId;
-    } catch (error) {
-      console.error(`[Scheduler] Error processing schedule ${schedule.id}:`, error);
-      
-      // Update schedule with error
-      await this.config.firestore.collection('validation_schedules').doc(schedule.id).update({
-        status: 'failed',
-        error: error.message || 'Unknown error',
-        lastError: admin.firestore.Timestamp.now()
-      });
-      
-      return null;
-    }
-  }
-  
-  /**
-   * Run the scheduler
-   * This should be called periodically (e.g., every hour) to check for scheduled tasks
-   */
-  public async run(): Promise<number> {
-    try {
-      console.log(`[Scheduler] Running media validation scheduler`);
-      
-      // Get all active schedules
-      const schedulesCollection = this.config.firestore.collection('validation_schedules');
-      const snapshot = await schedulesCollection.where('status', '==', 'active').get();
-      
-      if (snapshot.empty) {
-        console.log(`[Scheduler] No active schedules found`);
-        return 0;
-      }
-      
-      const schedulesToRun: ScheduleStatus[] = [];
-      
-      // Check each schedule
-      snapshot.forEach(doc => {
-        const schedule = doc.data() as ScheduleStatus;
-        
-        if (this.shouldRunSchedule(schedule)) {
-          schedulesToRun.push(schedule);
+      // Create worker for this task
+      const worker = new MediaValidationWorker(this.db, {
+        ...task.config,
+        onProgress: (progress: number, total: number) => {
+          // Forward progress to task config if provided
+          if (task.config.onProgress) {
+            task.config.onProgress(progress, total);
+          }
         }
       });
       
-      if (schedulesToRun.length === 0) {
-        console.log(`[Scheduler] No schedules due to run at this time`);
-        return 0;
+      // Run task
+      const report = await worker.start();
+      
+      // Update task status
+      task.status = TaskStatus.COMPLETED;
+      task.endTime = new Date();
+      task.report = report;
+      this.runningTasks--;
+      
+      // Notify completion
+      if (this.config.onComplete) {
+        this.config.onComplete(taskId, report);
       }
-      
-      console.log(`[Scheduler] Found ${schedulesToRun.length} schedules to run`);
-      
-      // Run each schedule
-      const results = await Promise.all(schedulesToRun.map(schedule => 
-        this.processSchedule(schedule)
-      ));
-      
-      const successCount = results.filter(Boolean).length;
-      console.log(`[Scheduler] Successfully ran ${successCount} of ${schedulesToRun.length} schedules`);
-      
-      return successCount;
     } catch (error) {
-      console.error(`[Scheduler] Error running scheduler:`, error);
-      return 0;
+      // Update task status
+      task.status = TaskStatus.FAILED;
+      task.endTime = new Date();
+      task.error = error instanceof Error ? error.message : String(error);
+      this.runningTasks--;
+      
+      // Notify error
+      if (this.config.onError) {
+        this.config.onError(taskId, error instanceof Error ? error : new Error(String(error)));
+      }
     }
   }
-  
+
   /**
-   * Update a schedule configuration
+   * Create a task ID
+   * 
+   * @returns Task ID
    */
-  public async updateSchedule(scheduleId: string, updates: Partial<ScheduleStatus>): Promise<void> {
-    // Check that the schedule exists
-    const scheduleRef = this.config.firestore.collection('validation_schedules').doc(scheduleId);
-    const doc = await scheduleRef.get();
+  private createTaskId(): string {
+    return `task-${this.schedulerId}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  }
+
+  /**
+   * Create a task manually
+   * 
+   * @param config Task configuration (overrides default worker config)
+   * @returns Task ID
+   */
+  async createTask(config?: Partial<MediaValidationWorkerConfig>): Promise<string> {
+    // Create a new task
+    const taskId = this.createTaskId();
+    const task: ScheduledTask = {
+      id: taskId,
+      status: TaskStatus.PENDING,
+      config: {
+        ...this.config.worker,
+        ...config
+      }
+    };
     
-    if (!doc.exists) {
-      throw new Error(`Schedule ${scheduleId} not found`);
+    // Store task
+    this.tasks.set(taskId, task);
+    
+    // Start task if we're not at capacity
+    if (this.runningTasks < (this.config.maxConcurrentTasks || 1)) {
+      // Start in the background
+      this.startTask(taskId);
     }
     
-    // Apply updates
-    await scheduleRef.update({
-      ...updates,
-      updatedAt: admin.firestore.Timestamp.now()
-    });
-    
-    console.log(`[Scheduler] Updated schedule ${scheduleId}`);
+    return taskId;
   }
-  
+
   /**
-   * Get all schedule configurations
+   * Get task status
+   * 
+   * @param taskId Task ID
+   * @returns Task or undefined if not found
    */
-  public async getSchedules(): Promise<ScheduleStatus[]> {
-    const snapshot = await this.config.firestore.collection('validation_schedules').get();
-    
-    if (snapshot.empty) {
-      return [];
+  getTask(taskId: string): ScheduledTask | undefined {
+    return this.tasks.get(taskId);
+  }
+
+  /**
+   * Get all tasks
+   * 
+   * @returns Array of tasks
+   */
+  getAllTasks(): ScheduledTask[] {
+    return Array.from(this.tasks.values());
+  }
+
+  /**
+   * Cancel a task
+   * 
+   * @param taskId Task ID
+   * @returns True if task was cancelled, false otherwise
+   */
+  cancelTask(taskId: string): boolean {
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      return false;
     }
     
-    const schedules: ScheduleStatus[] = [];
+    // Only pending tasks can be cancelled
+    if (task.status !== TaskStatus.PENDING) {
+      return false;
+    }
     
-    snapshot.forEach(doc => {
-      schedules.push(doc.data() as ScheduleStatus);
-    });
+    // Update task status
+    task.status = TaskStatus.CANCELLED;
+    task.endTime = new Date();
     
-    return schedules;
-  }
-  
-  /**
-   * Create a one-time validation task
-   */
-  public async createOneTimeTask(
-    type: 'validate-all' | 'validate-collection' | 'fix-relative-urls',
-    options: {
-      collectionName?: string;
-      documentId?: string;
-      parameters?: Record<string, any>;
-    } = {}
-  ): Promise<string> {
-    return this.worker.createTask(type, options);
+    return true;
   }
 }
