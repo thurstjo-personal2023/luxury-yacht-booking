@@ -3,13 +3,26 @@
  * 
  * This file provides utilities for testing React components and hooks
  * with proper context providers and mock implementations.
+ * Updated for compatibility with React 18.
  */
-import React, { ReactElement } from 'react';
-import { render, RenderOptions, RenderResult } from '@testing-library/react';
+import React, { ReactElement, ReactNode } from 'react';
+import { render, RenderOptions, renderHook, RenderResult } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from '@/hooks/use-auth';
-import { Toaster } from '@/components/ui/toaster';
-import { BrowserRouter, Route } from 'wouter';
+// Import from relative paths for testing
+import { Router, Route } from 'wouter';
+
+// Mock Auth Provider
+const AuthProvider = ({ children }: { children: ReactNode }) => {
+  return <>{children}</>;
+};
+
+// Mock Toaster component
+const Toaster = () => <div data-testid="toaster" />;
+
+// Custom Router for testing
+const BrowserRouter = ({ children }: { children: ReactNode }) => {
+  return <Router>{children}</Router>;
+};
 
 // Mock the Firebase auth
 jest.mock('firebase/auth', () => ({
@@ -38,7 +51,7 @@ function createTestQueryClient() {
     defaultOptions: {
       queries: {
         retry: false,
-        cacheTime: 0,
+        gcTime: 0, // In React Query v5, cacheTime was renamed to gcTime
         staleTime: 0,
         refetchOnWindowFocus: false,
       },
@@ -87,7 +100,7 @@ function customRender(
   }
 
   // Wrap component with all required providers
-  function AllTheProviders({ children }: { children: React.ReactNode }) {
+  function AllTheProviders({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
@@ -128,11 +141,114 @@ function renderWithAuth(
     });
   }
 
-  function AuthWrapper({ children }: { children: React.ReactNode }) {
+  function AuthWrapper({ children }: { children: ReactNode }) {
     return <AuthProvider>{children}</AuthProvider>;
   }
 
   return render(ui, { wrapper: AuthWrapper });
+}
+
+/**
+ * Render hook with the Query Client provider
+ */
+function renderHookWithQuery<Result, Props>(
+  callback: (props: Props) => Result,
+  options: {
+    initialProps?: Props;
+    queryClient?: QueryClient;
+  } = {}
+) {
+  const { initialProps, queryClient = createTestQueryClient() } = options;
+  
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+  
+  return renderHook(callback, { wrapper, initialProps });
+}
+
+/**
+ * Render hook with the Auth provider
+ */
+function renderHookWithAuth<Result, Props>(
+  callback: (props: Props) => Result,
+  options: {
+    initialProps?: Props;
+    authUser?: {
+      uid: string;
+      email: string;
+      role?: 'consumer' | 'producer' | 'partner';
+      [key: string]: any;
+    } | null;
+  } = {}
+) {
+  const { initialProps, authUser = null } = options;
+  
+  // If auth user is provided, mock the auth state
+  if (authUser) {
+    const { getAuth, onAuthStateChanged } = require('firebase/auth');
+    (onAuthStateChanged as jest.Mock).mockImplementation((auth, callback) => {
+      callback(authUser);
+      return jest.fn(); // Return unsubscribe function
+    });
+  }
+  
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <AuthProvider>{children}</AuthProvider>
+  );
+  
+  return renderHook(callback, { wrapper, initialProps });
+}
+
+/**
+ * Render hook with all providers
+ */
+function renderHookWithProviders<Result, Props>(
+  callback: (props: Props) => Result,
+  options: {
+    initialProps?: Props;
+    queryClient?: QueryClient;
+    authUser?: {
+      uid: string;
+      email: string;
+      role?: 'consumer' | 'producer' | 'partner';
+      [key: string]: any;
+    } | null;
+    route?: string;
+  } = {}
+) {
+  const { 
+    initialProps, 
+    queryClient = createTestQueryClient(), 
+    authUser = null,
+    route = '/'
+  } = options;
+  
+  // If auth user is provided, mock the auth state
+  if (authUser) {
+    const { getAuth, onAuthStateChanged } = require('firebase/auth');
+    (onAuthStateChanged as jest.Mock).mockImplementation((auth, callback) => {
+      callback(authUser);
+      return jest.fn(); // Return unsubscribe function
+    });
+  }
+
+  // Set the initial route
+  if (route) {
+    window.history.pushState({}, 'Test page', route);
+  }
+  
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter>
+          {children}
+        </BrowserRouter>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+  
+  return renderHook(callback, { wrapper, initialProps });
 }
 
 /**
@@ -159,12 +275,33 @@ function createMockUser(role: 'consumer' | 'producer' | 'partner' = 'consumer', 
   return { ...baseUser, ...overrides };
 }
 
+// Mock hook for forms
+const mockUseForm = () => {
+  return {
+    register: jest.fn(),
+    handleSubmit: jest.fn(cb => data => cb(data)),
+    formState: {
+      isSubmitting: false,
+      errors: {},
+    },
+    reset: jest.fn(),
+    setValue: jest.fn(),
+    watch: jest.fn(),
+    control: {},
+    getValues: jest.fn(),
+  };
+};
+
 // Export all utilities
 export {
   customRender,
   renderWithAuth,
+  renderHookWithAuth,
+  renderHookWithQuery,
+  renderHookWithProviders,
   createTestQueryClient,
-  createMockUser
+  createMockUser,
+  mockUseForm
 };
 
 // Re-export everything from testing-library

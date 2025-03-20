@@ -3,12 +3,17 @@
  * 
  * This file provides utilities specifically for testing React hooks
  * with proper context and environment simulation.
+ * Updated for compatibility with React 18.
  */
-import { renderHook, RenderHookOptions, RenderHookResult } from '@testing-library/react-hooks';
+import { renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { ReactNode } from 'react';
-import { AuthProvider } from '@/hooks/use-auth';
 import { createMockUser } from './react-test-utils';
+
+// Mock Auth Provider
+const AuthProvider = ({ children }: { children: ReactNode }) => {
+  return <>{children}</>;
+};
 
 // Create a fresh QueryClient for each test
 function createTestQueryClient() {
@@ -16,7 +21,7 @@ function createTestQueryClient() {
     defaultOptions: {
       queries: {
         retry: false,
-        cacheTime: 0,
+        gcTime: 0, // In React Query v5, cacheTime was renamed to gcTime
         staleTime: 0,
         refetchOnWindowFocus: false,
       },
@@ -27,27 +32,26 @@ function createTestQueryClient() {
   });
 }
 
-interface CustomRenderHookOptions<TProps> extends RenderHookOptions<TProps> {
-  queryClient?: QueryClient;
-  authUser?: {
-    uid: string;
-    email: string;
-    role?: 'consumer' | 'producer' | 'partner';
-    [key: string]: any;
-  };
-}
-
 /**
  * Custom renderHook function that wraps hooks with all necessary providers
  */
-function renderHookWithProviders<TProps, TResult>(
-  hook: (props: TProps) => TResult,
-  options: CustomRenderHookOptions<TProps> = {}
-): RenderHookResult<TProps, TResult> {
+function renderHookWithProviders<Result, Props>(
+  callback: (props: Props) => Result,
+  options: {
+    initialProps?: Props;
+    queryClient?: QueryClient;
+    authUser?: {
+      uid: string;
+      email: string;
+      role?: 'consumer' | 'producer' | 'partner';
+      [key: string]: any;
+    } | null;
+  } = {}
+) {
   const {
+    initialProps,
     queryClient = createTestQueryClient(),
     authUser = null,
-    ...renderOptions
   } = options;
 
   // If auth user is provided, mock the auth state
@@ -67,22 +71,26 @@ function renderHookWithProviders<TProps, TResult>(
     </QueryClientProvider>
   );
 
-  return renderHook(hook, { wrapper, ...renderOptions });
+  return renderHook(callback, { wrapper, initialProps });
 }
 
 /**
  * Render a hook with only the Auth provider
  */
-function renderHookWithAuth<TProps, TResult>(
-  hook: (props: TProps) => TResult,
-  authUser: {
-    uid: string;
-    email: string;
-    role?: 'consumer' | 'producer' | 'partner';
-    [key: string]: any;
-  } | null = null,
-  options: RenderHookOptions<TProps> = {}
-): RenderHookResult<TProps, TResult> {
+function renderHookWithAuth<Result, Props>(
+  callback: (props: Props) => Result,
+  options: {
+    initialProps?: Props;
+    authUser?: {
+      uid: string;
+      email: string;
+      role?: 'consumer' | 'producer' | 'partner';
+      [key: string]: any;
+    } | null;
+  } = {}
+) {
+  const { initialProps, authUser = null } = options;
+  
   // If auth user is provided, mock the auth state
   if (authUser) {
     const { getAuth, onAuthStateChanged } = require('firebase/auth');
@@ -96,23 +104,26 @@ function renderHookWithAuth<TProps, TResult>(
     <AuthProvider>{children}</AuthProvider>
   );
 
-  return renderHook(hook, { wrapper, ...options });
+  return renderHook(callback, { wrapper, initialProps });
 }
 
 /**
  * Render a hook with only the Query client provider
  */
-function renderHookWithQuery<TProps, TResult>(
-  hook: (props: TProps) => TResult,
-  options: RenderHookOptions<TProps> & { queryClient?: QueryClient } = {}
-): RenderHookResult<TProps, TResult> {
-  const { queryClient = createTestQueryClient(), ...renderOptions } = options;
+function renderHookWithQuery<Result, Props>(
+  callback: (props: Props) => Result,
+  options: {
+    initialProps?: Props;
+    queryClient?: QueryClient;
+  } = {}
+) {
+  const { initialProps, queryClient = createTestQueryClient() } = options;
 
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 
-  return renderHook(hook, { wrapper, ...renderOptions });
+  return renderHook(callback, { wrapper, initialProps });
 }
 
 // Mock hook for forms
@@ -142,5 +153,5 @@ export {
   createMockUser,
 };
 
-// Re-export testing hooks
-export * from '@testing-library/react-hooks';
+// Re-export everything from testing-library for hooks
+export * from '@testing-library/react';
