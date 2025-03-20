@@ -1,202 +1,185 @@
-/// <reference types="cypress" />
-// ***********************************************
-// This example commands.ts shows you how to
-// create various custom commands and overwrite
-// existing commands.
-//
-// For more comprehensive examples of custom
-// commands please read more here:
-// https://on.cypress.io/custom-commands
-// ***********************************************
+/**
+ * Cypress Custom Commands
+ * 
+ * This file contains custom commands that extend Cypress functionality
+ * for the Etoile Yachts testing suite.
+ */
 
-import firebase from 'firebase/compat/app';
-import 'firebase/compat/auth';
-import 'firebase/compat/firestore';
-import 'firebase/compat/storage';
-import { UserRoleType } from '../../shared/user-schema';
-
-// Initialize Firebase app for testing
-let firebaseApp: firebase.app.App;
-
-// Authentication commands
-Cypress.Commands.add('initializeFirebase', () => {
-  if (!firebaseApp) {
-    const config = Cypress.env('firebase');
+// Declare the Cypress namespace to add custom commands
+declare namespace Cypress {
+  interface Chainable {
+    /**
+     * Custom command to log in a user with email and password
+     * @param email - User's email
+     * @param password - User's password
+     * @example cy.login('user@example.com', 'password123')
+     */
+    login(email: string, password: string): Chainable<Element>;
     
-    if (!config) {
-      throw new Error('Firebase config is missing in Cypress environment');
-    }
+    /**
+     * Custom command to log out the current user
+     * @example cy.logout()
+     */
+    logout(): Chainable<Element>;
     
-    firebaseApp = firebase.initializeApp(config);
+    /**
+     * Custom command to select a date in the date picker
+     * @param selector - CSS selector for the date input
+     * @param date - Date to select (YYYY-MM-DD format)
+     * @example cy.selectDate('[data-cy=booking-date]', '2025-04-15')
+     */
+    selectDate(selector: string, date: string): Chainable<Element>;
+    
+    /**
+     * Custom command to verify a yacht card exists with the given name
+     * @param name - Name of the yacht to find
+     * @example cy.findYachtByName('Luxury Yacht 1')
+     */
+    findYachtByName(name: string): Chainable<Element>;
+    
+    /**
+     * Custom command to complete a booking process for a yacht
+     * @param yachtName - Name of the yacht to book
+     * @param startDate - Start date for the booking (YYYY-MM-DD format)
+     * @param paymentMethod - Payment method to use ('credit_card' or 'digital_wallet')
+     * @example cy.completeBooking('Luxury Yacht 1', '2025-04-15', 'credit_card')
+     */
+    completeBooking(yachtName: string, startDate: string, paymentMethod: 'credit_card' | 'digital_wallet'): Chainable<Element>;
+    
+    /**
+     * Custom command to create a new yacht listing (for producer tests)
+     * @param yachtData - Yacht data object with required fields
+     * @example cy.createYacht({ name: 'New Yacht', capacity: 10, price: 1000 })
+     */
+    createYacht(yachtData: object): Chainable<Element>;
   }
-  
-  return firebaseApp;
+}
+
+// Login command implementation
+Cypress.Commands.add('login', (email, password) => {
+  cy.visit('/login');
+  cy.get('[data-cy=login-email]').type(email);
+  cy.get('[data-cy=login-password]').type(password);
+  cy.get('[data-cy=login-submit]').click();
+  cy.get('[data-cy=user-menu]', { timeout: 10000 }).should('be.visible');
 });
 
-Cypress.Commands.add('login', (email: string, password: string) => {
-  const app = cy.initializeFirebase();
-  
-  return firebase
-    .auth()
-    .signInWithEmailAndPassword(email, password)
-    .then((userCredential) => {
-      return userCredential.user?.getIdToken(true).then((token) => {
-        window.localStorage.setItem('authToken', token);
-        return userCredential;
-      });
-    });
-});
-
+// Logout command implementation
 Cypress.Commands.add('logout', () => {
-  cy.window().then((win) => {
-    win.localStorage.removeItem('authToken');
-  });
-  
-  return firebase.auth().signOut();
+  cy.get('[data-cy=user-menu]').click();
+  cy.get('[data-cy=logout-button]').click();
+  cy.get('[data-cy=login-button]', { timeout: 5000 }).should('be.visible');
 });
 
-Cypress.Commands.add('createTestUser', (options: {
-  email: string;
-  password: string;
-  role: UserRoleType;
-  name: string;
-  phone?: string;
-}) => {
-  // This would typically interact with a test API endpoint to create a user
-  // For testing purposes, we'll use a custom endpoint
-  return cy.request({
-    method: 'POST',
-    url: '/api/test/create-user',
-    body: {
-      email: options.email,
-      password: options.password,
-      name: options.name,
-      role: options.role,
-      phone: options.phone || '1234567890'
-    }
-  });
+// Select date in date picker
+Cypress.Commands.add('selectDate', (selector, dateString) => {
+  // Click on the date input to open the date picker
+  cy.get(selector).click();
+  
+  // Parse the date string
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = date.toLocaleString('default', { month: 'long' });
+  const day = date.getDate();
+  
+  // Navigate to the correct month and year
+  cy.get('[data-cy=date-picker-month-dropdown]').select(month);
+  cy.get('[data-cy=date-picker-year-dropdown]').select(year.toString());
+  
+  // Click on the day
+  cy.get(`[data-cy=date-picker-day-${day}]`).click();
 });
 
-// Yacht booking flow commands
-Cypress.Commands.add('searchYachts', (filters: {
-  location?: string;
-  date?: string;
-  guests?: number;
-}) => {
-  cy.visit('/');
-  
-  if (filters.location) {
-    cy.get('[data-cy=location-filter]').type(filters.location);
-  }
-  
-  if (filters.date) {
-    cy.get('[data-cy=date-filter]').type(filters.date);
-  }
-  
-  if (filters.guests) {
-    cy.get('[data-cy=guests-filter]').clear().type(filters.guests.toString());
-  }
-  
-  cy.get('[data-cy=search-button]').click();
+// Find yacht by name
+Cypress.Commands.add('findYachtByName', (name) => {
+  cy.get('[data-cy=yacht-card]').contains(name).closest('[data-cy=yacht-card]');
 });
 
-Cypress.Commands.add('selectYacht', (yachtId: string) => {
-  cy.get(`[data-cy=yacht-card-${yachtId}]`).click();
-});
-
-Cypress.Commands.add('completeBooking', (paymentInfo: {
-  cardNumber: string;
-  expiry: string;
-  cvc: string;
-  name: string;
-}) => {
-  // Select date and time
-  cy.get('[data-cy=date-picker]').click();
-  cy.get('.day:not(.disabled)').first().click();
+// Complete a booking process
+Cypress.Commands.add('completeBooking', (yachtName, startDate, paymentMethod) => {
+  // Find yacht and click on it
+  cy.findYachtByName(yachtName).click();
   
-  // Select guests
-  cy.get('[data-cy=guest-select]').click();
-  cy.get('[data-cy=guest-option-2]').click();
-  
-  // Click Book Now button
+  // On yacht details page, click book now
   cy.get('[data-cy=book-now-button]').click();
   
-  // Fill payment information (assuming Stripe Elements are used)
-  cy.getStripeElement('cardNumber').type(paymentInfo.cardNumber);
-  cy.getStripeElement('cardExpiry').type(paymentInfo.expiry);
-  cy.getStripeElement('cardCvc').type(paymentInfo.cvc);
-  cy.get('[data-cy=name-on-card]').type(paymentInfo.name);
+  // Set booking date
+  cy.selectDate('[data-cy=booking-date-input]', startDate);
   
-  // Complete payment
-  cy.get('[data-cy=complete-payment-button]').click();
+  // Select payment method
+  cy.get(`[data-cy=payment-method-${paymentMethod}]`).click();
   
-  // Wait for confirmation
+  // If credit card, fill in details
+  if (paymentMethod === 'credit_card') {
+    cy.get('[data-cy=card-number]').type('4242424242424242');
+    cy.get('[data-cy=card-expiry]').type('1230');
+    cy.get('[data-cy=card-cvc]').type('123');
+    cy.get('[data-cy=card-name]').type('Test User');
+  }
+  
+  // Complete booking
+  cy.get('[data-cy=complete-booking-button]').click();
+  
+  // Verify booking confirmation
   cy.get('[data-cy=booking-confirmation]', { timeout: 10000 }).should('be.visible');
 });
 
-// Custom command to interact with Stripe Elements in iframes
-Cypress.Commands.add('getStripeElement', (fieldName: string) => {
-  cy.get(`[data-cy=${fieldName}] iframe`).then($iframe => {
-    const body = $iframe.contents().find('body');
-    cy.wrap(body).find('.InputElement').as('stripeInput');
-    cy.get('@stripeInput');
-  });
-});
-
-// Custom command for admin actions
-Cypress.Commands.add('adminLogin', () => {
-  return cy.login('admin@example.com', 'adminPassword');
-});
-
-Cypress.Commands.add('navigateToAdminPanel', () => {
-  cy.visit('/admin');
-});
-
-// Producer dashboard commands
-Cypress.Commands.add('producerLogin', () => {
-  return cy.login('producer@example.com', 'producerPassword');
-});
-
-Cypress.Commands.add('navigateToProducerDashboard', () => {
+// Create a yacht listing (for producer tests)
+Cypress.Commands.add('createYacht', (yachtData) => {
+  // Navigate to producer dashboard
   cy.visit('/producer/dashboard');
-});
-
-Cypress.Commands.add('createYachtListing', (yachtData: any) => {
-  cy.navigateToProducerDashboard();
+  
+  // Click create yacht button
   cy.get('[data-cy=create-yacht-button]').click();
   
-  // Fill in yacht details
-  cy.get('[data-cy=yacht-title]').type(yachtData.title);
-  cy.get('[data-cy=yacht-description]').type(yachtData.description);
-  cy.get('[data-cy=yacht-price]').type(yachtData.price.toString());
-  cy.get('[data-cy=yacht-capacity]').type(yachtData.capacity.toString());
-  
-  // Upload image (if needed)
-  if (yachtData.image) {
-    cy.get('[data-cy=upload-image]').attachFile(yachtData.image);
+  // Fill yacht form with the provided data
+  if (yachtData.title) {
+    cy.get('[data-cy=yacht-title]').type(yachtData.title);
   }
   
-  // Submit form
-  cy.get('[data-cy=submit-yacht-button]').click();
-});
-
-// Declare global Cypress namespace to add custom commands
-declare global {
-  namespace Cypress {
-    interface Chainable {
-      initializeFirebase(): Chainable<firebase.app.App>;
-      login(email: string, password: string): Chainable<firebase.auth.UserCredential>;
-      logout(): Chainable<void>;
-      createTestUser(options: { email: string; password: string; role: UserRoleType; name: string; phone?: string }): Chainable<any>;
-      searchYachts(filters: { location?: string; date?: string; guests?: number }): Chainable<void>;
-      selectYacht(yachtId: string): Chainable<void>;
-      completeBooking(paymentInfo: { cardNumber: string; expiry: string; cvc: string; name: string }): Chainable<void>;
-      getStripeElement(fieldName: string): Chainable<JQuery<HTMLElement>>;
-      adminLogin(): Chainable<firebase.auth.UserCredential>;
-      navigateToAdminPanel(): Chainable<void>;
-      producerLogin(): Chainable<firebase.auth.UserCredential>;
-      navigateToProducerDashboard(): Chainable<void>;
-      createYachtListing(yachtData: any): Chainable<void>;
+  if (yachtData.description) {
+    cy.get('[data-cy=yacht-description]').type(yachtData.description);
+  }
+  
+  if (yachtData.category) {
+    cy.get('[data-cy=yacht-category]').select(yachtData.category);
+  }
+  
+  if (yachtData.capacity) {
+    cy.get('[data-cy=yacht-capacity]').type(yachtData.capacity.toString());
+  }
+  
+  if (yachtData.duration) {
+    cy.get('[data-cy=yacht-duration]').type(yachtData.duration.toString());
+  }
+  
+  if (yachtData.pricing) {
+    cy.get('[data-cy=yacht-pricing]').type(yachtData.pricing.toString());
+  }
+  
+  if (yachtData.location) {
+    if (yachtData.location.region) {
+      cy.get('[data-cy=yacht-region]').select(yachtData.location.region);
+    }
+    if (yachtData.location.portMarina) {
+      cy.get('[data-cy=yacht-port-marina]').select(yachtData.location.portMarina);
+    }
+    if (yachtData.location.address) {
+      cy.get('[data-cy=yacht-address]').type(yachtData.location.address);
     }
   }
-}
+  
+  // Upload yacht image if provided
+  if (yachtData.imageFile) {
+    cy.get('[data-cy=yacht-image-upload]').attachFile(yachtData.imageFile);
+  }
+  
+  // Submit the form
+  cy.get('[data-cy=save-yacht-button]').click();
+  
+  // Verify success message
+  cy.get('[data-cy=yacht-created-success]', { timeout: 10000 }).should('be.visible');
+});
+
+// Add these commands to the global Cypress object
+export {};
