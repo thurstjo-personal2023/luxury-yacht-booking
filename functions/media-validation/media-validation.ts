@@ -1,672 +1,948 @@
 /**
  * Media Validation Service
  * 
- * This module provides functionality for validating and fixing media URLs
- * in Firestore documents across multiple collections.
+ * This module provides functionality to validate media URLs in Firestore documents.
+ * It can detect invalid URLs, missing media, and other issues.
  */
-import * as admin from 'firebase-admin';
-import { URLValidator, ValidationResult } from './url-validator';
+import { URLValidator, URLValidationResult } from './url-validator';
 
-// Types for validation configuration
-export interface MediaValidationConfig {
-  firestore: admin.firestore.Firestore;
-  collectionNames: string[];
+/**
+ * Configuration for the media validation service
+ */
+export interface MediaValidationOptions {
+  /**
+   * Base URL for the application (used to convert relative URLs)
+   */
   baseUrl: string;
+  
+  /**
+   * Maximum number of concurrent validation operations
+   */
+  concurrency?: number;
+  
+  /**
+   * Timeout for each validation operation (ms)
+   */
+  timeout?: number;
+  
+  /**
+   * Logger function for debug messages
+   */
+  logDebug?: (message: string) => void;
+  
+  /**
+   * Logger function for information messages
+   */
   logInfo: (message: string) => void;
+  
+  /**
+   * Logger function for error messages
+   */
   logError: (message: string, error?: any) => void;
-  logWarning: (message: string) => void;
-  batchSize?: number;
-}
-
-// Types for validation results
-export interface MediaValidationStatus {
-  reportId: string;
-  startTime: admin.firestore.Timestamp;
-  endTime?: admin.firestore.Timestamp;
-  totalDocuments: number;
-  totalMediaItems: number;
-  validItems: number;
-  invalidItems: number;
-  missingItems: number;
-  collections: {
-    [collectionName: string]: {
-      totalUrls: number;
-      valid: number;
-      invalid: number;
-      missing: number;
-    }
-  };
-  invalidItemDetails?: {
-    collectionName: string;
-    documentId: string;
-    fieldPath: string;
-    url: string;
-    reason: string;
-    status?: number;
-    error?: string;
-  }[];
-  status: 'running' | 'completed' | 'failed';
-  error?: string;
-}
-
-// Types for document validation results
-export interface DocumentValidationResult {
-  documentId: string;
-  collectionName: string;
-  valid: {
-    url: string;
-    fieldPath: string;
-    contentType?: string;
-  }[];
-  invalid: {
-    url: string;
-    fieldPath: string;
-    reason: string;
-    status?: number;
-    error?: string;
-  }[];
-  missing: {
-    fieldPath: string;
-  }[];
-}
-
-// Types for URL fix results
-export interface UrlFixResult {
-  documentId: string;
-  collectionName: string;
-  fixedUrls: {
-    fieldPath: string;
-    originalUrl: string;
-    fixedUrl: string;
-  }[];
-  fixedDocument: any;
+  
+  /**
+   * Whether to validate images
+   */
+  validateImages?: boolean;
+  
+  /**
+   * Whether to validate videos
+   */
+  validateVideos?: boolean;
+  
+  /**
+   * Pattern to identify relative URLs
+   */
+  relativeUrlPattern?: RegExp;
 }
 
 /**
- * Media Validation Service for validating and repairing media URLs
+ * Result of validation for a single field
+ */
+export interface FieldValidationResult {
+  /**
+   * Path to the field (e.g., 'media[0].url')
+   */
+  path: string;
+  
+  /**
+   * Value of the field (the URL)
+   */
+  value: string;
+  
+  /**
+   * Expected media type for this field
+   */
+  expectedType: 'image' | 'video' | 'unknown';
+  
+  /**
+   * Actual media type found during validation
+   */
+  actualType?: 'image' | 'video' | 'other';
+  
+  /**
+   * Whether the field is valid
+   */
+  isValid: boolean;
+  
+  /**
+   * Whether the field is a relative URL
+   */
+  isRelative?: boolean;
+  
+  /**
+   * Error message if validation failed
+   */
+  error?: string;
+  
+  /**
+   * HTTP status code from validation attempt
+   */
+  status?: number;
+  
+  /**
+   * Content type from validation attempt
+   */
+  contentType?: string;
+  
+  /**
+   * Whether the URL was normalized during validation
+   */
+  wasNormalized?: boolean;
+  
+  /**
+   * Original value before normalization
+   */
+  originalValue?: string;
+}
+
+/**
+ * Result of validation for a single document
+ */
+export interface DocumentValidationResult {
+  /**
+   * Document ID
+   */
+  id: string;
+  
+  /**
+   * Document path
+   */
+  path: string;
+  
+  /**
+   * Number of fields validated
+   */
+  fieldCount: number;
+  
+  /**
+   * Number of invalid fields
+   */
+  invalidCount: number;
+  
+  /**
+   * Number of relative URLs found
+   */
+  relativeUrlCount: number;
+  
+  /**
+   * Time taken for validation (ms)
+   */
+  validationTimeMs: number;
+  
+  /**
+   * List of validation results for each field
+   */
+  fieldResults: FieldValidationResult[];
+  
+  /**
+   * Whether the document has any invalid fields
+   */
+  hasInvalidFields: boolean;
+  
+  /**
+   * Whether the document has any relative URLs
+   */
+  hasRelativeUrls: boolean;
+}
+
+/**
+ * Result of validation for a collection
+ */
+export interface CollectionValidationResult {
+  /**
+   * Collection name
+   */
+  collection: string;
+  
+  /**
+   * Number of documents validated
+   */
+  documentCount: number;
+  
+  /**
+   * Number of documents with invalid fields
+   */
+  invalidDocumentCount: number;
+  
+  /**
+   * Number of fields validated
+   */
+  fieldCount: number;
+  
+  /**
+   * Number of invalid fields
+   */
+  invalidFieldCount: number;
+  
+  /**
+   * Number of relative URLs found
+   */
+  relativeUrlCount: number;
+  
+  /**
+   * Time taken for validation (ms)
+   */
+  validationTimeMs: number;
+  
+  /**
+   * List of invalid fields across all documents
+   */
+  invalidFields: FieldValidationResult[];
+  
+  /**
+   * List of relative URLs across all documents
+   */
+  relativeUrls: FieldValidationResult[];
+}
+
+/**
+ * Result of URL fixing for a field
+ */
+export interface FieldFixResult {
+  /**
+   * Path to the field (e.g., 'media[0].url')
+   */
+  path: string;
+  
+  /**
+   * Original value before fixing
+   */
+  originalValue: string;
+  
+  /**
+   * New value after fixing
+   */
+  newValue: string;
+  
+  /**
+   * Type of fix applied
+   */
+  fixType: 'relative-to-absolute' | 'replace-invalid' | 'type-mismatch';
+  
+  /**
+   * Whether the fix was successful
+   */
+  success: boolean;
+  
+  /**
+   * Error message if fix failed
+   */
+  error?: string;
+}
+
+/**
+ * Result of URL fixing for a document
+ */
+export interface DocumentFixResult {
+  /**
+   * Document ID
+   */
+  id: string;
+  
+  /**
+   * Document path
+   */
+  path: string;
+  
+  /**
+   * Number of fields fixed
+   */
+  fixedCount: number;
+  
+  /**
+   * List of fix results for each field
+   */
+  fieldResults: FieldFixResult[];
+  
+  /**
+   * Whether the document was updated
+   */
+  wasUpdated: boolean;
+  
+  /**
+   * Error message if update failed
+   */
+  error?: string;
+}
+
+/**
+ * Result of URL fixing for a collection
+ */
+export interface CollectionFixResult {
+  /**
+   * Collection name
+   */
+  collection: string;
+  
+  /**
+   * Number of documents fixed
+   */
+  documentCount: number;
+  
+  /**
+   * Number of fields fixed
+   */
+  fieldCount: number;
+  
+  /**
+   * Time taken for fixing (ms)
+   */
+  fixTimeMs: number;
+  
+  /**
+   * List of fix results for each document
+   */
+  documentResults: DocumentFixResult[];
+}
+
+/**
+ * Result of media validation for all collections
+ */
+export interface MediaValidationReport {
+  /**
+   * Timestamp of validation
+   */
+  timestamp: number;
+  
+  /**
+   * Results for each collection
+   */
+  collections: Record<string, CollectionValidationResult>;
+  
+  /**
+   * Summary statistics
+   */
+  stats: {
+    /**
+     * Total number of documents validated
+     */
+    documentCount: number;
+    
+    /**
+     * Total number of fields validated
+     */
+    fieldCount: number;
+    
+    /**
+     * Total number of invalid fields
+     */
+    invalidFieldCount: number;
+    
+    /**
+     * Total number of relative URLs found
+     */
+    relativeUrlCount: number;
+    
+    /**
+     * Total number of image URLs validated
+     */
+    imageCount: number;
+    
+    /**
+     * Total number of video URLs validated
+     */
+    videoCount: number;
+    
+    /**
+     * Number of invalid URLs by collection
+     */
+    byCollection: Record<string, {
+      documentCount: number;
+      invalidCount: number;
+      relativeCount: number;
+    }>;
+    
+    /**
+     * Time taken for validation (ms)
+     */
+    validationTimeMs: number;
+  };
+  
+  /**
+   * List of all invalid fields
+   */
+  invalid: FieldValidationResult[];
+  
+  /**
+   * List of all relative URLs
+   */
+  relative: FieldValidationResult[];
+  
+  /**
+   * Detailed information about each invalid item
+   */
+  invalidItemDetails?: Array<{
+    collection: string;
+    documentId: string;
+    path: string;
+    field: FieldValidationResult;
+  }>;
+}
+
+/**
+ * Result of URL fixing
+ */
+export interface UrlFixResult {
+  /**
+   * Timestamp of fix
+   */
+  timestamp: number;
+  
+  /**
+   * Results for each collection
+   */
+  collections: Record<string, CollectionFixResult>;
+  
+  /**
+   * Summary statistics
+   */
+  stats: {
+    /**
+     * Total number of documents processed
+     */
+    documentCount: number;
+    
+    /**
+     * Total number of documents fixed
+     */
+    fixedDocumentCount: number;
+    
+    /**
+     * Total number of fields fixed
+     */
+    fixedFieldCount: number;
+    
+    /**
+     * Number of fixed fields by collection
+     */
+    byCollection: Record<string, {
+      documentCount: number;
+      fixedCount: number;
+    }>;
+    
+    /**
+     * Time taken for fixing (ms)
+     */
+    fixTimeMs: number;
+  };
+  
+  /**
+   * List of all field fixes
+   */
+  fixes: FieldFixResult[];
+}
+
+/**
+ * Media Validation Service
+ * 
+ * This class provides methods to validate media URLs in Firestore documents.
  */
 export class MediaValidationService {
+  private options: Required<MediaValidationOptions>;
   private urlValidator: URLValidator;
-  private readonly batchSize: number;
   
-  constructor(private config: MediaValidationConfig) {
-    // Initialize URL validator
-    this.urlValidator = new URLValidator({
-      logError: config.logError,
-      logInfo: config.logInfo
-    });
+  /**
+   * Create a new media validation service
+   */
+  constructor(options: MediaValidationOptions) {
+    // Set default options
+    this.options = {
+      baseUrl: options.baseUrl,
+      concurrency: options.concurrency || 5,
+      timeout: options.timeout || 5000,
+      logDebug: options.logDebug || console.debug,
+      logInfo: options.logInfo,
+      logError: options.logError,
+      validateImages: options.validateImages !== false,
+      validateVideos: options.validateVideos !== false,
+      relativeUrlPattern: options.relativeUrlPattern || /^\/[^\/].*/
+    };
     
-    // Default batch size to 50 if not specified
-    this.batchSize = config.batchSize || 50;
+    // Create URL validator
+    this.urlValidator = new URLValidator({
+      logError: this.options.logError,
+      logInfo: this.options.logInfo,
+      isRelativeUrlPattern: this.options.relativeUrlPattern,
+      timeout: this.options.timeout
+    });
   }
   
   /**
-   * Deep scan an object to find all media URLs
-   * @param obj The object to scan
-   * @param currentPath Current field path for nested properties
-   * @param results Array to collect results
+   * Validate a specific field in a document
+   * 
+   * @param document The document containing the field
+   * @param path Path to the field in the document
+   * @param expectedType Expected media type ('image', 'video', or 'unknown')
+   * @returns A validation result for the field
    */
-  private findMediaUrls(
-    obj: any, 
-    currentPath: string = '', 
-    results: { url: string; fieldPath: string }[] = []
-  ): { url: string; fieldPath: string }[] {
-    // Skip if not an object
-    if (!obj || typeof obj !== 'object') {
-      return results;
+  async validateField(
+    document: any, 
+    path: string, 
+    expectedType: 'image' | 'video' | 'unknown' = 'unknown'
+  ): Promise<FieldValidationResult> {
+    // Get the field value
+    const value = this.getValueAtPath(document, path);
+    
+    // Create result object
+    const result: FieldValidationResult = {
+      path,
+      value,
+      expectedType,
+      isValid: false
+    };
+    
+    // Skip empty values
+    if (!value) {
+      result.isValid = false;
+      result.error = 'Empty URL';
+      return result;
     }
     
-    // Handle arrays
-    if (Array.isArray(obj)) {
-      obj.forEach((item, index) => {
-        const itemPath = currentPath ? `${currentPath}.[${index}]` : `[${index}]`;
-        
-        // Check if this is a media object with a URL
-        if (item && typeof item === 'object' && 'url' in item && typeof item.url === 'string') {
-          // This looks like a media object
-          results.push({
-            url: item.url,
-            fieldPath: `${itemPath}.url`
-          });
-        }
-        
-        // Continue deep scanning
-        this.findMediaUrls(item, itemPath, results);
-      });
-      return results;
+    // Check if it's a relative URL
+    result.isRelative = this.urlValidator.isRelativeURL(value);
+    
+    // Normalize relative URLs if needed
+    if (result.isRelative) {
+      result.originalValue = value;
+      result.value = this.urlValidator.normalizePotentialRelativeURL(value, this.options.baseUrl);
+      result.wasNormalized = true;
     }
     
-    // Handle objects
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        const value = obj[key];
-        const fieldPath = currentPath ? `${currentPath}.${key}` : key;
-        
-        // If this is a URL directly
-        if (key === 'url' && typeof value === 'string') {
-          results.push({
-            url: value,
-            fieldPath
-          });
-        }
-        
-        // Continue deep scanning
-        this.findMediaUrls(value, fieldPath, results);
+    // Skip validation for certain cases (can be customized)
+    if (
+      value.startsWith('blob:') || 
+      value.startsWith('data:') || 
+      value.includes('localhost') ||
+      value.includes('firebasestorage.googleapis.com') // Skip Firebase Storage URLs for now
+    ) {
+      result.isValid = true;
+      return result;
+    }
+    
+    try {
+      // Validate the URL
+      const expectedMediaType = expectedType === 'unknown' ? undefined : expectedType;
+      const validationResult = await this.urlValidator.validateURL(result.value, expectedMediaType);
+      
+      // Copy validation results to field result
+      result.isValid = validationResult.isValid;
+      result.error = validationResult.error;
+      result.status = validationResult.status;
+      result.contentType = validationResult.contentType;
+      result.actualType = validationResult.mediaType;
+      
+      // Type validation
+      if (
+        result.isValid && 
+        expectedType !== 'unknown' && 
+        result.actualType && 
+        result.actualType !== expectedType
+      ) {
+        result.isValid = false;
+        result.error = `Expected ${expectedType}, but got ${result.actualType}`;
+      }
+    } catch (error: any) {
+      result.isValid = false;
+      result.error = `Validation error: ${error.message}`;
+    }
+    
+    return result;
+  }
+  
+  /**
+   * Validate all media fields in a document
+   * 
+   * @param document The document to validate
+   * @param documentId ID of the document
+   * @param path Path to the document
+   * @returns A validation result for the document
+   */
+  async validateDocument(document: any, documentId: string, path: string): Promise<DocumentValidationResult> {
+    const startTime = Date.now();
+    
+    // Find all fields that might contain media URLs
+    const mediaFields = this.findMediaFields(document);
+    
+    // Initialize result
+    const result: DocumentValidationResult = {
+      id: documentId,
+      path,
+      fieldCount: mediaFields.length,
+      invalidCount: 0,
+      relativeUrlCount: 0,
+      validationTimeMs: 0,
+      fieldResults: [],
+      hasInvalidFields: false,
+      hasRelativeUrls: false
+    };
+    
+    // Skip if no media fields
+    if (mediaFields.length === 0) {
+      result.validationTimeMs = Date.now() - startTime;
+      return result;
+    }
+    
+    // Validate each field
+    for (const field of mediaFields) {
+      const fieldResult = await this.validateField(document, field.path, field.type);
+      result.fieldResults.push(fieldResult);
+      
+      // Update counters
+      if (!fieldResult.isValid) {
+        result.invalidCount++;
+        result.hasInvalidFields = true;
+      }
+      
+      if (fieldResult.isRelative) {
+        result.relativeUrlCount++;
+        result.hasRelativeUrls = true;
       }
     }
     
-    return results;
+    // Update timing
+    result.validationTimeMs = Date.now() - startTime;
+    
+    return result;
   }
   
   /**
-   * Validate media URLs in a document
-   * @param collectionName The collection name
-   * @param documentId The document ID
-   * @param documentData The document data
+   * Fix URLs in a document
+   * 
+   * @param document The document to fix
+   * @param validationResult Previous validation result for the document
+   * @returns A fix result for the document
    */
-  public async validateDocumentMedia(
-    collectionName: string,
-    documentId: string,
-    documentData: any
-  ): Promise<DocumentValidationResult> {
-    const result: DocumentValidationResult = {
-      documentId,
-      collectionName,
-      valid: [],
-      invalid: [],
-      missing: []
+  async fixDocumentUrls(document: any, validationResult: DocumentValidationResult): Promise<DocumentFixResult> {
+    // Copy document to avoid modifying the original
+    const documentCopy = JSON.parse(JSON.stringify(document));
+    
+    // Initialize result
+    const result: DocumentFixResult = {
+      id: validationResult.id,
+      path: validationResult.path,
+      fixedCount: 0,
+      fieldResults: [],
+      wasUpdated: false
     };
     
-    // Find all media URLs in the document
-    const mediaUrls = this.findMediaUrls(documentData);
+    // Skip if no invalid fields or relative URLs
+    if (!validationResult.hasInvalidFields && !validationResult.hasRelativeUrls) {
+      return result;
+    }
     
-    // Validate each URL
-    for (const { url, fieldPath } of mediaUrls) {
-      if (!url) {
-        // URL is missing
-        result.missing.push({ fieldPath });
+    // Process each field that needs fixing
+    for (const fieldResult of validationResult.fieldResults) {
+      // Skip valid fields that aren't relative
+      if (fieldResult.isValid && !fieldResult.isRelative) {
         continue;
       }
       
-      // Validate the URL
+      const fixResult: FieldFixResult = {
+        path: fieldResult.path,
+        originalValue: fieldResult.originalValue || fieldResult.value,
+        newValue: fieldResult.originalValue || fieldResult.value,
+        fixType: 'relative-to-absolute',
+        success: false
+      };
+      
       try {
-        // If it's a relative URL, validate with base URL
-        const finalUrl = this.urlValidator.isRelativeURL(url)
-          ? this.urlValidator.normalizePotentialRelativeURL(url, this.config.baseUrl)
-          : url;
-          
-        const validationResult = await this.urlValidator.validateURL(finalUrl);
-        
-        if (validationResult.isValid) {
-          // URL is valid
-          result.valid.push({
-            url,
-            fieldPath,
-            contentType: validationResult.contentType
-          });
-        } else {
-          // URL is invalid
-          result.invalid.push({
-            url,
-            fieldPath,
-            reason: validationResult.error ? 'Request failed' : 'Invalid content type',
-            status: validationResult.status,
-            error: validationResult.error || `Expected image, got ${validationResult.contentType}`
-          });
+        // Fix relative URLs
+        if (fieldResult.isRelative) {
+          fixResult.newValue = this.urlValidator.normalizePotentialRelativeURL(
+            fixResult.originalValue, 
+            this.options.baseUrl
+          );
+          fixResult.fixType = 'relative-to-absolute';
+          fixResult.success = true;
         }
-      } catch (error) {
-        // Error during validation
-        result.invalid.push({
-          url,
-          fieldPath,
-          reason: 'Validation error',
-          error: error.message || 'Unknown error'
-        });
+        // Replace invalid URLs
+        else if (!fieldResult.isValid) {
+          if (fieldResult.expectedType === 'image') {
+            fixResult.newValue = `${this.options.baseUrl}/images/placeholder-image.jpg`;
+            fixResult.fixType = 'replace-invalid';
+            fixResult.success = true;
+          } else if (fieldResult.expectedType === 'video') {
+            fixResult.newValue = `${this.options.baseUrl}/videos/placeholder-video.mp4`;
+            fixResult.fixType = 'replace-invalid';
+            fixResult.success = true;
+          } else {
+            fixResult.newValue = `${this.options.baseUrl}/media/placeholder.jpg`;
+            fixResult.fixType = 'replace-invalid';
+            fixResult.success = true;
+          }
+        }
+        // Fix type mismatches
+        else if (
+          fieldResult.expectedType !== 'unknown' && 
+          fieldResult.actualType && 
+          fieldResult.actualType !== fieldResult.expectedType
+        ) {
+          if (fieldResult.expectedType === 'image') {
+            fixResult.newValue = `${this.options.baseUrl}/images/placeholder-image.jpg`;
+            fixResult.fixType = 'type-mismatch';
+            fixResult.success = true;
+          } else if (fieldResult.expectedType === 'video') {
+            fixResult.newValue = `${this.options.baseUrl}/videos/placeholder-video.mp4`;
+            fixResult.fixType = 'type-mismatch';
+            fixResult.success = true;
+          }
+        }
+        
+        // Update document with fixed value if successful
+        if (fixResult.success && fixResult.newValue !== fixResult.originalValue) {
+          this.setValueAtPath(documentCopy, fieldResult.path, fixResult.newValue);
+          result.fixedCount++;
+          result.wasUpdated = true;
+        }
+      } catch (error: any) {
+        fixResult.success = false;
+        fixResult.error = `Fix error: ${error.message}`;
       }
+      
+      // Add fix result to document result
+      result.fieldResults.push(fixResult);
     }
+    
+    // Only mark as updated if changes were made
+    result.wasUpdated = result.fixedCount > 0;
     
     return result;
   }
   
   /**
-   * Validate all documents in a collection
-   * @param collectionName The collection to validate
+   * Get a value from a nested object path
+   * 
+   * @param obj The object to search in
+   * @param path The path to the value (e.g., 'media[0].url')
+   * @returns The value at the path, or undefined if not found
    */
-  public async validateCollection(collectionName: string): Promise<{
-    totalDocuments: number;
-    totalMediaItems: number;
-    validItems: number;
-    invalidItems: number;
-    missingItems: number;
-    documents: DocumentValidationResult[];
-  }> {
-    const collection = this.config.firestore.collection(collectionName);
-    const snapshot = await collection.get();
-    
-    if (snapshot.empty) {
-      this.config.logInfo(`No documents found in collection: ${collectionName}`);
-      return {
-        totalDocuments: 0,
-        totalMediaItems: 0,
-        validItems: 0,
-        invalidItems: 0,
-        missingItems: 0,
-        documents: []
-      };
-    }
-    
-    const results: DocumentValidationResult[] = [];
-    const validationStats = {
-      totalDocuments: snapshot.size,
-      totalMediaItems: 0,
-      validItems: 0,
-      invalidItems: 0,
-      missingItems: 0
-    };
-    
-    // Process documents in batches
-    const docs = snapshot.docs;
-    for (let i = 0; i < docs.length; i += this.batchSize) {
-      const batchDocs = docs.slice(i, i + this.batchSize);
-      
-      // Process each document in the batch
-      const batchPromises = batchDocs.map(async (doc) => {
-        try {
-          const documentData = doc.data();
-          const validationResult = await this.validateDocumentMedia(
-            collectionName,
-            doc.id,
-            documentData
-          );
-          
-          // Update statistics
-          validationStats.totalMediaItems += validationResult.valid.length + 
-            validationResult.invalid.length + validationResult.missing.length;
-          validationStats.validItems += validationResult.valid.length;
-          validationStats.invalidItems += validationResult.invalid.length;
-          validationStats.missingItems += validationResult.missing.length;
-          
-          return validationResult;
-        } catch (error) {
-          this.config.logError(`Error validating document ${doc.id} in ${collectionName}`, error);
-          return null;
-        }
-      });
-      
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults.filter(Boolean));
-      
-      // Log progress
-      this.config.logInfo(`Validated ${i + batchResults.length} of ${docs.length} documents in ${collectionName}`);
-    }
-    
-    return {
-      ...validationStats,
-      documents: results
-    };
-  }
-  
-  /**
-   * Run validation on all configured collections
-   */
-  public async validateAllCollections(): Promise<MediaValidationStatus> {
-    const reportId = this.config.firestore.collection('media_validation_reports').doc().id;
-    
-    // Create initial report
-    const report: MediaValidationStatus = {
-      reportId,
-      startTime: admin.firestore.Timestamp.now(),
-      totalDocuments: 0,
-      totalMediaItems: 0,
-      validItems: 0,
-      invalidItems: 0,
-      missingItems: 0,
-      collections: {},
-      status: 'running',
-      invalidItemDetails: []
-    };
-    
-    // Save initial report
-    await this.config.firestore.collection('media_validation_reports').doc(reportId).set(report);
-    
-    try {
-      // Validate each collection
-      for (const collectionName of this.config.collectionNames) {
-        this.config.logInfo(`Starting validation for collection: ${collectionName}`);
-        
-        const collectionResults = await this.validateCollection(collectionName);
-        
-        // Update collection stats
-        report.collections[collectionName] = {
-          totalUrls: collectionResults.totalMediaItems,
-          valid: collectionResults.validItems,
-          invalid: collectionResults.invalidItems,
-          missing: collectionResults.missingItems
-        };
-        
-        // Update overall stats
-        report.totalDocuments += collectionResults.totalDocuments;
-        report.totalMediaItems += collectionResults.totalMediaItems;
-        report.validItems += collectionResults.validItems;
-        report.invalidItems += collectionResults.invalidItems;
-        report.missingItems += collectionResults.missingItems;
-        
-        // Add invalid items to the report
-        for (const document of collectionResults.documents) {
-          for (const item of document.invalid) {
-            report.invalidItemDetails.push({
-              collectionName,
-              documentId: document.documentId,
-              fieldPath: item.fieldPath,
-              url: item.url,
-              reason: item.reason,
-              status: item.status,
-              error: item.error
-            });
-          }
-        }
-        
-        // Update the report with progress
-        await this.config.firestore.collection('media_validation_reports').doc(reportId).update({
-          collections: report.collections,
-          totalDocuments: report.totalDocuments,
-          totalMediaItems: report.totalMediaItems,
-          validItems: report.validItems,
-          invalidItems: report.invalidItems,
-          missingItems: report.missingItems,
-          invalidItemDetails: report.invalidItemDetails
-        });
-      }
-      
-      // Complete the report
-      report.endTime = admin.firestore.Timestamp.now();
-      report.status = 'completed';
-      
-      await this.config.firestore.collection('media_validation_reports').doc(reportId).update({
-        endTime: report.endTime,
-        status: report.status
-      });
-      
-      return report;
-    } catch (error) {
-      // Handle errors
-      this.config.logError('Error during media validation', error);
-      
-      // Update report with error
-      report.status = 'failed';
-      report.error = error.message || 'Unknown error during validation';
-      report.endTime = admin.firestore.Timestamp.now();
-      
-      await this.config.firestore.collection('media_validation_reports').doc(reportId).update({
-        status: report.status,
-        error: report.error,
-        endTime: report.endTime
-      });
-      
-      return report;
-    }
-  }
-  
-  /**
-   * Fix relative URLs in a document
-   * @param collectionName The collection name
-   * @param documentId The document ID
-   * @param documentData The document data
-   */
-  public async fixRelativeUrls(
-    collectionName: string,
-    documentId: string,
-    documentData: any
-  ): Promise<UrlFixResult> {
-    const result: UrlFixResult = {
-      documentId,
-      collectionName,
-      fixedUrls: [],
-      fixedDocument: JSON.parse(JSON.stringify(documentData)) // Deep clone
-    };
-    
-    // Find all media URLs
-    const mediaUrls = this.findMediaUrls(documentData);
-    
-    // Check each URL
-    for (const { url, fieldPath } of mediaUrls) {
-      if (url && this.urlValidator.isRelativeURL(url)) {
-        // This is a relative URL that needs fixing
-        const fixedUrl = this.urlValidator.normalizePotentialRelativeURL(url, this.config.baseUrl);
-        
-        // Record the fix
-        result.fixedUrls.push({
-          fieldPath,
-          originalUrl: url,
-          fixedUrl
-        });
-        
-        // Update the document
-        this.updateFieldValue(result.fixedDocument, fieldPath, fixedUrl);
-      }
-    }
-    
-    // If we fixed any URLs, save the updated document
-    if (result.fixedUrls.length > 0) {
-      try {
-        // Update the document in Firestore
-        await this.config.firestore.collection(collectionName).doc(documentId).set(
-          result.fixedDocument,
-          { merge: true }
-        );
-      } catch (error) {
-        this.config.logError(
-          `Error updating document ${documentId} in ${collectionName}`,
-          error
-        );
-        throw error;
-      }
-    }
-    
-    return result;
-  }
-  
-  /**
-   * Fix relative URLs in all documents within a collection
-   * @param collectionName The collection to fix
-   */
-  public async fixCollectionRelativeUrls(collectionName: string): Promise<{
-    totalDocuments: number;
-    fixedDocuments: number;
-    totalFixedUrls: number;
-    documents: UrlFixResult[];
-  }> {
-    const collection = this.config.firestore.collection(collectionName);
-    const snapshot = await collection.get();
-    
-    if (snapshot.empty) {
-      this.config.logInfo(`No documents found in collection: ${collectionName}`);
-      return {
-        totalDocuments: 0,
-        fixedDocuments: 0,
-        totalFixedUrls: 0,
-        documents: []
-      };
-    }
-    
-    const results: UrlFixResult[] = [];
-    const fixStats = {
-      totalDocuments: snapshot.size,
-      fixedDocuments: 0,
-      totalFixedUrls: 0
-    };
-    
-    // Process documents in batches
-    const docs = snapshot.docs;
-    for (let i = 0; i < docs.length; i += this.batchSize) {
-      const batchDocs = docs.slice(i, i + this.batchSize);
-      
-      // Process each document in the batch
-      const batchPromises = batchDocs.map(async (doc) => {
-        try {
-          const documentData = doc.data();
-          const fixResult = await this.fixRelativeUrls(
-            collectionName,
-            doc.id,
-            documentData
-          );
-          
-          if (fixResult.fixedUrls.length > 0) {
-            // Document had fixes
-            fixStats.fixedDocuments++;
-            fixStats.totalFixedUrls += fixResult.fixedUrls.length;
-          }
-          
-          return fixResult;
-        } catch (error) {
-          this.config.logError(`Error fixing document ${doc.id} in ${collectionName}`, error);
-          return null;
-        }
-      });
-      
-      const batchResults = await Promise.all(batchPromises);
-      // Only keep results where fixes were made
-      results.push(...batchResults.filter(result => result && result.fixedUrls.length > 0));
-      
-      // Log progress
-      this.config.logInfo(`Processed ${i + batchResults.length} of ${docs.length} documents in ${collectionName}`);
-    }
-    
-    return {
-      ...fixStats,
-      documents: results
-    };
-  }
-  
-  /**
-   * Fix relative URLs in all collections
-   */
-  public async fixAllRelativeUrls(): Promise<{
-    reportId: string;
-    totalDocuments: number;
-    fixedDocuments: number;
-    totalFixedUrls: number;
-    collections: {
-      [collectionName: string]: {
-        totalDocuments: number;
-        fixedDocuments: number;
-        totalFixedUrls: number;
-      }
-    };
-    status: 'completed' | 'failed';
-    error?: string;
-  }> {
-    const reportId = this.config.firestore.collection('url_fix_reports').doc().id;
-    
-    // Create initial report
-    const report = {
-      reportId,
-      startTime: admin.firestore.Timestamp.now(),
-      totalDocuments: 0,
-      fixedDocuments: 0,
-      totalFixedUrls: 0,
-      collections: {},
-      status: 'running' as const
-    };
-    
-    // Save initial report
-    await this.config.firestore.collection('url_fix_reports').doc(reportId).set(report);
-    
-    try {
-      // Fix each collection
-      for (const collectionName of this.config.collectionNames) {
-        this.config.logInfo(`Fixing relative URLs in collection: ${collectionName}`);
-        
-        const collectionResults = await this.fixCollectionRelativeUrls(collectionName);
-        
-        // Update collection stats
-        report.collections[collectionName] = {
-          totalDocuments: collectionResults.totalDocuments,
-          fixedDocuments: collectionResults.fixedDocuments,
-          totalFixedUrls: collectionResults.totalFixedUrls
-        };
-        
-        // Update overall stats
-        report.totalDocuments += collectionResults.totalDocuments;
-        report.fixedDocuments += collectionResults.fixedDocuments;
-        report.totalFixedUrls += collectionResults.totalFixedUrls;
-        
-        // Update the report with progress
-        await this.config.firestore.collection('url_fix_reports').doc(reportId).update({
-          collections: report.collections,
-          totalDocuments: report.totalDocuments,
-          fixedDocuments: report.fixedDocuments,
-          totalFixedUrls: report.totalFixedUrls
-        });
-      }
-      
-      // Complete the report
-      const finalReport = {
-        ...report,
-        endTime: admin.firestore.Timestamp.now(),
-        status: 'completed' as const
-      };
-      
-      await this.config.firestore.collection('url_fix_reports').doc(reportId).update({
-        endTime: finalReport.endTime,
-        status: finalReport.status
-      });
-      
-      return finalReport;
-    } catch (error) {
-      // Handle errors
-      this.config.logError('Error during URL fixing', error);
-      
-      // Update report with error
-      const errorReport = {
-        ...report,
-        status: 'failed' as const,
-        error: error.message || 'Unknown error during URL fixing',
-        endTime: admin.firestore.Timestamp.now()
-      };
-      
-      await this.config.firestore.collection('url_fix_reports').doc(reportId).update({
-        status: errorReport.status,
-        error: errorReport.error,
-        endTime: errorReport.endTime
-      });
-      
-      return errorReport;
-    }
-  }
-  
-  /**
-   * Update a field value in an object based on a dot-notation path
-   * @param obj The object to update
-   * @param path The field path in dot notation
-   * @param value The new value
-   */
-  private updateFieldValue(obj: any, path: string, value: any): void {
-    // Parse the path
+  private getValueAtPath(obj: any, path: string): any {
     const parts = path.split('.');
-    
-    // Navigate to the correct property
     let current = obj;
     
-    for (let i = 0; i < parts.length - 1; i++) {
-      const part = parts[i];
+    for (const part of parts) {
+      // Handle array indexing
+      const match = part.match(/^([^\[]+)(?:\[(\d+)\])?$/);
+      if (!match) return undefined;
       
-      // Handle array indices
-      if (part.startsWith('[') && part.endsWith(']')) {
-        const index = parseInt(part.substring(1, part.length - 1), 10);
-        if (i === 0) {
-          current = obj[index];
-        } else {
-          const prevPart = parts[i - 1];
-          current = current[prevPart][index];
-        }
-      } else if (i < parts.length - 1) {
-        current = current[part];
+      const [, key, indexStr] = match;
+      
+      // Navigate to the key
+      current = current[key];
+      if (current === undefined) return undefined;
+      
+      // Navigate to array index if specified
+      if (indexStr !== undefined) {
+        const index = parseInt(indexStr, 10);
+        if (!Array.isArray(current) || index >= current.length) return undefined;
+        current = current[index];
       }
     }
     
-    // Set the value
-    const lastPart = parts[parts.length - 1];
-    current[lastPart] = value;
+    return current;
+  }
+  
+  /**
+   * Set a value at a nested object path
+   * 
+   * @param obj The object to modify
+   * @param path The path to the value (e.g., 'media[0].url')
+   * @param value The new value to set
+   */
+  private setValueAtPath(obj: any, path: string, value: any): void {
+    const parts = path.split('.');
+    let current = obj;
+    
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      
+      // Handle array indexing
+      const match = part.match(/^([^\[]+)(?:\[(\d+)\])?$/);
+      if (!match) return;
+      
+      const [, key, indexStr] = match;
+      
+      // Last part of the path - set the value
+      if (i === parts.length - 1) {
+        if (indexStr === undefined) {
+          current[key] = value;
+        } else {
+          const index = parseInt(indexStr, 10);
+          if (!Array.isArray(current[key]) || index >= current[key].length) return;
+          current[key][index] = value;
+        }
+        return;
+      }
+      
+      // Navigate to the key
+      if (current[key] === undefined) {
+        current[key] = indexStr ? [] : {};
+      }
+      current = current[key];
+      
+      // Navigate to array index if specified
+      if (indexStr !== undefined) {
+        const index = parseInt(indexStr, 10);
+        if (!Array.isArray(current) || index >= current.length) return;
+        if (current[index] === undefined) {
+          current[index] = i === parts.length - 2 && parts[i + 1].includes('[') ? [] : {};
+        }
+        current = current[index];
+      }
+    }
+  }
+  
+  /**
+   * Find all fields that might contain media URLs in a document
+   * 
+   * @param document The document to search
+   * @param prefix Optional prefix for nested paths
+   * @returns List of paths and expected media types
+   */
+  private findMediaFields(document: any, prefix = ''): Array<{ path: string; type: 'image' | 'video' | 'unknown' }> {
+    const fields: Array<{ path: string; type: 'image' | 'video' | 'unknown' }> = [];
+    
+    // Handle null or undefined
+    if (document == null) {
+      return fields;
+    }
+    
+    // Handle arrays
+    if (Array.isArray(document)) {
+      for (let i = 0; i < document.length; i++) {
+        const item = document[i];
+        
+        // Check if array item is a string that looks like a URL
+        if (typeof item === 'string' && this.couldBeUrl(item)) {
+          // If the array property contains "image", assume image type
+          const type = prefix.toLowerCase().includes('image') ? 'image' : 
+                      prefix.toLowerCase().includes('video') ? 'video' : 'unknown';
+          fields.push({ path: `${prefix}[${i}]`, type });
+        }
+        // Check if array item is an object with media fields
+        else if (typeof item === 'object') {
+          const nestedFields = this.findMediaFields(item, `${prefix}[${i}]`);
+          fields.push(...nestedFields);
+        }
+      }
+      return fields;
+    }
+    
+    // Handle objects
+    if (typeof document === 'object') {
+      // Iterate over object properties
+      for (const key in document) {
+        const value = document[key];
+        const path = prefix ? `${prefix}.${key}` : key;
+        
+        // Check for common media field names
+        const isImageField = 
+          key === 'url' || key === 'imageUrl' || key === 'thumbnailUrl' || 
+          key === 'image' || key === 'imageURL' || key === 'thumbnail' ||
+          key === 'cover' || key === 'coverImage' || key === 'logo' ||
+          key === 'profilePhoto' || key === 'avatar' || key === 'icon';
+          
+        const isVideoField =
+          key === 'videoUrl' || key === 'videoURL' || key === 'video';
+          
+        // Check if value is a string that looks like a URL
+        if (typeof value === 'string' && this.couldBeUrl(value)) {
+          const type = isImageField ? 'image' : isVideoField ? 'video' : 'unknown';
+          fields.push({ path, type });
+        }
+        // Check for media array
+        else if (Array.isArray(value) && 
+                (key === 'media' || key === 'images' || key === 'photos' || key === 'videos')) {
+          // Handle standard media array with type field
+          for (let i = 0; i < value.length; i++) {
+            const item = value[i];
+            if (typeof item === 'object' && item !== null) {
+              // If media item has a URL property
+              if (typeof item.url === 'string' && this.couldBeUrl(item.url)) {
+                // Determine type from item's type field or from array name
+                const mediaType = 
+                  (item.type === 'image' || item.type === 'video') ? item.type :
+                  key === 'images' || key === 'photos' ? 'image' :
+                  key === 'videos' ? 'video' : 'unknown';
+                  
+                fields.push({ path: `${path}[${i}].url`, type: mediaType });
+              }
+              
+              // Also check for alternative URL field names
+              for (const urlField of ['imageUrl', 'videoUrl', 'thumbnailUrl', 'src']) {
+                if (typeof item[urlField] === 'string' && this.couldBeUrl(item[urlField])) {
+                  const mediaType = 
+                    urlField.includes('image') || urlField.includes('thumbnail') ? 'image' :
+                    urlField.includes('video') ? 'video' : 'unknown';
+                    
+                  fields.push({ path: `${path}[${i}].${urlField}`, type: mediaType });
+                }
+              }
+            }
+            // If array contains direct URL strings
+            else if (typeof item === 'string' && this.couldBeUrl(item)) {
+              const mediaType = 
+                key === 'images' || key === 'photos' ? 'image' :
+                key === 'videos' ? 'video' : 'unknown';
+                
+              fields.push({ path: `${path}[${i}]`, type: mediaType });
+            }
+          }
+        }
+        // Recursively check nested objects
+        else if (typeof value === 'object' && value !== null) {
+          const nestedFields = this.findMediaFields(value, path);
+          fields.push(...nestedFields);
+        }
+      }
+    }
+    
+    return fields;
+  }
+  
+  /**
+   * Check if a string could be a URL
+   * 
+   * @param str The string to check
+   * @returns true if the string might be a URL
+   */
+  private couldBeUrl(str: string): boolean {
+    // Skip empty strings
+    if (!str) return false;
+    
+    // URLs typically start with http://, https://, /, or contain domains
+    return (
+      str.startsWith('http://') ||
+      str.startsWith('https://') ||
+      str.startsWith('/') ||
+      str.startsWith('blob:') ||
+      str.startsWith('data:') ||
+      /\.(jpg|jpeg|png|gif|webp|mp4|mov|avi|webm)$/i.test(str) ||
+      str.includes('.com/') ||
+      str.includes('.org/') ||
+      str.includes('.net/') ||
+      str.includes('.io/')
+    );
   }
 }
