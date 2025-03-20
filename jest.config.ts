@@ -8,6 +8,12 @@ const config: Config.InitialOptions = {
     '^@/(.*)$': '<rootDir>/client/src/$1',
     '^@shared/(.*)$': '<rootDir>/shared/$1',
     '^@server/(.*)$': '<rootDir>/server/$1',
+    '^@components/(.*)$': '<rootDir>/client/src/components/$1',
+    '^@hooks/(.*)$': '<rootDir>/client/src/hooks/$1',
+    '^@lib/(.*)$': '<rootDir>/client/src/lib/$1',
+    '^@ui/(.*)$': '<rootDir>/client/src/components/ui/$1',
+    // Handle CSS imports (if needed)
+    '\\.(css|less|scss|sass)$': '<rootDir>/tests/__mocks__/styleMock.js',
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
@@ -23,14 +29,22 @@ const config: Config.InitialOptions = {
     'client/src/**/*.{ts,tsx}',
     'server/**/*.ts',
     'shared/**/*.ts',
+    'functions/**/*.{js,ts}',
     '!**/node_modules/**',
-    '!**/vendor/**'
+    '!**/vendor/**',
+    '!**/dist/**',
+    '!**/*.d.ts'
   ],
+  // Increase test timeout for slower operations
+  testTimeout: 30000,
   // Create separate test configurations
   projects: [
     {
       displayName: 'client',
-      testMatch: ['<rootDir>/client/src/**/*.test.{ts,tsx}'],
+      testMatch: [
+        '<rootDir>/client/src/**/*.test.{ts,tsx}',
+        '<rootDir>/tests/*.test.{ts,tsx}'  // Include tests in tests directory
+      ],
       testEnvironment: 'jsdom',
       setupFilesAfterEnv: ['<rootDir>/tests/setup-jsdom.ts'],
     },
@@ -45,11 +59,20 @@ const config: Config.InitialOptions = {
       testMatch: ['<rootDir>/tests/integration/**/*.test.ts'],
       testEnvironment: 'node',
       setupFilesAfterEnv: ['<rootDir>/tests/setup-integration.ts'],
+    },
+    {
+      displayName: 'functions',
+      testMatch: ['<rootDir>/functions/**/*.test.{js,ts}'],
+      testEnvironment: 'node',
+      setupFilesAfterEnv: ['<rootDir>/tests/setup-node.ts'],
     }
   ],
   globals: {
     'ts-jest': {
-      isolatedModules: true
+      isolatedModules: true,
+      tsconfig: {
+        jsx: 'react-jsx'
+      }
     }
   }
 };

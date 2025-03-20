@@ -3,196 +3,212 @@
  * 
  * This file contains tests for the media validation service functionality.
  */
+import { MediaValidationService } from '../functions/media-validation/media-validation';
+import { URLValidator } from '../functions/media-validation/url-validator';
 
-import * as admin from 'firebase-admin';
-import { mockFirestore, createMockDocument } from './test-utils';
+// Mock the URL validator
+jest.mock('../functions/media-validation/url-validator');
 
-// Test data for media validation
-const TEST_DOCUMENT_WITH_MEDIA = {
-  id: 'test-yacht-123',
-  title: 'Test Yacht',
-  description: 'A test yacht for validation',
-  media: [
-    { type: 'image', url: 'https://storage.googleapis.com/test-bucket/image1.jpg' },
-    { type: 'image', url: '/relative-path/image2.jpg' },
-    { type: 'image', url: 'blob:https://etoile-yachts.com/1234-5678-90ab-cdef' },
-    { type: 'image', url: 'https://storage.googleapis.com/test-bucket/video1.mp4' }
-  ]
+// Mock Firestore
+const mockFirestore = {
+  collection: jest.fn(() => ({
+    doc: jest.fn(() => ({
+      set: jest.fn().mockResolvedValue({}),
+      get: jest.fn().mockResolvedValue({
+        exists: true,
+        data: () => ({
+          id: 'test-doc',
+          title: 'Test Document',
+          media: [
+            { type: 'image', url: 'https://example.com/valid-image.jpg' },
+            { type: 'image', url: 'https://example.com/invalid-image.jpg' },
+            { type: 'image', url: '/relative-path-image.jpg' }
+          ]
+        })
+      })
+    })),
+    get: jest.fn().mockResolvedValue({
+      empty: false,
+      docs: [
+        {
+          id: 'doc1',
+          ref: {
+            id: 'doc1',
+            path: 'collection/doc1'
+          },
+          data: () => ({
+            id: 'doc1',
+            title: 'Document 1',
+            media: [
+              { type: 'image', url: 'https://example.com/image1.jpg' }
+            ]
+          })
+        },
+        {
+          id: 'doc2',
+          ref: {
+            id: 'doc2',
+            path: 'collection/doc2'
+          },
+          data: () => ({
+            id: 'doc2',
+            title: 'Document 2',
+            media: [
+              { type: 'image', url: 'https://example.com/image2.jpg' },
+              { type: 'image', url: 'https://example.com/image3.jpg' }
+            ]
+          })
+        }
+      ]
+    })
+  })
 };
 
-// Mock the Firebase admin module
-jest.mock('firebase-admin', () => ({
-  initializeApp: jest.fn(),
-  apps: [],
-  credential: {
-    cert: jest.fn(),
-  },
-  firestore: jest.fn(() => mockFirestore),
-  storage: jest.fn(() => ({
-    bucket: jest.fn(() => ({
-      file: jest.fn(() => ({
-        getMetadata: jest.fn(() => Promise.resolve([{ contentType: 'image/jpeg' }]))
-      }))
-    }))
-  })),
-}));
-
-// Helper function to extract imported modules dynamically
+// Helper function to get a media validation service with mocks
 function getMediaValidation() {
-  try {
-    // Try to import the actual module
-    return require('../functions/media-validation/validation');
-  } catch (error) {
-    // If not available, use a mock implementation for testing
-    return {
-      validateAndRepairMedia: jest.fn(async () => ({ fixed: true })),
-      processMediaArray: jest.fn(array => ({ 
-        mediaArray: array.map(item => {
-          if (item.url.startsWith('/')) {
-            return { ...item, url: `https://etoile-yachts.firebasestorage.app${item.url}` };
-          }
-          if (item.url.startsWith('blob:')) {
-            return { ...item, url: 'https://etoile-yachts.firebasestorage.app/yacht-placeholder.jpg' };
-          }
-          if (item.url.includes('.mp4')) {
-            return { ...item, type: 'video' as const };
-          }
-          return item;
-        }),
-        wasFixed: true 
-      })),
-      processMediaUrl: jest.fn(url => {
-        let wasFixed = false;
-        let detectedType: 'video' | undefined = undefined;
-        let processedUrl = url;
-        
-        if (url.startsWith('/')) {
-          processedUrl = `https://etoile-yachts.firebasestorage.app${url}`;
-          wasFixed = true;
-        }
-        
-        if (url.startsWith('blob:')) {
-          processedUrl = 'https://etoile-yachts.firebasestorage.app/yacht-placeholder.jpg';
-          wasFixed = true;
-        }
-        
-        if (url.includes('.mp4')) {
-          detectedType = 'video';
-          wasFixed = true;
-        }
-        
-        return { url: processedUrl, wasFixed, detectedType };
-      })
-    };
-  }
+  // Mock the URL validator implementation
+  const mockUrlValidator = {
+    validateURL: jest.fn(async (url: string) => {
+      if (url === 'https://example.com/valid-image.jpg') {
+        return {
+          isValid: true,
+          url,
+          status: 200,
+          contentType: 'image/jpeg'
+        };
+      } else if (url === '/relative-path-image.jpg') {
+        return {
+          isValid: false,
+          url,
+          error: 'Relative URL'
+        };
+      } else {
+        return {
+          isValid: false,
+          url,
+          status: 404,
+          error: 'Not Found'
+        };
+      }
+    }),
+    isRelativeURL: jest.fn((url: string) => url.startsWith('/')),
+    isAbsoluteURL: jest.fn((url: string) => url.startsWith('http')),
+    normalizePotentialRelativeURL: jest.fn((url: string, baseUrl: string) => {
+      if (url.startsWith('/')) {
+        return `${baseUrl}${url}`;
+      }
+      return url;
+    })
+  };
+  
+  (URLValidator as jest.Mock).mockImplementation(() => mockUrlValidator);
+  
+  return new MediaValidationService({
+    firestore: mockFirestore as any,
+    collectionNames: ['yacht_profiles', 'experience_packages'],
+    baseUrl: 'https://example.com',
+    logInfo: jest.fn(),
+    logError: jest.fn(),
+    logWarning: jest.fn(),
+    batchSize: 10
+  });
 }
 
-// Tests for media validation functions
-describe('Media Validation Service', () => {
-  
-  // Test detection and fixing of relative URLs
-  describe('processMediaUrl function', () => {
-    it('should convert relative URLs to absolute URLs', () => {
-      const { processMediaUrl } = getMediaValidation();
-      
-      const relativeUrl = '/images/test.jpg';
-      const result = processMediaUrl(relativeUrl, 'image');
-      
-      expect(result.wasFixed).toBe(true);
-      expect(result.url).toContain('https://');
-      expect(result.url).toContain(relativeUrl);
-    });
-    
-    it('should replace blob URLs with placeholder', () => {
-      const { processMediaUrl } = getMediaValidation();
-      
-      const blobUrl = 'blob:https://etoile-yachts.com/1234-5678';
-      const result = processMediaUrl(blobUrl, 'image');
-      
-      expect(result.wasFixed).toBe(true);
-      expect(result.url).toContain('placeholder');
-      expect(result.url).not.toBe(blobUrl);
-    });
-    
-    it('should detect video content from URL patterns', () => {
-      const { processMediaUrl } = getMediaValidation();
-      
-      const videoUrl = 'https://storage.googleapis.com/test-bucket/video1.mp4';
-      const result = processMediaUrl(videoUrl, 'image');
-      
-      expect(result.detectedType).toBe('video');
-      expect(result.wasFixed).toBe(true);
-    });
-    
-    it('should not modify valid image URLs', () => {
-      const { processMediaUrl } = getMediaValidation();
-      
-      const validUrl = 'https://storage.googleapis.com/test-bucket/image1.jpg';
-      const result = processMediaUrl(validUrl, 'image');
-      
-      expect(result.wasFixed).toBe(false);
-      expect(result.url).toBe(validUrl);
-    });
+describe('MediaValidationService', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
   
-  // Test processing of media arrays
-  describe('processMediaArray function', () => {
-    it('should fix all media items in an array', () => {
-      const { processMediaArray } = getMediaValidation();
-      
-      const mediaArray = [
-        { type: 'image', url: '/relative-path/image.jpg' },
-        { type: 'image', url: 'blob:https://etoile-yachts.com/1234-5678' },
-        { type: 'image', url: 'https://storage.googleapis.com/test-bucket/video.mp4' },
-        { type: 'image', url: 'https://storage.googleapis.com/test-bucket/image.jpg' }
-      ];
-      
-      const result = processMediaArray(mediaArray);
-      
-      expect(result.wasFixed).toBe(true);
-      expect(result.mediaArray[0].url.startsWith('/')).toBe(false);
-      expect(result.mediaArray[1].url.startsWith('blob:')).toBe(false);
-      expect(result.mediaArray[2].type).toBe('video');
-      expect(result.mediaArray[3].url).toBe(mediaArray[3].url);
-    });
-  });
-  
-  // Test full document validation and repair
-  describe('validateAndRepairMedia function', () => {
-    it('should validate and repair media in a document', async () => {
-      const { validateAndRepairMedia } = getMediaValidation();
-      
-      // Mock the Firestore document
-      const mockDoc = createMockDocument({
-        id: TEST_DOCUMENT_WITH_MEDIA.id,
-        data: TEST_DOCUMENT_WITH_MEDIA
-      });
-      
-      // Create a mock collection with the minimum required properties
-      const mockCollection = {
-        docs: [],
-        empty: false,
-        size: 1,
-        forEach: jest.fn(),
-        doc: jest.fn(() => mockDoc.ref),
-        add: jest.fn(),
-        get: jest.fn(),
-        where: jest.fn(),
-        orderBy: jest.fn(),
-        limit: jest.fn()
+  describe('validateDocument', () => {
+    it('should validate document media fields correctly', async () => {
+      const service = getMediaValidation();
+      const document = {
+        id: 'test-doc',
+        media: [
+          { type: 'image', url: 'https://example.com/valid-image.jpg' },
+          { type: 'image', url: 'https://example.com/invalid-image.jpg' }
+        ]
       };
       
-      // Mock the Firestore collection method
-      mockFirestore.collection.mockReturnValue(mockCollection);
+      const results = await service.validateDocumentMedia('test_collection', document.id, document);
       
-      // Run the validation
-      const result = await validateAndRepairMedia(
-        'unified_yacht_experiences', 
-        TEST_DOCUMENT_WITH_MEDIA.id, 
-        TEST_DOCUMENT_WITH_MEDIA
-      );
+      // Verify results
+      expect(results.valid.length).toBe(1);
+      expect(results.invalid.length).toBe(1);
+      expect(results.valid[0].url).toBe('https://example.com/valid-image.jpg');
+      expect(results.invalid[0].url).toBe('https://example.com/invalid-image.jpg');
+    });
+    
+    it('should handle nested media fields', async () => {
+      const service = getMediaValidation();
+      const document = {
+        id: 'test-doc',
+        // Nested media in arrays
+        categories: [
+          {
+            name: 'Category 1',
+            media: [
+              { type: 'image', url: 'https://example.com/valid-image.jpg' }
+            ]
+          },
+          {
+            name: 'Category 2',
+            media: [
+              { type: 'image', url: 'https://example.com/invalid-image.jpg' }
+            ]
+          }
+        ],
+        // Nested media in objects
+        featuredImage: {
+          type: 'image',
+          url: '/relative-path-image.jpg'
+        }
+      };
       
-      expect(result.fixed).toBe(true);
+      const results = await service.validateDocumentMedia('test_collection', document.id, document);
+      
+      // Verify results
+      expect(results.valid.length).toBe(1);
+      expect(results.invalid.length).toBe(2);
+      expect(results.invalid.some(i => i.url === '/relative-path-image.jpg')).toBe(true);
+    });
+  });
+  
+  describe('validateCollection', () => {
+    it('should validate all documents in a collection', async () => {
+      const service = getMediaValidation();
+      
+      const results = await service.validateCollection('yacht_profiles');
+      
+      // We expect 3 media items from 2 documents
+      expect(results.totalDocuments).toBe(2);
+      expect(results.totalMediaItems).toBe(3);
+      
+      // Verify Firestore collection was queried
+      expect(mockFirestore.collection).toHaveBeenCalledWith('yacht_profiles');
+    });
+  });
+  
+  describe('fixRelativeUrls', () => {
+    it('should fix relative URLs in documents', async () => {
+      const service = getMediaValidation();
+      const document = {
+        id: 'test-doc',
+        media: [
+          { type: 'image', url: '/relative-path-image.jpg' }
+        ],
+        featuredImage: {
+          type: 'image',
+          url: '/another-relative.jpg'
+        }
+      };
+      
+      const result = await service.fixRelativeUrls('test_collection', document.id, document);
+      
+      // Verify both relative URLs were fixed
+      expect(result.fixedUrls.length).toBe(2);
+      expect(result.fixedDocument.media[0].url).toBe('https://example.com/relative-path-image.jpg');
+      expect(result.fixedDocument.featuredImage.url).toBe('https://example.com/another-relative.jpg');
     });
   });
 });
