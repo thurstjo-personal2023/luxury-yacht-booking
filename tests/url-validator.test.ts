@@ -3,170 +3,143 @@
  * 
  * This file contains tests for the URL validation functionality.
  */
+import axios from 'axios';
+import { URLValidator } from '../functions/media-validation/url-validator';
 
-import * as admin from 'firebase-admin';
-import { mockFirestore, mockStorage } from './test-utils';
+// Mock axios
+jest.mock('axios');
+const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-// Test data for URL validation
-const VALID_IMAGE_URLS = [
-  'https://storage.googleapis.com/etoile-yachts.appspot.com/yacht_images/yacht1.jpg',
-  'https://firebasestorage.googleapis.com/v0/b/etoile-yachts.appspot.com/o/yacht_images%2Fyacht2.jpg',
-  'https://etoile-yachts.com/assets/images/yacht3.jpg'
-];
-
-const INVALID_IMAGE_URLS = [
-  '/relative-path/image.jpg',
-  'blob:https://etoile-yachts.com/1234-5678-90ab-cdef',
-  'https://example.com/nonexistent-image.jpg',
-  'not-a-url-at-all'
-];
-
-const VIDEO_URLS = [
-  'https://storage.googleapis.com/etoile-yachts.appspot.com/videos/yacht1.mp4',
-  'https://example.com/video-SBV-12345.mp4',
-  'https://storage.googleapis.com/test-bucket/Dynamic motion.mp4'
-];
-
-// Mock the Firebase admin module
-jest.mock('firebase-admin', () => ({
-  initializeApp: jest.fn(),
-  apps: [],
-  credential: {
-    cert: jest.fn(),
-  },
-  firestore: jest.fn(() => mockFirestore),
-  storage: jest.fn(() => mockStorage)
-}));
-
-// Helper function to extract imported modules dynamically
+// Helper function to get a URL validator instance with mocked dependencies
 function getUrlValidator() {
-  try {
-    // Try to import the actual URL validator module
-    return require('../scripts/url-validator-test-exports');
-  } catch (error) {
-    // If not available, use a mock implementation for testing
-    return {
-      isValidUrl: (url) => {
-        if (!url || typeof url !== 'string') return false;
-        try {
-          new URL(url);
-          return url.startsWith('http://') || url.startsWith('https://');
-        } catch {
-          return false;
-        }
-      },
-      
-      isVideoUrl: (url) => {
-        if (!url || typeof url !== 'string') return false;
-        const lowerUrl = url.toLowerCase();
-        const videoExtensions = ['.mp4', '.mov', '.avi', '.webm'];
-        const videoPatterns = ['-SBV-', 'Dynamic motion'];
-        
-        return videoExtensions.some(ext => lowerUrl.endsWith(ext)) ||
-               videoPatterns.some(pattern => lowerUrl.includes(pattern.toLowerCase()));
-      },
-      
-      validateImageUrl: async (url) => {
-        if (!url || typeof url !== 'string') return { valid: false, error: 'Invalid URL' };
-        
-        // Check if it's a valid URL
-        try {
-          new URL(url);
-        } catch {
-          return { valid: false, error: 'Invalid URL format' };
-        }
-        
-        // Mock successful validation for known valid URLs
-        if (VALID_IMAGE_URLS.includes(url)) {
-          return { valid: true, contentType: 'image/jpeg' };
-        }
-        
-        // Video detection
-        if (url.includes('.mp4') || url.includes('-SBV-') || url.includes('Dynamic motion')) {
-          return { valid: false, error: 'Expected image, got video', contentType: 'video/mp4' };
-        }
-        
-        // All other URLs are invalid
-        return { valid: false, error: 'Invalid URL' };
-      }
-    };
-  }
+  return new URLValidator({
+    logError: jest.fn(),
+    logInfo: jest.fn(),
+    isRelativeUrlPattern: /^\/[^\/].*/  // Matches URLs starting with a single slash
+  });
 }
 
-// Tests for URL validation functions
-describe('URL Validator', () => {
-  
-  // Test URL format validation
-  describe('isValidUrl function', () => {
-    it('should identify correctly formatted URLs', () => {
-      const { isValidUrl } = getUrlValidator();
-      
-      VALID_IMAGE_URLS.forEach(url => {
-        expect(isValidUrl(url)).toBe(true);
+describe('URLValidator', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('validateURL', () => {
+    it('should validate a good image URL', async () => {
+      // Setup
+      const validator = getUrlValidator();
+      mockedAxios.get.mockResolvedValueOnce({
+        status: 200,
+        headers: { 'content-type': 'image/jpeg' }
       });
-      
-      VIDEO_URLS.forEach(url => {
-        expect(isValidUrl(url)).toBe(true);
+
+      // Test
+      const result = await validator.validateURL('https://example.com/image.jpg');
+
+      // Verify
+      expect(result.isValid).toBe(true);
+      expect(result.status).toBe(200);
+      expect(result.contentType).toBe('image/jpeg');
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+      expect(mockedAxios.get).toHaveBeenCalledWith('https://example.com/image.jpg', {
+        responseType: 'arraybuffer',
+        headers: expect.any(Object),
+        validateStatus: expect.any(Function),
+        timeout: expect.any(Number),
       });
     });
-    
-    it('should reject invalid URLs', () => {
-      const { isValidUrl } = getUrlValidator();
-      
-      ['/relative-path/image.jpg', 'not-a-url-at-all', ''].forEach(url => {
-        expect(isValidUrl(url)).toBe(false);
+
+    it('should invalidate non-image content types', async () => {
+      // Setup
+      const validator = getUrlValidator();
+      mockedAxios.get.mockResolvedValueOnce({
+        status: 200,
+        headers: { 'content-type': 'video/mp4' }
       });
+
+      // Test
+      const result = await validator.validateURL('https://example.com/video.mp4');
+
+      // Verify
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain('Expected image');
+      expect(result.status).toBe(200);
+      expect(result.contentType).toBe('video/mp4');
+    });
+
+    it('should handle network errors', async () => {
+      // Setup
+      const validator = getUrlValidator();
+      mockedAxios.get.mockRejectedValueOnce(new Error('Network error'));
+
+      // Test
+      const result = await validator.validateURL('https://example.com/broken-image.jpg');
+
+      // Verify
+      expect(result.isValid).toBe(false);
+      expect(result.error).toBe('Network error');
+      expect(result.status).toBeUndefined();
+    });
+
+    it('should handle HTTP errors', async () => {
+      // Setup
+      const validator = getUrlValidator();
+      mockedAxios.get.mockResolvedValueOnce({
+        status: 404,
+        statusText: 'Not Found'
+      });
+
+      // Test
+      const result = await validator.validateURL('https://example.com/missing-image.jpg');
+
+      // Verify
+      expect(result.isValid).toBe(false);
+      expect(result.error).toBe('Not Found');
+      expect(result.status).toBe(404);
     });
   });
-  
-  // Test video URL detection
-  describe('isVideoUrl function', () => {
-    it('should identify video URLs based on extensions and patterns', () => {
-      const { isVideoUrl } = getUrlValidator();
+
+  describe('isRelativeURL', () => {
+    it('should identify relative URLs', () => {
+      const validator = getUrlValidator();
       
-      VIDEO_URLS.forEach(url => {
-        expect(isVideoUrl(url)).toBe(true);
-      });
-    });
-    
-    it('should not identify image URLs as videos', () => {
-      const { isVideoUrl } = getUrlValidator();
+      // Valid relative URLs
+      expect(validator.isRelativeURL('/images/logo.png')).toBe(true);
+      expect(validator.isRelativeURL('/assets/photos/beach.jpg')).toBe(true);
       
-      VALID_IMAGE_URLS.forEach(url => {
-        expect(isVideoUrl(url)).toBe(false);
-      });
+      // Invalid relative URLs (not starting with a single slash)
+      expect(validator.isRelativeURL('//cdn.example.com/image.jpg')).toBe(false);
+      expect(validator.isRelativeURL('https://example.com/image.jpg')).toBe(false);
+      expect(validator.isRelativeURL('image.jpg')).toBe(false);
     });
   });
-  
-  // Test image URL validation
-  describe('validateImageUrl function', () => {
-    it('should validate good image URLs', async () => {
-      const { validateImageUrl } = getUrlValidator();
+
+  describe('isAbsoluteURL', () => {
+    it('should identify absolute URLs', () => {
+      const validator = getUrlValidator();
       
-      for (const url of VALID_IMAGE_URLS) {
-        const result = await validateImageUrl(url);
-        expect(result.valid).toBe(true);
-        expect(result.contentType).toContain('image/');
-      }
+      // Valid absolute URLs
+      expect(validator.isAbsoluteURL('https://example.com/image.jpg')).toBe(true);
+      expect(validator.isAbsoluteURL('http://subdomain.example.org/assets/logo.png')).toBe(true);
+      
+      // Invalid absolute URLs
+      expect(validator.isAbsoluteURL('/images/logo.png')).toBe(false);
+      expect(validator.isAbsoluteURL('image.jpg')).toBe(false);
     });
-    
-    it('should reject video URLs when expecting images', async () => {
-      const { validateImageUrl } = getUrlValidator();
+  });
+
+  describe('normalizePotentialRelativeURL', () => {
+    it('should convert relative URLs to absolute', () => {
+      const validator = getUrlValidator();
+      const baseUrl = 'https://example.com';
       
-      for (const url of VIDEO_URLS) {
-        const result = await validateImageUrl(url);
-        expect(result.valid).toBe(false);
-        expect(result.error).toContain('video');
-      }
-    });
-    
-    it('should reject malformed URLs', async () => {
-      const { validateImageUrl } = getUrlValidator();
+      // Convert relative to absolute
+      expect(validator.normalizePotentialRelativeURL('/images/logo.png', baseUrl))
+        .toBe('https://example.com/images/logo.png');
       
-      for (const url of INVALID_IMAGE_URLS) {
-        const result = await validateImageUrl(url);
-        expect(result.valid).toBe(false);
-      }
+      // Leave absolute URLs unchanged
+      expect(validator.normalizePotentialRelativeURL('https://cdn.example.org/logo.png', baseUrl))
+        .toBe('https://cdn.example.org/logo.png');
     });
   });
 });
