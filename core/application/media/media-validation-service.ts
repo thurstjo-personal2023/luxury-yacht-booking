@@ -1,612 +1,330 @@
 /**
- * Media Validation Service Implementation
+ * Media Validation Application Service
  * 
- * This module implements the IMediaValidationService interface.
- * It provides functionality for validating media resources.
+ * Orchestrates media validation operations across the system.
  */
 
-import axios from 'axios';
-import { 
-  IMediaValidationService, 
-  MediaValidationResult,
-  MediaTypeDetectionResult,
-  MediaValidationOptions
-} from '../../domain/media/media-validation-service';
-import { Media } from '../../domain/media/media';
+import { v4 as uuidv4 } from 'uuid';
+import { MediaType } from '../../domain/media/media-type';
+import { URL } from '../../domain/value-objects/url';
+import { DocumentValidationResult, FieldValidationResult } from '../../domain/validation/document-validation-result';
+import { MediaRepairType, DocumentRepairResult, FieldRepairResult, RepairReport } from '../../domain/validation/media-repair';
+import { MediaValidator, MediaValidationOptions } from '../../domain/validation/media-validator';
+import { ValidationReport } from '../../domain/validation/validation-report';
+import { ValidationResult } from '../../domain/validation/validation-result';
+import { IMediaRepository } from '../../../adapters/repositories/interfaces/media-repository';
 
 /**
- * Media validation service configuration
+ * Common URL fields to check for media content
  */
-export interface MediaValidationServiceConfig {
-  timeout: number;
-  placeholderImageUrl: string;
-  placeholderVideoUrl: string;
-  checkContentTypes: boolean;
+export const COMMON_IMAGE_FIELDS = [
+  "imageUrl",
+  "coverImageUrl",
+  "thumbnailUrl",
+  "profilePhoto",
+  "logoUrl",
+  "bannerUrl",
+  "featuredImageUrl"
+];
+
+/**
+ * Media validation service options
+ */
+export interface MediaValidationServiceOptions {
+  validationOptions?: MediaValidationOptions;
+  batchSize?: number;
+  includeCollections?: string[];
+  excludeCollections?: string[];
+  maxDocumentsPerCollection?: number;
 }
 
 /**
- * Media validation service implementation
+ * Media validation service default options
  */
-export class MediaValidationService implements IMediaValidationService {
-  // File extension mappings
-  private readonly imageExtensions = [
-    '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.bmp', '.tiff'
-  ];
-  
-  private readonly videoExtensions = [
-    '.mp4', '.mov', '.avi', '.webm', '.ogg', '.mkv', '.flv', '.m4v'
-  ];
-  
-  // Video detection patterns
-  private readonly videoPatterns = [
-    '-SBV-',
-    'Dynamic motion',
-    '.mp4',
-    '.mov',
-    '.avi',
-    '.webm',
-    'video/'
-  ];
-  
-  constructor(private readonly config: MediaValidationServiceConfig) {}
-  
+export const DEFAULT_SERVICE_OPTIONS: MediaValidationServiceOptions = {
+  batchSize: 50,
+  maxDocumentsPerCollection: 1000
+};
+
+/**
+ * Media validation application service
+ */
+export class MediaValidationService {
+  private repository: IMediaRepository;
+  private options: MediaValidationServiceOptions;
+
+  constructor(
+    repository: IMediaRepository, 
+    options: MediaValidationServiceOptions = DEFAULT_SERVICE_OPTIONS
+  ) {
+    this.repository = repository;
+    this.options = {
+      ...DEFAULT_SERVICE_OPTIONS,
+      ...options
+    };
+  }
+
   /**
    * Validate a media URL
    */
-  async validateMediaUrl(
-    url: string,
-    options?: MediaValidationOptions
-  ): Promise<MediaValidationResult> {
+  async validateUrl(
+    url: string | URL, 
+    expectedType: MediaType = MediaType.IMAGE
+  ): Promise<ValidationResult> {
     try {
-      if (!url) {
-        return {
-          isValid: false,
-          url,
-          mediaType: 'unknown',
-          error: 'URL is empty or undefined'
-        };
+      // Apply domain validation first
+      const urlString = url instanceof URL ? url.value : url;
+      const domainValidation = MediaValidator.validateUrl(
+        urlString, 
+        expectedType, 
+        this.options.validationOptions
+      );
+
+      // If the domain validator found an issue that it fixed, return that result
+      if (domainValidation.url !== urlString) {
+        return domainValidation;
       }
-      
-      // Handle relative URLs
-      if (this.isRelativeUrl(url)) {
-        return {
-          isValid: false,
-          url,
-          mediaType: 'unknown',
-          error: 'Invalid URL: Relative URLs are not supported'
-        };
-      }
-      
-      // Handle blob URLs
-      if (this.isBlobUrl(url)) {
-        return {
-          isValid: false,
-          url,
-          mediaType: 'unknown',
-          error: 'Invalid URL: Blob URLs are not supported'
-        };
-      }
-      
-      // Handle data URLs (they're always valid)
-      if (this.isDataUrl(url)) {
-        const mediaType = url.startsWith('data:image/') 
-          ? 'image' 
-          : url.startsWith('data:video/') 
-            ? 'video' 
-            : 'unknown';
-            
-        return {
-          isValid: true,
-          url,
-          mediaType,
-          status: 200,
-          statusText: 'OK',
-          contentType: mediaType === 'image' ? 'image/base64' : 'unknown'
-        };
-      }
-      
-      // Check URL validity
-      if (!this.isValidUrl(url)) {
-        return {
-          isValid: false,
-          url,
-          mediaType: 'unknown',
-          error: 'Invalid URL format'
-        };
-      }
-      
-      // Skip content validation if not needed
-      if (options?.validateContent === false) {
-        // Guess mediaType based on URL
-        const mediaType = this.guessMediaTypeFromUrl(url);
-        
-        return {
-          isValid: true,
-          url,
-          mediaType,
-          status: 200,
-          statusText: 'OK (not validated)'
-        };
-      }
-      
-      // Verify URL with HTTP request
-      try {
-        const response = await axios.head(url, {
-          timeout: options?.timeout || this.config.timeout,
-          maxRedirects: 5,
-          validateStatus: () => true // Accept any status code
-        });
-        
-        const contentType = response.headers['content-type'] || '';
-        const mediaType = this.getMediaTypeFromContentType(contentType, url);
-        
-        // Check if expected media type matches detected media type
-        if (options?.expectedType && mediaType !== 'unknown' && options.expectedType !== mediaType) {
-          return {
-            isValid: false,
-            url,
-            mediaType,
-            status: response.status,
-            statusText: response.statusText,
-            contentType,
-            error: `Expected ${options.expectedType}, got ${mediaType}`
-          };
-        }
-        
-        // Check if response status is successful
-        if (response.status >= 400) {
-          return {
-            isValid: false,
-            url,
-            mediaType,
-            status: response.status,
-            statusText: response.statusText,
-            contentType,
-            error: `HTTP error: ${response.status} ${response.statusText}`
-          };
-        }
-        
-        return {
-          isValid: true,
-          url,
-          mediaType,
-          status: response.status,
-          statusText: response.statusText,
-          contentType
-        };
-      } catch (error) {
-        // Handle Axios errors
-        if (axios.isAxiosError(error)) {
-          return {
-            isValid: false,
-            url,
-            mediaType: 'unknown',
-            status: error.response?.status,
-            statusText: error.response?.statusText,
-            contentType: error.response?.headers?.['content-type'],
-            error: error.message
-          };
-        }
-        
-        // Handle other errors
-        return {
-          isValid: false,
-          url,
-          mediaType: 'unknown',
-          error: error instanceof Error ? error.message : String(error)
-        };
-      }
+
+      // Otherwise, perform repository validation (which may include HTTP requests)
+      return await this.repository.validateUrl(url, expectedType);
     } catch (error) {
-      return {
-        isValid: false,
-        url,
-        mediaType: 'unknown',
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return ValidationResult.createInvalid(
+        url instanceof URL ? url.value : url,
+        error instanceof Error ? error.message : String(error)
+      );
     }
   }
-  
+
   /**
-   * Validate a media object
+   * Validate media fields in a document
    */
-  async validateMedia(
-    media: Media,
-    options?: MediaValidationOptions
-  ): Promise<MediaValidationResult> {
-    const expectedType = media.type === 'image' || media.type === 'video'
-      ? media.type
-      : undefined;
-    
-    return this.validateMediaUrl(media.url, {
-      ...options,
-      expectedType
-    });
-  }
-  
-  /**
-   * Check if a URL points to an image
-   */
-  async isImageUrl(url: string): Promise<boolean> {
-    const result = await this.detectMediaType(url);
-    return result.detectedType === 'image';
-  }
-  
-  /**
-   * Check if a URL points to a video
-   */
-  async isVideoUrl(url: string): Promise<boolean> {
-    const result = await this.detectMediaType(url);
-    return result.detectedType === 'video';
-  }
-  
-  /**
-   * Detect the media type of a URL
-   */
-  async detectMediaType(url: string): Promise<MediaTypeDetectionResult> {
-    // Check for null or empty URL
-    if (!url) {
-      return {
-        url,
-        detectedType: 'unknown',
-        isTypeValid: false
-      };
-    }
-    
-    // Check for data URLs
-    if (this.isDataUrl(url)) {
-      const isImage = url.startsWith('data:image/');
-      const isVideo = url.startsWith('data:video/');
-      
-      if (isImage) {
-        return {
-          url,
-          detectedType: 'image',
-          mimeType: 'image/data-url',
-          isTypeValid: true
-        };
-      }
-      
-      if (isVideo) {
-        return {
-          url,
-          detectedType: 'video',
-          mimeType: 'video/data-url',
-          isTypeValid: true
-        };
-      }
-      
-      return {
-        url,
-        detectedType: 'unknown',
-        mimeType: 'application/data-url',
-        isTypeValid: false
-      };
-    }
-    
-    // Check file extension first
-    const extension = this.getFileExtension(url);
-    
-    if (extension) {
-      if (this.isImageExtension(extension)) {
-        return {
-          url,
-          detectedType: 'image',
-          mimeType: this.getMimeTypeFromExtension(extension),
-          isTypeValid: true
-        };
-      }
-      
-      if (this.isVideoExtension(extension)) {
-        return {
-          url,
-          detectedType: 'video',
-          mimeType: this.getMimeTypeFromExtension(extension),
-          isTypeValid: true
-        };
-      }
-    }
-    
-    // Check for video patterns in URL
-    for (const pattern of this.videoPatterns) {
-      if (url.includes(pattern)) {
-        return {
-          url,
-          detectedType: 'video',
-          isTypeValid: true
-        };
-      }
-    }
-    
-    // If the config allows content type checking, make an HTTP request
-    if (this.config.checkContentTypes && this.isValidUrl(url) && !this.isRelativeUrl(url)) {
-      try {
-        const response = await axios.head(url, {
-          timeout: this.config.timeout,
-          maxRedirects: 5,
-          validateStatus: () => true
-        });
-        
-        const contentType = response.headers['content-type'] || '';
-        
-        if (contentType.startsWith('image/')) {
-          return {
-            url,
-            detectedType: 'image',
-            mimeType: contentType,
-            isTypeValid: true
-          };
-        }
-        
-        if (contentType.startsWith('video/')) {
-          return {
-            url,
-            detectedType: 'video',
-            mimeType: contentType,
-            isTypeValid: true
-          };
-        }
-        
-        return {
-          url,
-          detectedType: 'unknown',
-          mimeType: contentType,
-          isTypeValid: false
-        };
-      } catch (error) {
-        // If we can't check content type, fall back to guessing
-        const guessedType = this.guessMediaTypeFromUrl(url);
-        
-        return {
-          url,
-          detectedType: guessedType,
-          isTypeValid: guessedType !== 'unknown'
-        };
-      }
-    }
-    
-    // Default to guessing based on URL patterns
-    const guessedType = this.guessMediaTypeFromUrl(url);
-    
-    return {
-      url,
-      detectedType: guessedType,
-      isTypeValid: guessedType !== 'unknown'
-    };
-  }
-  
-  /**
-   * Check if a URL is relative
-   */
-  isRelativeUrl(url: string): boolean {
-    if (!url) {
-      return false;
-    }
-    
-    // Check if it starts with / or ./ or ../
-    return url.startsWith('/') || 
-      url.startsWith('./') || 
-      url.startsWith('../') || 
-      (!url.includes('://') && !url.startsWith('data:') && !url.startsWith('blob:'));
-  }
-  
-  /**
-   * Check if a URL is a blob URL
-   */
-  isBlobUrl(url: string): boolean {
-    return url?.startsWith('blob:') || false;
-  }
-  
-  /**
-   * Check if a URL is a data URL
-   */
-  isDataUrl(url: string): boolean {
-    return url?.startsWith('data:') || false;
-  }
-  
-  /**
-   * Normalize a URL by adding a base URL if it's relative
-   */
-  normalizeUrl(url: string, baseUrl: string): string {
-    if (!url) {
-      return '';
-    }
-    
-    if (!this.isRelativeUrl(url)) {
-      return url;
-    }
-    
-    // Remove trailing slash from base URL if present
-    const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    
-    // Add leading slash to URL if missing
-    const path = url.startsWith('/') ? url : `/${url}`;
-    
-    return `${base}${path}`;
-  }
-  
-  /**
-   * Extract the file extension from a URL
-   */
-  getFileExtension(url: string): string | null {
-    if (!url) {
-      return null;
-    }
-    
-    // Remove query string and hash
-    const cleanUrl = url.split('?')[0].split('#')[0];
-    
-    // Find the last dot in the path
-    const lastDot = cleanUrl.lastIndexOf('.');
-    
-    if (lastDot === -1 || lastDot === 0) {
-      return null;
-    }
-    
-    // Extract the extension (including the dot)
-    return cleanUrl.slice(lastDot).toLowerCase();
-  }
-  
-  /**
-   * Check if a file extension is an image extension
-   */
-  isImageExtension(extension: string): boolean {
-    return this.imageExtensions.includes(extension.toLowerCase());
-  }
-  
-  /**
-   * Check if a file extension is a video extension
-   */
-  isVideoExtension(extension: string): boolean {
-    return this.videoExtensions.includes(extension.toLowerCase());
-  }
-  
-  /**
-   * Get a placeholder URL for a media type
-   */
-  getPlaceholderUrl(mediaType: 'image' | 'video'): string {
-    return mediaType === 'image'
-      ? this.config.placeholderImageUrl
-      : this.config.placeholderVideoUrl;
-  }
-  
-  /**
-   * Get media type from content type header
-   */
-  private getMediaTypeFromContentType(
-    contentType: string,
-    url: string
-  ): 'image' | 'video' | 'unknown' {
-    if (!contentType) {
-      return this.guessMediaTypeFromUrl(url);
-    }
-    
-    if (contentType.startsWith('image/')) {
-      return 'image';
-    }
-    
-    if (contentType.startsWith('video/')) {
-      return 'video';
-    }
-    
-    // Check URL for video patterns
-    for (const pattern of this.videoPatterns) {
-      if (url.includes(pattern)) {
-        return 'video';
-      }
-    }
-    
-    return 'unknown';
-  }
-  
-  /**
-   * Guess media type from URL
-   */
-  private guessMediaTypeFromUrl(url: string): 'image' | 'video' | 'unknown' {
-    if (!url) {
-      return 'unknown';
-    }
-    
-    // Check extension
-    const extension = this.getFileExtension(url);
-    
-    if (extension) {
-      if (this.isImageExtension(extension)) {
-        return 'image';
-      }
-      
-      if (this.isVideoExtension(extension)) {
-        return 'video';
-      }
-    }
-    
-    // Check for common video indicators in URL
-    for (const pattern of this.videoPatterns) {
-      if (url.includes(pattern)) {
-        return 'video';
-      }
-    }
-    
-    // Check for common image indicators in URL
-    if (
-      url.includes('image') || 
-      url.includes('photo') || 
-      url.includes('picture') || 
-      url.includes('img') || 
-      url.includes('thumbnail')
-    ) {
-      return 'image';
-    }
-    
-    // Default assumption: most media URLs are images
-    return 'image';
-  }
-  
-  /**
-   * Get MIME type from file extension
-   */
-  private getMimeTypeFromExtension(extension: string): string {
-    // Image MIME types
-    const imageMimeTypes: Record<string, string> = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif',
-      '.svg': 'image/svg+xml',
-      '.webp': 'image/webp',
-      '.bmp': 'image/bmp',
-      '.tiff': 'image/tiff'
-    };
-    
-    // Video MIME types
-    const videoMimeTypes: Record<string, string> = {
-      '.mp4': 'video/mp4',
-      '.mov': 'video/quicktime',
-      '.avi': 'video/x-msvideo',
-      '.webm': 'video/webm',
-      '.ogg': 'video/ogg',
-      '.mkv': 'video/x-matroska',
-      '.flv': 'video/x-flv',
-      '.m4v': 'video/x-m4v'
-    };
-    
-    // Check for image MIME type
-    if (extension in imageMimeTypes) {
-      return imageMimeTypes[extension];
-    }
-    
-    // Check for video MIME type
-    if (extension in videoMimeTypes) {
-      return videoMimeTypes[extension];
-    }
-    
-    // Unknown extension
-    return 'application/octet-stream';
-  }
-  
-  /**
-   * Check if a URL is valid
-   */
-  private isValidUrl(url: string): boolean {
-    if (!url) {
-      return false;
-    }
-    
-    // Data URLs and blob URLs are valid
-    if (this.isDataUrl(url) || this.isBlobUrl(url)) {
-      return true;
-    }
-    
-    // Relative URLs need a base URL
-    if (this.isRelativeUrl(url)) {
-      return false;
-    }
-    
+  async validateDocument(
+    collection: string, 
+    documentId: string
+  ): Promise<DocumentValidationResult> {
     try {
-      // Try to parse the URL
-      new URL(url);
-      return true;
+      return await this.repository.validateDocument(collection, documentId);
     } catch (error) {
-      return false;
+      // Create a minimal validation result if the repository validation fails
+      return new DocumentValidationResult({
+        collection,
+        documentId,
+        fields: [],
+        validatedAt: new Date()
+      });
     }
+  }
+
+  /**
+   * Run validation across all collections
+   */
+  async validateAllCollections(): Promise<ValidationReport> {
+    const startTime = new Date();
+    const allResults: DocumentValidationResult[] = [];
+    const reportId = uuidv4();
+
+    try {
+      // Get all collections
+      const collections = await this.repository.getCollections();
+      
+      // Filter collections if needed
+      let collectionsToValidate = collections;
+      
+      if (this.options.includeCollections && this.options.includeCollections.length > 0) {
+        collectionsToValidate = collections.filter(collection => 
+          this.options.includeCollections!.includes(collection)
+        );
+      }
+      
+      if (this.options.excludeCollections && this.options.excludeCollections.length > 0) {
+        collectionsToValidate = collectionsToValidate.filter(collection => 
+          !this.options.excludeCollections!.includes(collection)
+        );
+      }
+      
+      // Process each collection
+      for (const collection of collectionsToValidate) {
+        // Get documents for this collection
+        const documentIds = await this.repository.getDocumentIds(
+          collection, 
+          this.options.maxDocumentsPerCollection
+        );
+        
+        // Process documents in batches
+        const batchSize = this.options.batchSize || 50;
+        for (let i = 0; i < documentIds.length; i += batchSize) {
+          const batch = documentIds.slice(i, i + batchSize);
+          
+          // Process each document in the batch
+          for (const documentId of batch) {
+            const result = await this.validateDocument(collection, documentId);
+            allResults.push(result);
+          }
+        }
+      }
+      
+      // Generate the validation report
+      const endTime = new Date();
+      const report = ValidationReport.generateFromResults(
+        reportId,
+        allResults,
+        startTime,
+        endTime
+      );
+      
+      // Save the report
+      await this.repository.saveValidationReport(report.toObject());
+      
+      return report;
+    } catch (error) {
+      // If there's an error, still generate a partial report
+      const endTime = new Date();
+      const report = ValidationReport.generateFromResults(
+        reportId,
+        allResults,
+        startTime,
+        endTime
+      );
+      
+      try {
+        await this.repository.saveValidationReport(report.toObject());
+      } catch {
+        // Ignore errors when saving partial report
+      }
+      
+      return report;
+    }
+  }
+
+  /**
+   * Repair invalid media URLs based on a validation report
+   */
+  async repairInvalidMediaUrls(reportId: string): Promise<RepairReport> {
+    const startTime = new Date();
+    const repairResults: DocumentRepairResult[] = [];
+    const repairReportId = uuidv4();
+
+    try {
+      // Get the validation report
+      const report = await this.repository.getValidationReport(reportId);
+      
+      if (!report) {
+        throw new Error(`Validation report with ID ${reportId} not found`);
+      }
+      
+      // Process each invalid result
+      const groupedResults = this.groupInvalidResultsByDocument(report.invalidResults);
+      
+      for (const [collectionAndDocId, invalidFields] of groupedResults.entries()) {
+        const [collection, documentId] = collectionAndDocId.split('||');
+        
+        // Prepare repairs for this document
+        const fieldUpdates: Record<string, string> = {};
+        const repairDetails: FieldRepairResult[] = [];
+        
+        for (const field of invalidFields) {
+          // Determine the type of repair needed
+          let repairType: MediaRepairType;
+          let fixedUrl: string;
+          
+          if (field.url.startsWith('/')) {
+            // Fix relative URL
+            repairType = MediaRepairType.RELATIVE_URL_FIX;
+            fixedUrl = `${this.options.validationOptions?.baseUrl || ''}${field.url}`;
+          } else if (field.url.startsWith('blob:')) {
+            // Replace blob URL
+            repairType = MediaRepairType.BLOB_URL_RESOLVE;
+            fixedUrl = this.options.validationOptions?.placeholderUrl || 
+              'https://etoile-yachts.firebasestorage.app/yacht-placeholder.jpg';
+          } else if (field.error && field.error.includes('Expected image, got video')) {
+            // Fix media type mismatch
+            repairType = MediaRepairType.MEDIA_TYPE_CORRECTION;
+            // Just update media type, not URL
+            fixedUrl = field.url;
+          } else {
+            // Use placeholder for other issues
+            repairType = MediaRepairType.PLACEHOLDER_INSERTION;
+            fixedUrl = this.options.validationOptions?.placeholderUrl || 
+              'https://etoile-yachts.firebasestorage.app/yacht-placeholder.jpg';
+          }
+          
+          // Add to updates
+          fieldUpdates[field.field] = fixedUrl;
+          
+          // Record the repair details
+          repairDetails.push({
+            path: field.field,
+            originalValue: field.url,
+            newValue: fixedUrl,
+            repairType
+          });
+        }
+        
+        // Apply the repairs to the document
+        if (Object.keys(fieldUpdates).length > 0) {
+          const success = await this.repository.repairDocument(
+            collection,
+            documentId,
+            fieldUpdates
+          );
+          
+          if (success) {
+            repairResults.push(new DocumentRepairResult({
+              collection,
+              documentId,
+              fields: repairDetails,
+              repairedAt: new Date()
+            }));
+          }
+        }
+      }
+      
+      // Generate the repair report
+      const endTime = new Date();
+      const repairReport = RepairReport.generateFromResults(
+        repairReportId,
+        repairResults,
+        startTime,
+        endTime
+      );
+      
+      // Save the report
+      // Note: saveRepairReport method would need to be added to the repository interface
+      // await this.repository.saveRepairReport(repairReport.toObject());
+      
+      return repairReport;
+    } catch (error) {
+      // If there's an error, still generate a partial report
+      const endTime = new Date();
+      const repairReport = RepairReport.generateFromResults(
+        repairReportId,
+        repairResults,
+        startTime,
+        endTime
+      );
+      
+      return repairReport;
+    }
+  }
+
+  /**
+   * Group invalid results by document for efficient repair
+   */
+  private groupInvalidResultsByDocument(
+    invalidResults: InvalidFieldResult[]
+  ): Map<string, InvalidFieldResult[]> {
+    const grouped = new Map<string, InvalidFieldResult[]>();
+    
+    for (const result of invalidResults) {
+      const key = `${result.collection}||${result.documentId}`;
+      
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      
+      grouped.get(key)!.push(result);
+    }
+    
+    return grouped;
   }
 }

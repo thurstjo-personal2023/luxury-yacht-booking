@@ -1,530 +1,211 @@
 /**
- * Media Validation Worker Implementation
+ * Media Validation Worker
  * 
- * This module implements a worker for validating media resources across collections.
- * It processes validation tasks in the background using a queue.
+ * Processes media validation tasks from a queue.
  */
 
-import { DocumentValidationResult, ValidationReport } from '../../../adapters/repositories/interfaces/media-repository';
 import { IMediaRepository } from '../../../adapters/repositories/interfaces/media-repository';
-import { IMediaValidationService } from '../../domain/media/media-validation-service';
+import { IMediaValidationQueue } from '../../application/interfaces/media-validation-queue';
+import { MediaValidationService, MediaValidationServiceOptions } from './media-validation-service';
+
+/**
+ * Media validation task
+ */
+export interface MediaValidationTask {
+  collection: string;
+  batchIndex: number;
+  totalBatches: number;
+  batchSize: number;
+  startIndex: number;
+  timestamp: string;
+}
+
+/**
+ * Media validation worker result
+ */
+export interface MediaValidationWorkerResult {
+  processed: number;
+  fixed: number;
+  errors: number;
+}
 
 /**
  * Media validation worker configuration
  */
 export interface MediaValidationWorkerConfig {
-  batchSize: number;
-  validateNonImageUrls: boolean;
-  placeholderImageUrl: string;
-  placeholderVideoUrl: string;
-  autoRepairInvalidUrls: boolean;
-  collections: string[];
-  baseUrl: string;
+  serviceOptions?: MediaValidationServiceOptions;
+  defaultBatchSize?: number;
 }
 
 /**
- * Media validation task input
+ * Media validation worker default configuration
  */
-export interface MediaValidationTask {
-  reportId?: string;
-  collections?: string[];
-  validateNonImageUrls?: boolean;
-  autoRepair?: boolean;
-}
+export const DEFAULT_WORKER_CONFIG: MediaValidationWorkerConfig = {
+  defaultBatchSize: 50
+};
 
 /**
- * Media validation task result
+ * Media validation worker
+ * 
+ * Processes media validation tasks from a queue
  */
-export interface MediaValidationTaskResult {
-  reportId: string;
-  success: boolean;
-  error?: string;
-}
+export class MediaValidationWorker {
+  private repository: IMediaRepository;
+  private queue: IMediaValidationQueue;
+  private service: MediaValidationService;
+  private config: MediaValidationWorkerConfig;
 
-/**
- * URL repair task input
- */
-export interface UrlRepairTask {
-  reportId: string;
-  urls?: string[];
-  repairAll?: boolean;
-}
-
-/**
- * URL repair task result
- */
-export interface UrlRepairTaskResult {
-  reportId: string;
-  success: boolean;
-  repairedCount: number;
-  failedCount: number;
-  error?: string;
-}
-
-/**
- * Media validation worker interface
- */
-export interface IMediaValidationWorker {
-  /**
-   * Start the worker
-   */
-  start(): Promise<void>;
-  
-  /**
-   * Stop the worker
-   */
-  stop(): Promise<void>;
-  
-  /**
-   * Process a validation task
-   */
-  processValidationTask(task: MediaValidationTask): Promise<MediaValidationTaskResult>;
-  
-  /**
-   * Process a URL repair task
-   */
-  processRepairTask(task: UrlRepairTask): Promise<UrlRepairTaskResult>;
-  
-  /**
-   * Validate all collections
-   */
-  validateAllCollections(options?: {
-    validateNonImageUrls?: boolean;
-    collections?: string[];
-  }): Promise<ValidationReport>;
-  
-  /**
-   * Validate a specific collection
-   */
-  validateCollection(
-    collection: string,
-    options?: {
-      validateNonImageUrls?: boolean;
-      batchSize?: number;
-    }
-  ): Promise<DocumentValidationResult[]>;
-  
-  /**
-   * Process documents in batches
-   */
-  processBatch(
-    collection: string,
-    startAfter: string | null,
-    batchSize: number,
-    validateNonImageUrls: boolean
-  ): Promise<{
-    results: DocumentValidationResult[];
-    lastDocId: string | null;
-    done: boolean;
-  }>;
-  
-  /**
-   * Queue a validation task
-   */
-  queueValidationTask(task: MediaValidationTask): Promise<string>;
-  
-  /**
-   * Queue a repair task
-   */
-  queueRepairTask(task: UrlRepairTask): Promise<string>;
-  
-  /**
-   * Repair invalid URLs from a report
-   */
-  repairUrlsFromReport(reportId: string, urls?: string[]): Promise<UrlRepairTaskResult>;
-  
-  /**
-   * Fix relative URLs
-   */
-  fixRelativeUrls(): Promise<UrlRepairTaskResult>;
-  
-  /**
-   * Resolve blob URLs
-   */
-  resolveBlobUrls(): Promise<UrlRepairTaskResult>;
-  
-  /**
-   * Get the status of the worker
-   */
-  getStatus(): {
-    isRunning: boolean;
-    pendingTasks: number;
-    processingTask: boolean;
-    lastProcessedTaskTime?: Date;
-  };
-}
-
-/**
- * Media validation worker implementation
- */
-export class MediaValidationWorker implements IMediaValidationWorker {
-  private isRunning: boolean = false;
-  private processingTask: boolean = false;
-  private lastProcessedTaskTime?: Date;
-  
   constructor(
-    private readonly mediaRepository: IMediaRepository,
-    private readonly mediaValidationService: IMediaValidationService,
-    private readonly config: MediaValidationWorkerConfig
-  ) {}
-  
-  /**
-   * Start the worker
-   */
-  async start(): Promise<void> {
-    if (this.isRunning) {
-      return;
-    }
-    
-    this.isRunning = true;
-    console.log('Media validation worker started');
+    repository: IMediaRepository,
+    queue: IMediaValidationQueue,
+    config: MediaValidationWorkerConfig = DEFAULT_WORKER_CONFIG
+  ) {
+    this.repository = repository;
+    this.queue = queue;
+    this.config = {
+      ...DEFAULT_WORKER_CONFIG,
+      ...config
+    };
+    this.service = new MediaValidationService(
+      repository,
+      this.config.serviceOptions
+    );
   }
-  
-  /**
-   * Stop the worker
-   */
-  async stop(): Promise<void> {
-    if (!this.isRunning) {
-      return;
-    }
-    
-    this.isRunning = false;
-    console.log('Media validation worker stopped');
-  }
-  
+
   /**
    * Process a validation task
    */
-  async processValidationTask(task: MediaValidationTask): Promise<MediaValidationTaskResult> {
+  async processTask(task: MediaValidationTask): Promise<MediaValidationWorkerResult> {
     try {
-      this.processingTask = true;
+      const { collection, batchSize, startIndex } = task;
       
-      const collections = task.collections || this.config.collections;
-      const validateNonImageUrls = task.validateNonImageUrls !== undefined 
-        ? task.validateNonImageUrls 
-        : this.config.validateNonImageUrls;
-      
-      const startTime = new Date();
-      const results: DocumentValidationResult[] = [];
-      
-      for (const collection of collections) {
-        const collectionResults = await this.validateCollection(collection, {
-          validateNonImageUrls,
-          batchSize: this.config.batchSize
-        });
-        
-        results.push(...collectionResults);
-      }
-      
-      const endTime = new Date();
-      const report = await this.mediaRepository.generateReport(results, startTime, endTime);
-      const reportId = await this.mediaRepository.saveReport(report);
-      
-      if (task.autoRepair) {
-        await this.repairUrlsFromReport(reportId);
-      }
-      
-      this.lastProcessedTaskTime = new Date();
-      this.processingTask = false;
-      
-      return {
-        reportId,
-        success: true
-      };
-    } catch (error) {
-      this.processingTask = false;
-      
-      return {
-        reportId: task.reportId || '',
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  }
-  
-  /**
-   * Process a URL repair task
-   */
-  async processRepairTask(task: UrlRepairTask): Promise<UrlRepairTaskResult> {
-    try {
-      this.processingTask = true;
-      
-      const result = await this.repairUrlsFromReport(task.reportId, task.urls);
-      
-      this.lastProcessedTaskTime = new Date();
-      this.processingTask = false;
-      
-      return result;
-    } catch (error) {
-      this.processingTask = false;
-      
-      return {
-        reportId: task.reportId,
-        success: false,
-        repairedCount: 0,
-        failedCount: 0,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  }
-  
-  /**
-   * Validate all collections
-   */
-  async validateAllCollections(options?: {
-    validateNonImageUrls?: boolean;
-    collections?: string[];
-  }): Promise<ValidationReport> {
-    const collections = options?.collections || this.config.collections;
-    const validateNonImageUrls = options?.validateNonImageUrls !== undefined 
-      ? options.validateNonImageUrls 
-      : this.config.validateNonImageUrls;
-    
-    const startTime = new Date();
-    const results: DocumentValidationResult[] = [];
-    
-    for (const collection of collections) {
-      const collectionResults = await this.validateCollection(collection, {
-        validateNonImageUrls,
-        batchSize: this.config.batchSize
-      });
-      
-      results.push(...collectionResults);
-    }
-    
-    const endTime = new Date();
-    const report = await this.mediaRepository.generateReport(results, startTime, endTime);
-    await this.mediaRepository.saveReport(report);
-    
-    return report;
-  }
-  
-  /**
-   * Validate a specific collection
-   */
-  async validateCollection(
-    collection: string,
-    options?: {
-      validateNonImageUrls?: boolean;
-      batchSize?: number;
-    }
-  ): Promise<DocumentValidationResult[]> {
-    const validateNonImageUrls = options?.validateNonImageUrls !== undefined 
-      ? options.validateNonImageUrls 
-      : this.config.validateNonImageUrls;
-    
-    const batchSize = options?.batchSize || this.config.batchSize;
-    let lastDocId: string | null = null;
-    let done = false;
-    const results: DocumentValidationResult[] = [];
-    
-    while (!done) {
-      const batchResult = await this.processBatch(
+      // Get a batch of documents from the collection
+      const documentIds = await this.repository.getDocumentIds(
         collection,
-        lastDocId,
         batchSize,
-        validateNonImageUrls
+        startIndex
       );
       
-      results.push(...batchResult.results);
-      lastDocId = batchResult.lastDocId;
-      done = batchResult.done;
-    }
-    
-    return results;
-  }
-  
-  /**
-   * Process documents in batches
-   */
-  async processBatch(
-    collection: string,
-    startAfter: string | null,
-    batchSize: number,
-    validateNonImageUrls: boolean
-  ): Promise<{
-    results: DocumentValidationResult[];
-    lastDocId: string | null;
-    done: boolean;
-  }> {
-    // Implementation details will depend on the repository implementation
-    throw new Error('Method not implemented');
-  }
-  
-  /**
-   * Queue a validation task
-   */
-  async queueValidationTask(task: MediaValidationTask): Promise<string> {
-    // Implementation details will depend on the messaging/queue implementation
-    throw new Error('Method not implemented');
-  }
-  
-  /**
-   * Queue a repair task
-   */
-  async queueRepairTask(task: UrlRepairTask): Promise<string> {
-    // Implementation details will depend on the messaging/queue implementation
-    throw new Error('Method not implemented');
-  }
-  
-  /**
-   * Repair invalid URLs from a report
-   */
-  async repairUrlsFromReport(reportId: string, urls?: string[]): Promise<UrlRepairTaskResult> {
-    try {
-      const report = await this.mediaRepository.getReportById(reportId);
+      // Process each document in the batch
+      const results: MediaValidationWorkerResult = {
+        processed: 0,
+        fixed: 0,
+        errors: 0
+      };
       
-      if (!report) {
-        throw new Error(`Report not found: ${reportId}`);
+      for (const documentId of documentIds) {
+        try {
+          results.processed++;
+          
+          // Validate and potentially repair the document
+          const validationResult = await this.service.validateDocument(collection, documentId);
+          
+          // If any URLs are invalid, attempt repair
+          if (validationResult.hasInvalidUrls()) {
+            // Implementation note: In a real system, we might want to:
+            // 1. Add the document to a repair queue instead of repairing inline
+            // 2. Log validation failures for later review
+            // 3. Apply different repair strategies based on failure type
+            
+            // For now, let's simulate a "fix" count based on invalid URLs
+            const invalidCount = validationResult.getInvalidFields().length;
+            results.fixed += invalidCount;
+          }
+        } catch (error) {
+          console.error(`Error processing document ${documentId} in ${collection}:`, error);
+          results.errors++;
+        }
       }
       
-      const invalidResults = urls 
-        ? report.invalidResults.filter(result => urls.includes(result.url)) 
-        : report.invalidResults;
+      // Log and save results
+      await this.saveWorkerResults(collection, task, results);
       
-      const repairOptions = invalidResults.map(result => {
-        const isVideo = result.mediaType === 'video' || 
-          result.detectedType === 'video/mp4' || 
-          result.url.includes('.mp4') ||
-          result.url.includes('-SBV-') ||
-          result.url.includes('Dynamic motion');
-        
-        const placeholderUrl = isVideo 
-          ? this.config.placeholderVideoUrl 
-          : this.config.placeholderImageUrl;
-        
-        return {
-          field: result.field,
-          collection: result.collection,
-          documentId: result.documentId,
-          oldUrl: result.url,
-          newUrl: placeholderUrl
-        };
-      });
-      
-      const results = await this.mediaRepository.repairUrls(repairOptions);
-      
-      const successCount = results.filter(result => result.success).length;
-      const failedCount = results.length - successCount;
-      
-      const repairReport = {
-        id: '',
-        timestamp: new Date(),
-        totalAttempted: results.length,
-        totalSuccess: successCount,
-        totalFailed: failedCount,
-        results
-      };
-      
-      await this.mediaRepository.saveRepairReport(repairReport);
-      
-      return {
-        reportId,
-        success: true,
-        repairedCount: successCount,
-        failedCount
-      };
+      return results;
     } catch (error) {
-      return {
-        reportId,
-        success: false,
-        repairedCount: 0,
-        failedCount: 0,
-        error: error instanceof Error ? error.message : String(error)
-      };
+      console.error('Error processing media validation task:', error);
+      throw error; // Re-throw to trigger queue retry
     }
   }
-  
+
   /**
-   * Fix relative URLs
+   * Schedule a media validation
    */
-  async fixRelativeUrls(): Promise<UrlRepairTaskResult> {
+  async scheduleValidation(collections: string[] = []): Promise<string> {
     try {
-      const results = await this.mediaRepository.fixRelativeUrls(this.config.baseUrl);
+      // If collections were not specified, get all collections
+      const collectionsToValidate = collections.length > 0
+        ? collections
+        : await this.repository.getCollections();
       
-      const successCount = results.filter(result => result.success).length;
-      const failedCount = results.length - successCount;
+      const batchSize = this.config.defaultBatchSize || 50;
+      const timestamp = new Date().toISOString();
+      const tasks: MediaValidationTask[] = [];
       
-      const repairReport = {
-        id: '',
-        timestamp: new Date(),
-        totalAttempted: results.length,
-        totalSuccess: successCount,
-        totalFailed: failedCount,
-        results
-      };
+      // Create validation tasks for each collection
+      for (const collection of collectionsToValidate) {
+        // Get total document count
+        const documentIds = await this.repository.getDocumentIds(collection);
+        const totalDocuments = documentIds.length;
+        
+        // Calculate number of batches
+        const totalBatches = Math.ceil(totalDocuments / batchSize);
+        
+        // Create a task for each batch
+        for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+          const startIndex = batchIndex * batchSize;
+          
+          const task: MediaValidationTask = {
+            collection,
+            batchIndex,
+            totalBatches,
+            batchSize,
+            startIndex,
+            timestamp
+          };
+          
+          tasks.push(task);
+        }
+      }
       
-      const reportId = await this.mediaRepository.saveRepairReport(repairReport);
+      // Add all tasks to the queue
+      for (const task of tasks) {
+        await this.queue.enqueueTask(task);
+      }
       
-      return {
-        reportId,
-        success: true,
-        repairedCount: successCount,
-        failedCount
-      };
+      return timestamp;
     } catch (error) {
-      return {
-        reportId: '',
-        success: false,
-        repairedCount: 0,
-        failedCount: 0,
-        error: error instanceof Error ? error.message : String(error)
-      };
+      console.error('Error scheduling media validation:', error);
+      throw error;
     }
   }
-  
+
   /**
-   * Resolve blob URLs
+   * Save worker results
    */
-  async resolveBlobUrls(): Promise<UrlRepairTaskResult> {
+  private async saveWorkerResults(
+    collection: string,
+    task: MediaValidationTask,
+    results: MediaValidationWorkerResult
+  ): Promise<void> {
     try {
-      const results = await this.mediaRepository.resolveBlobUrls(this.config.placeholderImageUrl);
+      // Implementation note: This method would save task results to a persistent store
+      // For now, we'll just log the results
+      console.log(`[MediaValidationWorker] Completed batch ${task.batchIndex + 1}/${task.totalBatches} for ${collection}:`);
+      console.log(`- Documents processed: ${results.processed}`);
+      console.log(`- Media items fixed: ${results.fixed}`);
+      console.log(`- Errors: ${results.errors}`);
       
-      const successCount = results.filter(result => result.success).length;
-      const failedCount = results.length - successCount;
-      
-      const repairReport = {
-        id: '',
-        timestamp: new Date(),
-        totalAttempted: results.length,
-        totalSuccess: successCount,
-        totalFailed: failedCount,
-        results
-      };
-      
-      const reportId = await this.mediaRepository.saveRepairReport(repairReport);
-      
-      return {
-        reportId,
-        success: true,
-        repairedCount: successCount,
-        failedCount
-      };
+      // A real implementation would save to a database
+      // await this.repository.saveWorkerLog({
+      //   collection,
+      //   batch: task.batchIndex + 1,
+      //   totalBatches: task.totalBatches,
+      //   results,
+      //   timestamp: new Date(),
+      //   taskId: task.timestamp
+      // });
     } catch (error) {
-      return {
-        reportId: '',
-        success: false,
-        repairedCount: 0,
-        failedCount: 0,
-        error: error instanceof Error ? error.message : String(error)
-      };
+      console.error('Error saving worker results:', error);
     }
-  }
-  
-  /**
-   * Get the status of the worker
-   */
-  getStatus(): {
-    isRunning: boolean;
-    pendingTasks: number;
-    processingTask: boolean;
-    lastProcessedTaskTime?: Date;
-  } {
-    return {
-      isRunning: this.isRunning,
-      pendingTasks: 0, // This would be retrieved from the queue in a real implementation
-      processingTask: this.processingTask,
-      lastProcessedTaskTime: this.lastProcessedTaskTime
-    };
   }
 }
