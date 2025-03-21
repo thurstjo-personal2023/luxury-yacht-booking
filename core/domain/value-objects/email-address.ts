@@ -1,69 +1,54 @@
 /**
  * Email Address Value Object
  * 
- * This represents a validated email address in the domain model.
+ * Represents an email address with validation logic.
  */
 
-/**
- * Regular expression for validating email addresses
- */
-const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-
-/**
- * Email address value object
- */
 export class EmailAddress {
-  private readonly value: string;
+  private readonly _value: string;
   
-  constructor(email: string) {
-    this.validate(email);
-    this.value = email.toLowerCase().trim();
+  constructor(value: string) {
+    const trimmedValue = value.trim();
+    
+    if (!EmailAddress.isValid(trimmedValue)) {
+      throw new Error(`Invalid email address: ${trimmedValue}`);
+    }
+    
+    this._value = trimmedValue;
   }
   
   /**
    * Get the email address value
    */
-  getValue(): string {
-    return this.value;
+  get value(): string {
+    return this._value;
   }
   
   /**
-   * Check if the email address is valid
+   * Check if an email address is valid
    */
-  private validate(email: string): void {
-    if (!email) {
-      throw new Error('Email address is required');
+  static isValid(value: string): boolean {
+    if (!value || typeof value !== 'string') {
+      return false;
     }
     
-    const trimmedEmail = email.trim();
+    // Email regex pattern
+    const pattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     
-    if (trimmedEmail.length > 320) {
-      throw new Error('Email address is too long');
-    }
-    
-    if (!EMAIL_REGEX.test(trimmedEmail)) {
-      throw new Error('Invalid email address format');
-    }
+    return pattern.test(value);
+  }
+  
+  /**
+   * Convert to string
+   */
+  toString(): string {
+    return this.value;
   }
   
   /**
    * Check if two email addresses are equal
    */
   equals(other: EmailAddress): boolean {
-    return this.value === other.getValue();
-  }
-  
-  /**
-   * Create an email address from a string
-   */
-  static create(email: string): EmailAddress {
-    return new EmailAddress(email);
-  }
-  
-  /**
-   * Convert the email address to a string
-   */
-  toString(): string {
-    return this.value;
+    return this.value.toLowerCase() === other.value.toLowerCase();
   }
 }

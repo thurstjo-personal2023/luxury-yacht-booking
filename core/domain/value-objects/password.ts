@@ -1,132 +1,77 @@
 /**
  * Password Value Object
  * 
- * This represents a password in the domain model.
- * It includes validation rules and hashing utilities.
+ * Represents a password with validation logic.
  */
 
-/**
- * Regular expression for validating password strength
- * Requires at least:
- * - 8 characters
- * - 1 uppercase letter
- * - 1 lowercase letter
- * - 1 number
- * - 1 special character from !@#$%^&*()_+{}[]|:;"'<>,.?/~`-=
- */
-const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+{}\[\]|:;"'<>,.?/~`\-=])[A-Za-z\d!@#$%^&*()_+{}\[\]|:;"'<>,.?/~`\-=]{8,}$/;
-
-/**
- * Minimum password length
- */
-const MIN_PASSWORD_LENGTH = 8;
-
-/**
- * Maximum password length
- */
-const MAX_PASSWORD_LENGTH = 128;
-
-/**
- * Password value object
- */
 export class Password {
-  private readonly value: string;
-  private readonly hashed: boolean;
+  private readonly _value: string;
   
-  private constructor(password: string, hashed: boolean = false) {
-    this.value = password;
-    this.hashed = hashed;
+  constructor(value: string) {
+    const trimmedValue = value.trim();
     
-    // Only validate if the password is not already hashed
-    if (!hashed) {
-      this.validate(password);
+    if (!Password.isValid(trimmedValue)) {
+      throw new Error(
+        'Invalid password. Password must be at least 8 characters long, ' +
+        'contain at least one uppercase letter, one lowercase letter, ' +
+        'one number, and one special character.'
+      );
     }
+    
+    this._value = trimmedValue;
   }
   
   /**
    * Get the password value
-   * @warning This should only be used for authentication, not for storage or display
    */
-  getValue(): string {
-    return this.value;
+  get value(): string {
+    return this._value;
   }
   
   /**
-   * Check if the password is hashed
+   * Check if a password is valid
    */
-  isHashed(): boolean {
-    return this.hashed;
-  }
-  
-  /**
-   * Validate the password
-   */
-  private validate(password: string): void {
-    if (!password) {
-      throw new Error('Password is required');
+  static isValid(value: string): boolean {
+    if (!value || typeof value !== 'string' || value.length < 8) {
+      return false;
     }
     
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long`);
+    // Check for at least one uppercase letter
+    if (!/[A-Z]/.test(value)) {
+      return false;
     }
     
-    if (password.length > MAX_PASSWORD_LENGTH) {
-      throw new Error(`Password cannot be longer than ${MAX_PASSWORD_LENGTH} characters`);
-    }
-  }
-  
-  /**
-   * Check if the password is strong
-   */
-  isStrong(): boolean {
-    return STRONG_PASSWORD_REGEX.test(this.value);
-  }
-  
-  /**
-   * Create a password from a plain text string
-   */
-  static createFromPlainText(password: string): Password {
-    return new Password(password, false);
-  }
-  
-  /**
-   * Create a password from a hashed string
-   */
-  static createFromHashed(hashedPassword: string): Password {
-    return new Password(hashedPassword, true);
-  }
-  
-  /**
-   * Hash the password
-   * Note: This is a placeholder. In a real implementation, you would use a proper
-   * hashing library like bcrypt, argon2, or scrypt.
-   */
-  async hash(): Promise<Password> {
-    if (this.hashed) {
-      return this;
+    // Check for at least one lowercase letter
+    if (!/[a-z]/.test(value)) {
+      return false;
     }
     
-    // This is a placeholder for actual hashing
-    // In production, use a proper password hashing library
-    const hashedValue = `hashed:${this.value}`;
+    // Check for at least one number
+    if (!/[0-9]/.test(value)) {
+      return false;
+    }
     
-    return Password.createFromHashed(hashedValue);
+    // Check for at least one special character
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(value)) {
+      return false;
+    }
+    
+    return true;
   }
   
   /**
-   * Verify a password against this password
-   * Note: This is a placeholder. In a real implementation, you would use a proper
-   * verification function from a hashing library.
+   * Create a password hash (for illustration - in real app would use bcrypt)
    */
-  async verify(plainTextPassword: string): Promise<boolean> {
-    if (!this.hashed) {
-      return this.value === plainTextPassword;
-    }
-    
-    // This is a placeholder for actual verification
-    // In production, use a proper password hashing library
-    const hashedAttempt = `hashed:${plainTextPassword}`;
-    
-    return this.value === hashedAttempt;
+  hash(): string {
+    // In a real application, we would use a proper hashing algorithm
+    // For demonstration purposes, we'll just prepend "hashed_" to the password
+    return `hashed_${this._value}`;
+  }
+  
+  /**
+   * Verify that a given password matches this password
+   */
+  verify(password: string): boolean {
+    return this._value === password;
   }
 }

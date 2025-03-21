@@ -1,12 +1,9 @@
 /**
- * User Role Enum
+ * User Role Definition
  * 
- * This defines the different roles that users can have in the system.
+ * Defines the possible roles for users in the system.
  */
 
-/**
- * User roles
- */
 export enum UserRole {
   CONSUMER = 'consumer',
   PRODUCER = 'producer',
@@ -16,104 +13,74 @@ export enum UserRole {
 }
 
 /**
- * Get the permissions for a user role
+ * Permission-to-role mapping
  */
-export function getRolePermissions(role: UserRole): string[] {
-  const permissions: Record<UserRole, string[]> = {
-    [UserRole.CONSUMER]: [
-      'view_yacht_listings',
-      'book_yacht',
-      'view_own_bookings',
-      'cancel_own_bookings',
-      'update_own_profile'
-    ],
-    [UserRole.PRODUCER]: [
-      'view_yacht_listings',
-      'create_yacht_listings',
-      'update_own_yacht_listings',
-      'delete_own_yacht_listings',
-      'view_own_bookings',
-      'cancel_own_bookings',
-      'update_own_profile',
-      'view_own_analytics'
-    ],
-    [UserRole.PARTNER]: [
-      'view_yacht_listings',
-      'create_addons',
-      'update_own_addons',
-      'delete_own_addons',
-      'view_own_bookings',
-      'update_own_profile',
-      'view_own_analytics'
-    ],
-    [UserRole.ADMINISTRATOR]: [
-      'view_all_yacht_listings',
-      'update_any_yacht_listing',
-      'delete_any_yacht_listing',
-      'view_all_bookings',
-      'update_any_booking',
-      'cancel_any_booking',
-      'view_all_users',
-      'update_any_user',
-      'view_all_analytics',
-      'validate_media',
-      'repair_media'
-    ],
-    [UserRole.SUPER_ADMINISTRATOR]: [
-      'view_all_yacht_listings',
-      'update_any_yacht_listing',
-      'delete_any_yacht_listing',
-      'view_all_bookings',
-      'update_any_booking',
-      'cancel_any_booking',
-      'view_all_users',
-      'update_any_user',
-      'delete_any_user',
-      'create_admin_users',
-      'approve_admin_users',
-      'view_all_analytics',
-      'validate_media',
-      'repair_media',
-      'view_system_settings',
-      'update_system_settings'
-    ]
-  };
-  
-  return permissions[role] || [];
-}
+const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
+  [UserRole.CONSUMER]: [
+    'view:yacht',
+    'book:yacht',
+    'rate:yacht',
+    'view:profile',
+    'edit:own_profile'
+  ],
+  [UserRole.PRODUCER]: [
+    'view:yacht',
+    'book:yacht',
+    'rate:yacht',
+    'view:profile',
+    'edit:own_profile',
+    'create:yacht',
+    'edit:own_yacht',
+    'delete:own_yacht',
+    'view:producer_dashboard',
+    'view:bookings'
+  ],
+  [UserRole.PARTNER]: [
+    'view:yacht',
+    'book:yacht',
+    'rate:yacht',
+    'view:profile',
+    'edit:own_profile',
+    'view:partner_dashboard',
+    'create:addon',
+    'edit:own_addon',
+    'delete:own_addon'
+  ],
+  [UserRole.ADMINISTRATOR]: [
+    'view:yacht',
+    'edit:yacht',
+    'delete:yacht',
+    'view:profile',
+    'edit:profile',
+    'view:admin_dashboard',
+    'manage:users',
+    'manage:content',
+    'validate:media',
+    'repair:media'
+  ],
+  [UserRole.SUPER_ADMINISTRATOR]: [
+    'view:yacht',
+    'edit:yacht',
+    'delete:yacht',
+    'view:profile',
+    'edit:profile',
+    'view:admin_dashboard',
+    'manage:users',
+    'manage:content',
+    'validate:media',
+    'repair:media',
+    'manage:administrators',
+    'create:administrator',
+    'approve:administrator',
+    'reject:administrator',
+    'view:system_settings',
+    'edit:system_settings'
+  ]
+};
 
 /**
  * Check if a role has a specific permission
  */
 export function hasPermission(role: UserRole, permission: string): boolean {
-  const permissions = getRolePermissions(role);
-  return permissions.includes(permission);
-}
-
-/**
- * Check if a role is an administrative role
- */
-export function isAdminRole(role: UserRole): boolean {
-  return role === UserRole.ADMINISTRATOR || role === UserRole.SUPER_ADMINISTRATOR;
-}
-
-/**
- * Get all available roles
- */
-export function getAllRoles(): UserRole[] {
-  return Object.values(UserRole);
-}
-
-/**
- * Get all consumer-facing roles (non-administrative)
- */
-export function getConsumerFacingRoles(): UserRole[] {
-  return [UserRole.CONSUMER, UserRole.PRODUCER, UserRole.PARTNER];
-}
-
-/**
- * Get all administrative roles
- */
-export function getAdminRoles(): UserRole[] {
-  return [UserRole.ADMINISTRATOR, UserRole.SUPER_ADMINISTRATOR];
+  return ROLE_PERMISSIONS[role]?.includes(permission) || false;
 }

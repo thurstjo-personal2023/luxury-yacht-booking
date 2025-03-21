@@ -1,113 +1,87 @@
 /**
  * Phone Number Value Object
  * 
- * This represents a validated phone number in the domain model.
+ * Represents a phone number with validation logic.
  */
 
-/**
- * Regular expression for validating phone numbers
- * This validates international phone numbers in E.164 format
- * or formats with separators like +1-234-567-8901 or +1 (234) 567-8901
- */
-const PHONE_REGEX = /^\+?[1-9]\d{1,14}$|^\+?[1-9][\d\s\-()]{1,20}$/;
-
-/**
- * Phone number value object
- */
 export class PhoneNumber {
-  private readonly value: string;
-  private readonly countryCode?: string;
+  private readonly _value: string;
   
-  constructor(phoneNumber: string, countryCode?: string) {
-    this.validate(phoneNumber);
-    this.value = this.normalize(phoneNumber);
-    this.countryCode = countryCode;
+  constructor(value: string) {
+    const normalizedValue = PhoneNumber.normalize(value);
+    
+    if (!PhoneNumber.isValid(normalizedValue)) {
+      throw new Error(`Invalid phone number: ${value}`);
+    }
+    
+    this._value = normalizedValue;
   }
   
   /**
    * Get the phone number value
    */
-  getValue(): string {
-    return this.value;
+  get value(): string {
+    return this._value;
   }
   
   /**
-   * Get the country code
+   * Get the formatted phone number
    */
-  getCountryCode(): string | undefined {
-    return this.countryCode;
+  get formatted(): string {
+    // Format as (XXX) XXX-XXXX for US numbers
+    if (this._value.length === 10) {
+      return `(${this._value.substring(0, 3)}) ${this._value.substring(3, 6)}-${this._value.substring(6)}`;
+    }
+    
+    // For international numbers, just add a + prefix
+    return `+${this._value}`;
   }
   
   /**
-   * Check if the phone number is valid
+   * Normalize a phone number by removing non-digit characters
    */
-  private validate(phoneNumber: string): void {
-    if (!phoneNumber) {
-      throw new Error('Phone number is required');
-    }
-    
-    const trimmedPhone = phoneNumber.trim();
-    
-    if (!PHONE_REGEX.test(trimmedPhone)) {
-      throw new Error('Invalid phone number format');
-    }
+  static normalize(value: string): string {
+    return value.replace(/[^\d+]/g, '');
   }
   
   /**
-   * Normalize the phone number by removing non-digit characters except leading +
+   * Check if a phone number is valid
    */
-  private normalize(phoneNumber: string): string {
-    const trimmedPhone = phoneNumber.trim();
-    
-    // If it's an international number (starting with +), keep the + sign
-    if (trimmedPhone.startsWith('+')) {
-      return '+' + trimmedPhone.substring(1).replace(/[^\d]/g, '');
+  static isValid(value: string): boolean {
+    if (!value || typeof value !== 'string') {
+      return false;
     }
     
-    // Otherwise, just keep the digits
-    return trimmedPhone.replace(/[^\d]/g, '');
+    // Remove any non-digit characters except the + for international format
+    const digits = value.replace(/[^\d+]/g, '');
+    
+    // Must have at least 10 digits (US number)
+    if (digits.length < 10) {
+      return false;
+    }
+    
+    // If it starts with +, ensure it has a valid country code
+    if (digits.startsWith('+')) {
+      // Simple validation for common country codes
+      const validCountryCodes = ['+1', '+44', '+33', '+49', '+61', '+971', '+91'];
+      return validCountryCodes.some(code => digits.startsWith(code));
+    }
+    
+    // For US numbers (no + prefix), must be exactly 10 digits
+    return digits.length === 10;
   }
   
   /**
-   * Format the phone number for display
+   * Convert to string
    */
-  format(): string {
-    // Simple formatting logic for display - could be expanded based on country
-    const digits = this.value.replace(/^\+/, '');
-    
-    if (digits.length === 10) {
-      // US/Canada format: (XXX) XXX-XXXX
-      return `(${digits.substring(0, 3)}) ${digits.substring(3, 6)}-${digits.substring(6)}`;
-    } else if (digits.length === 11 && digits.startsWith('1')) {
-      // US/Canada with country code: +1 (XXX) XXX-XXXX
-      return `+1 (${digits.substring(1, 4)}) ${digits.substring(4, 7)}-${digits.substring(7)}`;
-    } else if (this.value.startsWith('+')) {
-      // International format with country code: +XX XXX XXX XXXX
-      return this.value;
-    }
-    
-    // Default format
-    return this.value;
+  toString(): string {
+    return this.formatted;
   }
   
   /**
    * Check if two phone numbers are equal
    */
   equals(other: PhoneNumber): boolean {
-    return this.value === other.getValue();
-  }
-  
-  /**
-   * Create a phone number from a string
-   */
-  static create(phoneNumber: string, countryCode?: string): PhoneNumber {
-    return new PhoneNumber(phoneNumber, countryCode);
-  }
-  
-  /**
-   * Convert the phone number to a string
-   */
-  toString(): string {
-    return this.value;
+    return this._value === other.value;
   }
 }
