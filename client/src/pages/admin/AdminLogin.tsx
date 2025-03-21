@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocation, useNavigate } from 'wouter';
+import { useLocation } from 'wouter';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -26,8 +26,7 @@ export default function AdminLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const { adminSignIn, error } = useAdminAuth();
   const { toast } = useToast();
-  const [location] = useLocation();
-  const navigate = useNavigate();
+  const [location, setLocation] = useLocation();
   
   // Get returnUrl from query parameters
   const params = new URLSearchParams(location.split('?')[1] || '');
@@ -60,7 +59,7 @@ export default function AdminLogin() {
         });
         
         // Redirect to MFA verification page with returnUrl
-        navigate(`/admin-mfa-verify?returnUrl=${encodeURIComponent(returnUrl)}`);
+        setLocation(`/admin-mfa-verify?returnUrl=${encodeURIComponent(returnUrl)}`);
       }
     } catch (err: any) {
       console.error('Login error:', err);
