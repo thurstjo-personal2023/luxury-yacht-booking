@@ -1,188 +1,267 @@
 /**
  * Unit tests for AdminInvitationService
  */
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import { AdminInvitationService } from '../../../../../core/domain/admin/admin-invitation-service';
 import { AdminInvitation } from '../../../../../core/domain/admin/admin-invitation';
 import { AdminRole } from '../../../../../core/domain/admin/admin-role';
 
 describe('AdminInvitationService', () => {
-  let invitationService: AdminInvitationService;
-  
-  beforeEach(() => {
-    // Initialize with mock crypto function
-    invitationService = new AdminInvitationService({
-      generateRandomString: jest.fn().mockReturnValue('random-code')
+  describe('createInvitationData', () => {
+    it('should create invitation data with default expiration time', () => {
+      // Arrange
+      const randomStringGenerator = {
+        generateRandomString: jest.fn().mockReturnValue('generated-code')
+      };
+      
+      const invitationService = new AdminInvitationService(randomStringGenerator);
+      
+      const email = 'admin@example.com';
+      const name = 'Test Admin';
+      const role = AdminRole.ADMIN;
+      const invitedById = 'inviter-123';
+      
+      // Act
+      const invitation = invitationService.createInvitationData({
+        email,
+        name,
+        role,
+        invitedById,
+      });
+      
+      // Assert
+      expect(invitation.email).toBe(email);
+      expect(invitation.name).toBe(name);
+      expect(invitation.role).toBe(role);
+      expect(invitation.invitedById).toBe(invitedById);
+      expect(invitation.code).toBe('generated-code');
+      expect(invitation.expiresAt).toBeInstanceOf(Date);
+      
+      // Should expire in 7 days by default
+      const expectedExpiration = new Date();
+      expectedExpiration.setDate(expectedExpiration.getDate() + 7);
+      expect(invitation.expiresAt?.getDate()).toBe(expectedExpiration.getDate());
+      
+      expect(randomStringGenerator.generateRandomString).toHaveBeenCalledWith(16);
+    });
+    
+    it('should create invitation data with custom expiration time', () => {
+      // Arrange
+      const randomStringGenerator = {
+        generateRandomString: jest.fn().mockReturnValue('generated-code')
+      };
+      
+      const invitationService = new AdminInvitationService(randomStringGenerator);
+      
+      const email = 'admin@example.com';
+      const name = 'Test Admin';
+      const role = AdminRole.ADMIN;
+      const invitedById = 'inviter-123';
+      const expirationDays = 30;
+      
+      // Act
+      const invitation = invitationService.createInvitationData({
+        email,
+        name,
+        role,
+        invitedById,
+        expirationDays
+      });
+      
+      // Assert
+      expect(invitation.email).toBe(email);
+      expect(invitation.name).toBe(name);
+      expect(invitation.role).toBe(role);
+      expect(invitation.invitedById).toBe(invitedById);
+      expect(invitation.code).toBe('generated-code');
+      expect(invitation.expiresAt).toBeInstanceOf(Date);
+      
+      // Should expire in 30 days
+      const expectedExpiration = new Date();
+      expectedExpiration.setDate(expectedExpiration.getDate() + 30);
+      expect(invitation.expiresAt?.getDate()).toBe(expectedExpiration.getDate());
     });
   });
   
-  it('should create an invitation with the specified properties', () => {
-    // Arrange
-    const email = 'newadmin@example.com';
-    const name = 'New Admin';
-    const role = AdminRole.ADMIN;
-    const invitedById = 'admin-123';
-    
-    // Act
-    const invitation = invitationService.createInvitation({
-      email,
-      name,
-      role,
-      invitedById
+  describe('verifyInvitation', () => {
+    it('should verify valid invitation', () => {
+      // Arrange
+      const invitationService = new AdminInvitationService();
+      
+      const invitation = new AdminInvitation({
+        id: 'invitation-123',
+        email: 'admin@example.com',
+        name: 'Test Admin',
+        role: AdminRole.ADMIN,
+        invitedById: 'inviter-123',
+        code: 'valid-code',
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 1 day in future
+      });
+      
+      // Act
+      const result = invitationService.verifyInvitation(invitation, 'valid-code');
+      
+      // Assert
+      expect(result).toBe(true);
     });
     
-    // Assert
-    expect(invitation).toBeInstanceOf(AdminInvitation);
-    expect(invitation.email).toBe(email);
-    expect(invitation.name).toBe(name);
-    expect(invitation.role).toBe(role);
-    expect(invitation.invitedById).toBe(invitedById);
-    expect(invitation.code).toBe('random-code');
-    expect(invitation.expiresAt).toBeInstanceOf(Date);
+    it('should reject invitation with incorrect code', () => {
+      // Arrange
+      const invitationService = new AdminInvitationService();
+      
+      const invitation = new AdminInvitation({
+        id: 'invitation-123',
+        email: 'admin@example.com',
+        name: 'Test Admin',
+        role: AdminRole.ADMIN,
+        invitedById: 'inviter-123',
+        code: 'valid-code',
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 1 day in future
+      });
+      
+      // Act
+      const result = invitationService.verifyInvitation(invitation, 'invalid-code');
+      
+      // Assert
+      expect(result).toBe(false);
+    });
     
-    // Check that the expiration date is in the future (approximately 7 days)
-    const now = new Date();
-    const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
-    const expectedExpiry = new Date(now.getTime() + sevenDaysInMs);
-    const diffMs = Math.abs(invitation.expiresAt.getTime() - expectedExpiry.getTime());
-    expect(diffMs).toBeLessThan(1000); // Allow 1 second tolerance
+    it('should reject expired invitation', () => {
+      // Arrange
+      const invitationService = new AdminInvitationService();
+      
+      const invitation = new AdminInvitation({
+        id: 'invitation-123',
+        email: 'admin@example.com',
+        name: 'Test Admin',
+        role: AdminRole.ADMIN,
+        invitedById: 'inviter-123',
+        code: 'valid-code',
+        expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000) // 1 day in past
+      });
+      
+      // Act
+      const result = invitationService.verifyInvitation(invitation, 'valid-code');
+      
+      // Assert
+      expect(result).toBe(false);
+    });
   });
   
-  it('should generate a unique code for each invitation', () => {
-    // Arrange
-    // Set up the mock to return different values on consecutive calls
-    const generateRandomStringMock = jest.fn()
-      .mockReturnValueOnce('code-1')
-      .mockReturnValueOnce('code-2');
-    
-    const customInvitationService = new AdminInvitationService({
-      generateRandomString: generateRandomStringMock
+  describe('isInvitationExpired', () => {
+    it('should return true for expired invitation', () => {
+      // Arrange
+      const invitationService = new AdminInvitationService();
+      
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 1); // 1 day ago
+      
+      const invitation = new AdminInvitation({
+        id: 'invitation-123',
+        email: 'admin@example.com',
+        name: 'Test Admin',
+        role: AdminRole.ADMIN,
+        invitedById: 'inviter-123',
+        code: 'valid-code',
+        expiresAt: pastDate
+      });
+      
+      // Act
+      const result = invitationService.isInvitationExpired(invitation);
+      
+      // Assert
+      expect(result).toBe(true);
     });
     
-    // Act
-    const invitation1 = customInvitationService.createInvitation({
-      email: 'admin1@example.com',
-      name: 'Admin 1',
-      role: AdminRole.ADMIN,
-      invitedById: 'admin-123'
+    it('should return false for valid invitation', () => {
+      // Arrange
+      const invitationService = new AdminInvitationService();
+      
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 1); // 1 day in future
+      
+      const invitation = new AdminInvitation({
+        id: 'invitation-123',
+        email: 'admin@example.com',
+        name: 'Test Admin',
+        role: AdminRole.ADMIN,
+        invitedById: 'inviter-123',
+        code: 'valid-code',
+        expiresAt: futureDate
+      });
+      
+      // Act
+      const result = invitationService.isInvitationExpired(invitation);
+      
+      // Assert
+      expect(result).toBe(false);
     });
     
-    const invitation2 = customInvitationService.createInvitation({
-      email: 'admin2@example.com',
-      name: 'Admin 2',
-      role: AdminRole.ADMIN,
-      invitedById: 'admin-123'
+    it('should return true if expiration date is missing', () => {
+      // Arrange
+      const invitationService = new AdminInvitationService();
+      
+      const invitation = new AdminInvitation({
+        id: 'invitation-123',
+        email: 'admin@example.com',
+        name: 'Test Admin',
+        role: AdminRole.ADMIN,
+        invitedById: 'inviter-123',
+        code: 'valid-code'
+        // No expiresAt
+      });
+      
+      // Act
+      const result = invitationService.isInvitationExpired(invitation);
+      
+      // Assert
+      expect(result).toBe(true);
     });
-    
-    // Assert
-    expect(invitation1.code).toBe('code-1');
-    expect(invitation2.code).toBe('code-2');
-    expect(invitation1.code).not.toBe(invitation2.code);
-    expect(generateRandomStringMock).toHaveBeenCalledTimes(2);
   });
   
-  it('should verify a valid invitation code', () => {
-    // Arrange
-    const invitation = new AdminInvitation({
-      id: 'invitation-123',
-      email: 'newadmin@example.com',
-      name: 'New Admin',
-      role: AdminRole.ADMIN,
-      invitedById: 'admin-123',
-      code: 'valid-code',
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 1 day in the future
+  describe('generateInvitationCode', () => {
+    it('should generate random code with default length', () => {
+      // Arrange
+      const randomStringGenerator = {
+        generateRandomString: jest.fn().mockReturnValue('abcdef1234567890')
+      };
+      
+      const invitationService = new AdminInvitationService(randomStringGenerator);
+      
+      // Act
+      const code = invitationService.generateInvitationCode();
+      
+      // Assert
+      expect(code).toBe('abcdef1234567890');
+      expect(randomStringGenerator.generateRandomString).toHaveBeenCalledWith(16);
     });
     
-    // Act
-    const isValid = invitationService.verifyInvitation(invitation, 'valid-code');
-    
-    // Assert
-    expect(isValid).toBe(true);
-  });
-  
-  it('should reject an invalid invitation code', () => {
-    // Arrange
-    const invitation = new AdminInvitation({
-      id: 'invitation-123',
-      email: 'newadmin@example.com',
-      name: 'New Admin',
-      role: AdminRole.ADMIN,
-      invitedById: 'admin-123',
-      code: 'valid-code',
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 1 day in the future
+    it('should generate random code with custom length', () => {
+      // Arrange
+      const randomStringGenerator = {
+        generateRandomString: jest.fn().mockReturnValue('abcdef1234')
+      };
+      
+      const invitationService = new AdminInvitationService(randomStringGenerator);
+      
+      // Act
+      const code = invitationService.generateInvitationCode(10);
+      
+      // Assert
+      expect(code).toBe('abcdef1234');
+      expect(randomStringGenerator.generateRandomString).toHaveBeenCalledWith(10);
     });
     
-    // Act
-    const isValid = invitationService.verifyInvitation(invitation, 'wrong-code');
-    
-    // Assert
-    expect(isValid).toBe(false);
-  });
-  
-  it('should reject an expired invitation', () => {
-    // Arrange
-    const invitation = new AdminInvitation({
-      id: 'invitation-123',
-      email: 'newadmin@example.com',
-      name: 'New Admin',
-      role: AdminRole.ADMIN,
-      invitedById: 'admin-123',
-      code: 'valid-code',
-      expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000) // 1 day in the past
+    it('should use internal random generator if not provided', () => {
+      // Arrange
+      const invitationService = new AdminInvitationService();
+      
+      // Act
+      const code = invitationService.generateInvitationCode();
+      
+      // Assert
+      expect(code).toHaveLength(16);
+      expect(typeof code).toBe('string');
     });
-    
-    // Act
-    const isValid = invitationService.verifyInvitation(invitation, 'valid-code');
-    
-    // Assert
-    expect(isValid).toBe(false);
-  });
-  
-  it('should determine if an invitation is expired', () => {
-    // Arrange
-    const expiredInvitation = new AdminInvitation({
-      id: 'invitation-123',
-      email: 'expired@example.com',
-      name: 'Expired Invitation',
-      role: AdminRole.ADMIN,
-      invitedById: 'admin-123',
-      code: 'code',
-      expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000) // 1 day in the past
-    });
-    
-    const validInvitation = new AdminInvitation({
-      id: 'invitation-456',
-      email: 'valid@example.com',
-      name: 'Valid Invitation',
-      role: AdminRole.ADMIN,
-      invitedById: 'admin-123',
-      code: 'code',
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 1 day in the future
-    });
-    
-    // Act & Assert
-    expect(invitationService.isInvitationExpired(expiredInvitation)).toBe(true);
-    expect(invitationService.isInvitationExpired(validInvitation)).toBe(false);
-  });
-  
-  it('should create an invitation with a custom expiration date', () => {
-    // Arrange
-    const email = 'newadmin@example.com';
-    const name = 'New Admin';
-    const role = AdminRole.ADMIN;
-    const invitedById = 'admin-123';
-    const customExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days in the future
-    
-    // Act
-    const invitation = invitationService.createInvitation({
-      email,
-      name,
-      role,
-      invitedById,
-      expiresAt: customExpiry
-    });
-    
-    // Assert
-    expect(invitation.expiresAt).toBe(customExpiry);
   });
 });

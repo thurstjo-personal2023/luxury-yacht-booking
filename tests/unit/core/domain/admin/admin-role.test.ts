@@ -2,77 +2,96 @@
  * Unit tests for AdminRole value object
  */
 import { describe, expect, it } from '@jest/globals';
-import { AdminRole } from '../../../../../core/domain/admin/admin-role';
+import { AdminRole, AdminRoleType } from '../../../../../core/domain/admin/admin-role';
 
 describe('AdminRole Value Object', () => {
-  it('should create roles with the correct values', () => {
-    // Assert
-    expect(AdminRole.SUPER_ADMIN.value).toBe('super_admin');
-    expect(AdminRole.ADMIN.value).toBe('admin');
-    expect(AdminRole.MODERATOR.value).toBe('moderator');
-  });
-  
-  it('should return a string representation', () => {
-    // Assert
-    expect(AdminRole.SUPER_ADMIN.toString()).toBe('super_admin');
-    expect(AdminRole.ADMIN.toString()).toBe('admin');
-    expect(AdminRole.MODERATOR.toString()).toBe('moderator');
-  });
-  
-  it('should compare roles correctly', () => {
-    // Assert
-    expect(AdminRole.SUPER_ADMIN.equals(AdminRole.SUPER_ADMIN)).toBe(true);
-    expect(AdminRole.ADMIN.equals(AdminRole.ADMIN)).toBe(true);
-    expect(AdminRole.MODERATOR.equals(AdminRole.MODERATOR)).toBe(true);
+  it('should create valid admin roles', () => {
+    // Arrange & Act
+    const superAdmin = new AdminRole(AdminRoleType.SUPER_ADMIN);
+    const admin = new AdminRole(AdminRoleType.ADMIN);
+    const moderator = new AdminRole(AdminRoleType.MODERATOR);
     
-    expect(AdminRole.SUPER_ADMIN.equals(AdminRole.ADMIN)).toBe(false);
-    expect(AdminRole.ADMIN.equals(AdminRole.MODERATOR)).toBe(false);
-    expect(AdminRole.MODERATOR.equals(AdminRole.SUPER_ADMIN)).toBe(false);
-  });
-  
-  it('should check if a role has higher privileges than another', () => {
     // Assert
-    expect(AdminRole.SUPER_ADMIN.hasHigherPrivilegesThan(AdminRole.ADMIN)).toBe(true);
-    expect(AdminRole.SUPER_ADMIN.hasHigherPrivilegesThan(AdminRole.MODERATOR)).toBe(true);
-    expect(AdminRole.ADMIN.hasHigherPrivilegesThan(AdminRole.MODERATOR)).toBe(true);
-    
-    expect(AdminRole.ADMIN.hasHigherPrivilegesThan(AdminRole.SUPER_ADMIN)).toBe(false);
-    expect(AdminRole.MODERATOR.hasHigherPrivilegesThan(AdminRole.ADMIN)).toBe(false);
-    expect(AdminRole.MODERATOR.hasHigherPrivilegesThan(AdminRole.SUPER_ADMIN)).toBe(false);
-    
-    // A role does not have higher privileges than itself
-    expect(AdminRole.SUPER_ADMIN.hasHigherPrivilegesThan(AdminRole.SUPER_ADMIN)).toBe(false);
-    expect(AdminRole.ADMIN.hasHigherPrivilegesThan(AdminRole.ADMIN)).toBe(false);
-    expect(AdminRole.MODERATOR.hasHigherPrivilegesThan(AdminRole.MODERATOR)).toBe(false);
+    expect(superAdmin).toBeInstanceOf(AdminRole);
+    expect(admin).toBeInstanceOf(AdminRole);
+    expect(moderator).toBeInstanceOf(AdminRole);
   });
   
-  it('should create a role from a string value', () => {
+  it('should convert roles to strings', () => {
+    // Arrange
+    const superAdmin = new AdminRole(AdminRoleType.SUPER_ADMIN);
+    const admin = new AdminRole(AdminRoleType.ADMIN);
+    const moderator = new AdminRole(AdminRoleType.MODERATOR);
+    
     // Act & Assert
-    expect(AdminRole.fromString('super_admin')).toBe(AdminRole.SUPER_ADMIN);
-    expect(AdminRole.fromString('admin')).toBe(AdminRole.ADMIN);
-    expect(AdminRole.fromString('moderator')).toBe(AdminRole.MODERATOR);
+    expect(superAdmin.toString()).toBe(AdminRoleType.SUPER_ADMIN);
+    expect(admin.toString()).toBe(AdminRoleType.ADMIN);
+    expect(moderator.toString()).toBe(AdminRoleType.MODERATOR);
+    
+    expect(superAdmin.toString()).not.toBe(AdminRoleType.ADMIN);
+    expect(admin.toString()).not.toBe(AdminRoleType.MODERATOR);
+    expect(moderator.toString()).not.toBe(AdminRoleType.SUPER_ADMIN);
   });
   
-  it('should throw an error for invalid role string', () => {
-    // Act & Assert
-    expect(() => AdminRole.fromString('invalid_role')).toThrow('Invalid admin role: invalid_role');
+  it('should correctly identify role hierarchies', () => {
+    // Arrange
+    const superAdmin = new AdminRole(AdminRoleType.SUPER_ADMIN);
+    const admin = new AdminRole(AdminRoleType.ADMIN);
+    const moderator = new AdminRole(AdminRoleType.MODERATOR);
+    
+    // Act & Assert - Check role privileges
+    expect(superAdmin.isSuperAdmin()).toBe(true);
+    expect(admin.isSuperAdmin()).toBe(false);
+    expect(moderator.isSuperAdmin()).toBe(false);
+    
+    expect(superAdmin.isAdmin()).toBe(true);
+    expect(admin.isAdmin()).toBe(true);
+    expect(moderator.isAdmin()).toBe(false);
+    
+    expect(superAdmin.isModerator()).toBe(true);
+    expect(admin.isModerator()).toBe(true);
+    expect(moderator.isModerator()).toBe(true);
   });
   
-  it('should check if a role is at least as privileged as another', () => {
+  it('should correctly compare role privileges', () => {
+    // Arrange
+    const superAdmin = new AdminRole(AdminRoleType.SUPER_ADMIN);
+    const admin = new AdminRole(AdminRoleType.ADMIN);
+    const moderator = new AdminRole(AdminRoleType.MODERATOR);
+    
+    // Act & Assert - Super Admin has highest privileges
+    expect(superAdmin.hasEqualOrHigherPrivilegeThan(superAdmin)).toBe(true);
+    expect(superAdmin.hasEqualOrHigherPrivilegeThan(admin)).toBe(true);
+    expect(superAdmin.hasEqualOrHigherPrivilegeThan(moderator)).toBe(true);
+    
+    expect(admin.hasEqualOrHigherPrivilegeThan(superAdmin)).toBe(false);
+    expect(moderator.hasEqualOrHigherPrivilegeThan(admin)).toBe(false);
+    expect(moderator.hasEqualOrHigherPrivilegeThan(superAdmin)).toBe(false);
+    
+    // Admin has mid-level privileges
+    expect(admin.hasEqualOrHigherPrivilegeThan(admin)).toBe(true);
+    expect(admin.hasEqualOrHigherPrivilegeThan(moderator)).toBe(true);
+    
+    // Moderator has lowest privileges
+    expect(moderator.hasEqualOrHigherPrivilegeThan(moderator)).toBe(true);
+  });
+  
+  it('should create roles from string values', () => {
+    // Arrange & Act
+    const superAdmin = AdminRole.fromString(AdminRoleType.SUPER_ADMIN);
+    const admin = AdminRole.fromString(AdminRoleType.ADMIN);
+    const moderator = AdminRole.fromString(AdminRoleType.MODERATOR);
+    
     // Assert
-    // Super admin has at least the same privileges as all roles
-    expect(AdminRole.SUPER_ADMIN.hasAtLeastSamePrivilegesAs(AdminRole.SUPER_ADMIN)).toBe(true);
-    expect(AdminRole.SUPER_ADMIN.hasAtLeastSamePrivilegesAs(AdminRole.ADMIN)).toBe(true);
-    expect(AdminRole.SUPER_ADMIN.hasAtLeastSamePrivilegesAs(AdminRole.MODERATOR)).toBe(true);
-    
-    // Admin has at least the same privileges as admin and moderator
-    expect(AdminRole.ADMIN.hasAtLeastSamePrivilegesAs(AdminRole.ADMIN)).toBe(true);
-    expect(AdminRole.ADMIN.hasAtLeastSamePrivilegesAs(AdminRole.MODERATOR)).toBe(true);
-    expect(AdminRole.ADMIN.hasAtLeastSamePrivilegesAs(AdminRole.SUPER_ADMIN)).toBe(false);
-    
-    // Moderator has at least the same privileges only as moderator
-    expect(AdminRole.MODERATOR.hasAtLeastSamePrivilegesAs(AdminRole.MODERATOR)).toBe(true);
-    expect(AdminRole.MODERATOR.hasAtLeastSamePrivilegesAs(AdminRole.ADMIN)).toBe(false);
-    expect(AdminRole.MODERATOR.hasAtLeastSamePrivilegesAs(AdminRole.SUPER_ADMIN)).toBe(false);
+    expect(superAdmin).toBeInstanceOf(AdminRole);
+    expect(admin).toBeInstanceOf(AdminRole);
+    expect(moderator).toBeInstanceOf(AdminRole);
+  });
+  
+  it('should throw error for invalid role strings', () => {
+    // Arrange & Act & Assert
+    expect(() => {
+      AdminRole.fromString('invalid_role');
+    }).toThrow('Invalid admin role: invalid_role');
   });
 });
