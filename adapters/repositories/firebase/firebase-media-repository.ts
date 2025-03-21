@@ -1,1454 +1,575 @@
 /**
- * Firebase Media Repository Implementation
+ * Firebase Media Repository
  * 
- * This module implements the IMediaRepository interface using Firebase Firestore.
+ * Implementation of the IMediaRepository interface using Firebase.
  */
 
-import { 
-  Firestore, 
-  CollectionReference, 
-  DocumentReference, 
-  DocumentSnapshot,
-  QueryDocumentSnapshot,
-  Query,
-  WriteBatch,
-  FieldPath
-} from 'firebase/firestore';
-import { v4 as uuidv4 } from 'uuid';
+import { Firestore, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, updateDoc, setDoc, query, limit, startAfter, orderBy } from 'firebase/firestore';
 import axios from 'axios';
 
-import { 
-  IMediaRepository,
-  MediaValidationResult,
-  DocumentUrlValidationResult,
-  DocumentValidationResult,
-  CollectionValidationOptions,
-  ValidationReport,
-  CollectionValidationSummary,
-  UrlRepairOptions,
-  UrlRepairResult,
-  RepairReport
-} from '../interfaces/media-repository';
-import { Media } from '../../../core/domain/media/media';
-import { IMediaValidationService } from '../../../core/domain/media/media-validation-service';
+import { IMediaRepository } from '../interfaces/media-repository';
+import { DocumentValidationResult } from '../../../core/domain/validation/document-validation-result';
+import { Media, createPlaceholderMedia } from '../../../core/domain/media/media';
+import { MediaType, getMediaTypeFromMime, getMediaTypeFromUrl } from '../../../core/domain/media/media-type';
+import { ValidationResult } from '../../../core/domain/validation/validation-result';
 
 /**
  * Firebase media repository configuration
  */
 export interface FirebaseMediaRepositoryConfig {
-  mediaCollection: string;
-  reportsCollection: string;
-  repairReportsCollection: string;
-  batchSize: number;
-  placeholderImageUrl: string;
-  placeholderVideoUrl: string;
-  baseUrl: string;
+  collectionsToExclude?: string[];
+  maxConcurrentRequests?: number;
+  validationTimeoutMs?: number;
+  placeholderBaseUrl?: string;
 }
 
 /**
- * Firebase media repository implementation
+ * Default Firebase media repository configuration
+ */
+export const DEFAULT_FIREBASE_REPOSITORY_CONFIG: FirebaseMediaRepositoryConfig = {
+  collectionsToExclude: ['media_validation_reports', 'mail', 'logs', 'system_settings'],
+  maxConcurrentRequests: 10,
+  validationTimeoutMs: 10000,
+  placeholderBaseUrl: 'https://etoile-yachts.replit.app/placeholders'
+};
+
+/**
+ * Firebase media repository
  */
 export class FirebaseMediaRepository implements IMediaRepository {
-  private readonly mediaCollection: CollectionReference;
-  private readonly reportsCollection: CollectionReference;
-  private readonly repairReportsCollection: CollectionReference;
-  
+  private db: Firestore;
+  private config: FirebaseMediaRepositoryConfig;
+
   constructor(
-    private readonly firestore: Firestore,
-    private readonly mediaValidationService: IMediaValidationService,
-    private readonly config: FirebaseMediaRepositoryConfig
+    db: Firestore,
+    config: FirebaseMediaRepositoryConfig = {}
   ) {
-    this.mediaCollection = this.getCollection(config.mediaCollection);
-    this.reportsCollection = this.getCollection(config.reportsCollection);
-    this.repairReportsCollection = this.getCollection(config.repairReportsCollection);
+    this.db = db;
+    this.config = {
+      ...DEFAULT_FIREBASE_REPOSITORY_CONFIG,
+      ...config
+    };
   }
-  
+
   /**
-   * Get a Firestore collection reference
+   * Get all collections
    */
-  private getCollection(collectionPath: string): CollectionReference {
-    return this.firestore.collection(collectionPath);
+  async getCollections(): Promise<string[]> {
+    try {
+      const collections = await getDocs(collection(this.db, '/'));
+      return collections.docs
+        .map(doc => doc.id)
+        .filter(id => !this.config.collectionsToExclude?.includes(id));
+    } catch (error) {
+      console.error('Error getting collections:', error);
+      throw error;
+    }
   }
-  
+
   /**
-   * Save a media entity to Firestore
+   * Get document IDs for a collection
+   * Optionally limited by batch size and starting index for pagination
    */
-  async saveMedia(media: Media): Promise<Media> {
-    const mediaData = this.mapMediaToFirestore(media);
-    const docRef = media.id
-      ? this.mediaCollection.doc(media.id)
-      : this.mediaCollection.doc();
-    
-    await docRef.set(mediaData);
-    
-    return media;
+  async getDocumentIds(
+    collectionName: string,
+    limitSize?: number,
+    startIndex?: number
+  ): Promise<string[]> {
+    try {
+      let docsQuery = query(
+        collection(this.db, collectionName),
+        orderBy('__name__')
+      );
+
+      // Apply pagination if specified
+      if (limitSize) {
+        docsQuery = query(docsQuery, limit(limitSize));
+      }
+
+      // If startIndex is specified, we need to get the document at that index
+      // and use it as the starting point for our query
+      if (startIndex && startIndex > 0) {
+        // Get all documents up to startIndex
+        const snapshot = await getDocs(
+          query(
+            collection(this.db, collectionName),
+            orderBy('__name__'),
+            limit(startIndex)
+          )
+        );
+
+        // Use the last document as the starting point
+        if (snapshot.docs.length === startIndex) {
+          const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+          docsQuery = query(docsQuery, startAfter(lastDoc));
+        }
+      }
+
+      const documentsSnapshot = await getDocs(docsQuery);
+      return documentsSnapshot.docs.map(doc => doc.id);
+    } catch (error) {
+      console.error(`Error getting document IDs for collection ${collectionName}:`, error);
+      throw error;
+    }
   }
-  
+
   /**
-   * Get a media entity by ID from Firestore
+   * Get a document by ID
    */
-  async getMediaById(id: string): Promise<Media | null> {
-    const docRef = this.mediaCollection.doc(id);
-    const doc = await docRef.get();
+  async getDocument(
+    collectionName: string,
+    documentId: string
+  ): Promise<Record<string, any>> {
+    try {
+      const docRef = doc(this.db, collectionName, documentId);
+      const snapshot = await getDoc(docRef);
+      
+      if (!snapshot.exists()) {
+        throw new Error(`Document ${documentId} does not exist in collection ${collectionName}`);
+      }
+      
+      return snapshot.data() as Record<string, any>;
+    } catch (error) {
+      console.error(`Error getting document ${documentId} from collection ${collectionName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all media URLs in a document
+   * Returns a map of field paths to URLs
+   */
+  async getMediaUrls(
+    collectionName: string,
+    documentId: string
+  ): Promise<Map<string, string>> {
+    try {
+      const urls = new Map<string, string>();
+      const data = await this.getDocument(collectionName, documentId);
+      
+      // Recursively scan the document for URLs
+      this.extractUrlsFromObject(data, urls);
+      
+      return urls;
+    } catch (error) {
+      console.error(`Error getting media URLs from document ${documentId} in collection ${collectionName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Recursively extract URLs from an object
+   */
+  private extractUrlsFromObject(
+    obj: any,
+    urls: Map<string, string>,
+    prefix: string = ''
+  ): void {
+    if (!obj || typeof obj !== 'object') {
+      return;
+    }
+
+    // Handle arrays
+    if (Array.isArray(obj)) {
+      obj.forEach((item, index) => {
+        const path = prefix ? `${prefix}.[${index}]` : `[${index}]`;
+        
+        // Check if this is a Media object
+        if (item && typeof item === 'object' && 'url' in item && 'type' in item) {
+          urls.set(`${path}.url`, item.url);
+        } else {
+          this.extractUrlsFromObject(item, urls, path);
+        }
+      });
+      return;
+    }
+
+    // Handle objects
+    Object.entries(obj).forEach(([key, value]) => {
+      const path = prefix ? `${prefix}.${key}` : key;
+      
+      // Check if this is a URL
+      if (key === 'url' && typeof value === 'string') {
+        urls.set(path, value);
+        return;
+      }
+      
+      // Check if this is a Media object
+      if (
+        key === 'media' && 
+        Array.isArray(value) && 
+        value.length > 0 && 
+        typeof value[0] === 'object' && 
+        'url' in value[0]
+      ) {
+        value.forEach((media: any, index: number) => {
+          if (media && typeof media === 'object' && 'url' in media) {
+            urls.set(`${path}.[${index}].url`, media.url);
+          }
+        });
+        return;
+      }
+      
+      // Check for other nested objects or arrays with URLs
+      if (value && typeof value === 'object') {
+        this.extractUrlsFromObject(value, urls, path);
+      }
+    });
+  }
+
+  /**
+   * Get media type from URL or content
+   */
+  async getMediaTypeFromUrl(url: string): Promise<MediaType> {
+    // First, check if we can determine the type from the URL itself
+    const guessedType = getMediaTypeFromUrl(url);
     
-    if (!doc.exists) {
-      return null;
+    // If we're confident in the URL-based guess, return it
+    if (guessedType !== MediaType.UNKNOWN) {
+      return guessedType;
     }
     
-    return this.mapFirestoreToMedia(doc);
-  }
-  
-  /**
-   * Validate a media URL
-   */
-  async validateMediaUrl(
-    url: string,
-    mediaType?: 'image' | 'video'
-  ): Promise<MediaValidationResult> {
+    // Otherwise, try to fetch headers to get content type
     try {
-      if (!url || url.trim() === '') {
-        return {
-          isValid: false,
-          status: 400,
-          error: 'URL is empty or undefined',
-          contentType: undefined
-        };
-      }
+      const response = await axios.head(url, { 
+        timeout: this.config.validationTimeoutMs,
+        maxRedirects: 5
+      });
       
-      // Check if it's a relative URL (we'll consider it invalid)
-      if (this.mediaValidationService.isRelativeUrl(url)) {
-        return {
-          isValid: false,
-          status: 400,
-          error: 'Relative URLs are not supported',
-          contentType: undefined
-        };
-      }
-      
-      // Check if it's a blob URL (we'll consider it invalid)
-      if (this.mediaValidationService.isBlobUrl(url)) {
-        return {
-          isValid: false,
-          status: 400,
-          error: 'Blob URLs are not supported',
-          contentType: undefined
-        };
-      }
-      
-      // Check if it's a data URL
-      if (this.mediaValidationService.isDataUrl(url)) {
-        // Data URLs are valid, but we don't need to verify them further
+      const contentType = response.headers['content-type'];
+      return getMediaTypeFromMime(contentType);
+    } catch (error) {
+      // If we can't determine, default to image
+      return MediaType.IMAGE;
+    }
+  }
+
+  /**
+   * Check if a URL is valid and accessible
+   */
+  async validateUrl(
+    url: string,
+    expectedType?: MediaType
+  ): Promise<{
+    isValid: boolean;
+    status?: number;
+    statusText?: string;
+    contentType?: string;
+    error?: string;
+  }> {
+    try {
+      // Skip validation for data URLs
+      if (url.startsWith('data:')) {
         return {
           isValid: true,
           status: 200,
-          contentType: url.startsWith('data:image/') ? 'image' : 'unknown'
+          statusText: 'OK',
+          contentType: url.split(',')[0].split(':')[1].split(';')[0]
         };
       }
       
-      // Perform HTTP request to validate URL
-      try {
-        const response = await axios.head(url, {
-          timeout: 5000,
-          maxRedirects: 5
-        });
-        
-        const contentType = response.headers['content-type'] || '';
-        const isImage = contentType.startsWith('image/');
-        const isVideo = contentType.startsWith('video/') || 
-          url.includes('.mp4') || 
-          url.includes('-SBV-') || 
-          url.includes('Dynamic motion');
-        
-        // Check if content type matches expected type
-        if (mediaType === 'image' && !isImage) {
-          return {
-            isValid: false,
-            status: response.status,
-            statusText: response.statusText,
-            contentType,
-            error: `Expected image, got ${contentType}`
-          };
-        }
-        
-        if (mediaType === 'video' && !isVideo) {
-          return {
-            isValid: false,
-            status: response.status,
-            statusText: response.statusText,
-            contentType,
-            error: `Expected video, got ${contentType}`
-          };
-        }
-        
-        return {
-          isValid: true,
-          status: response.status,
-          statusText: response.statusText,
-          contentType
-        };
-      } catch (error) {
-        if (axios.isAxiosError(error)) {
-          return {
-            isValid: false,
-            status: error.response?.status || 0,
-            statusText: error.response?.statusText || '',
-            error: error.message,
-            contentType: error.response?.headers?.['content-type']
-          };
-        }
-        
-        return {
-          isValid: false,
-          error: error instanceof Error ? error.message : String(error)
-        };
-      }
-    } catch (error) {
-      return {
-        isValid: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  }
-  
-  /**
-   * Validate a document field containing a media URL
-   */
-  async validateDocumentField(
-    collection: string,
-    documentId: string,
-    field: string
-  ): Promise<DocumentUrlValidationResult> {
-    try {
-      const docRef = this.firestore.collection(collection).doc(documentId);
-      const doc = await docRef.get();
-      
-      if (!doc.exists) {
-        return {
-          url: '',
-          collection,
-          documentId,
-          field,
-          isValid: false,
-          mediaType: 'unknown',
-          error: 'Document does not exist'
-        };
-      }
-      
-      const data = doc.data();
-      let url = '';
-      
-      // Handle nested fields like 'media.0.url'
-      if (field.includes('.')) {
-        const parts = field.split('.');
-        let current: any = data;
-        
-        for (const part of parts) {
-          if (current === undefined || current === null) {
-            break;
-          }
-          
-          // Handle array indices
-          if (!isNaN(Number(part)) && Array.isArray(current)) {
-            current = current[Number(part)];
-          } else {
-            current = current[part];
-          }
-        }
-        
-        url = current;
-      } else {
-        url = data?.[field];
-      }
-      
-      if (!url || typeof url !== 'string') {
-        return {
-          url: '',
-          collection,
-          documentId,
-          field,
-          isValid: false,
-          mediaType: 'unknown',
-          error: 'Field is empty or not a string'
-        };
-      }
-      
-      // Determine expected media type based on field name or context
-      const expectedType = this.getExpectedMediaType(field, url);
-      
-      // Detect media type
-      const detectionResult = await this.mediaValidationService.detectMediaType(url);
-      
-      // Validate the URL
-      const validationResult = await this.mediaValidationService.validateMediaUrl(url, {
-        expectedType
+      // Make a HEAD request to check if the URL is accessible
+      const response = await axios.head(url, {
+        timeout: this.config.validationTimeoutMs,
+        maxRedirects: 5,
+        validateStatus: (status) => status < 500 // Accept 4xx responses for validation
       });
       
+      const contentType = response.headers['content-type'];
+      
+      // Check if status is successful
+      const isStatusValid = response.status >= 200 && response.status < 400;
+      
+      // If expected type is specified, check if it matches
+      if (expectedType && isStatusValid) {
+        const actualType = getMediaTypeFromMime(contentType);
+        
+        if (actualType !== expectedType && actualType !== MediaType.UNKNOWN) {
+          return {
+            isValid: false,
+            status: response.status,
+            statusText: response.statusText,
+            contentType,
+            error: `Expected ${expectedType}, got ${actualType}`
+          };
+        }
+      }
+      
       return {
-        url,
-        collection,
-        documentId,
-        field,
-        isValid: validationResult.isValid,
-        mediaType: detectionResult.detectedType,
-        status: validationResult.status,
-        statusText: validationResult.statusText,
-        contentType: validationResult.contentType,
-        error: validationResult.error,
-        detectedType: detectionResult.mimeType,
-        expectedType
+        isValid: isStatusValid,
+        status: response.status,
+        statusText: response.statusText,
+        contentType
       };
     } catch (error) {
+      // Handle different error types
+      if (axios.isAxiosError(error)) {
+        return {
+          isValid: false,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          error: error.message
+        };
+      }
+      
       return {
-        url: '',
-        collection,
-        documentId,
-        field,
         isValid: false,
-        mediaType: 'unknown',
         error: error instanceof Error ? error.message : String(error)
       };
     }
   }
-  
+
   /**
-   * Determine the expected media type based on field name and URL
+   * Save validation result
    */
-  private getExpectedMediaType(field: string, url: string): 'image' | 'video' | undefined {
-    // Check URL for video indicators
-    if (
-      url.includes('.mp4') || 
-      url.includes('.mov') || 
-      url.includes('.webm') || 
-      url.includes('video/') ||
-      url.includes('-SBV-') || 
-      url.includes('Dynamic motion')
-    ) {
-      return 'video';
-    }
-    
-    // Check URL for image indicators
-    if (
-      url.includes('.jpg') || 
-      url.includes('.jpeg') || 
-      url.includes('.png') || 
-      url.includes('.gif') || 
-      url.includes('.webp') || 
-      url.includes('image/')
-    ) {
-      return 'image';
-    }
-    
-    // Check field name for indicators
-    const fieldLower = field.toLowerCase();
-    if (
-      fieldLower.includes('video') || 
-      fieldLower.includes('movie') || 
-      fieldLower.includes('clip')
-    ) {
-      return 'video';
-    }
-    
-    if (
-      fieldLower.includes('image') || 
-      fieldLower.includes('photo') || 
-      fieldLower.includes('picture') || 
-      fieldLower.includes('thumbnail') || 
-      fieldLower.includes('cover') || 
-      fieldLower.includes('avatar')
-    ) {
-      return 'image';
-    }
-    
-    // Default to image if we can't determine
-    return 'image';
-  }
-  
-  /**
-   * Validate all media URLs in a document
-   */
-  async validateDocument(
-    collection: string,
-    documentId: string
-  ): Promise<DocumentValidationResult> {
-    try {
-      const docRef = this.firestore.collection(collection).doc(documentId);
-      const doc = await docRef.get();
-      
-      if (!doc.exists) {
-        return {
-          collection,
-          documentId,
-          totalUrls: 0,
-          validUrls: 0,
-          invalidUrls: 0,
-          missingUrls: 0,
-          results: []
-        };
-      }
-      
-      const data = doc.data();
-      const mediaFields = this.findMediaFields(data);
-      const results: DocumentUrlValidationResult[] = [];
-      
-      for (const field of mediaFields) {
-        const result = await this.validateDocumentField(collection, documentId, field);
-        results.push(result);
-      }
-      
-      const totalUrls = results.length;
-      const validUrls = results.filter(r => r.isValid).length;
-      const invalidUrls = results.filter(r => !r.isValid && r.url).length;
-      const missingUrls = results.filter(r => !r.url).length;
-      
-      return {
-        collection,
-        documentId,
-        totalUrls,
-        validUrls,
-        invalidUrls,
-        missingUrls,
-        results
-      };
-    } catch (error) {
-      console.error(`Error validating document ${collection}/${documentId}:`, error);
-      
-      return {
-        collection,
-        documentId,
-        totalUrls: 0,
-        validUrls: 0,
-        invalidUrls: 0,
-        missingUrls: 0,
-        results: []
-      };
-    }
-  }
-  
-  /**
-   * Find all media fields in a document
-   */
-  private findMediaFields(data: any, prefix = ''): string[] {
-    const fields: string[] = [];
-    
-    // Base case: null or undefined
-    if (data === null || data === undefined) {
-      return fields;
-    }
-    
-    // Handle arrays
-    if (Array.isArray(data)) {
-      for (let i = 0; i < data.length; i++) {
-        const item = data[i];
-        
-        // If it's an object, recurse
-        if (item && typeof item === 'object' && !Array.isArray(item)) {
-          fields.push(...this.findMediaFields(item, `${prefix}${prefix ? '.' : ''}${i}`));
-        }
-        
-        // If it's an array item that has a url property, add it
-        if (
-          item && 
-          typeof item === 'object' && 
-          'url' in item && 
-          typeof item.url === 'string'
-        ) {
-          fields.push(`${prefix}${prefix ? '.' : ''}${i}.url`);
-        }
-        
-        // Check if the array item is a string that looks like a media URL
-        if (typeof item === 'string' && this.looksLikeMediaUrl(item)) {
-          fields.push(`${prefix}${prefix ? '.' : ''}${i}`);
-        }
-      }
-      
-      return fields;
-    }
-    
-    // Handle objects
-    if (typeof data === 'object') {
-      for (const key in data) {
-        const value = data[key];
-        const fieldName = `${prefix}${prefix ? '.' : ''}${key}`;
-        
-        // If this is a URL field, add it
-        if (
-          key === 'url' && 
-          typeof value === 'string' && 
-          this.looksLikeMediaUrl(value) && 
-          (prefix.includes('media') || prefix.includes('image') || prefix.includes('photo'))
-        ) {
-          fields.push(fieldName);
-          continue;
-        }
-        
-        // If this is the media array, check its items
-        if (
-          key === 'media' && 
-          Array.isArray(value) && 
-          value.length > 0
-        ) {
-          for (let i = 0; i < value.length; i++) {
-            const mediaItem = value[i];
-            
-            if (
-              mediaItem && 
-              typeof mediaItem === 'object' && 
-              'url' in mediaItem && 
-              typeof mediaItem.url === 'string'
-            ) {
-              fields.push(`${fieldName}.${i}.url`);
-            }
-          }
-          continue;
-        }
-        
-        // If this is a string that looks like a media URL, add it
-        if (typeof value === 'string' && this.looksLikeMediaUrl(value)) {
-          // Only add if the field name suggests it's media
-          if (
-            fieldName.includes('image') || 
-            fieldName.includes('photo') || 
-            fieldName.includes('picture') || 
-            fieldName.includes('avatar') || 
-            fieldName.includes('thumbnail') || 
-            fieldName.includes('cover') || 
-            fieldName.includes('media') || 
-            fieldName.includes('video') || 
-            fieldName.includes('url')
-          ) {
-            fields.push(fieldName);
-          }
-          continue;
-        }
-        
-        // Recurse for nested objects
-        if (value && typeof value === 'object') {
-          fields.push(...this.findMediaFields(value, fieldName));
-        }
-      }
-    }
-    
-    return fields;
-  }
-  
-  /**
-   * Check if a string looks like a media URL
-   */
-  private looksLikeMediaUrl(str: string): boolean {
-    if (!str || typeof str !== 'string') {
-      return false;
-    }
-    
-    // Data URLs
-    if (str.startsWith('data:image/') || str.startsWith('data:video/')) {
-      return true;
-    }
-    
-    // Blob URLs
-    if (str.startsWith('blob:')) {
-      return true;
-    }
-    
-    // Relative URLs to media
-    if (str.startsWith('/') && this.hasMediaExtension(str)) {
-      return true;
-    }
-    
-    // URLs to common image/video services
-    if (
-      str.includes('cloudinary.com') || 
-      str.includes('storage.googleapis.com') || 
-      str.includes('firebasestorage.googleapis.com') || 
-      str.includes('.firebasestorage.app') || 
-      str.includes('amazonaws.com') || 
-      str.includes('imgix.net')
-    ) {
-      return true;
-    }
-    
-    // URLs with image/video extensions
-    if (this.hasMediaExtension(str)) {
-      return true;
-    }
-    
-    // HTTP URLs
-    if ((str.startsWith('http://') || str.startsWith('https://')) && !str.endsWith('/')) {
-      // Skip URLs that are clearly not media
-      if (
-        str.includes('swagger') || 
-        str.includes('api') || 
-        str.includes('json') || 
-        str.includes('xml') || 
-        str.includes('graphql')
-      ) {
-        return false;
-      }
-      
-      return true;
-    }
-    
-    return false;
-  }
-  
-  /**
-   * Check if a URL has a media file extension
-   */
-  private hasMediaExtension(url: string): boolean {
-    const mediaExtensions = [
-      '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.bmp', '.tiff', 
-      '.mp4', '.mov', '.avi', '.webm', '.ogg', '.mkv', '.flv', '.m4v'
-    ];
-    
-    return mediaExtensions.some(ext => url.toLowerCase().endsWith(ext));
-  }
-  
-  /**
-   * Validate all media URLs in a collection
-   */
-  async validateCollection(
-    options: CollectionValidationOptions
-  ): Promise<DocumentValidationResult[]> {
-    const { 
-      collection, 
-      batchSize = this.config.batchSize,
-      limit,
-      skipValidation = false
-    } = options;
-    
-    try {
-      const results: DocumentValidationResult[] = [];
-      let query: Query = this.firestore.collection(collection);
-      
-      if (limit) {
-        query = query.limit(limit);
-      }
-      
-      const snapshot = await query.get();
-      
-      if (snapshot.empty) {
-        return results;
-      }
-      
-      let batch: DocumentSnapshot[] = [];
-      
-      // Process in batches to avoid memory issues
-      for (const doc of snapshot.docs) {
-        batch.push(doc);
-        
-        if (batch.length >= batchSize) {
-          await this.processBatch(batch, collection, skipValidation, results);
-          batch = [];
-        }
-      }
-      
-      // Process any remaining documents
-      if (batch.length > 0) {
-        await this.processBatch(batch, collection, skipValidation, results);
-      }
-      
-      return results;
-    } catch (error) {
-      console.error(`Error validating collection ${collection}:`, error);
-      return [];
-    }
-  }
-  
-  /**
-   * Process a batch of documents
-   */
-  private async processBatch(
-    batch: DocumentSnapshot[],
-    collection: string,
-    skipValidation: boolean,
-    results: DocumentValidationResult[]
+  async saveValidationResult(
+    result: DocumentValidationResult,
+    reportId: string
   ): Promise<void> {
-    for (const doc of batch) {
-      try {
-        const result = await this.validateDocument(collection, doc.id);
-        results.push(result);
-      } catch (error) {
-        console.error(`Error validating document ${collection}/${doc.id}:`, error);
-      }
-    }
-  }
-  
-  /**
-   * Generate a validation report
-   */
-  async generateReport(
-    results: DocumentValidationResult[],
-    startTime: Date,
-    endTime: Date
-  ): Promise<ValidationReport> {
     try {
-      // Calculate duration in milliseconds
-      const duration = endTime.getTime() - startTime.getTime();
+      const docRef = doc(this.db, 'media_validation_reports', reportId);
+      const docResult = collection(docRef, 'document_results');
       
-      // Count total documents, fields, valid/invalid URLs
-      const totalDocuments = results.length;
-      const totalFields = results.reduce((sum, result) => sum + result.totalUrls, 0);
-      const validUrls = results.reduce((sum, result) => sum + result.validUrls, 0);
-      const invalidUrls = results.reduce((sum, result) => sum + result.invalidUrls, 0);
-      const missingUrls = results.reduce((sum, result) => sum + result.missingUrls, 0);
-      
-      // Group results by collection
-      const collectionGroups = results.reduce<Record<string, DocumentValidationResult[]>>(
-        (groups, result) => {
-          if (!groups[result.collection]) {
-            groups[result.collection] = [];
-          }
-          
-          groups[result.collection].push(result);
-          return groups;
-        }, 
-        {}
+      // Create a document for this result
+      await setDoc(
+        doc(docResult, `${result.getCollection()}_${result.getDocumentId()}`),
+        result.toObject()
       );
-      
-      // Generate collection summaries
-      const collectionSummaries: CollectionValidationSummary[] = Object.entries(collectionGroups)
-        .map(([collection, docs]) => {
-          const totalUrls = docs.reduce((sum, doc) => sum + doc.totalUrls, 0);
-          const validUrlsCount = docs.reduce((sum, doc) => sum + doc.validUrls, 0);
-          const invalidUrlsCount = docs.reduce((sum, doc) => sum + doc.invalidUrls, 0);
-          const missingUrlsCount = docs.reduce((sum, doc) => sum + doc.missingUrls, 0);
-          
-          return {
-            collection,
-            totalUrls,
-            validUrls: validUrlsCount,
-            invalidUrls: invalidUrlsCount,
-            missingUrls: missingUrlsCount,
-            validPercent: totalUrls > 0 ? (validUrlsCount / totalUrls) * 100 : 0,
-            invalidPercent: totalUrls > 0 ? (invalidUrlsCount / totalUrls) * 100 : 0,
-            missingPercent: totalUrls > 0 ? (missingUrlsCount / totalUrls) * 100 : 0
-          };
-        });
-      
-      // Extract all invalid URL results
-      const invalidResults: DocumentUrlValidationResult[] = results
-        .flatMap(result => result.results.filter(r => !r.isValid && r.url));
-      
-      // Generate the report
-      const report: ValidationReport = {
-        id: uuidv4(),
-        startTime,
-        endTime,
-        duration,
-        totalDocuments,
-        totalFields,
-        validUrls,
-        invalidUrls,
-        missingUrls,
-        collectionSummaries,
-        invalidResults
-      };
-      
-      return report;
     } catch (error) {
-      console.error('Error generating validation report:', error);
-      
-      // Return a minimal report
-      return {
-        id: uuidv4(),
-        startTime,
-        endTime,
-        duration: endTime.getTime() - startTime.getTime(),
-        totalDocuments: results.length,
-        totalFields: 0,
-        validUrls: 0,
-        invalidUrls: 0,
-        missingUrls: 0,
-        collectionSummaries: [],
-        invalidResults: []
-      };
-    }
-  }
-  
-  /**
-   * Save a validation report to Firestore
-   */
-  async saveReport(report: ValidationReport): Promise<string> {
-    try {
-      const docRef = this.reportsCollection.doc(report.id);
-      await docRef.set({
-        ...report,
-        startTime: new Date(report.startTime),
-        endTime: new Date(report.endTime)
-      });
-      
-      return report.id;
-    } catch (error) {
-      console.error('Error saving validation report:', error);
+      console.error('Error saving validation result:', error);
       throw error;
     }
   }
-  
+
   /**
-   * Get a validation report by ID from Firestore
+   * Get summary of validation reports
    */
-  async getReportById(id: string): Promise<ValidationReport | null> {
+  async getValidationReports(): Promise<{
+    id: string;
+    startTime: Date;
+    endTime: Date;
+    totalDocuments: number;
+    validUrlsPercent: number;
+    invalidUrlsPercent: number;
+  }[]> {
     try {
-      const docRef = this.reportsCollection.doc(id);
-      const doc = await docRef.get();
-      
-      if (!doc.exists) {
-        return null;
-      }
-      
-      const data = doc.data();
-      
-      return {
-        ...data,
-        id: doc.id,
-        startTime: data.startTime.toDate(),
-        endTime: data.endTime.toDate()
-      } as ValidationReport;
-    } catch (error) {
-      console.error(`Error getting validation report ${id}:`, error);
-      return null;
-    }
-  }
-  
-  /**
-   * Get all validation reports from Firestore
-   */
-  async getAllReports(): Promise<ValidationReport[]> {
-    try {
-      const snapshot = await this.reportsCollection
-        .orderBy('startTime', 'desc')
-        .get();
-      
-      if (snapshot.empty) {
-        return [];
-      }
+      const reportsCollection = collection(this.db, 'media_validation_reports');
+      const snapshot = await getDocs(reportsCollection);
       
       return snapshot.docs.map(doc => {
         const data = doc.data();
-        
         return {
-          ...data,
           id: doc.id,
           startTime: data.startTime.toDate(),
-          endTime: data.endTime.toDate()
-        } as ValidationReport;
+          endTime: data.endTime.toDate(),
+          totalDocuments: data.totalDocuments,
+          validUrlsPercent: (data.validUrls / data.totalUrls) * 100,
+          invalidUrlsPercent: (data.invalidUrls / data.totalUrls) * 100
+        };
       });
     } catch (error) {
       console.error('Error getting validation reports:', error);
-      return [];
-    }
-  }
-  
-  /**
-   * Repair a broken URL in a document
-   */
-  async repairUrl(options: UrlRepairOptions): Promise<UrlRepairResult> {
-    try {
-      const { collection, documentId, field, oldUrl, newUrl } = options;
-      const docRef = this.firestore.collection(collection).doc(documentId);
-      const doc = await docRef.get();
-      
-      if (!doc.exists) {
-        return {
-          success: false,
-          field,
-          collection,
-          documentId,
-          oldUrl,
-          newUrl,
-          error: 'Document does not exist'
-        };
-      }
-      
-      // Handle nested fields like 'media.0.url'
-      if (field.includes('.')) {
-        const data = doc.data();
-        const parts = field.split('.');
-        let current: any = data;
-        let parent: any = null;
-        let lastPart: string | number = '';
-        
-        // Navigate to the parent of the field we want to update
-        for (let i = 0; i < parts.length - 1; i++) {
-          const part = parts[i];
-          
-          if (current === undefined || current === null) {
-            return {
-              success: false,
-              field,
-              collection,
-              documentId,
-              oldUrl,
-              newUrl,
-              error: `Field ${parts.slice(0, i + 1).join('.')} does not exist`
-            };
-          }
-          
-          parent = current;
-          
-          // Handle array indices
-          if (!isNaN(Number(part)) && Array.isArray(current)) {
-            lastPart = Number(part);
-            current = current[Number(part)];
-          } else {
-            lastPart = part;
-            current = current[part];
-          }
-        }
-        
-        // Get the last part (the actual field to update)
-        const lastFieldPart = parts[parts.length - 1];
-        
-        // Handle array index as last part
-        if (!isNaN(Number(lastFieldPart)) && Array.isArray(current)) {
-          if (current[Number(lastFieldPart)] !== oldUrl) {
-            return {
-              success: false,
-              field,
-              collection,
-              documentId,
-              oldUrl,
-              newUrl,
-              error: 'URL does not match expected value'
-            };
-          }
-          
-          current[Number(lastFieldPart)] = newUrl;
-        } else {
-          if (current[lastFieldPart] !== oldUrl) {
-            return {
-              success: false,
-              field,
-              collection,
-              documentId,
-              oldUrl,
-              newUrl,
-              error: 'URL does not match expected value'
-            };
-          }
-          
-          current[lastFieldPart] = newUrl;
-        }
-        
-        // Update the field in Firestore
-        const updateData: any = {};
-        
-        if (typeof lastPart === 'number' && Array.isArray(parent)) {
-          // Need to update the entire array for array items
-          const arrayField = parts.slice(0, parts.length - 2).join('.');
-          updateData[arrayField || 'media'] = parent;
-        } else {
-          // Can update the field directly
-          updateData[field] = newUrl;
-        }
-        
-        await docRef.update(updateData);
-      } else {
-        // Simple field update
-        const data = doc.data();
-        
-        if (data[field] !== oldUrl) {
-          return {
-            success: false,
-            field,
-            collection,
-            documentId,
-            oldUrl,
-            newUrl,
-            error: 'URL does not match expected value'
-          };
-        }
-        
-        await docRef.update({
-          [field]: newUrl
-        });
-      }
-      
-      return {
-        success: true,
-        field,
-        collection,
-        documentId,
-        oldUrl,
-        newUrl
-      };
-    } catch (error) {
-      return {
-        success: false,
-        field: options.field,
-        collection: options.collection,
-        documentId: options.documentId,
-        oldUrl: options.oldUrl,
-        newUrl: options.newUrl,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  }
-  
-  /**
-   * Repair multiple broken URLs
-   */
-  async repairUrls(options: UrlRepairOptions[]): Promise<UrlRepairResult[]> {
-    const results: UrlRepairResult[] = [];
-    
-    // Group by collection and document ID to minimize Firestore operations
-    const grouped = options.reduce<Record<string, Record<string, UrlRepairOptions[]>>>(
-      (acc, option) => {
-        if (!acc[option.collection]) {
-          acc[option.collection] = {};
-        }
-        
-        if (!acc[option.collection][option.documentId]) {
-          acc[option.collection][option.documentId] = [];
-        }
-        
-        acc[option.collection][option.documentId].push(option);
-        return acc;
-      }, 
-      {}
-    );
-    
-    // Process each collection
-    for (const collection of Object.keys(grouped)) {
-      // Process each document in the collection
-      for (const documentId of Object.keys(grouped[collection])) {
-        const options = grouped[collection][documentId];
-        
-        try {
-          // Get the document
-          const docRef = this.firestore.collection(collection).doc(documentId);
-          const doc = await docRef.get();
-          
-          if (!doc.exists) {
-            // Document doesn't exist, mark all repairs as failed
-            options.forEach(option => {
-              results.push({
-                success: false,
-                field: option.field,
-                collection,
-                documentId,
-                oldUrl: option.oldUrl,
-                newUrl: option.newUrl,
-                error: 'Document does not exist'
-              });
-            });
-            continue;
-          }
-          
-          // Apply all updates to this document in a single batch
-          const data = doc.data();
-          const updates: Record<string, any> = {};
-          const updateResults: UrlRepairResult[] = [];
-          
-          for (const option of options) {
-            try {
-              // Handle nested fields
-              if (option.field.includes('.')) {
-                const result = await this.repairUrl(option);
-                updateResults.push(result);
-              } else {
-                // Simple field update
-                if (data[option.field] === option.oldUrl) {
-                  updates[option.field] = option.newUrl;
-                  updateResults.push({
-                    success: true,
-                    field: option.field,
-                    collection,
-                    documentId,
-                    oldUrl: option.oldUrl,
-                    newUrl: option.newUrl
-                  });
-                } else {
-                  updateResults.push({
-                    success: false,
-                    field: option.field,
-                    collection,
-                    documentId,
-                    oldUrl: option.oldUrl,
-                    newUrl: option.newUrl,
-                    error: 'URL does not match expected value'
-                  });
-                }
-              }
-            } catch (error) {
-              updateResults.push({
-                success: false,
-                field: option.field,
-                collection,
-                documentId,
-                oldUrl: option.oldUrl,
-                newUrl: option.newUrl,
-                error: error instanceof Error ? error.message : String(error)
-              });
-            }
-          }
-          
-          // Apply the updates if there are any
-          if (Object.keys(updates).length > 0) {
-            await docRef.update(updates);
-          }
-          
-          // Add the results
-          results.push(...updateResults);
-        } catch (error) {
-          // Error processing this document, mark all repairs as failed
-          options.forEach(option => {
-            results.push({
-              success: false,
-              field: option.field,
-              collection,
-              documentId,
-              oldUrl: option.oldUrl,
-              newUrl: option.newUrl,
-              error: error instanceof Error ? error.message : String(error)
-            });
-          });
-        }
-      }
-    }
-    
-    return results;
-  }
-  
-  /**
-   * Save a repair report to Firestore
-   */
-  async saveRepairReport(report: RepairReport): Promise<string> {
-    try {
-      const id = report.id || uuidv4();
-      const docRef = this.repairReportsCollection.doc(id);
-      
-      await docRef.set({
-        ...report,
-        id,
-        timestamp: new Date(report.timestamp)
-      });
-      
-      return id;
-    } catch (error) {
-      console.error('Error saving repair report:', error);
       throw error;
     }
   }
-  
+
   /**
-   * Get a repair report by ID from Firestore
+   * Get details of a validation report
    */
-  async getRepairReportById(id: string): Promise<RepairReport | null> {
+  async getValidationReport(reportId: string): Promise<{
+    id: string;
+    startTime: Date;
+    endTime: Date;
+    totalDocuments: number;
+    totalFields: number;
+    validUrls: number;
+    invalidUrls: number;
+    missingUrls: number;
+    collectionSummaries: Array<{
+      collection: string;
+      totalUrls: number;
+      validUrls: number;
+      invalidUrls: number;
+      missingUrls: number;
+    }>;
+    invalidResults: Array<{
+      collection: string;
+      documentId: string;
+      field: string;
+      url: string;
+      error: string;
+    }>;
+  }> {
     try {
-      const docRef = this.repairReportsCollection.doc(id);
-      const doc = await docRef.get();
+      // Get the report document
+      const reportRef = doc(this.db, 'media_validation_reports', reportId);
+      const reportSnapshot = await getDoc(reportRef);
       
-      if (!doc.exists) {
-        return null;
+      if (!reportSnapshot.exists()) {
+        throw new Error(`Report ${reportId} not found`);
       }
       
-      const data = doc.data();
+      const reportData = reportSnapshot.data();
       
-      return {
-        ...data,
-        id: doc.id,
-        timestamp: data.timestamp.toDate()
-      } as RepairReport;
-    } catch (error) {
-      console.error(`Error getting repair report ${id}:`, error);
-      return null;
-    }
-  }
-  
-  /**
-   * Get all repair reports from Firestore
-   */
-  async getAllRepairReports(): Promise<RepairReport[]> {
-    try {
-      const snapshot = await this.repairReportsCollection
-        .orderBy('timestamp', 'desc')
-        .get();
+      // Get the document results subcollection
+      const resultsCollection = collection(reportRef, 'document_results');
+      const resultsSnapshot = await getDocs(resultsCollection);
       
-      if (snapshot.empty) {
-        return [];
-      }
+      // Extract the invalid results
+      const invalidResults: Array<{
+        collection: string;
+        documentId: string;
+        field: string;
+        url: string;
+        error: string;
+      }> = [];
       
-      return snapshot.docs.map(doc => {
+      resultsSnapshot.docs.forEach(doc => {
         const data = doc.data();
         
-        return {
-          ...data,
-          id: doc.id,
-          timestamp: data.timestamp.toDate()
-        } as RepairReport;
-      });
-    } catch (error) {
-      console.error('Error getting repair reports:', error);
-      return [];
-    }
-  }
-  
-  /**
-   * Find all relative URLs in the database
-   */
-  async findRelativeUrls(): Promise<DocumentUrlValidationResult[]> {
-    const results: DocumentUrlValidationResult[] = [];
-    
-    // Get all collections to scan
-    const collections = await this.firestore.listCollections();
-    
-    for (const collection of collections) {
-      try {
-        const snapshot = await collection.get();
-        
-        for (const doc of snapshot.docs) {
-          try {
-            const data = doc.data();
-            const mediaFields = this.findMediaFields(data);
-            
-            for (const field of mediaFields) {
-              // Get the field value
-              let value = '';
-              
-              if (field.includes('.')) {
-                const parts = field.split('.');
-                let current: any = data;
-                
-                for (const part of parts) {
-                  if (current === undefined || current === null) {
-                    break;
-                  }
-                  
-                  if (!isNaN(Number(part)) && Array.isArray(current)) {
-                    current = current[Number(part)];
-                  } else {
-                    current = current[part];
-                  }
-                }
-                
-                value = current;
-              } else {
-                value = data[field];
-              }
-              
-              // Check if it's a relative URL
-              if (
-                typeof value === 'string' && 
-                value && 
-                this.mediaValidationService.isRelativeUrl(value)
-              ) {
-                results.push({
-                  url: value,
-                  collection: collection.id,
-                  documentId: doc.id,
-                  field,
-                  isValid: false,
-                  mediaType: 'unknown',
-                  error: 'Relative URL'
-                });
-              }
-            }
-          } catch (error) {
-            console.error(`Error scanning document ${collection.id}/${doc.id}:`, error);
-          }
+        if (data.invalidFields && Array.isArray(data.invalidFields)) {
+          data.invalidFields.forEach((field: any) => {
+            invalidResults.push({
+              collection: data.collection,
+              documentId: data.documentId,
+              field: field.field,
+              url: field.url,
+              error: field.error || 'Unknown error'
+            });
+          });
         }
-      } catch (error) {
-        console.error(`Error scanning collection ${collection.id}:`, error);
-      }
+      });
+      
+      return {
+        id: reportId,
+        startTime: reportData.startTime.toDate(),
+        endTime: reportData.endTime.toDate(),
+        totalDocuments: reportData.totalDocuments,
+        totalFields: reportData.totalFields,
+        validUrls: reportData.validUrls,
+        invalidUrls: reportData.invalidUrls,
+        missingUrls: reportData.missingUrls,
+        collectionSummaries: reportData.collectionSummaries,
+        invalidResults
+      };
+    } catch (error) {
+      console.error(`Error getting validation report ${reportId}:`, error);
+      throw error;
     }
-    
-    return results;
   }
-  
+
   /**
-   * Find all blob URLs in the database
+   * Update document fields
    */
-  async findBlobUrls(): Promise<DocumentUrlValidationResult[]> {
-    const results: DocumentUrlValidationResult[] = [];
-    
-    // Get all collections to scan
-    const collections = await this.firestore.listCollections();
-    
-    for (const collection of collections) {
-      try {
-        const snapshot = await collection.get();
+  async updateDocument(
+    collectionName: string,
+    documentId: string,
+    updates: Record<string, any>
+  ): Promise<void> {
+    try {
+      const docRef = doc(this.db, collectionName, documentId);
+      await updateDoc(docRef, updates);
+    } catch (error) {
+      console.error(`Error updating document ${documentId} in collection ${collectionName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Replace a field's value in a document
+   */
+  async replaceFieldValue(
+    collectionName: string,
+    documentId: string,
+    fieldPath: string,
+    value: any
+  ): Promise<void> {
+    try {
+      // Convert field path to object structure
+      const updates = this.createNestedObject({}, fieldPath, value);
+      await this.updateDocument(collectionName, documentId, updates);
+    } catch (error) {
+      console.error(`Error replacing field ${fieldPath} in document ${documentId} of collection ${collectionName}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a nested object from a field path
+   */
+  private createNestedObject(
+    obj: Record<string, any>,
+    path: string,
+    value: any
+  ): Record<string, any> {
+    // Handle array paths
+    const arrayMatch = path.match(/^(.*)\.\[(\d+)\](.*)$/);
+    if (arrayMatch) {
+      const [, prefix, indexStr, suffix] = arrayMatch;
+      const index = parseInt(indexStr, 10);
+      
+      if (prefix) {
+        // We have a prefix, so create a nested object for it
+        const prefixObj = this.createNestedObject({}, prefix, []);
+        const prefixKey = Object.keys(prefixObj)[0];
         
-        for (const doc of snapshot.docs) {
-          try {
-            const data = doc.data();
-            const mediaFields = this.findMediaFields(data);
-            
-            for (const field of mediaFields) {
-              // Get the field value
-              let value = '';
-              
-              if (field.includes('.')) {
-                const parts = field.split('.');
-                let current: any = data;
-                
-                for (const part of parts) {
-                  if (current === undefined || current === null) {
-                    break;
-                  }
-                  
-                  if (!isNaN(Number(part)) && Array.isArray(current)) {
-                    current = current[Number(part)];
-                  } else {
-                    current = current[part];
-                  }
-                }
-                
-                value = current;
-              } else {
-                value = data[field];
-              }
-              
-              // Check if it's a blob URL
-              if (
-                typeof value === 'string' && 
-                value && 
-                this.mediaValidationService.isBlobUrl(value)
-              ) {
-                results.push({
-                  url: value,
-                  collection: collection.id,
-                  documentId: doc.id,
-                  field,
-                  isValid: false,
-                  mediaType: 'unknown',
-                  error: 'Blob URL'
-                });
-              }
-            }
-          } catch (error) {
-            console.error(`Error scanning document ${collection.id}/${doc.id}:`, error);
-          }
+        if (!obj[prefixKey]) {
+          obj[prefixKey] = prefixObj[prefixKey];
         }
-      } catch (error) {
-        console.error(`Error scanning collection ${collection.id}:`, error);
-      }
-    }
-    
-    return results;
-  }
-  
-  /**
-   * Fix relative URLs by adding base URL
-   */
-  async fixRelativeUrls(baseUrl: string): Promise<UrlRepairResult[]> {
-    try {
-      // Find all relative URLs
-      const relativeUrls = await this.findRelativeUrls();
-      
-      if (relativeUrls.length === 0) {
-        return [];
-      }
-      
-      // Prepare the repair options
-      const repairOptions: UrlRepairOptions[] = relativeUrls.map(result => {
-        const normalizedUrl = this.mediaValidationService.normalizeUrl(
-          result.url, 
-          baseUrl
-        );
         
-        return {
-          field: result.field,
-          collection: result.collection,
-          documentId: result.documentId,
-          oldUrl: result.url,
-          newUrl: normalizedUrl
-        };
-      });
-      
-      // Repair the URLs
-      return await this.repairUrls(repairOptions);
-    } catch (error) {
-      console.error('Error fixing relative URLs:', error);
-      return [];
-    }
-  }
-  
-  /**
-   * Resolve blob URLs by replacing with placeholder
-   */
-  async resolveBlobUrls(placeholderUrl: string): Promise<UrlRepairResult[]> {
-    try {
-      // Find all blob URLs
-      const blobUrls = await this.findBlobUrls();
-      
-      if (blobUrls.length === 0) {
-        return [];
+        // Ensure the array exists
+        if (!Array.isArray(obj[prefixKey])) {
+          obj[prefixKey] = [];
+        }
+        
+        // Ensure the array has enough elements
+        while (obj[prefixKey].length <= index) {
+          obj[prefixKey].push(null);
+        }
+        
+        if (suffix) {
+          // We have a suffix, so create a nested object for it
+          if (!obj[prefixKey][index] || typeof obj[prefixKey][index] !== 'object') {
+            obj[prefixKey][index] = {};
+          }
+          
+          const suffixPath = suffix.startsWith('.') ? suffix.substring(1) : suffix;
+          this.createNestedObject(obj[prefixKey][index], suffixPath, value);
+        } else {
+          // No suffix, so assign the value directly
+          obj[prefixKey][index] = value;
+        }
+      } else {
+        // No prefix, direct array assignment
+        if (!obj[index]) {
+          obj[index] = value;
+        }
       }
       
-      // Prepare the repair options
-      const repairOptions: UrlRepairOptions[] = blobUrls.map(result => {
-        return {
-          field: result.field,
-          collection: result.collection,
-          documentId: result.documentId,
-          oldUrl: result.url,
-          newUrl: placeholderUrl
-        };
-      });
-      
-      // Repair the URLs
-      return await this.repairUrls(repairOptions);
-    } catch (error) {
-      console.error('Error resolving blob URLs:', error);
-      return [];
+      return obj;
     }
-  }
-  
-  /**
-   * Map a media entity to Firestore format
-   */
-  private mapMediaToFirestore(media: Media): any {
-    return {
-      id: media.id,
-      url: media.url,
-      type: media.type,
-      name: media.name,
-      description: media.description,
-      size: media.size,
-      width: media.width,
-      height: media.height,
-      duration: media.duration,
-      mimeType: media.mimeType,
-      source: media.source,
-      provider: media.provider,
-      status: media.status,
-      ownerId: media.ownerId,
-      createdAt: media.createdAt,
-      updatedAt: media.updatedAt,
-      validatedAt: media.validatedAt,
-      isValid: media.isValid,
-      tags: media.tags,
-      metadata: media.metadata
-    };
-  }
-  
-  /**
-   * Map Firestore data to a media entity
-   */
-  private mapFirestoreToMedia(doc: DocumentSnapshot): Media {
-    const data = doc.data();
     
-    return new Media({
-      id: doc.id,
-      url: data.url,
-      type: data.type,
-      name: data.name,
-      description: data.description,
-      size: data.size,
-      width: data.width,
-      height: data.height,
-      duration: data.duration,
-      mimeType: data.mimeType,
-      source: data.source,
-      provider: data.provider,
-      status: data.status,
-      ownerId: data.ownerId,
-      createdAt: data.createdAt?.toDate(),
-      updatedAt: data.updatedAt?.toDate(),
-      validatedAt: data.validatedAt?.toDate(),
-      isValid: data.isValid,
-      tags: data.tags,
-      metadata: data.metadata
-    });
+    // Handle regular dot-notation paths
+    const parts = path.split('.');
+    
+    let current = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i];
+      if (!current[part]) {
+        current[part] = {};
+      }
+      current = current[part];
+    }
+    
+    current[parts[parts.length - 1]] = value;
+    return obj;
+  }
+
+  /**
+   * Create a placeholder media object
+   */
+  async createPlaceholderMedia(type: MediaType): Promise<Media> {
+    return createPlaceholderMedia(type);
   }
 }

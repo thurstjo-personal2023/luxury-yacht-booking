@@ -1,126 +1,168 @@
 /**
- * DocumentValidationResult Entity
+ * Document Validation Result
  * 
- * Represents the result of validating media fields within a document.
+ * A value object that represents the result of validating all media URLs in a document.
  */
 
-import { MediaType } from '../media/media-type';
-import { ValidationResult } from './validation-result';
+import { ValidationResult, ValidationResultProps } from './validation-result';
 
 /**
- * Field validation result interface
+ * Invalid field result
  */
-export interface FieldValidationResult {
-  path: string;
+export interface InvalidFieldResult {
+  field: string;
   url: string;
-  expectedType: MediaType;
   isValid: boolean;
-  error?: string;
-  statusCode?: number;
+  status?: number;
   statusText?: string;
-  mimeType?: string;
+  contentType?: string;
+  error?: string;
 }
 
 /**
- * Document validation result properties
+ * Properties for creating a document validation result
  */
 export interface DocumentValidationResultProps {
   collection: string;
   documentId: string;
-  fields: FieldValidationResult[];
-  totalUrls?: number;
-  validUrls?: number;
-  invalidUrls?: number;
-  missingUrls?: number;
-  validatedAt: Date;
+  fields: Map<string, ValidationResultProps>;
+  validatedAt?: Date;
 }
 
 /**
- * Document validation result entity
+ * Document validation result
  */
 export class DocumentValidationResult {
-  readonly collection: string;
-  readonly documentId: string;
-  readonly fields: ReadonlyArray<FieldValidationResult>;
-  readonly totalUrls: number;
-  readonly validUrls: number;
-  readonly invalidUrls: number;
-  readonly missingUrls: number;
-  readonly validatedAt: Date;
+  private readonly collection: string;
+  private readonly documentId: string;
+  private readonly fields: Map<string, ValidationResult>;
+  private readonly validatedAt: Date;
+  private readonly totalUrls: number;
+  private readonly validUrls: number;
+  private readonly invalidUrls: number;
+  private readonly missingUrls: number;
 
   constructor(props: DocumentValidationResultProps) {
     this.collection = props.collection;
     this.documentId = props.documentId;
-    this.fields = [...props.fields];
-    this.totalUrls = props.totalUrls || props.fields.length;
-    this.validUrls = props.validUrls || props.fields.filter(field => field.isValid).length;
-    this.invalidUrls = props.invalidUrls || props.fields.filter(field => !field.isValid).length;
-    this.missingUrls = props.missingUrls || 0;
-    this.validatedAt = props.validatedAt;
+    this.validatedAt = props.validatedAt || new Date();
+    
+    // Convert field results to ValidationResult objects
+    this.fields = new Map();
+    for (const [field, result] of props.fields.entries()) {
+      this.fields.set(field, new ValidationResult(result));
+    }
+    
+    // Calculate statistics
+    this.totalUrls = this.fields.size;
+    this.validUrls = Array.from(this.fields.values()).filter(r => r.getIsValid()).length;
+    this.invalidUrls = Array.from(this.fields.values()).filter(r => !r.getIsValid()).length;
+    this.missingUrls = 0; // For now, missing URLs are counted as invalid
   }
 
   /**
-   * Check if document has any invalid URLs
+   * Get the collection name
+   */
+  getCollection(): string {
+    return this.collection;
+  }
+
+  /**
+   * Get the document ID
+   */
+  getDocumentId(): string {
+    return this.documentId;
+  }
+
+  /**
+   * Get all field validation results
+   */
+  getFields(): Map<string, ValidationResult> {
+    return this.fields;
+  }
+
+  /**
+   * Get the validation timestamp
+   */
+  getValidatedAt(): Date {
+    return this.validatedAt;
+  }
+
+  /**
+   * Get total number of URLs validated
+   */
+  getTotalUrls(): number {
+    return this.totalUrls;
+  }
+
+  /**
+   * Get number of valid URLs
+   */
+  getValidUrls(): number {
+    return this.validUrls;
+  }
+
+  /**
+   * Get number of invalid URLs
+   */
+  getInvalidUrls(): number {
+    return this.invalidUrls;
+  }
+
+  /**
+   * Get number of missing URLs
+   */
+  getMissingUrls(): number {
+    return this.missingUrls;
+  }
+
+  /**
+   * Check if the document has any invalid URLs
    */
   hasInvalidUrls(): boolean {
     return this.invalidUrls > 0;
   }
 
   /**
-   * Check if document has any missing URLs
+   * Get all invalid fields
    */
-  hasMissingUrls(): boolean {
-    return this.missingUrls > 0;
+  getInvalidFields(): InvalidFieldResult[] {
+    const invalidFields: InvalidFieldResult[] = [];
+    
+    for (const [field, result] of this.fields.entries()) {
+      if (!result.getIsValid()) {
+        invalidFields.push({
+          field,
+          url: result.getUrl(),
+          isValid: false,
+          status: result.getStatus(),
+          statusText: result.getStatusText(),
+          contentType: result.getContentType(),
+          error: result.getError()
+        });
+      }
+    }
+    
+    return invalidFields;
   }
 
   /**
-   * Get all invalid field results
+   * Convert to a plain object
    */
-  getInvalidFields(): FieldValidationResult[] {
-    return this.fields.filter(field => !field.isValid);
-  }
-
-  /**
-   * Calculate the percentage of valid URLs
-   */
-  getValidPercentage(): number {
-    if (this.totalUrls === 0) return 100;
-    return (this.validUrls / this.totalUrls) * 100;
-  }
-
-  /**
-   * Convert ValidationResult to FieldValidationResult
-   */
-  static createFieldResult(
-    path: string,
-    result: ValidationResult,
-    expectedType: MediaType
-  ): FieldValidationResult {
-    return {
-      path,
-      url: result.url,
-      expectedType,
-      isValid: result.isValid,
-      error: result.error,
-      statusCode: result.statusCode,
-      statusText: result.statusText,
-      mimeType: result.mimeType
-    };
-  }
-
-  /**
-   * Convert to plain object
-   */
-  toObject(): DocumentValidationResultProps {
+  toObject(): any {
     return {
       collection: this.collection,
       documentId: this.documentId,
-      fields: [...this.fields],
+      validatedAt: this.validatedAt,
       totalUrls: this.totalUrls,
       validUrls: this.validUrls,
       invalidUrls: this.invalidUrls,
       missingUrls: this.missingUrls,
-      validatedAt: this.validatedAt
+      fields: Array.from(this.fields.entries()).map(([field, result]) => ({
+        field,
+        ...result.toObject()
+      })),
+      invalidFields: this.getInvalidFields()
     };
   }
 }

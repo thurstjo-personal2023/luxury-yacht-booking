@@ -1,198 +1,134 @@
 /**
  * Media Repository Interface
  * 
- * Defines the contract for media data persistence operations.
+ * Defines the contract for media repository implementations.
  */
 
+import { DocumentValidationResult } from '../../../core/domain/validation/document-validation-result';
 import { Media } from '../../../core/domain/media/media';
 import { MediaType } from '../../../core/domain/media/media-type';
-import { URL } from '../../../core/domain/value-objects/url';
-
-/**
- * Media validation result
- */
-export interface MediaValidationResult {
-  url: string;
-  isValid: boolean;
-  error?: string;
-  statusCode?: number;
-  mimeType?: string;
-  size?: number;
-  width?: number;
-  height?: number;
-  validatedAt: Date;
-}
-
-/**
- * Media search criteria
- */
-export interface MediaSearchCriteria {
-  type?: MediaType;
-  isValid?: boolean;
-  createdAfter?: Date;
-  createdBefore?: Date;
-  validatedAfter?: Date;
-  validatedBefore?: Date;
-  limit?: number;
-  offset?: number;
-  collection?: string;
-  documentId?: string;
-  ownerId?: string;
-  containsText?: string;
-}
-
-/**
- * Document validation result
- */
-export interface DocumentValidationResult {
-  collection: string;
-  documentId: string;
-  fields: {
-    path: string;
-    url: string;
-    expectedType: MediaType;
-    isValid: boolean;
-    error?: string;
-    statusCode?: number;
-    mimeType?: string;
-  }[];
-  validatedAt: Date;
-}
-
-/**
- * Validation report
- */
-export interface ValidationReport {
-  id: string;
-  startTime: Date;
-  endTime: Date;
-  duration: number;
-  totalDocuments: number;
-  totalFields: number;
-  validUrls: number;
-  invalidUrls: number;
-  missingUrls: number;
-  collectionSummaries: {
-    collection: string;
-    totalUrls: number;
-    validUrls: number;
-    invalidUrls: number;
-    missingUrls: number;
-    validPercent: number;
-    invalidPercent: number;
-    missingPercent: number;
-  }[];
-  invalidResults: {
-    field: string;
-    url: string;
-    isValid: boolean;
-    status?: number;
-    statusText?: string;
-    error?: string;
-    collection: string;
-    documentId: string;
-  }[];
-}
 
 /**
  * Media repository interface
  */
 export interface IMediaRepository {
   /**
-   * Find media by ID
-   */
-  findById(id: string): Promise<Media | null>;
-  
-  /**
-   * Find media by URL
-   */
-  findByUrl(url: URL | string): Promise<Media | null>;
-  
-  /**
-   * Find media by type
-   */
-  findByType(type: MediaType): Promise<Media[]>;
-  
-  /**
-   * Search for media based on criteria
-   */
-  search(criteria: MediaSearchCriteria): Promise<Media[]>;
-  
-  /**
-   * Count media matching criteria
-   */
-  count(criteria: MediaSearchCriteria): Promise<number>;
-  
-  /**
-   * Save media (create or update)
-   */
-  save(media: Media): Promise<Media>;
-  
-  /**
-   * Create new media
-   */
-  create(media: Media): Promise<Media>;
-  
-  /**
-   * Update existing media
-   */
-  update(media: Media): Promise<Media>;
-  
-  /**
-   * Delete media by ID
-   */
-  delete(id: string): Promise<boolean>;
-  
-  /**
-   * Validate a media URL
-   */
-  validateUrl(url: URL | string, expectedType?: MediaType): Promise<MediaValidationResult>;
-  
-  /**
-   * Validate media in a document
-   */
-  validateDocument(collection: string, documentId: string): Promise<DocumentValidationResult>;
-  
-  /**
-   * Get all collections in the database
+   * Get all collections
    */
   getCollections(): Promise<string[]>;
   
   /**
    * Get document IDs for a collection
+   * Optionally limited by batch size and starting index for pagination
    */
-  getDocumentIds(collection: string, limit?: number): Promise<string[]>;
+  getDocumentIds(
+    collection: string,
+    limit?: number,
+    startIndex?: number
+  ): Promise<string[]>;
   
   /**
-   * Save a validation report
+   * Get a document by ID
    */
-  saveValidationReport(report: Omit<ValidationReport, 'id'>): Promise<ValidationReport>;
+  getDocument(
+    collection: string,
+    documentId: string
+  ): Promise<Record<string, any>>;
   
   /**
-   * Get a validation report by ID
+   * Get all media URLs in a document
+   * Returns a map of field paths to URLs
    */
-  getValidationReport(reportId: string): Promise<ValidationReport | null>;
+  getMediaUrls(
+    collection: string,
+    documentId: string
+  ): Promise<Map<string, string>>;
   
   /**
-   * Get all validation reports
+   * Get media type from URL or content
    */
-  getValidationReports(limit?: number): Promise<ValidationReport[]>;
+  getMediaTypeFromUrl(url: string): Promise<MediaType>;
   
   /**
-   * Update a document with repaired media URLs
+   * Check if a URL is valid and accessible
    */
-  repairDocument(
+  validateUrl(url: string, expectedType?: MediaType): Promise<{
+    isValid: boolean;
+    status?: number;
+    statusText?: string;
+    contentType?: string;
+    error?: string;
+  }>;
+  
+  /**
+   * Save validation result
+   */
+  saveValidationResult(
+    result: DocumentValidationResult,
+    reportId: string
+  ): Promise<void>;
+  
+  /**
+   * Get summary of validation reports
+   */
+  getValidationReports(): Promise<{
+    id: string;
+    startTime: Date;
+    endTime: Date;
+    totalDocuments: number;
+    validUrlsPercent: number;
+    invalidUrlsPercent: number;
+  }[]>;
+  
+  /**
+   * Get details of a validation report
+   */
+  getValidationReport(reportId: string): Promise<{
+    id: string;
+    startTime: Date;
+    endTime: Date;
+    totalDocuments: number;
+    totalFields: number;
+    validUrls: number;
+    invalidUrls: number;
+    missingUrls: number;
+    collectionSummaries: Array<{
+      collection: string;
+      totalUrls: number;
+      validUrls: number;
+      invalidUrls: number;
+      missingUrls: number;
+    }>;
+    invalidResults: Array<{
+      collection: string;
+      documentId: string;
+      field: string;
+      url: string;
+      error: string;
+    }>;
+  }>;
+  
+  /**
+   * Update document fields
+   */
+  updateDocument(
     collection: string,
     documentId: string,
-    updates: Record<string, string>
-  ): Promise<boolean>;
+    updates: Record<string, any>
+  ): Promise<void>;
   
   /**
-   * Get media URLs from a document
+   * Replace a field's value in a document
    */
-  getMediaUrlsFromDocument(collection: string, documentId: string): Promise<{
-    field: string;
-    url: string;
-    expectedType: MediaType;
-  }[]>;
+  replaceFieldValue(
+    collection: string,
+    documentId: string,
+    fieldPath: string,
+    value: any
+  ): Promise<void>;
+  
+  /**
+   * Create a placeholder media object
+   */
+  createPlaceholderMedia(type: MediaType): Promise<Media>;
 }
