@@ -1,168 +1,235 @@
 /**
  * Unit tests for AdminCredentials entity
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import { AdminCredentials } from '../../../../../core/domain/admin/admin-credentials';
-import { MfaStatus } from '../../../../../core/domain/admin/mfa-status';
+import { MfaStatus, MfaStatusType } from '../../../../../core/domain/admin/mfa-status';
 
 describe('AdminCredentials Entity', () => {
   it('should create admin credentials with valid properties', () => {
     // Arrange
-    const adminId = 'admin-123';
+    const userId = 'admin-123';
+    const email = 'admin@example.com';
     const passwordHash = 'hashed-password';
     const mfaSecret = 'mfa-secret';
-    const mfaStatus = MfaStatus.ENABLED;
-    const lastPasswordChangeAt = new Date();
+    const updatedAt = new Date();
     
     // Act
-    const credentials = new AdminCredentials({
-      adminId,
+    const credentials = new AdminCredentials(
+      userId,
+      email,
+      updatedAt,
       passwordHash,
-      mfaSecret,
-      mfaStatus,
-      lastPasswordChangeAt
-    });
+      mfaSecret
+    );
     
     // Assert
-    expect(credentials.adminId).toBe(adminId);
-    expect(credentials.passwordHash).toBe(passwordHash);
-    expect(credentials.mfaSecret).toBe(mfaSecret);
-    expect(credentials.mfaStatus).toBe(mfaStatus);
-    expect(credentials.lastPasswordChangeAt).toBe(lastPasswordChangeAt);
+    expect(credentials.userId).toBe(userId);
+    expect(credentials.email).toBe(email);
+    expect(credentials.updatedAt).toEqual(updatedAt);
+    expect(credentials.hasPassword).toBe(true);
+    expect(credentials.hasMfaSecret).toBe(true);
   });
   
-  it('should require an adminId', () => {
-    // Arrange & Act & Assert
-    expect(() => {
-      new AdminCredentials({
-        adminId: '',
-        passwordHash: 'hashed-password'
-      });
-    }).toThrow('Admin ID is required');
-  });
-  
-  it('should require a passwordHash', () => {
-    // Arrange & Act & Assert
-    expect(() => {
-      new AdminCredentials({
-        adminId: 'admin-123',
-        passwordHash: ''
-      });
-    }).toThrow('Password hash is required');
-  });
-  
-  it('should set MFA status to disabled by default', () => {
+  it('should correctly track if credentials have password', () => {
     // Arrange & Act
-    const credentials = new AdminCredentials({
-      adminId: 'admin-123',
-      passwordHash: 'hashed-password'
-    });
+    const withPassword = new AdminCredentials(
+      'admin-123',
+      'admin@example.com',
+      new Date(),
+      'password-hash'
+    );
+    
+    const withoutPassword = new AdminCredentials(
+      'admin-123',
+      'admin@example.com',
+      new Date()
+    );
     
     // Assert
-    expect(credentials.mfaStatus).toBe(MfaStatus.DISABLED);
+    expect(withPassword.hasPassword).toBe(true);
+    expect(withoutPassword.hasPassword).toBe(false);
   });
   
-  it('should check if MFA is enabled', () => {
-    // Arrange
-    const credentialsWithMfa = new AdminCredentials({
-      adminId: 'admin-123',
-      passwordHash: 'hashed-password',
-      mfaStatus: MfaStatus.ENABLED,
-      mfaSecret: 'secret'
-    });
+  it('should correctly track if credentials have MFA secret', () => {
+    // Arrange & Act
+    const withMfa = new AdminCredentials(
+      'admin-123',
+      'admin@example.com',
+      new Date(),
+      'password-hash',
+      'mfa-secret'
+    );
     
-    const credentialsWithoutMfa = new AdminCredentials({
-      adminId: 'admin-456',
-      passwordHash: 'hashed-password',
-      mfaStatus: MfaStatus.DISABLED
-    });
-    
-    // Act & Assert
-    expect(credentialsWithMfa.isMfaEnabled()).toBe(true);
-    expect(credentialsWithoutMfa.isMfaEnabled()).toBe(false);
-  });
-  
-  it('should validate MFA secret is required when MFA is enabled', () => {
-    // Arrange & Act & Assert
-    expect(() => {
-      new AdminCredentials({
-        adminId: 'admin-123',
-        passwordHash: 'hashed-password',
-        mfaStatus: MfaStatus.ENABLED,
-        mfaSecret: ''
-      });
-    }).toThrow('MFA secret is required when MFA is enabled');
-  });
-  
-  it('should set lastPasswordChangeAt to current date if not provided', () => {
-    // Arrange
-    const now = new Date();
-    
-    // Act
-    const credentials = new AdminCredentials({
-      adminId: 'admin-123',
-      passwordHash: 'hashed-password'
-    });
+    const withoutMfa = new AdminCredentials(
+      'admin-123',
+      'admin@example.com',
+      new Date(),
+      'password-hash'
+    );
     
     // Assert
-    expect(credentials.lastPasswordChangeAt).toBeInstanceOf(Date);
-    
-    // Should be approximately now (allow 1 second tolerance for test execution time)
-    const diffMs = Math.abs(credentials.lastPasswordChangeAt.getTime() - now.getTime());
-    expect(diffMs).toBeLessThan(1000);
+    expect(withMfa.hasMfaSecret).toBe(true);
+    expect(withoutMfa.hasMfaSecret).toBe(false);
   });
   
-  it('should update password hash and lastPasswordChangeAt', () => {
+  it('should update password hash correctly', () => {
     // Arrange
-    const credentials = new AdminCredentials({
-      adminId: 'admin-123',
-      passwordHash: 'old-hash'
-    });
+    const credentials = new AdminCredentials(
+      'admin-123',
+      'admin@example.com',
+      new Date(),
+      'old-hash'
+    );
     
-    const oldChangeDate = credentials.lastPasswordChangeAt;
+    const oldUpdateTime = credentials.updatedAt;
     
     // Wait a small amount of time to ensure the timestamps are different
     jest.advanceTimersByTime(1000);
     
     // Act
-    credentials.updatePassword('new-hash');
+    credentials.updatePasswordHash('new-hash');
     
     // Assert
-    expect(credentials.passwordHash).toBe('new-hash');
-    expect(credentials.lastPasswordChangeAt.getTime()).toBeGreaterThan(oldChangeDate.getTime());
+    // We can't directly access the private _passwordHash field,
+    // but we can verify that hasPassword is still true
+    expect(credentials.hasPassword).toBe(true);
+    expect(credentials.updatedAt.getTime()).toBeGreaterThan(oldUpdateTime.getTime());
   });
   
-  it('should enable MFA with a secret', () => {
+  it('should setup MFA correctly', () => {
     // Arrange
-    const credentials = new AdminCredentials({
-      adminId: 'admin-123',
-      passwordHash: 'hashed-password'
-    });
+    const credentials = new AdminCredentials(
+      'admin-123',
+      'admin@example.com',
+      new Date(),
+      'hash'
+    );
     
     // Act
-    credentials.enableMfa('new-secret');
+    credentials.setupMfa('new-mfa-secret');
     
     // Assert
-    expect(credentials.mfaStatus).toBe(MfaStatus.ENABLED);
-    expect(credentials.mfaSecret).toBe('new-secret');
-    expect(credentials.isMfaEnabled()).toBe(true);
+    expect(credentials.hasMfaSecret).toBe(true);
   });
   
-  it('should disable MFA', () => {
+  it('should disable MFA correctly', () => {
     // Arrange
-    const credentials = new AdminCredentials({
-      adminId: 'admin-123',
-      passwordHash: 'hashed-password',
-      mfaStatus: MfaStatus.ENABLED,
-      mfaSecret: 'secret'
-    });
+    const credentials = new AdminCredentials(
+      'admin-123',
+      'admin@example.com',
+      new Date(),
+      'hash',
+      'mfa-secret'
+    );
     
     // Act
     credentials.disableMfa();
     
     // Assert
-    expect(credentials.mfaStatus).toBe(MfaStatus.DISABLED);
-    expect(credentials.mfaSecret).toBeUndefined();
-    expect(credentials.isMfaEnabled()).toBe(false);
+    expect(credentials.hasMfaSecret).toBe(false);
+  });
+  
+  it('should generate and verify temporary tokens', () => {
+    // Arrange
+    const credentials = new AdminCredentials(
+      'admin-123',
+      'admin@example.com',
+      new Date(),
+      'hash'
+    );
+    
+    // Act
+    const token = credentials.generateTemporaryToken(60); // 60 minutes expiry
+    
+    // Assert
+    expect(token).toBeTruthy();
+    expect(credentials.hasTemporaryToken).toBe(true);
+    expect(credentials.verifyTemporaryToken(token)).toBe(true);
+    expect(credentials.verifyTemporaryToken('invalid-token')).toBe(false);
+  });
+  
+  it('should clear temporary tokens', () => {
+    // Arrange
+    const credentials = new AdminCredentials(
+      'admin-123',
+      'admin@example.com',
+      new Date(),
+      'hash'
+    );
+    
+    const token = credentials.generateTemporaryToken();
+    expect(credentials.hasTemporaryToken).toBe(true);
+    
+    // Act
+    credentials.clearTemporaryToken();
+    
+    // Assert
+    expect(credentials.hasTemporaryToken).toBe(false);
+    expect(credentials.verifyTemporaryToken(token)).toBe(false);
+  });
+  
+  it('should validate MFA tokens correctly', () => {
+    // Arrange
+    const credentials = new AdminCredentials(
+      'admin-123',
+      'admin@example.com',
+      new Date(),
+      'hash',
+      'mfa-secret'
+    );
+    
+    // Act & Assert
+    // Per implementation, in test mode a valid token is a 6-digit number
+    expect(credentials.validateMfaToken('123456')).toBe(true);
+    expect(credentials.validateMfaToken('12345')).toBe(false); // too short
+    expect(credentials.validateMfaToken('1234567')).toBe(false); // too long
+    expect(credentials.validateMfaToken('abcdef')).toBe(false); // not numeric
+  });
+  
+  it('should not validate MFA tokens if no MFA secret is set', () => {
+    // Arrange
+    const credentials = new AdminCredentials(
+      'admin-123',
+      'admin@example.com',
+      new Date(),
+      'hash'
+    );
+    
+    // Act & Assert
+    expect(credentials.validateMfaToken('123456')).toBe(false);
+  });
+  
+  it('should convert to and from data object correctly', () => {
+    // Arrange
+    const userId = 'admin-123';
+    const email = 'admin@example.com';
+    const updatedAt = new Date();
+    const passwordHash = 'hash';
+    const mfaSecret = 'secret';
+    const tokenExpiry = new Date(Date.now() + 3600000);
+    const temporaryToken = 'temp-token';
+    
+    const credentials = new AdminCredentials(
+      userId,
+      email,
+      updatedAt,
+      passwordHash,
+      mfaSecret,
+      temporaryToken,
+      tokenExpiry
+    );
+    
+    // Act
+    const data = credentials.toData();
+    const recreated = AdminCredentials.fromData(data);
+    
+    // Assert
+    expect(recreated.userId).toBe(userId);
+    expect(recreated.email).toBe(email);
+    expect(recreated.updatedAt.getTime()).toBe(updatedAt.getTime());
+    expect(recreated.hasPassword).toBe(true);
+    expect(recreated.hasMfaSecret).toBe(true);
+    expect(recreated.hasTemporaryToken).toBe(true);
   });
 });
