@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLocation, navigate } from 'wouter';
+import { useLocation } from 'wouter';
 import { Lock, KeyRound, ArrowLeft } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -28,7 +28,7 @@ export default function MfaVerify() {
   const [resendCountdown, setResendCountdown] = useState(0);
   const { adminUser, verifyMfa, error } = useAdminAuth();
   const { toast } = useToast();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   
   // Get returnUrl from query parameters
   const params = new URLSearchParams(location.split('?')[1] || '');
@@ -46,7 +46,7 @@ export default function MfaVerify() {
   useEffect(() => {
     if (!adminUser && !localStorage.getItem('adminSessionActive')) {
       // No admin user, redirect to login
-      navigate('/admin-login');
+      setLocation('/admin-login');
     }
   }, [adminUser]);
 
@@ -76,7 +76,7 @@ export default function MfaVerify() {
         });
         
         // Redirect to returnUrl or dashboard
-        navigate(returnUrl);
+        setLocation(returnUrl);
       } else {
         toast({
           title: 'Verification Failed',
@@ -128,7 +128,7 @@ export default function MfaVerify() {
     try {
       // In a real implementation, this would sign out the user
       // For now, just navigate back to the login page
-      navigate('/admin-login');
+      setLocation('/admin-login');
     } catch (err) {
       console.error('Error navigating back:', err);
     }

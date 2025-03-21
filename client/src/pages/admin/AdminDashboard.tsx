@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'wouter';
+import { useLocation } from 'wouter';
 import { 
   BarChart3, 
   LayoutDashboard, 
@@ -47,7 +47,7 @@ export default function AdminDashboard() {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { adminUser, adminSignOut } = useAdminAuth();
-  const navigate = useNavigate();
+  const [_, setLocation] = useLocation();
   const { toast } = useToast();
 
   // Check admin authentication
