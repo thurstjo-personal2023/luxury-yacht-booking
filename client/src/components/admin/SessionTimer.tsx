@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { navigate } from 'wouter';
+import { useLocation } from 'wouter';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
@@ -11,7 +11,7 @@ export function SessionTimer() {
   const [totalTime, setTotalTime] = useState<number>(0);
   const [showWarning, setShowWarning] = useState(false);
   const { adminUser, refreshSession, sessionTimeout, adminSignOut } = useAdminAuth();
-  // Using navigate from wouter directly
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   // Calculate the percentage of time remaining
@@ -119,7 +119,7 @@ export function SessionTimer() {
       });
       
       // Redirect to login page
-      navigate('/admin-login');
+      setLocation('/admin-login');
     } catch (error) {
       console.error('Error handling session expiration:', error);
     }

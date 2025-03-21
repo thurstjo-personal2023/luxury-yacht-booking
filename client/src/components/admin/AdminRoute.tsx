@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'wouter';
+import { useLocation } from 'wouter';
 import { useAdminAuth } from '@/hooks/use-admin-auth';
 
 // Loading spinner component
@@ -19,8 +19,7 @@ interface AdminRouteProps {
 export function AdminRoute({ children, requiresMfa = true }: AdminRouteProps) {
   const [isLoading, setIsLoading] = useState(true);
   const { adminUser, loading } = useAdminAuth();
-  const [location] = useLocation();
-  const navigate = useNavigate();
+  const [location, setLocation] = useLocation();
 
   useEffect(() => {
     // Wait for admin auth to initialize
@@ -31,20 +30,20 @@ export function AdminRoute({ children, requiresMfa = true }: AdminRouteProps) {
     // Check if user is authenticated as admin
     if (!adminUser) {
       // Redirect to admin login, preserving the intended destination
-      navigate(`/admin-login?returnUrl=${encodeURIComponent(location)}`);
+      setLocation(`/admin-login?returnUrl=${encodeURIComponent(location)}`);
       return;
     }
     
     // Check MFA if required
     if (requiresMfa && !adminUser.mfaVerified) {
       // If MFA is not yet verified, redirect to MFA verification
-      navigate(`/admin-mfa-verify?returnUrl=${encodeURIComponent(location)}`);
+      setLocation(`/admin-mfa-verify?returnUrl=${encodeURIComponent(location)}`);
       return;
     }
     
     // Authentication and MFA checks passed
     setIsLoading(false);
-  }, [adminUser, loading, navigate, location, requiresMfa]);
+  }, [adminUser, loading, setLocation, location, requiresMfa]);
 
   // Show loading spinner while checking authentication
   if (loading || isLoading) {

@@ -1,35 +1,39 @@
 import { useState } from 'react';
-import { useNavigate } from 'wouter';
-import { useForm } from 'react-hook-form';
+import { useLocation, useNavigate } from 'wouter';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-import { AlertCircle, Lock, Mail } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { Lock, Mail } from 'lucide-react';
 
 // UI Components
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
+import { useAdminAuth } from '@/hooks/use-admin-auth';
 
-// Login form schema with validation
+// Login form schema
 const loginSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address' }),
-  password: z.string().min(8, { message: 'Password must be at least 8 characters long' }),
+  password: z.string().min(8, { message: 'Password must be at least 8 characters' }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function AdminLogin() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const { adminSignIn, error } = useAdminAuth();
   const { toast } = useToast();
-  const auth = getAuth();
-
-  // Set up form with validation
+  const [location] = useLocation();
+  const navigate = useNavigate();
+  
+  // Get returnUrl from query parameters
+  const params = new URLSearchParams(location.split('?')[1] || '');
+  const returnUrl = params.get('returnUrl') || '/admin-dashboard';
+  
+  // Initialize form with React Hook Form
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -37,135 +41,125 @@ export default function AdminLogin() {
       password: '',
     },
   });
-
+  
   // Handle form submission
-  const onSubmit = async (data: LoginFormValues) => {
-    setLoading(true);
-    setError(null);
-
+  const onSubmit = async (values: LoginFormValues) => {
     try {
-      // Sign in with Firebase auth
-      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
-      const user = userCredential.user;
-
-      // Get ID token result to check admin role
-      const tokenResult = await user.getIdTokenResult();
-      const role = tokenResult.claims.role;
-
-      // Check if user is an admin
-      // For now using the producer role as admin, can be changed later
-      if (role !== 'admin' && role !== 'producer') {
-        await auth.signOut();
-        setError('This account does not have administrative privileges');
-        setLoading(false);
-        return;
-      }
-
-      // Check if MFA is required (will redirect to MFA verification)
-      // This part will be implemented in the next phase
+      setIsLoading(true);
       
-      // Temporary: Redirect to admin dashboard
+      // Call adminSignIn from our auth hook
+      const user = await adminSignIn(values.email, values.password);
+      
+      if (user) {
+        // Check if MFA is required
+        // For now, redirect to MFA verification if admin signs in successfully
+        // In the future, we'll check MFA status from Firestore
+        toast({
+          title: 'Authentication successful',
+          description: 'Redirecting to MFA verification...',
+        });
+        
+        // Redirect to MFA verification page with returnUrl
+        navigate(`/admin-mfa-verify?returnUrl=${encodeURIComponent(returnUrl)}`);
+      }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      
+      // Show error toast
       toast({
-        title: 'Login Successful',
-        description: 'Welcome to the admin dashboard.',
+        title: 'Login Failed',
+        description: err.message || 'Invalid email or password',
+        variant: 'destructive',
       });
-      
-      // Navigate to admin dashboard
-      navigate('/admin/dashboard');
-    } catch (err) {
-      let errorMessage = 'Failed to sign in';
-      
-      if (err instanceof Error) {
-        // Parse Firebase error messages to be more user-friendly
-        if (err.message.includes('auth/wrong-password') || err.message.includes('auth/user-not-found')) {
-          errorMessage = 'Invalid email or password';
-        } else if (err.message.includes('auth/too-many-requests')) {
-          errorMessage = 'Too many failed login attempts. Please try again later.';
-        } else {
-          errorMessage = err.message;
-        }
-      }
-      
-      setError(errorMessage);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <Card className="shadow-lg border-primary/10">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">Administrator Login</CardTitle>
-            <CardDescription className="text-center">
-              Secure access to the Etoile Yachts admin dashboard
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {error && (
-              <Alert variant="destructive" className="mb-6">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <div className="flex items-center border rounded-md focus-within:ring-1 focus-within:ring-ring">
-                          <Mail className="ml-2 h-5 w-5 text-muted-foreground" />
-                          <Input 
-                            placeholder="admin@example.com" 
-                            className="flex-1 border-0 focus-visible:ring-0" 
-                            {...field} 
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <div className="flex items-center border rounded-md focus-within:ring-1 focus-within:ring-ring">
-                          <Lock className="ml-2 h-5 w-5 text-muted-foreground" />
-                          <Input 
-                            type="password" 
-                            placeholder="••••••••" 
-                            className="flex-1 border-0 focus-visible:ring-0" 
-                            {...field} 
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Signing in...' : 'Sign In'}
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-          <CardFooter className="flex flex-col gap-4">
-            <div className="text-sm text-center text-muted-foreground">
-              This is a secure area. Unauthorized access attempts are monitored and logged.
-            </div>
-          </CardFooter>
-        </Card>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader className="space-y-1 text-center">
+          <div className="flex justify-center mb-2">
+            <Lock className="h-12 w-12 text-primary" />
+          </div>
+          <CardTitle className="text-2xl font-bold">Admin Portal Login</CardTitle>
+          <CardDescription>
+            Enter your credentials to access the admin dashboard
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                          placeholder="your@email.com" 
+                          className="pl-10" 
+                          disabled={isLoading}
+                          {...field} 
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                          type="password" 
+                          placeholder="••••••••" 
+                          className="pl-10" 
+                          disabled={isLoading}
+                          {...field} 
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {error && (
+                <div className="text-sm text-red-500 mt-2">
+                  {error}
+                </div>
+              )}
+              
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Signing in...' : 'Sign In'}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+        <CardFooter className="flex flex-col space-y-4">
+          <div className="text-sm text-center text-muted-foreground">
+            <span>This portal is only for authorized administrators. </span>
+            <a href="/" className="text-primary hover:underline">
+              Return to website
+            </a>
+          </div>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

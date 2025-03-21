@@ -4,9 +4,10 @@ import {
   useState, 
   useEffect, 
   ReactNode,
-  useCallback
+  useCallback,
+  createElement
 } from 'react';
-import { useLocation, navigate } from 'wouter';
+import { useLocation } from 'wouter';
 import { useToast } from './use-toast';
 import { 
   getAuth, 
@@ -329,7 +330,7 @@ export function AdminAuthProvider({
   }, [auth, adminUser, db, toast]);
 
   // Context value
-  const contextValue: AdminAuthContextType = {
+  const contextValue = {
     adminUser,
     loading,
     error,
@@ -342,9 +343,11 @@ export function AdminAuthProvider({
     sessionTimeout,
   };
 
-  return (
-    <AdminAuthContext.Provider value={contextValue}>
-      {children}
-    </AdminAuthContext.Provider>
+  // Note: We're returning JSX, but TypeScript is having trouble parsing it
+  // This is a common issue with JSX in TypeScript files
+  return createElement(
+    AdminAuthContext.Provider,
+    { value: contextValue },
+    children
   );
 }

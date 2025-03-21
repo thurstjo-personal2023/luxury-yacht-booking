@@ -11,6 +11,7 @@ import { Suspense, lazy, useEffect } from "react";
 import { initializeFirestore } from "./lib/firestore-init";
 import { initializeConnectionManager } from "./lib/connection-manager";
 import { AuthProvider } from "@/hooks/use-auth";
+import { AdminAuthProvider } from "@/components/admin/AdminAuthProvider";
 
 // Lazy load pages
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -52,6 +53,12 @@ const EmailTest = lazy(() => import("@/pages/admin/EmailTest"));
 const ImageValidator = lazy(() => import("@/pages/admin/ImageValidator"));
 const MediaAdmin = lazy(() => import("@/pages/admin/MediaAdmin"));
 const MediaValidation = lazy(() => import("@/pages/admin/MediaValidation"));
+
+// Secure Admin Portal
+const SecureAdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard"));
+const AdminLogin = lazy(() => import("@/pages/admin/AdminLogin"));
+const AdminMfaSetup = lazy(() => import("@/pages/admin/MfaSetup"));
+const AdminMfaVerify = lazy(() => import("@/pages/admin/MfaVerify"));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -100,11 +107,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <div className="min-h-screen flex flex-col">
-          <Navbar />
-          <main className="flex-1">
-            <Suspense fallback={<LoadingSpinner />}>
-              <Switch>
+        <AdminAuthProvider sessionTimeout={15 * 60}>
+          <div className="min-h-screen flex flex-col">
+            <Navbar />
+            <main className="flex-1">
+              <Suspense fallback={<LoadingSpinner />}>
+                <Switch>
                 <Route path="/" component={Home} />
                 <Route path="/login" component={Login} />
                 <Route path="/register" component={Register} />
@@ -199,6 +207,12 @@ function App() {
                 <PrivateRoute component={MediaValidation} />
               </Route>
               
+              {/* Secure Admin Portal Routes */}
+              <Route path="/admin-login" component={AdminLogin} />
+              <Route path="/admin-mfa-setup" component={AdminMfaSetup} />
+              <Route path="/admin-mfa-verify" component={AdminMfaVerify} />
+              <Route path="/admin-dashboard" component={SecureAdminDashboard} />
+              
               {/* Debug Tools */}
               <Route path="/debug/role">
                 <PrivateRoute component={RoleDebugPage} />
@@ -216,6 +230,7 @@ function App() {
         <ConnectionStatus />
       </div>
       <Toaster />
+        </AdminAuthProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
