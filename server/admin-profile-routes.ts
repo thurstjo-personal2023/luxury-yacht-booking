@@ -118,7 +118,7 @@ export function registerAdminProfileRoutes(app: Express) {
       }
       
       // Get the admin profile
-      const adminDoc = await adminDb.collection('admin_users').doc(uid).get();
+      const adminDoc = await adminDb.collection('admin_users').doc(uid as string).get();
       
       if (!adminDoc.exists) {
         return res.status(404).json({ error: 'Admin profile not found' });
@@ -175,7 +175,7 @@ export function registerAdminProfileRoutes(app: Express) {
       if (phone) updateData.phone = phone;
       
       // Update the admin profile
-      await adminDb.collection('admin_users').doc(uid).update(updateData);
+      await adminDb.collection('admin_users').doc(uid as string).update(updateData);
       
       res.json({
         success: true,
@@ -199,8 +199,12 @@ export function registerAdminProfileRoutes(app: Express) {
     try {
       const uid = req.user?.uid;
       
+      if (!uid) {
+        return res.status(401).json({ error: 'Unauthorized: User ID missing' });
+      }
+      
       // Verify super admin status
-      const adminDoc = await adminDb.collection('admin_users').doc(uid).get();
+      const adminDoc = await adminDb.collection('admin_users').doc(uid as string).get();
       const adminData = adminDoc.data();
       
       if (!adminData?.permissions.includes('approve_admins')) {
@@ -246,6 +250,10 @@ export function registerAdminProfileRoutes(app: Express) {
     try {
       const approverUid = req.user?.uid;
       const { adminUid, status, notes } = req.body;
+      
+      if (!approverUid) {
+        return res.status(401).json({ error: 'Unauthorized: User ID missing' });
+      }
       
       if (!adminUid || !status) {
         return res.status(400).json({ error: 'Admin UID and status are required' });

@@ -5,6 +5,7 @@ import { registerUserProfileRoutes } from "./user-profile-routes";
 import { registerUploadRoutes } from "./upload-routes";
 import { registerEmailRoutes } from "./email-routes";
 import { registerAdminRoutes } from "./admin-routes";
+import { registerAdminProfileRoutes } from "./admin-profile-routes";
 import { testProductionStorage, runStorageTest } from "./test-storage";
 import { USE_FIREBASE_EMULATORS } from "./env-config";
 
@@ -59,6 +60,9 @@ app.use((req, res, next) => {
     
     // Register admin routes
     registerAdminRoutes(app);
+    
+    // Register admin profile routes
+    registerAdminProfileRoutes(app);
     
     // Test Firebase Storage in production
     if (!USE_FIREBASE_EMULATORS) {
