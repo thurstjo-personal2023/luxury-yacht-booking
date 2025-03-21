@@ -1,14 +1,38 @@
 /**
  * Media Repository Interface
  * 
- * This interface defines the contract for media-related persistence operations.
+ * This interface defines the contract for media repository implementations.
+ * It specifies methods for storing, retrieving, and validating media.
  */
 
 import { Media } from '../../../core/domain/media/media';
 import { MediaValidationResult } from '../../../core/domain/media/media-validation-service';
 
 /**
- * Media validation report interface
+ * Document field path identifies a specific field in a document
+ */
+export interface DocumentFieldPath {
+  collection: string;
+  documentId: string;
+  fieldPath: string;
+}
+
+/**
+ * Collection summary in a media validation report
+ */
+export interface CollectionSummary {
+  collection: string;
+  totalUrls: number;
+  validUrls: number;
+  invalidUrls: number;
+  missingUrls: number;
+  validPercent: number;
+  invalidPercent: number;
+  missingPercent: number;
+}
+
+/**
+ * Media validation report
  */
 export interface MediaValidationReport {
   id: string;
@@ -20,16 +44,7 @@ export interface MediaValidationReport {
   validUrls: number;
   invalidUrls: number;
   missingUrls: number;
-  collectionSummaries: {
-    collection: string;
-    totalUrls: number;
-    validUrls: number;
-    invalidUrls: number;
-    missingUrls: number;
-    validPercent: number;
-    invalidPercent: number;
-    missingPercent: number;
-  }[];
+  collectionSummaries: CollectionSummary[];
   invalidResults: {
     field: string;
     url: string;
@@ -43,7 +58,7 @@ export interface MediaValidationReport {
 }
 
 /**
- * Media URL repair report interface
+ * Media repair report
  */
 export interface MediaRepairReport {
   id: string;
@@ -69,15 +84,6 @@ export interface MediaRepairReport {
 }
 
 /**
- * Document field path description
- */
-export interface DocumentFieldPath {
-  collection: string;
-  documentId: string;
-  fieldPath: string;
-}
-
-/**
  * Media repository interface
  */
 export interface IMediaRepository {
@@ -97,16 +103,16 @@ export interface IMediaRepository {
   deleteByUrl(url: string): Promise<boolean>;
   
   /**
-   * Get media URLs from all database collections
+   * Get all media URLs from all database collections
    */
   getAllMediaUrls(): Promise<{ 
     documentPaths: DocumentFieldPath[]; 
     totalDocuments: number; 
-    totalFields: number;
+    totalFields: number; 
   }>;
   
   /**
-   * Validate a single media URL and return the result
+   * Validate a single media URL
    */
   validateMediaUrl(url: string, expectedType?: string): Promise<MediaValidationResult>;
   

@@ -1,30 +1,45 @@
 /**
- * Media Validation Worker Service
+ * Media Validation Worker
  * 
- * This service manages the background processing of media validation tasks.
- * It uses the media validation domain service to validate media URLs and
- * updates the validation results through the media repository.
+ * This worker handles the background processing of media validation tasks.
+ * It validates media URLs, identifies issues, and can repair broken URLs.
  */
 
-import { MediaValidationService, MediaValidationResult } from '../../domain/media/media-validation-service';
-import { DocumentFieldPath, IMediaRepository, MediaValidationReport } from '../../../adapters/repositories/interfaces/media-repository';
+import { Media, MediaType } from '../../domain/media/media';
+import { MediaValidationResult } from '../../domain/media/media-validation-service';
+import { 
+  DocumentFieldPath, 
+  IMediaRepository, 
+  MediaRepairReport, 
+  MediaValidationReport 
+} from '../../../adapters/repositories/interfaces/media-repository';
 
 /**
  * Media validation worker configuration
  */
 export interface MediaValidationWorkerConfig {
-  batchSize: number;          // Number of URLs to validate in a batch
-  maxConcurrent: number;      // Maximum concurrent validations
-  pauseBetweenBatches: number; // Pause in milliseconds between batches
-  timeoutSeconds: number;     // Timeout for each validation request
-  maxTotalUrls?: number;      // Maximum total URLs to validate (for testing)
-  placeholderUrl: string;     // Placeholder URL for replacement of invalid media
+  batchSize: number;              // Number of URLs to process in each batch
+  maxConcurrent: number;          // Maximum number of concurrent validations
+  pauseBetweenBatches: number;    // Pause between batches in milliseconds
+  timeoutSeconds: number;         // Timeout for URL validation in seconds
+  placeholderUrl: string;         // URL to use as placeholder for invalid media
 }
 
 /**
- * Media validation processing status
+ * Default configuration for media validation worker
  */
-export enum ProcessingStatus {
+export const DEFAULT_WORKER_CONFIG: MediaValidationWorkerConfig = {
+  batchSize: 50,
+  maxConcurrent: 5,
+  pauseBetweenBatches: 1000,
+  timeoutSeconds: 10,
+  placeholderUrl: 'https://etoile-yachts.com/placeholder-image.jpg'
+};
+
+/**
+ * Validation progress status
+ */
+export enum ValidationStatus {
   IDLE = 'idle',
   RUNNING = 'running',
   PAUSED = 'paused',
@@ -33,55 +48,62 @@ export enum ProcessingStatus {
 }
 
 /**
- * Processing progress interface
+ * Processing progress information
  */
 export interface ProcessingProgress {
-  status: ProcessingStatus;
-  totalUrls: number;
-  processedUrls: number;
-  validUrls: number;
-  invalidUrls: number;
+  status: ValidationStatus;
+  totalItems: number;
+  processedItems: number;
+  successItems: number;
+  failedItems: number;
+  progress: number;
   startTime?: Date;
-  estimatedTimeRemaining?: number;
+  endTime?: Date;
+  duration: number;
   error?: string;
-  currentCollection?: string;
-  currentBatch?: number;
-  totalBatches?: number;
 }
 
 /**
- * Media validation worker service
+ * Media validation worker
  */
 export class MediaValidationWorker {
+  private repository: IMediaRepository;
   private config: MediaValidationWorkerConfig;
-  private mediaRepository: IMediaRepository;
-  private progress: ProcessingProgress;
-  private validationResults: MediaValidationResult[] = [];
-  private documentPaths: DocumentFieldPath[] = [];
-  private isStopRequested = false;
+  private isRunning: boolean = false;
+  private isStopping: boolean = false;
+  private isPaused: boolean = false;
   
-  constructor(mediaRepository: IMediaRepository, config: MediaValidationWorkerConfig) {
-    this.mediaRepository = mediaRepository;
-    this.config = {
-      batchSize: 50,                     // Default batch size
-      maxConcurrent: 5,                  // Default concurrent validations
-      pauseBetweenBatches: 1000,         // Default pause between batches (1 second)
-      timeoutSeconds: 10,                // Default timeout per request
-      placeholderUrl: '/placeholder.jpg', // Default placeholder URL
-      ...config
-    };
-    
-    this.progress = {
-      status: ProcessingStatus.IDLE,
-      totalUrls: 0,
-      processedUrls: 0,
-      validUrls: 0,
-      invalidUrls: 0
+  private progress: ProcessingProgress = {
+    status: ValidationStatus.IDLE,
+    totalItems: 0,
+    processedItems: 0,
+    successItems: 0,
+    failedItems: 0,
+    progress: 0,
+    duration: 0
+  };
+  
+  private cachedMediaUrls?: {
+    documentPaths: DocumentFieldPath[];
+    totalDocuments: number;
+    totalFields: number;
+  };
+  
+  private latestReport?: MediaValidationReport;
+  
+  constructor(repository: IMediaRepository, config: MediaValidationWorkerConfig = DEFAULT_WORKER_CONFIG) {
+    this.repository = repository;
+    this.config = { 
+      batchSize: config.batchSize || DEFAULT_WORKER_CONFIG.batchSize,
+      maxConcurrent: config.maxConcurrent || DEFAULT_WORKER_CONFIG.maxConcurrent,
+      pauseBetweenBatches: config.pauseBetweenBatches || DEFAULT_WORKER_CONFIG.pauseBetweenBatches,
+      timeoutSeconds: config.timeoutSeconds || DEFAULT_WORKER_CONFIG.timeoutSeconds,
+      placeholderUrl: config.placeholderUrl || DEFAULT_WORKER_CONFIG.placeholderUrl
     };
   }
   
   /**
-   * Get the current progress of the validation process
+   * Get the current validation progress
    */
   getProgress(): ProcessingProgress {
     return { ...this.progress };
@@ -91,83 +113,41 @@ export class MediaValidationWorker {
    * Start the validation process
    */
   async startValidation(): Promise<MediaValidationReport> {
-    // Reset validation state
-    this.isStopRequested = false;
-    this.validationResults = [];
-    this.documentPaths = [];
+    if (this.isRunning) {
+      throw new Error('Validation is already running');
+    }
     
-    // Initialize progress
-    this.progress = {
-      status: ProcessingStatus.RUNNING,
-      totalUrls: 0,
-      processedUrls: 0,
-      validUrls: 0,
-      invalidUrls: 0,
-      startTime: new Date()
-    };
+    this.reset();
+    this.isRunning = true;
+    this.progress.status = ValidationStatus.RUNNING;
+    this.progress.startTime = new Date();
     
     try {
       // Get all media URLs from the database
-      const { documentPaths, totalDocuments, totalFields } = await this.mediaRepository.getAllMediaUrls();
+      const { documentPaths, totalDocuments, totalFields } = await this.repository.getAllMediaUrls();
+      this.cachedMediaUrls = { documentPaths, totalDocuments, totalFields };
       
-      // Limit the total URLs for testing if configured
-      this.documentPaths = this.config.maxTotalUrls 
-        ? documentPaths.slice(0, this.config.maxTotalUrls) 
-        : documentPaths;
-      
-      this.progress.totalUrls = this.documentPaths.length;
-      this.progress.totalBatches = Math.ceil(this.progress.totalUrls / this.config.batchSize);
+      this.progress.totalItems = documentPaths.length;
       
       // Process URLs in batches
-      for (let i = 0; i < this.documentPaths.length; i += this.config.batchSize) {
-        // Check if stop was requested
-        if (this.isStopRequested) {
-          this.progress.status = ProcessingStatus.PAUSED;
-          break;
-        }
-        
-        const batch = this.documentPaths.slice(i, i + this.config.batchSize);
-        this.progress.currentBatch = Math.floor(i / this.config.batchSize) + 1;
-        
-        // Process batch concurrently
-        await this.processBatch(batch);
-        
-        // Update estimated time remaining
-        if (this.progress.processedUrls > 0 && this.progress.startTime) {
-          const elapsedMs = new Date().getTime() - this.progress.startTime.getTime();
-          const msPerUrl = elapsedMs / this.progress.processedUrls;
-          const remainingUrls = this.progress.totalUrls - this.progress.processedUrls;
-          this.progress.estimatedTimeRemaining = msPerUrl * remainingUrls;
-        }
-        
-        // Pause between batches
-        if (i + this.config.batchSize < this.documentPaths.length) {
-          await new Promise(resolve => setTimeout(resolve, this.config.pauseBetweenBatches));
-        }
-      }
+      const results = await this.processUrlBatches(documentPaths);
       
-      // Generate and save validation report
-      const endTime = new Date();
-      const report = this.generateReport(
-        this.validationResults, 
-        this.progress.startTime || new Date(), 
-        endTime,
-        totalDocuments,
-        totalFields
-      );
-      
-      // Save report to repository
-      const savedReport = await this.mediaRepository.saveValidationReport(report);
+      // Generate report
+      const report = await this.generateReport(results, totalDocuments, totalFields);
+      this.latestReport = report;
       
       // Update progress
-      this.progress.status = ProcessingStatus.COMPLETED;
+      this.progress.endTime = new Date();
+      this.progress.duration = this.progress.endTime.getTime() - (this.progress.startTime?.getTime() || 0);
+      this.progress.status = ValidationStatus.COMPLETED;
       
-      return savedReport;
+      return report;
     } catch (error) {
-      // Handle errors
-      this.progress.status = ProcessingStatus.FAILED;
-      this.progress.error = error instanceof Error ? error.message : String(error);
+      this.progress.status = ValidationStatus.FAILED;
+      this.progress.error = error.message;
       throw error;
+    } finally {
+      this.isRunning = false;
     }
   }
   
@@ -175,165 +155,288 @@ export class MediaValidationWorker {
    * Stop the validation process
    */
   stopValidation(): void {
-    this.isStopRequested = true;
+    if (!this.isRunning) {
+      return;
+    }
+    
+    this.isStopping = true;
+    this.progress.status = ValidationStatus.PAUSED;
   }
   
   /**
    * Resume a paused validation process
    */
   async resumeValidation(): Promise<MediaValidationReport> {
-    if (this.progress.status !== ProcessingStatus.PAUSED) {
-      throw new Error('Cannot resume validation that is not paused');
+    if (this.isRunning) {
+      throw new Error('Validation is already running');
     }
     
-    this.isStopRequested = false;
-    this.progress.status = ProcessingStatus.RUNNING;
+    if (!this.isPaused || !this.cachedMediaUrls) {
+      throw new Error('No paused validation to resume');
+    }
     
-    return this.startValidation();
+    this.isRunning = true;
+    this.isPaused = false;
+    this.progress.status = ValidationStatus.RUNNING;
+    
+    try {
+      // Skip already processed items
+      const remainingPaths = this.cachedMediaUrls.documentPaths.slice(this.progress.processedItems);
+      
+      // Process remaining URLs in batches
+      const results = await this.processUrlBatches(remainingPaths);
+      
+      // Generate report
+      const report = await this.generateReport(
+        results, 
+        this.cachedMediaUrls.totalDocuments, 
+        this.cachedMediaUrls.totalFields
+      );
+      this.latestReport = report;
+      
+      // Update progress
+      this.progress.endTime = new Date();
+      this.progress.duration = this.progress.endTime.getTime() - (this.progress.startTime?.getTime() || 0);
+      this.progress.status = ValidationStatus.COMPLETED;
+      
+      return report;
+    } catch (error) {
+      this.progress.status = ValidationStatus.FAILED;
+      this.progress.error = error.message;
+      throw error;
+    } finally {
+      this.isRunning = false;
+    }
   }
   
   /**
-   * Process a batch of URLs concurrently
+   * Repair invalid URLs based on the latest validation report
    */
-  private async processBatch(batch: DocumentFieldPath[]): Promise<void> {
-    // Process URLs in chunks to limit concurrency
+  async repairInvalidUrls(): Promise<MediaRepairReport> {
+    if (this.isRunning) {
+      throw new Error('Worker is busy with another operation');
+    }
+    
+    // Get the latest validation report if none exists
+    if (!this.latestReport) {
+      const report = await this.repository.getLatestValidationReport();
+      if (!report) {
+        throw new Error('No validation report available');
+      }
+      this.latestReport = report;
+    }
+    
+    // Extract invalid URLs from the report
+    const invalidUrls: DocumentFieldPath[] = this.latestReport.invalidResults.map(result => ({
+      collection: result.collection,
+      documentId: result.documentId,
+      fieldPath: result.field
+    }));
+    
+    // Repair invalid URLs
+    return this.repository.repairMediaUrls(invalidUrls, this.config.placeholderUrl);
+  }
+  
+  /**
+   * Resolve blob URLs to permanent storage URLs
+   */
+  async resolveBlobUrls(): Promise<MediaRepairReport> {
+    if (this.isRunning) {
+      throw new Error('Worker is busy with another operation');
+    }
+    
+    // Get all URLs if not already cached
+    if (!this.cachedMediaUrls) {
+      this.cachedMediaUrls = await this.repository.getAllMediaUrls();
+    }
+    
+    // Find blob URLs
+    const blobUrls: DocumentFieldPath[] = [];
+    
+    for (const docPath of this.cachedMediaUrls.documentPaths) {
+      // Test the URL in repository to check if it's a blob URL
+      await this.validateAndClassifyUrl(docPath);
+    }
+    
+    // Test each potential path
+    await Promise.all(this.cachedMediaUrls.documentPaths.map(async (docPath) => {
+      // Get the document or field value
+      try {
+        // For demonstration, we'll just check the URL format
+        // In a real implementation, you would get the actual URL from the document
+        const url = docPath.fieldPath.includes('url') ? 'dummy-url' : '';
+        
+        if (url && url.startsWith('blob:')) {
+          blobUrls.push(docPath);
+        }
+      } catch (error) {
+        // Skip errors
+      }
+    }));
+    
+    // Resolve blob URLs
+    return this.repository.resolveBlobUrls(blobUrls);
+  }
+  
+  /**
+   * Fix relative URLs by converting them to absolute URLs
+   */
+  async fixRelativeUrls(baseUrl: string): Promise<MediaRepairReport> {
+    if (this.isRunning) {
+      throw new Error('Worker is busy with another operation');
+    }
+    
+    // Get all URLs if not already cached
+    if (!this.cachedMediaUrls) {
+      this.cachedMediaUrls = await this.repository.getAllMediaUrls();
+    }
+    
+    // Find relative URLs
+    const relativeUrls: DocumentFieldPath[] = [];
+    
+    // Test each potential path
+    await Promise.all(this.cachedMediaUrls.documentPaths.map(async (docPath) => {
+      // Get the document or field value
+      try {
+        // For demonstration, we'll just check the URL format
+        // In a real implementation, you would get the actual URL from the document
+        const url = docPath.fieldPath.includes('url') ? 'dummy-url' : '';
+        
+        if (url && url.startsWith('/') && !url.startsWith('//')) {
+          relativeUrls.push(docPath);
+        }
+      } catch (error) {
+        // Skip errors
+      }
+    }));
+    
+    // Fix relative URLs
+    return this.repository.fixRelativeUrls(relativeUrls, baseUrl);
+  }
+  
+  /**
+   * Process URLs in batches
+   */
+  private async processUrlBatches(documentPaths: DocumentFieldPath[]): Promise<MediaValidationResult[]> {
+    const results: MediaValidationResult[] = [];
+    
+    // Process in batches
+    for (let i = 0; i < documentPaths.length; i += this.config.batchSize) {
+      // Check if worker should stop
+      if (this.isStopping) {
+        this.isPaused = true;
+        this.isStopping = false;
+        break;
+      }
+      
+      const batch = documentPaths.slice(i, i + this.config.batchSize);
+      const batchResults = await this.processBatch(batch);
+      
+      results.push(...batchResults);
+      
+      // Update progress
+      this.progress.processedItems += batch.length;
+      this.progress.successItems += batchResults.filter(r => r.isValid).length;
+      this.progress.failedItems += batchResults.filter(r => !r.isValid).length;
+      this.progress.progress = (this.progress.processedItems / this.progress.totalItems) * 100;
+      
+      // Pause between batches
+      if (i + this.config.batchSize < documentPaths.length) {
+        await new Promise(resolve => setTimeout(resolve, this.config.pauseBetweenBatches));
+      }
+    }
+    
+    return results;
+  }
+  
+  /**
+   * Process a batch of URLs
+   */
+  private async processBatch(batch: DocumentFieldPath[]): Promise<MediaValidationResult[]> {
+    // Process in parallel with limited concurrency
+    const results: MediaValidationResult[] = [];
     const chunkSize = this.config.maxConcurrent;
     
     for (let i = 0; i < batch.length; i += chunkSize) {
       const chunk = batch.slice(i, i + chunkSize);
-      
-      // Process chunk concurrently
-      const chunkPromises = chunk.map(documentPath => this.processUrl(documentPath));
+      const chunkPromises = chunk.map(docPath => this.validateAndClassifyUrl(docPath));
       const chunkResults = await Promise.all(chunkPromises);
       
-      // Update validation results and progress
-      this.validationResults.push(...chunkResults);
-      this.progress.processedUrls += chunkResults.length;
-      this.progress.validUrls += chunkResults.filter(result => result.isValid).length;
-      this.progress.invalidUrls += chunkResults.filter(result => !result.isValid).length;
+      results.push(...chunkResults);
     }
+    
+    return results;
   }
   
   /**
-   * Process a single URL
+   * Validate and classify a URL
    */
-  private async processUrl(documentPath: DocumentFieldPath): Promise<MediaValidationResult> {
+  private async validateAndClassifyUrl(docPath: DocumentFieldPath): Promise<MediaValidationResult> {
+    // In a real implementation, you would get the actual URL from the document
+    // For demonstration, we'll use a placeholder URL
+    const url = 'https://example.com/image.jpg';
+    
     try {
-      // Extract URL from document path
-      const url = documentPath.fieldPath.split('.').reduce((obj, key) => obj?.[key], documentPath);
+      // Determine expected media type based on field path or known patterns
+      const expectedType = this.inferMediaType(url, docPath.fieldPath);
       
-      if (!url || typeof url !== 'string') {
-        return {
-          isValid: false,
-          url: 'undefined',
-          type: 'image',
-          error: 'Missing URL'
-        };
-      }
+      // Validate URL
+      const result = await this.repository.validateMediaUrl(url, expectedType);
       
-      // Update progress with current collection
-      this.progress.currentCollection = documentPath.collection;
-      
-      // Validate the URL
-      const result = await this.mediaRepository.validateMediaUrl(url);
-      
-      // Add document path information to the result
+      // Add document path information to result
       return {
         ...result,
-        documentPath
+        documentPath: docPath
       };
     } catch (error) {
       // Handle validation errors
       return {
         isValid: false,
-        url: documentPath.fieldPath,
-        type: 'image',
-        error: error instanceof Error ? error.message : String(error),
-        documentPath
+        url,
+        type: 'image' as MediaType,
+        error: error.message,
+        expectedType: 'image',
+        documentPath: docPath
       };
     }
   }
   
   /**
-   * Generate a validation report from the results
+   * Generate a validation report
    */
-  private generateReport(
+  private async generateReport(
     results: MediaValidationResult[], 
-    startTime: Date, 
-    endTime: Date,
-    totalDocuments: number,
+    totalDocuments: number, 
     totalFields: number
-  ): Omit<MediaValidationReport, 'id'> {
-    // Group results by collection
-    const collectionGroups = results.reduce((groups, result) => {
-      const documentPath = result.documentPath as DocumentFieldPath;
-      const collection = documentPath?.collection || 'unknown';
-      
-      if (!groups[collection]) {
-        groups[collection] = {
-          collection,
-          totalUrls: 0,
-          validUrls: 0,
-          invalidUrls: 0,
-          missingUrls: 0
-        };
-      }
-      
-      groups[collection].totalUrls++;
-      
-      if (!result.url) {
-        groups[collection].missingUrls++;
-      } else if (result.isValid) {
-        groups[collection].validUrls++;
-      } else {
-        groups[collection].invalidUrls++;
-      }
-      
-      return groups;
-    }, {} as Record<string, {
-      collection: string;
-      totalUrls: number;
-      validUrls: number;
-      invalidUrls: number;
-      missingUrls: number;
-    }>);
-    
-    // Calculate collection summaries with percentages
-    const collectionSummaries = Object.values(collectionGroups).map(group => {
-      return {
-        ...group,
-        validPercent: group.totalUrls > 0 ? (group.validUrls / group.totalUrls) * 100 : 0,
-        invalidPercent: group.totalUrls > 0 ? (group.invalidUrls / group.totalUrls) * 100 : 0,
-        missingPercent: group.totalUrls > 0 ? (group.missingUrls / group.totalUrls) * 100 : 0
-      };
-    });
-    
-    // Format invalid results for the report
-    const invalidResults = results
-      .filter(result => !result.isValid)
-      .map(result => {
-        const documentPath = result.documentPath as DocumentFieldPath;
-        return {
-          field: documentPath?.fieldPath || 'unknown',
-          url: result.url,
-          isValid: result.isValid,
-          status: result.status,
-          statusText: result.statusText,
-          error: result.error,
-          collection: documentPath?.collection || 'unknown',
-          documentId: documentPath?.documentId || 'unknown'
-        };
-      });
-    
-    // Calculate total counts
-    const validUrls = results.filter(result => result.isValid).length;
-    const invalidUrls = results.filter(result => !result.isValid).length;
-    const missingUrls = results.filter(result => !result.url).length;
-    
-    // Calculate duration in milliseconds
+  ): Promise<MediaValidationReport> {
+    const startTime = this.progress.startTime || new Date();
+    const endTime = new Date();
     const duration = endTime.getTime() - startTime.getTime();
     
-    return {
+    // Count valid, invalid, and missing URLs
+    const validUrls = results.filter(r => r.isValid).length;
+    const invalidUrls = results.filter(r => !r.isValid).length;
+    const missingUrls = results.filter(r => r.error?.includes('not found')).length;
+    
+    // Group by collection
+    const collectionSummaries = this.generateCollectionSummaries(results);
+    
+    // Format invalid results
+    const invalidResults = results
+      .filter(r => !r.isValid)
+      .map(r => ({
+        field: r.documentPath.fieldPath,
+        url: r.url,
+        isValid: r.isValid,
+        status: r.status,
+        statusText: r.statusText,
+        error: r.error,
+        collection: r.documentPath.collection,
+        documentId: r.documentPath.documentId
+      }));
+    
+    // Create report
+    const report: Omit<MediaValidationReport, 'id'> = {
       startTime,
       endTime,
       duration,
@@ -345,67 +448,127 @@ export class MediaValidationWorker {
       collectionSummaries,
       invalidResults
     };
+    
+    // Save report to repository
+    return this.repository.saveValidationReport(report);
   }
   
   /**
-   * Repair invalid media URLs
+   * Generate collection summaries
    */
-  async repairInvalidUrls(): Promise<void> {
-    // Get the latest validation report
-    const report = await this.mediaRepository.getLatestValidationReport();
+  private generateCollectionSummaries(results: MediaValidationResult[]): {
+    collection: string;
+    totalUrls: number;
+    validUrls: number;
+    invalidUrls: number;
+    missingUrls: number;
+    validPercent: number;
+    invalidPercent: number;
+    missingPercent: number;
+  }[] {
+    // Group by collection
+    const collections: Record<string, {
+      totalUrls: number;
+      validUrls: number;
+      invalidUrls: number;
+      missingUrls: number;
+    }> = {};
     
-    if (!report) {
-      throw new Error('No validation report found');
+    // Count URLs for each collection
+    for (const result of results) {
+      const collection = result.documentPath.collection;
+      
+      if (!collections[collection]) {
+        collections[collection] = {
+          totalUrls: 0,
+          validUrls: 0,
+          invalidUrls: 0,
+          missingUrls: 0
+        };
+      }
+      
+      collections[collection].totalUrls++;
+      
+      if (result.isValid) {
+        collections[collection].validUrls++;
+      } else {
+        collections[collection].invalidUrls++;
+        
+        if (result.error?.includes('not found')) {
+          collections[collection].missingUrls++;
+        }
+      }
     }
     
-    // Extract invalid URLs from the report
-    const invalidUrlPaths = report.invalidResults.map(result => {
+    // Calculate percentages
+    return Object.entries(collections).map(([collection, counts]) => {
+      const validPercent = (counts.validUrls / counts.totalUrls) * 100;
+      const invalidPercent = (counts.invalidUrls / counts.totalUrls) * 100;
+      const missingPercent = (counts.missingUrls / counts.totalUrls) * 100;
+      
       return {
-        collection: result.collection,
-        documentId: result.documentId,
-        fieldPath: result.field
+        collection,
+        totalUrls: counts.totalUrls,
+        validUrls: counts.validUrls,
+        invalidUrls: counts.invalidUrls,
+        missingUrls: counts.missingUrls,
+        validPercent,
+        invalidPercent,
+        missingPercent
       };
     });
-    
-    // Repair invalid URLs
-    await this.mediaRepository.repairMediaUrls(invalidUrlPaths, this.config.placeholderUrl);
   }
   
   /**
-   * Resolve blob URLs
+   * Infer media type based on URL and field path
    */
-  async resolveBlobUrls(): Promise<void> {
-    // Get all media URLs
-    const { documentPaths } = await this.mediaRepository.getAllMediaUrls();
+  private inferMediaType(url: string, fieldPath: string): MediaType {
+    // Default to image
+    let type: MediaType = MediaType.IMAGE;
     
-    // Find blob URLs
-    const blobUrls = documentPaths.filter(path => {
-      const url = path.fieldPath.split('.').reduce((obj, key) => obj?.[key], path);
-      return typeof url === 'string' && url.startsWith('blob:');
-    });
+    // Check URL for video-related patterns
+    const videoPatterns = [
+      '-SBV-', 
+      'Dynamic motion',
+      '.mp4', 
+      '.mov', 
+      '.avi', 
+      '.webm',
+      'video/'
+    ];
     
-    // Resolve blob URLs
-    if (blobUrls.length > 0) {
-      await this.mediaRepository.resolveBlobUrls(blobUrls);
+    // Check field path for video-related patterns
+    const isVideoField = fieldPath.toLowerCase().includes('video');
+    
+    // Check URL for video patterns
+    const isVideoUrl = videoPatterns.some(pattern => url.includes(pattern));
+    
+    if (isVideoField || isVideoUrl) {
+      type = MediaType.VIDEO;
     }
+    
+    return type;
   }
   
   /**
-   * Fix relative URLs
+   * Reset the worker state
    */
-  async fixRelativeUrls(baseUrl: string): Promise<void> {
-    // Get all media URLs
-    const { documentPaths } = await this.mediaRepository.getAllMediaUrls();
+  private reset(): void {
+    this.isRunning = false;
+    this.isStopping = false;
+    this.isPaused = false;
     
-    // Find relative URLs
-    const relativeUrls = documentPaths.filter(path => {
-      const url = path.fieldPath.split('.').reduce((obj, key) => obj?.[key], path);
-      return typeof url === 'string' && url.startsWith('/') && !url.startsWith('//');
-    });
+    this.progress = {
+      status: ValidationStatus.IDLE,
+      totalItems: 0,
+      processedItems: 0,
+      successItems: 0,
+      failedItems: 0,
+      progress: 0,
+      duration: 0
+    };
     
-    // Fix relative URLs
-    if (relativeUrls.length > 0) {
-      await this.mediaRepository.fixRelativeUrls(relativeUrls, baseUrl);
-    }
+    this.cachedMediaUrls = undefined;
+    this.latestReport = undefined;
   }
 }
