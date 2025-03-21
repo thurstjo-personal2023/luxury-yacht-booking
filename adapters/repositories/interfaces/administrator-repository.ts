@@ -1,48 +1,16 @@
 /**
  * Administrator Repository Interface
  * 
- * This interface defines the contract for administrator repository implementations.
+ * Defines the contract for administrator data persistence operations.
  */
 
 import { Administrator } from '../../../core/domain/user/administrator';
-import { AdministratorApprovalStatus } from '../../../core/domain/user/administrator';
+import { AdministratorApprovalStatus } from '../../../core/domain/user/administrator-approval-status';
 import { EmailAddress } from '../../../core/domain/value-objects/email-address';
 import { UserRole } from '../../../core/domain/user/user-role';
 
 /**
- * Administrator filter options
- */
-export interface AdministratorFilterOptions {
-  role?: UserRole;
-  approvalStatus?: AdministratorApprovalStatus;
-  department?: string;
-  mfaEnabled?: boolean;
-  searchTerm?: string;
-}
-
-/**
- * Administrator pagination options
- */
-export interface AdministratorPaginationOptions {
-  page: number;
-  pageSize: number;
-  sortBy?: string;
-  sortDirection?: 'asc' | 'desc';
-}
-
-/**
- * Paginated administrator result
- */
-export interface PaginatedAdministrators {
-  administrators: Administrator[];
-  totalCount: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
-
-/**
- * Administrator invitation
+ * Administrator invitation data
  */
 export interface AdministratorInvitation {
   id: string;
@@ -52,38 +20,34 @@ export interface AdministratorInvitation {
   invitedBy: string;
   invitedAt: Date;
   expiresAt: Date;
-  acceptedAt?: Date;
   isAccepted: boolean;
+  acceptedAt?: Date;
 }
 
 /**
- * Administrator invitation filter options
+ * Administrator search criteria
  */
-export interface InvitationFilterOptions {
-  isAccepted?: boolean;
-  isExpired?: boolean;
-}
-
-/**
- * Paginated invitation result
- */
-export interface PaginatedInvitations {
-  invitations: AdministratorInvitation[];
-  totalCount: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
+export interface AdministratorSearchCriteria {
+  role?: UserRole;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  department?: string;
+  position?: string;
+  approvalStatus?: AdministratorApprovalStatus;
+  mfaEnabled?: boolean;
+  isEmailVerified?: boolean;
+  invitedBy?: string;
+  createdAfter?: Date;
+  createdBefore?: Date;
+  limit?: number;
+  offset?: number;
 }
 
 /**
  * Administrator repository interface
  */
 export interface IAdministratorRepository {
-  /**
-   * Save an administrator
-   */
-  save(administrator: Administrator): Promise<Administrator>;
-  
   /**
    * Find an administrator by ID
    */
@@ -95,57 +59,54 @@ export interface IAdministratorRepository {
   findByEmail(email: EmailAddress | string): Promise<Administrator | null>;
   
   /**
-   * Get all administrators
+   * Find administrators by role
    */
-  findAll(
-    filters?: AdministratorFilterOptions,
-    pagination?: AdministratorPaginationOptions
-  ): Promise<PaginatedAdministrators>;
-  
-  /**
-   * Delete an administrator
-   */
-  delete(id: string): Promise<boolean>;
+  findByRole(role: UserRole): Promise<Administrator[]>;
   
   /**
    * Find administrators by approval status
    */
-  findByApprovalStatus(
-    status: AdministratorApprovalStatus,
-    pagination?: AdministratorPaginationOptions
-  ): Promise<PaginatedAdministrators>;
+  findByApprovalStatus(status: AdministratorApprovalStatus): Promise<Administrator[]>;
   
   /**
-   * Count administrators by approval status
+   * Find administrators by who invited them
    */
-  countByApprovalStatus(status: AdministratorApprovalStatus): Promise<number>;
+  findByInvitedBy(invitedBy: string): Promise<Administrator[]>;
   
   /**
-   * Find administrators by role
+   * Search for administrators based on criteria
    */
-  findByRole(
-    role: UserRole,
-    pagination?: AdministratorPaginationOptions
-  ): Promise<PaginatedAdministrators>;
+  search(criteria: AdministratorSearchCriteria): Promise<Administrator[]>;
   
   /**
-   * Search administrators
+   * Count administrators matching criteria
    */
-  search(
-    query: string,
-    filters?: AdministratorFilterOptions,
-    pagination?: AdministratorPaginationOptions
-  ): Promise<PaginatedAdministrators>;
+  count(criteria: AdministratorSearchCriteria): Promise<number>;
   
   /**
-   * Create an administrator invitation
+   * Save an administrator (create or update)
+   */
+  save(administrator: Administrator): Promise<Administrator>;
+  
+  /**
+   * Create a new administrator
+   */
+  create(administrator: Administrator): Promise<Administrator>;
+  
+  /**
+   * Update an existing administrator
+   */
+  update(administrator: Administrator): Promise<Administrator>;
+  
+  /**
+   * Delete an administrator by ID
+   */
+  delete(id: string): Promise<boolean>;
+  
+  /**
+   * Create an invitation for a new administrator
    */
   createInvitation(invitation: Omit<AdministratorInvitation, 'id'>): Promise<AdministratorInvitation>;
-  
-  /**
-   * Find an invitation by ID
-   */
-  findInvitationById(id: string): Promise<AdministratorInvitation | null>;
   
   /**
    * Find an invitation by token
@@ -158,20 +119,32 @@ export interface IAdministratorRepository {
   findInvitationsByEmail(email: string): Promise<AdministratorInvitation[]>;
   
   /**
-   * Get all invitations
+   * Find invitations by who sent them
    */
-  findAllInvitations(
-    filters?: InvitationFilterOptions,
-    pagination?: AdministratorPaginationOptions
-  ): Promise<PaginatedInvitations>;
+  findInvitationsByInviter(invitedBy: string): Promise<AdministratorInvitation[]>;
   
   /**
    * Mark an invitation as accepted
    */
-  markInvitationAsAccepted(id: string): Promise<AdministratorInvitation>;
+  markInvitationAsAccepted(invitationId: string): Promise<boolean>;
   
   /**
    * Delete an invitation
    */
-  deleteInvitation(id: string): Promise<boolean>;
+  deleteInvitation(invitationId: string): Promise<boolean>;
+  
+  /**
+   * Approve an administrator
+   */
+  approve(id: string, approvedBy: string): Promise<Administrator | null>;
+  
+  /**
+   * Reject an administrator
+   */
+  reject(id: string, rejectedBy: string, reason: string): Promise<Administrator | null>;
+  
+  /**
+   * Update administrator activity
+   */
+  updateActivity(id: string): Promise<Administrator | null>;
 }

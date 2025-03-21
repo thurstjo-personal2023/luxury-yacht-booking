@@ -1,69 +1,294 @@
 /**
  * Firebase User Repository Implementation
  * 
- * This module implements the IUserRepository interface using Firebase Firestore.
+ * Implements the IUserRepository interface using Firebase Firestore.
  */
 
-import { 
-  Firestore, 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
+import {
+  Firestore,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit,
   startAfter,
+  Timestamp,
   DocumentData,
   QueryDocumentSnapshot,
-  DocumentSnapshot
+  DocumentReference,
+  DocumentSnapshot,
+  serverTimestamp
 } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 
-import { 
-  IUserRepository,
-  UserFilterOptions,
-  UserPaginationOptions,
-  PaginatedUsers
-} from '../interfaces/user-repository';
-import { User } from '../../../core/domain/user/user';
+import { IUserRepository, UserSearchCriteria } from '../interfaces/user-repository';
+import { User, UserProps } from '../../../core/domain/user/user';
 import { EmailAddress } from '../../../core/domain/value-objects/email-address';
+import { PhoneNumber } from '../../../core/domain/value-objects/phone-number';
 import { UserRole } from '../../../core/domain/user/user-role';
 
 /**
- * Firebase user repository configuration
+ * Firebase User Repository configuration
  */
 export interface FirebaseUserRepositoryConfig {
   usersCollection: string;
-  defaultPageSize: number;
 }
 
 /**
- * Firebase user repository implementation
+ * Firebase User Repository implementation
  */
 export class FirebaseUserRepository implements IUserRepository {
-  private readonly usersCollection: string;
+  private readonly firestore: Firestore;
+  private readonly config: FirebaseUserRepositoryConfig;
   
-  constructor(
-    private readonly firestore: Firestore,
-    private readonly config: FirebaseUserRepositoryConfig
-  ) {
-    this.usersCollection = config.usersCollection;
+  constructor(firestore: Firestore, config: FirebaseUserRepositoryConfig) {
+    this.firestore = firestore;
+    this.config = config;
   }
   
   /**
-   * Save a user to Firestore
+   * Find a user by ID
+   */
+  async findById(id: string): Promise<User | null> {
+    try {
+      const userRef = doc(this.firestore, this.config.usersCollection, id);
+      const userDoc = await getDoc(userRef);
+      
+      if (!userDoc.exists()) {
+        return null;
+      }
+      
+      return this.documentToUser(userDoc);
+    } catch (error) {
+      console.error('Error finding user by ID:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Find a user by email
+   */
+  async findByEmail(email: EmailAddress | string): Promise<User | null> {
+    try {
+      const emailStr = email instanceof EmailAddress ? email.value : email;
+      
+      const usersRef = collection(this.firestore, this.config.usersCollection);
+      const q = query(usersRef, where('email', '==', emailStr));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        return null;
+      }
+      
+      return this.documentToUser(querySnapshot.docs[0]);
+    } catch (error) {
+      console.error('Error finding user by email:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Find a user by phone number
+   */
+  async findByPhone(phone: PhoneNumber | string): Promise<User | null> {
+    try {
+      const phoneStr = phone instanceof PhoneNumber ? phone.value : phone;
+      
+      const usersRef = collection(this.firestore, this.config.usersCollection);
+      const q = query(usersRef, where('phone', '==', phoneStr));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        return null;
+      }
+      
+      return this.documentToUser(querySnapshot.docs[0]);
+    } catch (error) {
+      console.error('Error finding user by phone:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Find users by role
+   */
+  async findByRole(role: UserRole): Promise<User[]> {
+    try {
+      const usersRef = collection(this.firestore, this.config.usersCollection);
+      const q = query(usersRef, where('role', '==', role));
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => this.documentToUser(doc));
+    } catch (error) {
+      console.error('Error finding users by role:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Search for users based on criteria
+   */
+  async search(criteria: UserSearchCriteria): Promise<User[]> {
+    try {
+      const usersRef = collection(this.firestore, this.config.usersCollection);
+      let q = query(usersRef);
+      
+      // Add filters
+      if (criteria.role) {
+        q = query(q, where('role', '==', criteria.role));
+      }
+      
+      if (criteria.email) {
+        q = query(q, where('email', '==', criteria.email));
+      }
+      
+      if (criteria.isEmailVerified !== undefined) {
+        q = query(q, where('isEmailVerified', '==', criteria.isEmailVerified));
+      }
+      
+      if (criteria.isPhoneVerified !== undefined) {
+        q = query(q, where('isPhoneVerified', '==', criteria.isPhoneVerified));
+      }
+      
+      if (criteria.createdAfter) {
+        const timestamp = Timestamp.fromDate(criteria.createdAfter);
+        q = query(q, where('createdAt', '>=', timestamp));
+      }
+      
+      if (criteria.createdBefore) {
+        const timestamp = Timestamp.fromDate(criteria.createdBefore);
+        q = query(q, where('createdAt', '<=', timestamp));
+      }
+      
+      // Add sorting and pagination
+      q = query(q, orderBy('createdAt', 'desc'));
+      
+      if (criteria.limit) {
+        q = query(q, limit(criteria.limit));
+      }
+      
+      if (criteria.offset && criteria.offset > 0) {
+        // Get the first offset documents
+        const offsetSnapshot = await getDocs(
+          query(q, limit(criteria.offset))
+        );
+        
+        if (!offsetSnapshot.empty) {
+          const lastVisible = offsetSnapshot.docs[offsetSnapshot.docs.length - 1];
+          q = query(q, startAfter(lastVisible));
+        }
+      }
+      
+      const querySnapshot = await getDocs(q);
+      
+      const users = querySnapshot.docs.map(doc => this.documentToUser(doc));
+      
+      // Handle firstName and lastName client-side filtering
+      // This is not ideal but Firestore doesn't support case-insensitive queries
+      if (criteria.firstName) {
+        const firstName = criteria.firstName.toLowerCase();
+        return users.filter(user => 
+          user.firstName.toLowerCase().includes(firstName)
+        );
+      }
+      
+      if (criteria.lastName) {
+        const lastName = criteria.lastName.toLowerCase();
+        return users.filter(user => 
+          user.lastName.toLowerCase().includes(lastName)
+        );
+      }
+      
+      return users;
+    } catch (error) {
+      console.error('Error searching users:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Count users matching criteria
+   */
+  async count(criteria: UserSearchCriteria): Promise<number> {
+    try {
+      const usersRef = collection(this.firestore, this.config.usersCollection);
+      let q = query(usersRef);
+      
+      // Add filters
+      if (criteria.role) {
+        q = query(q, where('role', '==', criteria.role));
+      }
+      
+      if (criteria.email) {
+        q = query(q, where('email', '==', criteria.email));
+      }
+      
+      if (criteria.isEmailVerified !== undefined) {
+        q = query(q, where('isEmailVerified', '==', criteria.isEmailVerified));
+      }
+      
+      if (criteria.isPhoneVerified !== undefined) {
+        q = query(q, where('isPhoneVerified', '==', criteria.isPhoneVerified));
+      }
+      
+      if (criteria.createdAfter) {
+        const timestamp = Timestamp.fromDate(criteria.createdAfter);
+        q = query(q, where('createdAt', '>=', timestamp));
+      }
+      
+      if (criteria.createdBefore) {
+        const timestamp = Timestamp.fromDate(criteria.createdBefore);
+        q = query(q, where('createdAt', '<=', timestamp));
+      }
+      
+      const querySnapshot = await getDocs(q);
+      let count = querySnapshot.size;
+      
+      // Handle firstName and lastName client-side filtering
+      if (criteria.firstName || criteria.lastName) {
+        const users = querySnapshot.docs.map(doc => this.documentToUser(doc));
+        
+        if (criteria.firstName) {
+          const firstName = criteria.firstName.toLowerCase();
+          count = users.filter(user => 
+            user.firstName.toLowerCase().includes(firstName)
+          ).length;
+        }
+        
+        if (criteria.lastName) {
+          const lastName = criteria.lastName.toLowerCase();
+          count = users.filter(user => 
+            user.lastName.toLowerCase().includes(lastName)
+          ).length;
+        }
+      }
+      
+      return count;
+    } catch (error) {
+      console.error('Error counting users:', error);
+      return 0;
+    }
+  }
+  
+  /**
+   * Save a user (create or update)
    */
   async save(user: User): Promise<User> {
     try {
-      const userRef = doc(this.firestore, this.usersCollection, user.id);
-      const userData = this.mapUserToFirestore(user);
+      const userRef = doc(this.firestore, this.config.usersCollection, user.id);
+      const userDoc = await getDoc(userRef);
       
-      await setDoc(userRef, userData, { merge: true });
+      if (userDoc.exists()) {
+        await this.update(user);
+      } else {
+        await this.create(user);
+      }
       
       return user;
     } catch (error) {
@@ -73,209 +298,177 @@ export class FirebaseUserRepository implements IUserRepository {
   }
   
   /**
-   * Find a user by ID from Firestore
+   * Create a new user
    */
-  async findById(id: string): Promise<User | null> {
+  async create(user: User): Promise<User> {
     try {
-      const userRef = doc(this.firestore, this.usersCollection, id);
+      const userId = user.id || uuidv4();
+      const userRef = doc(this.firestore, this.config.usersCollection, userId);
+      
+      const userData = this.userToDocument(user);
+      
+      // Add creation timestamps
+      userData.createdAt = serverTimestamp();
+      userData.updatedAt = serverTimestamp();
+      
+      await setDoc(userRef, userData);
+      
+      // Get the newly created user
+      const userDoc = await getDoc(userRef);
+      return this.documentToUser(userDoc);
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Update an existing user
+   */
+  async update(user: User): Promise<User> {
+    try {
+      const userRef = doc(this.firestore, this.config.usersCollection, user.id);
+      
+      const userData = this.userToDocument(user);
+      
+      // Update timestamp
+      userData.updatedAt = serverTimestamp();
+      
+      await updateDoc(userRef, userData);
+      
+      // Get the updated user
+      const userDoc = await getDoc(userRef);
+      return this.documentToUser(userDoc);
+    } catch (error) {
+      console.error('Error updating user:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Delete a user by ID
+   */
+  async delete(id: string): Promise<boolean> {
+    try {
+      const userRef = doc(this.firestore, this.config.usersCollection, id);
+      await deleteDoc(userRef);
+      return true;
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Verify a user's email
+   */
+  async verifyEmail(id: string): Promise<User | null> {
+    try {
+      const userRef = doc(this.firestore, this.config.usersCollection, id);
       const userDoc = await getDoc(userRef);
       
       if (!userDoc.exists()) {
         return null;
       }
       
-      return this.mapFirestoreToUser(userDoc);
+      const userData = userDoc.data();
+      
+      await updateDoc(userRef, {
+        isEmailVerified: true,
+        updatedAt: serverTimestamp()
+      });
+      
+      const updatedUserDoc = await getDoc(userRef);
+      return this.documentToUser(updatedUserDoc);
     } catch (error) {
-      console.error(`Error finding user by ID ${id}:`, error);
+      console.error('Error verifying email:', error);
       return null;
     }
   }
   
   /**
-   * Find a user by email from Firestore
+   * Verify a user's phone number
    */
-  async findByEmail(email: EmailAddress | string): Promise<User | null> {
+  async verifyPhone(id: string): Promise<User | null> {
     try {
-      const emailStr = email instanceof EmailAddress ? email.value : email;
-      const usersRef = collection(this.firestore, this.usersCollection);
-      const q = query(usersRef, where('email', '==', emailStr));
-      const querySnapshot = await getDocs(q);
+      const userRef = doc(this.firestore, this.config.usersCollection, id);
+      const userDoc = await getDoc(userRef);
       
-      if (querySnapshot.empty) {
+      if (!userDoc.exists()) {
         return null;
       }
       
-      return this.mapFirestoreToUser(querySnapshot.docs[0]);
+      await updateDoc(userRef, {
+        isPhoneVerified: true,
+        updatedAt: serverTimestamp()
+      });
+      
+      const updatedUserDoc = await getDoc(userRef);
+      return this.documentToUser(updatedUserDoc);
     } catch (error) {
-      console.error(`Error finding user by email ${email}:`, error);
+      console.error('Error verifying phone:', error);
       return null;
     }
   }
   
   /**
-   * Get all users with pagination and filtering
+   * Update a user's last login time
    */
-  async findAll(
-    filters?: UserFilterOptions,
-    pagination?: UserPaginationOptions
-  ): Promise<PaginatedUsers> {
+  async updateLastLogin(id: string, lastLoginAt: Date): Promise<User | null> {
     try {
-      const usersRef = collection(this.firestore, this.usersCollection);
-      let q = query(usersRef);
+      const userRef = doc(this.firestore, this.config.usersCollection, id);
+      const userDoc = await getDoc(userRef);
       
-      // Apply filters if provided
-      if (filters) {
-        if (filters.role) {
-          q = query(q, where('role', '==', filters.role));
-        }
-        
-        if (filters.isEmailVerified !== undefined) {
-          q = query(q, where('isEmailVerified', '==', filters.isEmailVerified));
-        }
-        
-        // Note: Full-text search functionality would require Algolia or Firestore's 
-        // compound queries to properly implement. This is a simplified version.
-        if (filters.searchTerm) {
-          // For simplicity, we'll search by name or email containing the search term
-          // In a real implementation, this should use a proper search index
-          q = query(q, where('name', '>=', filters.searchTerm));
-        }
+      if (!userDoc.exists()) {
+        return null;
       }
       
-      // Get total count for pagination
-      const countSnapshot = await getDocs(q);
-      const totalCount = countSnapshot.size;
+      await updateDoc(userRef, {
+        lastLoginAt: Timestamp.fromDate(lastLoginAt),
+        updatedAt: serverTimestamp()
+      });
       
-      // Apply pagination
-      const pageSize = pagination?.pageSize || this.config.defaultPageSize;
-      const currentPage = pagination?.page || 1;
-      const totalPages = Math.ceil(totalCount / pageSize);
-      
-      // Apply sorting
-      if (pagination?.sortBy) {
-        const sortDirection = pagination.sortDirection || 'asc';
-        q = query(q, orderBy(pagination.sortBy, sortDirection));
-      } else {
-        // Default sort by createdAt
-        q = query(q, orderBy('createdAt', 'desc'));
-      }
-      
-      // Apply pagination
-      q = query(q, limit(pageSize));
-      
-      // If not the first page, use startAfter with the last document from the previous page
-      if (currentPage > 1) {
-        // This is a simplified approach. In a real app, you'd need to store the last document
-        // from each page or use a cursor-based pagination approach
-        const prevPageQuery = query(
-          q,
-          limit((currentPage - 1) * pageSize)
-        );
-        const prevPageSnapshot = await getDocs(prevPageQuery);
-        const lastDoc = prevPageSnapshot.docs[prevPageSnapshot.docs.length - 1];
-        
-        if (lastDoc) {
-          q = query(q, startAfter(lastDoc));
-        }
-      }
-      
-      // Get the paginated results
-      const querySnapshot = await getDocs(q);
-      
-      // Map the documents to User objects
-      const users = querySnapshot.docs.map(doc => this.mapFirestoreToUser(doc));
-      
-      return {
-        users,
-        totalCount,
-        page: currentPage,
-        pageSize,
-        totalPages
-      };
+      const updatedUserDoc = await getDoc(userRef);
+      return this.documentToUser(updatedUserDoc);
     } catch (error) {
-      console.error('Error finding all users:', error);
-      
-      return {
-        users: [],
-        totalCount: 0,
-        page: 1,
-        pageSize: this.config.defaultPageSize,
-        totalPages: 0
-      };
+      console.error('Error updating last login:', error);
+      return null;
     }
   }
   
   /**
-   * Delete a user from Firestore
+   * Convert a Firestore document to a User entity
    */
-  async delete(id: string): Promise<boolean> {
-    try {
-      const userRef = doc(this.firestore, this.usersCollection, id);
-      await deleteDoc(userRef);
-      
-      return true;
-    } catch (error) {
-      console.error(`Error deleting user ${id}:`, error);
-      return false;
+  private documentToUser(doc: DocumentSnapshot | QueryDocumentSnapshot): User {
+    const data = doc.data();
+    
+    if (!data) {
+      throw new Error(`User document ${doc.id} does not exist`);
     }
+    
+    const props: UserProps = {
+      id: doc.id,
+      firstName: data.firstName || '',
+      lastName: data.lastName || '',
+      email: new EmailAddress(data.email),
+      phone: data.phone ? new PhoneNumber(data.phone) : undefined,
+      role: data.role as UserRole,
+      isEmailVerified: data.isEmailVerified || false,
+      isPhoneVerified: data.isPhoneVerified || false,
+      createdAt: data.createdAt?.toDate() || new Date(),
+      updatedAt: data.updatedAt?.toDate() || new Date(),
+      lastLoginAt: data.lastLoginAt?.toDate(),
+      preferences: data.preferences || []
+    };
+    
+    return new User(props);
   }
   
   /**
-   * Check if a user exists by email
+   * Convert a User entity to a Firestore document
    */
-  async existsByEmail(email: EmailAddress | string): Promise<boolean> {
-    try {
-      const user = await this.findByEmail(email);
-      return user !== null;
-    } catch (error) {
-      console.error(`Error checking if user exists by email ${email}:`, error);
-      return false;
-    }
-  }
-  
-  /**
-   * Find users by role with pagination
-   */
-  async findByRole(
-    role: UserRole,
-    pagination?: UserPaginationOptions
-  ): Promise<PaginatedUsers> {
-    return this.findAll({ role }, pagination);
-  }
-  
-  /**
-   * Search users with filters and pagination
-   */
-  async search(
-    query: string,
-    filters?: UserFilterOptions,
-    pagination?: UserPaginationOptions
-  ): Promise<PaginatedUsers> {
-    return this.findAll({ ...filters, searchTerm: query }, pagination);
-  }
-  
-  /**
-   * Count users by role
-   */
-  async countByRole(role: UserRole): Promise<number> {
-    try {
-      const usersRef = collection(this.firestore, this.usersCollection);
-      const q = query(usersRef, where('role', '==', role));
-      const querySnapshot = await getDocs(q);
-      
-      return querySnapshot.size;
-    } catch (error) {
-      console.error(`Error counting users by role ${role}:`, error);
-      return 0;
-    }
-  }
-  
-  /**
-   * Map a User entity to Firestore format
-   */
-  private mapUserToFirestore(user: User): DocumentData {
+  private userToDocument(user: User): Record<string, any> {
     return {
-      id: user.id,
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email.value,
@@ -283,34 +476,9 @@ export class FirebaseUserRepository implements IUserRepository {
       role: user.role,
       isEmailVerified: user.isEmailVerified,
       isPhoneVerified: user.isPhoneVerified,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      lastLoginAt: user.lastLoginAt
+      updatedAt: Timestamp.fromDate(user.updatedAt),
+      lastLoginAt: user.lastLoginAt ? Timestamp.fromDate(user.lastLoginAt) : null,
+      preferences: user.preferences
     };
-  }
-  
-  /**
-   * Map Firestore data to a User entity
-   */
-  private mapFirestoreToUser(doc: DocumentSnapshot<DocumentData> | QueryDocumentSnapshot<DocumentData>): User {
-    const data = doc.data();
-    
-    if (!data) {
-      throw new Error(`No data found for user document ${doc.id}`);
-    }
-    
-    return new User({
-      id: doc.id,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      email: new EmailAddress(data.email),
-      phone: data.phone,
-      role: data.role,
-      isEmailVerified: data.isEmailVerified,
-      isPhoneVerified: data.isPhoneVerified,
-      createdAt: data.createdAt?.toDate(),
-      updatedAt: data.updatedAt?.toDate(),
-      lastLoginAt: data.lastLoginAt?.toDate()
-    });
   }
 }

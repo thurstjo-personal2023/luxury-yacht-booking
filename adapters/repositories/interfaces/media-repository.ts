@@ -1,56 +1,44 @@
 /**
  * Media Repository Interface
  * 
- * This interface defines the contract for media repository implementations.
- * It is responsible for validating, storing, and retrieving media resources.
+ * Defines the contract for media data persistence operations.
  */
 
 import { Media } from '../../../core/domain/media/media';
+import { MediaType } from '../../../core/domain/media/media-type';
+import { URL } from '../../../core/domain/value-objects/url';
 
 /**
  * Media validation result
  */
 export interface MediaValidationResult {
-  isValid: boolean;
-  status?: number;
-  statusText?: string;
-  contentType?: string;
-  error?: string;
-}
-
-/**
- * Document field path
- */
-export interface DocumentFieldPath {
-  collection: string;
-  documentId: string;
-  field: string;
-}
-
-/**
- * Collection validation options
- */
-export interface CollectionValidationOptions {
-  collection: string;
-  batchSize?: number;
-  mediaFieldPaths?: string[];
-  skipValidation?: boolean;
-  limit?: number;
-  validateNonImageUrls?: boolean;
-}
-
-/**
- * Media URL validation result with document context
- */
-export interface DocumentUrlValidationResult extends MediaValidationResult {
   url: string;
-  collection: string;
-  documentId: string;
-  field: string;
-  mediaType: 'image' | 'video' | 'unknown';
   isValid: boolean;
-  detectedType?: string;
-  expectedType?: string;
+  error?: string;
+  statusCode?: number;
+  mimeType?: string;
+  size?: number;
+  width?: number;
+  height?: number;
+  validatedAt: Date;
+}
+
+/**
+ * Media search criteria
+ */
+export interface MediaSearchCriteria {
+  type?: MediaType;
+  isValid?: boolean;
+  createdAfter?: Date;
+  createdBefore?: Date;
+  validatedAfter?: Date;
+  validatedBefore?: Date;
+  limit?: number;
+  offset?: number;
+  collection?: string;
+  documentId?: string;
+  ownerId?: string;
+  containsText?: string;
 }
 
 /**
@@ -59,25 +47,16 @@ export interface DocumentUrlValidationResult extends MediaValidationResult {
 export interface DocumentValidationResult {
   collection: string;
   documentId: string;
-  totalUrls: number;
-  validUrls: number;
-  invalidUrls: number;
-  missingUrls: number;
-  results: DocumentUrlValidationResult[];
-}
-
-/**
- * Collection validation summary
- */
-export interface CollectionValidationSummary {
-  collection: string;
-  totalUrls: number;
-  validUrls: number;
-  invalidUrls: number;
-  missingUrls: number;
-  validPercent: number;
-  invalidPercent: number;
-  missingPercent: number;
+  fields: {
+    path: string;
+    url: string;
+    expectedType: MediaType;
+    isValid: boolean;
+    error?: string;
+    statusCode?: number;
+    mimeType?: string;
+  }[];
+  validatedAt: Date;
 }
 
 /**
@@ -93,44 +72,26 @@ export interface ValidationReport {
   validUrls: number;
   invalidUrls: number;
   missingUrls: number;
-  collectionSummaries: CollectionValidationSummary[];
-  invalidResults: DocumentUrlValidationResult[];
-}
-
-/**
- * URL repair options
- */
-export interface UrlRepairOptions {
-  field: string;
-  collection: string;
-  documentId: string;
-  oldUrl: string;
-  newUrl: string;
-}
-
-/**
- * URL repair result
- */
-export interface UrlRepairResult {
-  success: boolean;
-  field: string;
-  collection: string;
-  documentId: string;
-  oldUrl: string;
-  newUrl: string;
-  error?: string;
-}
-
-/**
- * Repair report
- */
-export interface RepairReport {
-  id: string;
-  timestamp: Date;
-  totalAttempted: number;
-  totalSuccess: number;
-  totalFailed: number;
-  results: UrlRepairResult[];
+  collectionSummaries: {
+    collection: string;
+    totalUrls: number;
+    validUrls: number;
+    invalidUrls: number;
+    missingUrls: number;
+    validPercent: number;
+    invalidPercent: number;
+    missingPercent: number;
+  }[];
+  invalidResults: {
+    field: string;
+    url: string;
+    isValid: boolean;
+    status?: number;
+    statusText?: string;
+    error?: string;
+    collection: string;
+    documentId: string;
+  }[];
 }
 
 /**
@@ -138,110 +99,100 @@ export interface RepairReport {
  */
 export interface IMediaRepository {
   /**
-   * Save a media resource
+   * Find media by ID
    */
-  saveMedia(media: Media): Promise<Media>;
+  findById(id: string): Promise<Media | null>;
   
   /**
-   * Get a media resource by ID
+   * Find media by URL
    */
-  getMediaById(id: string): Promise<Media | null>;
+  findByUrl(url: URL | string): Promise<Media | null>;
+  
+  /**
+   * Find media by type
+   */
+  findByType(type: MediaType): Promise<Media[]>;
+  
+  /**
+   * Search for media based on criteria
+   */
+  search(criteria: MediaSearchCriteria): Promise<Media[]>;
+  
+  /**
+   * Count media matching criteria
+   */
+  count(criteria: MediaSearchCriteria): Promise<number>;
+  
+  /**
+   * Save media (create or update)
+   */
+  save(media: Media): Promise<Media>;
+  
+  /**
+   * Create new media
+   */
+  create(media: Media): Promise<Media>;
+  
+  /**
+   * Update existing media
+   */
+  update(media: Media): Promise<Media>;
+  
+  /**
+   * Delete media by ID
+   */
+  delete(id: string): Promise<boolean>;
   
   /**
    * Validate a media URL
    */
-  validateMediaUrl(url: string, mediaType?: 'image' | 'video'): Promise<MediaValidationResult>;
+  validateUrl(url: URL | string, expectedType?: MediaType): Promise<MediaValidationResult>;
   
   /**
-   * Validate a document field containing a media URL
+   * Validate media in a document
    */
-  validateDocumentField(
-    collection: string,
-    documentId: string,
-    field: string
-  ): Promise<DocumentUrlValidationResult>;
+  validateDocument(collection: string, documentId: string): Promise<DocumentValidationResult>;
   
   /**
-   * Validate all media URLs in a document
+   * Get all collections in the database
    */
-  validateDocument(
-    collection: string,
-    documentId: string
-  ): Promise<DocumentValidationResult>;
+  getCollections(): Promise<string[]>;
   
   /**
-   * Validate all media URLs in a collection
+   * Get document IDs for a collection
    */
-  validateCollection(
-    options: CollectionValidationOptions
-  ): Promise<DocumentValidationResult[]>;
-  
-  /**
-   * Generate a validation report
-   */
-  generateReport(
-    results: DocumentValidationResult[],
-    startTime: Date,
-    endTime: Date
-  ): Promise<ValidationReport>;
+  getDocumentIds(collection: string, limit?: number): Promise<string[]>;
   
   /**
    * Save a validation report
    */
-  saveReport(report: ValidationReport): Promise<string>;
+  saveValidationReport(report: Omit<ValidationReport, 'id'>): Promise<ValidationReport>;
   
   /**
    * Get a validation report by ID
    */
-  getReportById(id: string): Promise<ValidationReport | null>;
+  getValidationReport(reportId: string): Promise<ValidationReport | null>;
   
   /**
    * Get all validation reports
    */
-  getAllReports(): Promise<ValidationReport[]>;
+  getValidationReports(limit?: number): Promise<ValidationReport[]>;
   
   /**
-   * Repair a broken URL
+   * Update a document with repaired media URLs
    */
-  repairUrl(options: UrlRepairOptions): Promise<UrlRepairResult>;
+  repairDocument(
+    collection: string,
+    documentId: string,
+    updates: Record<string, string>
+  ): Promise<boolean>;
   
   /**
-   * Repair multiple broken URLs
+   * Get media URLs from a document
    */
-  repairUrls(options: UrlRepairOptions[]): Promise<UrlRepairResult[]>;
-  
-  /**
-   * Save a repair report
-   */
-  saveRepairReport(report: RepairReport): Promise<string>;
-  
-  /**
-   * Get a repair report by ID
-   */
-  getRepairReportById(id: string): Promise<RepairReport | null>;
-  
-  /**
-   * Get all repair reports
-   */
-  getAllRepairReports(): Promise<RepairReport[]>;
-  
-  /**
-   * Find all relative URLs in the database
-   */
-  findRelativeUrls(): Promise<DocumentUrlValidationResult[]>;
-  
-  /**
-   * Find all blob URLs in the database
-   */
-  findBlobUrls(): Promise<DocumentUrlValidationResult[]>;
-  
-  /**
-   * Fix relative URLs by adding base URL
-   */
-  fixRelativeUrls(baseUrl: string): Promise<UrlRepairResult[]>;
-  
-  /**
-   * Resolve blob URLs by replacing with placeholder
-   */
-  resolveBlobUrls(placeholderUrl: string): Promise<UrlRepairResult[]>;
+  getMediaUrlsFromDocument(collection: string, documentId: string): Promise<{
+    field: string;
+    url: string;
+    expectedType: MediaType;
+  }[]>;
 }

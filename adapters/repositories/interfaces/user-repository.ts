@@ -1,52 +1,35 @@
 /**
  * User Repository Interface
  * 
- * This interface defines the contract for user repository implementations.
+ * Defines the contract for user data persistence operations.
  */
 
 import { User } from '../../../core/domain/user/user';
 import { EmailAddress } from '../../../core/domain/value-objects/email-address';
+import { PhoneNumber } from '../../../core/domain/value-objects/phone-number';
 import { UserRole } from '../../../core/domain/user/user-role';
 
 /**
- * User filter options
+ * User search criteria
  */
-export interface UserFilterOptions {
+export interface UserSearchCriteria {
   role?: UserRole;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
   isEmailVerified?: boolean;
-  searchTerm?: string;
-}
-
-/**
- * User pagination options
- */
-export interface UserPaginationOptions {
-  page: number;
-  pageSize: number;
-  sortBy?: string;
-  sortDirection?: 'asc' | 'desc';
-}
-
-/**
- * Paginated user result
- */
-export interface PaginatedUsers {
-  users: User[];
-  totalCount: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
+  isPhoneVerified?: boolean;
+  createdAfter?: Date;
+  createdBefore?: Date;
+  limit?: number;
+  offset?: number;
 }
 
 /**
  * User repository interface
  */
 export interface IUserRepository {
-  /**
-   * Save a user
-   */
-  save(user: User): Promise<User>;
-  
   /**
    * Find a user by ID
    */
@@ -58,42 +41,57 @@ export interface IUserRepository {
   findByEmail(email: EmailAddress | string): Promise<User | null>;
   
   /**
-   * Get all users
+   * Find a user by phone number
    */
-  findAll(
-    filters?: UserFilterOptions,
-    pagination?: UserPaginationOptions
-  ): Promise<PaginatedUsers>;
-  
-  /**
-   * Delete a user
-   */
-  delete(id: string): Promise<boolean>;
-  
-  /**
-   * Check if a user exists by email
-   */
-  existsByEmail(email: EmailAddress | string): Promise<boolean>;
+  findByPhone(phone: PhoneNumber | string): Promise<User | null>;
   
   /**
    * Find users by role
    */
-  findByRole(
-    role: UserRole,
-    pagination?: UserPaginationOptions
-  ): Promise<PaginatedUsers>;
+  findByRole(role: UserRole): Promise<User[]>;
   
   /**
-   * Search users
+   * Search for users based on criteria
    */
-  search(
-    query: string,
-    filters?: UserFilterOptions,
-    pagination?: UserPaginationOptions
-  ): Promise<PaginatedUsers>;
+  search(criteria: UserSearchCriteria): Promise<User[]>;
   
   /**
-   * Count users by role
+   * Count users matching criteria
    */
-  countByRole(role: UserRole): Promise<number>;
+  count(criteria: UserSearchCriteria): Promise<number>;
+  
+  /**
+   * Save a user (create or update)
+   */
+  save(user: User): Promise<User>;
+  
+  /**
+   * Create a new user
+   */
+  create(user: User): Promise<User>;
+  
+  /**
+   * Update an existing user
+   */
+  update(user: User): Promise<User>;
+  
+  /**
+   * Delete a user by ID
+   */
+  delete(id: string): Promise<boolean>;
+  
+  /**
+   * Verify a user's email
+   */
+  verifyEmail(id: string): Promise<User | null>;
+  
+  /**
+   * Verify a user's phone number
+   */
+  verifyPhone(id: string): Promise<User | null>;
+  
+  /**
+   * Update a user's last login time
+   */
+  updateLastLogin(id: string, lastLoginAt: Date): Promise<User | null>;
 }
