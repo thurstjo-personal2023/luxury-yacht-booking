@@ -55,9 +55,9 @@ export default function AdminDashboard() {
     // For now, we're just checking if adminUser exists
     // In the future, this will be handled by the useAdminAuth hook
     if (!adminUser && !localStorage.getItem('adminSessionActive')) {
-      navigate('/admin-login');
+      setLocation('/admin-login');
     }
-  }, [adminUser, navigate]);
+  }, [adminUser, setLocation]);
 
   // Handle sidebar navigation
   const handleNavigation = (section: string) => {
@@ -77,7 +77,7 @@ export default function AdminDashboard() {
   const handleSignOut = async () => {
     try {
       await adminSignOut();
-      navigate('/admin-login');
+      setLocation('/admin-login');
     } catch (error) {
       console.error('Error signing out:', error);
       toast({
