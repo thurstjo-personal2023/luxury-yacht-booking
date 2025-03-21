@@ -4,9 +4,9 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
 import { AdminAuthorizationService, AuthorizationResult } from '../../../../../core/domain/admin/admin-authorization-service';
 import { AdminUser } from '../../../../../core/domain/admin/admin-user';
-import { AdminRole } from '../../../../../core/domain/admin/admin-role';
+import { AdminRole, AdminRoleType } from '../../../../../core/domain/admin/admin-role';
 import { Permission, PermissionCategory, PermissionAction } from '../../../../../core/domain/admin/permission';
-import { MfaStatus } from '../../../../../core/domain/admin/mfa-status';
+import { MfaStatus, MfaStatusType } from '../../../../../core/domain/admin/mfa-status';
 
 describe('AdminAuthorizationService', () => {
   let authorizationService: AdminAuthorizationService;
@@ -23,9 +23,9 @@ describe('AdminAuthorizationService', () => {
         'super-admin-123',
         'superadmin@example.com',
         'Super Admin',
-        new AdminRole('super_admin'),
+        new AdminRole(AdminRoleType.SUPER_ADMIN),
         true,
-        new MfaStatus('enabled'),
+        new MfaStatus(MfaStatusType.ENABLED),
         [
           new Permission(PermissionCategory.USER_MANAGEMENT, PermissionAction.VIEW),
           new Permission(PermissionCategory.SYSTEM_SETTINGS, PermissionAction.EDIT)
@@ -51,9 +51,9 @@ describe('AdminAuthorizationService', () => {
         'admin-123',
         'admin@example.com',
         'Regular Admin',
-        new AdminRole('admin'),
+        new AdminRole(AdminRoleType.ADMIN),
         true,
-        new MfaStatus('enabled'),
+        new MfaStatus(MfaStatusType.ENABLED),
         [
           new Permission(PermissionCategory.CONTENT_MANAGEMENT, PermissionAction.EDIT)
         ],
@@ -79,9 +79,9 @@ describe('AdminAuthorizationService', () => {
         'admin-123',
         'admin@example.com',
         'Inactive Admin',
-        new AdminRole('admin'),
+        new AdminRole(AdminRoleType.ADMIN),
         false, // inactive
-        new MfaStatus('enabled'),
+        new MfaStatus(MfaStatusType.ENABLED),
         [
           new Permission(PermissionCategory.SYSTEM_SETTINGS, PermissionAction.EDIT)
         ],
@@ -109,9 +109,9 @@ describe('AdminAuthorizationService', () => {
         'admin-123',
         'admin@example.com',
         'Admin',
-        new AdminRole('admin'),
+        new AdminRole(AdminRoleType.ADMIN),
         true,
-        new MfaStatus('enabled'),
+        new MfaStatus(MfaStatusType.ENABLED),
         [
           new Permission(PermissionCategory.CONTENT_MANAGEMENT, PermissionAction.EDIT)
         ],
@@ -138,9 +138,9 @@ describe('AdminAuthorizationService', () => {
         'admin-123',
         'admin@example.com',
         'Admin',
-        new AdminRole('admin'),
+        new AdminRole(AdminRoleType.ADMIN),
         true,
-        new MfaStatus('enabled'),
+        new MfaStatus(MfaStatusType.ENABLED),
         [
           new Permission(PermissionCategory.CONTENT_MANAGEMENT, PermissionAction.VIEW)
         ],
@@ -170,9 +170,9 @@ describe('AdminAuthorizationService', () => {
         'super-admin-123',
         'superadmin@example.com',
         'Super Admin',
-        new AdminRole('super_admin'),
+        new AdminRole(AdminRoleType.SUPER_ADMIN),
         true,
-        new MfaStatus('enabled'),
+        new MfaStatus(MfaStatusType.ENABLED),
         [],
         true,
         []
@@ -191,9 +191,9 @@ describe('AdminAuthorizationService', () => {
         'super-admin-123',
         'superadmin@example.com',
         'Super Admin',
-        new AdminRole('super_admin'),
+        new AdminRole(AdminRoleType.SUPER_ADMIN),
         true,
-        new MfaStatus('enabled'),
+        new MfaStatus(MfaStatusType.ENABLED),
         [],
         true,
         []
@@ -212,9 +212,9 @@ describe('AdminAuthorizationService', () => {
         'admin-123',
         'admin@example.com',
         'Admin',
-        new AdminRole('admin'),
+        new AdminRole(AdminRoleType.ADMIN),
         true,
-        new MfaStatus('enabled'),
+        new MfaStatus(MfaStatusType.ENABLED),
         [],
         true,
         []
@@ -234,9 +234,9 @@ describe('AdminAuthorizationService', () => {
         'mod-123',
         'mod@example.com',
         'Moderator',
-        new AdminRole('moderator'),
+        new AdminRole(AdminRoleType.MODERATOR),
         true,
-        new MfaStatus('enabled'),
+        new MfaStatus(MfaStatusType.ENABLED),
         [],
         true,
         []
@@ -258,9 +258,9 @@ describe('AdminAuthorizationService', () => {
         'admin-123',
         'admin@example.com',
         'Admin',
-        new AdminRole('admin'),
+        new AdminRole(AdminRoleType.ADMIN),
         true,
-        new MfaStatus('enabled'),
+        new MfaStatus(MfaStatusType.ENABLED),
         [],
         true,
         ['192.168.1.1', '10.0.0.1']
@@ -279,9 +279,9 @@ describe('AdminAuthorizationService', () => {
         'admin-123',
         'admin@example.com',
         'Admin',
-        new AdminRole('admin'),
+        new AdminRole(AdminRoleType.ADMIN),
         true,
-        new MfaStatus('enabled'),
+        new MfaStatus(MfaStatusType.ENABLED),
         [],
         true,
         ['192.168.1.1', '10.0.0.1']
