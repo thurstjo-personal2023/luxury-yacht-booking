@@ -51,8 +51,8 @@ describe('Administrator Registration & Validation', () => {
     });
     
     // Get auth and Firestore instances
-    auth = getAuth(app);
-    db = getFirestore(app);
+    auth = getAuth(firebaseApp);
+    db = getFirestore(firebaseApp);
     
     // Connect to Firebase Auth Emulator
     connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
@@ -64,8 +64,8 @@ describe('Administrator Registration & Validation', () => {
     await signOut(auth).catch(() => {});
     
     // Setup Express app for API testing
-    app = express();
-    app.use(express.json());
+    expressApp = express();
+    expressApp.use(express.json());
     
     // Mock verifyAuth middleware for testing
     const mockVerifyAuth = (req: Request, res: Response, next: NextFunction) => {
@@ -114,7 +114,7 @@ describe('Administrator Registration & Validation', () => {
     };
     
     // Register routes with mock dependencies
-    app.post('/api/admin/create-profile', mockVerifyAuth, (req: Request, res: Response) => {
+    expressApp.post('/api/admin/create-profile', mockVerifyAuth, (req: Request, res: Response) => {
       const { name, email, phone, invitationId, status = 'pending_approval' } = req.body;
       const uid = req.user?.uid;
       
@@ -135,7 +135,7 @@ describe('Administrator Registration & Validation', () => {
     });
     
     // Mock endpoint for testing admin approval
-    app.post('/api/admin/process-approval', mockVerifyAuth, (req: Request, res: Response) => {
+    expressApp.post('/api/admin/process-approval', mockVerifyAuth, (req: Request, res: Response) => {
       const { adminUid, status, notes } = req.body;
       
       if (!adminUid || !status) {
@@ -296,7 +296,7 @@ describe('Administrator Registration & Validation', () => {
       expect(validationResult.data.valid).toBe(false);
       
       // 2. Test API rejection with supertest
-      const response = await request(app)
+      const response = await request(expressApp)
         .post('/api/admin/create-profile')
         .set('Authorization', 'Bearer mock-token')
         .send({
@@ -352,7 +352,7 @@ describe('Administrator Registration & Validation', () => {
         expect(adminDoc.data()?.status).toBe('pending_approval');
         
         // 6. Test that the profile creation API works
-        const response = await request(app)
+        const response = await request(expressApp)
           .post('/api/admin/create-profile')
           .set('Authorization', 'Bearer mock-token')
           .send({
@@ -442,7 +442,7 @@ describe('Administrator Registration & Validation', () => {
       });
       
       // 3. Test the approval API
-      const response = await request(app)
+      const response = await request(expressApp)
         .post('/api/admin/process-approval')
         .set('Authorization', 'Bearer mock-token')
         .send({
