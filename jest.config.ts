@@ -78,10 +78,22 @@ const config: Config.InitialOptions = {
     {
       displayName: 'admin',
       testMatch: [
-        '<rootDir>/tests/admin-registration.test.ts'
+        '<rootDir>/tests/admin-registration.test.ts',
+        '<rootDir>/tests/admin-routes.test.ts'
       ],
       testEnvironment: 'node',
-      setupFilesAfterEnv: ['<rootDir>/tests/setup-node.ts'],
+      setupFilesAfterEnv: ['<rootDir>/tests/setup-admin.ts'],
+    },
+    {
+      displayName: 'admin-ui',
+      testMatch: [
+        '<rootDir>/tests/use-admin-auth.test.tsx',
+        '<rootDir>/tests/admin-login-flow.test.tsx',
+        '<rootDir>/tests/admin-session.test.tsx',
+        '<rootDir>/tests/admin-mfa.test.tsx'
+      ],
+      testEnvironment: 'jsdom',
+      setupFilesAfterEnv: ['<rootDir>/tests/setup-jsdom.ts', '<rootDir>/tests/setup-admin.ts'],
     }
   ],
   globals: {
