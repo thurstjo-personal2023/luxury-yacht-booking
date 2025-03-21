@@ -39,7 +39,8 @@ beforeAll(async () => {
   });
   
   // Add to global scope for test access
-  (global as any).__FIREBASE_TEST_ENV__ = {
+  const globalAny = global as any;
+  globalAny.__FIREBASE_TEST_ENV__ = {
     app: firebase.getApp(),
     auth,
     firestore: db,
@@ -53,7 +54,8 @@ beforeAll(async () => {
 afterAll(async () => {
   try {
     // Run cleanup function
-    await (global as any).__FIREBASE_TEST_ENV__?.cleanup();
+    const globalAny = global as any;
+    await globalAny.__FIREBASE_TEST_ENV__?.cleanup();
     
     // Firebase v9 doesn't support app.delete() in the same way as v8
     // We'll sign out and let garbage collection handle the app instance
