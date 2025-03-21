@@ -89,6 +89,7 @@ const config: Config.InitialOptions = {
     {
       displayName: 'admin-ui',
       testMatch: [
+        '<rootDir>/tests/simple-admin-test.ts',
         '<rootDir>/tests/use-admin-auth.test.tsx',
         '<rootDir>/tests/admin-login-flow.test.tsx',
         '<rootDir>/tests/admin-session.test.tsx',
