@@ -3,8 +3,10 @@
  * 
  * This file contains tests for the useAdminAuth hook.
  */
+import React from 'react';
 import { renderHookWithProviders } from './hook-test-utils';
-import { useAdminAuth } from '@/hooks/use-admin-auth';
+// Using a relative import instead of the alias to avoid path mapping issues
+import { useAdminAuth } from '../client/src/hooks/use-admin-auth';
 import { act, waitFor } from '@testing-library/react';
 import { 
   getAuth, 

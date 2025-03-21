@@ -4,16 +4,18 @@
  * This file contains integration tests for the admin login flow.
  * It tests the complete login -> MFA verification -> dashboard flow.
  */
+import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import AdminLogin from '@/pages/admin/AdminLogin';
-import MfaVerify from '@/pages/admin/MfaVerify';
-import AdminDashboard from '@/pages/admin/AdminDashboard';
-import { AdminAuthProvider } from '@/components/admin/AdminAuthProvider';
+// Using relative imports instead of aliases to avoid path mapping issues
+import AdminLogin from '../client/src/pages/admin/AdminLogin';
+import MfaVerify from '../client/src/pages/admin/MfaVerify';
+import AdminDashboard from '../client/src/pages/admin/AdminDashboard';
+import { AdminAuthProvider } from '../client/src/components/admin/AdminAuthProvider';
 import { customRender } from './react-test-utils';
 
 // Mock the hooks and Firebase functions
-jest.mock('@/hooks/use-admin-auth', () => {
-  const originalModule = jest.requireActual('@/hooks/use-admin-auth');
+jest.mock('../client/src/hooks/use-admin-auth', () => {
+  const originalModule = jest.requireActual('../client/src/hooks/use-admin-auth');
   
   // Create a mock version of the hook
   const mockAdminAuth = {
@@ -64,7 +66,7 @@ describe('Admin Login Flow', () => {
     (require('wouter') as any).__currentLocation = '/';
     
     // Reset the admin auth mock
-    const { useAdminAuth } = require('@/hooks/use-admin-auth');
+    const { useAdminAuth } = require('../client/src/hooks/use-admin-auth');
     useAdminAuth.mockImplementation(() => ({
       adminUser: null,
       loading: false,
