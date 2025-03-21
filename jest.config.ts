@@ -18,8 +18,10 @@ const config: Config.InitialOptions = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: 'tsconfig.json',
+      useESM: true,
     }],
   },
+  extensionsToTreatAsEsm: ['.ts', '.tsx'],
   testMatch: [
     '**/__tests__/**/*.ts?(x)',
     '**/?(*.)+(spec|test).ts?(x)'
@@ -99,6 +101,7 @@ const config: Config.InitialOptions = {
   globals: {
     'ts-jest': {
       isolatedModules: true,
+      useESM: true,
       tsconfig: {
         jsx: 'react-jsx'
       }

@@ -1,10 +1,10 @@
 /**
  * Jest setup file for React/DOM testing environment
  */
-import '@testing-library/jest-dom';
+require('@testing-library/jest-dom');
 
 // Add required browser globals for React environment
-global.ResizeObserver = class ResizeObserver {
+global.ResizeObserver = class {
   observe() {}
   unobserve() {}
   disconnect() {}
@@ -27,17 +27,19 @@ Object.defineProperty(window, 'matchMedia', {
 
 // Mock for IntersectionObserver
 global.IntersectionObserver = class MockIntersectionObserver {
-  root: Element | null = null;
-  rootMargin: string = '0px';
-  thresholds: ReadonlyArray<number> = [0];
+  root = null;
+  rootMargin = '0px';
+  thresholds = [0];
   
-  constructor(private callback: IntersectionObserverCallback) {}
+  constructor(callback) {
+    this.callback = callback;
+  }
   
   observe() {}
   unobserve() {}
   disconnect() {}
-  takeRecords(): IntersectionObserverEntry[] { return []; }
-} as unknown as typeof IntersectionObserver;
+  takeRecords() { return []; }
+};
 
 // Web Storage API Mock
 const localStorageMock = (() => {

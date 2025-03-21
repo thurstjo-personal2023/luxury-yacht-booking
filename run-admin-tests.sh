@@ -6,8 +6,8 @@
 echo "Running Admin Authentication Tests..."
 echo "===================================="
 
-# Run tests with Jest
-npx jest --config=jest.config.js
+# Run tests with Jest using TypeScript config
+npx jest --config=jest.config.ts --projects=admin-ui
 
 # Check results
 if [ $? -eq 0 ]

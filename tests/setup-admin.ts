@@ -4,9 +4,9 @@
  * This module initializes a testing environment for administrator
  * registration tests, including Firebase emulator connections.
  */
-import * as firebase from 'firebase/app';
-import { getAuth, signOut, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+const firebase = require('firebase/app');
+const { getAuth, signOut, connectAuthEmulator } = require('firebase/auth');
+const { getFirestore, connectFirestoreEmulator } = require('firebase/firestore');
 
 // Initialize Firebase for tests
 beforeAll(async () => {
