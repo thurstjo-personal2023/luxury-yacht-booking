@@ -1,147 +1,51 @@
 /**
  * Password Value Object
  * 
- * This value object encapsulates a password and its validation rules.
+ * This represents a password in the domain model.
+ * It includes validation rules and hashing utilities.
  */
 
 /**
- * Password validation error types
+ * Regular expression for validating password strength
+ * Requires at least:
+ * - 8 characters
+ * - 1 uppercase letter
+ * - 1 lowercase letter
+ * - 1 number
+ * - 1 special character from !@#$%^&*()_+{}[]|:;"'<>,.?/~`-=
  */
-export enum PasswordValidationError {
-  EMPTY = 'Password cannot be empty',
-  LENGTH = 'Password must be at least 8 characters',
-  FORMAT = 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
-  ADMIN_FORMAT = 'Admin password must contain at least one uppercase letter, one lowercase letter, one number, and one special character, and be at least 12 characters long'
-}
+const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+{}\[\]|:;"'<>,.?/~`\-=])[A-Za-z\d!@#$%^&*()_+{}\[\]|:;"'<>,.?/~`\-=]{8,}$/;
 
 /**
- * Password strength levels
+ * Minimum password length
  */
-export enum PasswordStrength {
-  WEAK = 'weak',
-  MEDIUM = 'medium',
-  STRONG = 'strong',
-  VERY_STRONG = 'very_strong'
-}
+const MIN_PASSWORD_LENGTH = 8;
+
+/**
+ * Maximum password length
+ */
+const MAX_PASSWORD_LENGTH = 128;
 
 /**
  * Password value object
  */
 export class Password {
   private readonly value: string;
-  private readonly isHashed: boolean;
+  private readonly hashed: boolean;
   
-  // Validation patterns
-  private static readonly HAS_UPPERCASE = /[A-Z]/;
-  private static readonly HAS_LOWERCASE = /[a-z]/;
-  private static readonly HAS_NUMBER = /[0-9]/;
-  private static readonly HAS_SPECIAL = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/;
-  
-  // Minimum password lengths
-  private static readonly MIN_LENGTH = 8;
-  private static readonly ADMIN_MIN_LENGTH = 12;
-  
-  private constructor(password: string, isHashed: boolean = false) {
+  private constructor(password: string, hashed: boolean = false) {
     this.value = password;
-    this.isHashed = isHashed;
-  }
-  
-  /**
-   * Create a new Password value object
-   * @throws Error if the password is invalid
-   */
-  static create(password: string, isAdmin: boolean = false): Password {
-    // Check if password is empty
-    if (!password) {
-      throw new Error(PasswordValidationError.EMPTY);
+    this.hashed = hashed;
+    
+    // Only validate if the password is not already hashed
+    if (!hashed) {
+      this.validate(password);
     }
-    
-    // Check minimum length based on user type
-    const minLength = isAdmin ? Password.ADMIN_MIN_LENGTH : Password.MIN_LENGTH;
-    if (password.length < minLength) {
-      throw new Error(isAdmin ? PasswordValidationError.ADMIN_FORMAT : PasswordValidationError.LENGTH);
-    }
-    
-    // Check password complexity
-    const hasUppercase = Password.HAS_UPPERCASE.test(password);
-    const hasLowercase = Password.HAS_LOWERCASE.test(password);
-    const hasNumber = Password.HAS_NUMBER.test(password);
-    const hasSpecial = Password.HAS_SPECIAL.test(password);
-    
-    // For regular users, only enforce minimum length
-    if (!isAdmin) {
-      return new Password(password);
-    }
-    
-    // For admin users, enforce strict complexity requirements
-    if (!hasUppercase || !hasLowercase || !hasNumber || !hasSpecial) {
-      throw new Error(PasswordValidationError.ADMIN_FORMAT);
-    }
-    
-    return new Password(password);
-  }
-  
-  /**
-   * Create a password object from a hashed password
-   */
-  static createFromHashed(hashedPassword: string): Password {
-    return new Password(hashedPassword, true);
-  }
-  
-  /**
-   * Try to create a Password, return null if invalid
-   */
-  static tryCreate(password: string, isAdmin: boolean = false): Password | null {
-    try {
-      return Password.create(password, isAdmin);
-    } catch (error) {
-      return null;
-    }
-  }
-  
-  /**
-   * Check if a password is valid
-   */
-  static isValid(password: string, isAdmin: boolean = false): boolean {
-    try {
-      Password.create(password, isAdmin);
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-  
-  /**
-   * Check password strength
-   */
-  static checkStrength(password: string): PasswordStrength {
-    // Empty password
-    if (!password) {
-      return PasswordStrength.WEAK;
-    }
-    
-    let score = 0;
-    
-    // Length
-    if (password.length >= 8) score++;
-    if (password.length >= 12) score++;
-    if (password.length >= 16) score++;
-    
-    // Complexity
-    if (Password.HAS_UPPERCASE.test(password)) score++;
-    if (Password.HAS_LOWERCASE.test(password)) score++;
-    if (Password.HAS_NUMBER.test(password)) score++;
-    if (Password.HAS_SPECIAL.test(password)) score++;
-    
-    // Convert score to strength level
-    if (score <= 3) return PasswordStrength.WEAK;
-    if (score <= 5) return PasswordStrength.MEDIUM;
-    if (score <= 7) return PasswordStrength.STRONG;
-    return PasswordStrength.VERY_STRONG;
   }
   
   /**
    * Get the password value
+   * @warning This should only be used for authentication, not for storage or display
    */
   getValue(): string {
     return this.value;
@@ -150,7 +54,79 @@ export class Password {
   /**
    * Check if the password is hashed
    */
-  getIsHashed(): boolean {
-    return this.isHashed;
+  isHashed(): boolean {
+    return this.hashed;
+  }
+  
+  /**
+   * Validate the password
+   */
+  private validate(password: string): void {
+    if (!password) {
+      throw new Error('Password is required');
+    }
+    
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long`);
+    }
+    
+    if (password.length > MAX_PASSWORD_LENGTH) {
+      throw new Error(`Password cannot be longer than ${MAX_PASSWORD_LENGTH} characters`);
+    }
+  }
+  
+  /**
+   * Check if the password is strong
+   */
+  isStrong(): boolean {
+    return STRONG_PASSWORD_REGEX.test(this.value);
+  }
+  
+  /**
+   * Create a password from a plain text string
+   */
+  static createFromPlainText(password: string): Password {
+    return new Password(password, false);
+  }
+  
+  /**
+   * Create a password from a hashed string
+   */
+  static createFromHashed(hashedPassword: string): Password {
+    return new Password(hashedPassword, true);
+  }
+  
+  /**
+   * Hash the password
+   * Note: This is a placeholder. In a real implementation, you would use a proper
+   * hashing library like bcrypt, argon2, or scrypt.
+   */
+  async hash(): Promise<Password> {
+    if (this.hashed) {
+      return this;
+    }
+    
+    // This is a placeholder for actual hashing
+    // In production, use a proper password hashing library
+    const hashedValue = `hashed:${this.value}`;
+    
+    return Password.createFromHashed(hashedValue);
+  }
+  
+  /**
+   * Verify a password against this password
+   * Note: This is a placeholder. In a real implementation, you would use a proper
+   * verification function from a hashing library.
+   */
+  async verify(plainTextPassword: string): Promise<boolean> {
+    if (!this.hashed) {
+      return this.value === plainTextPassword;
+    }
+    
+    // This is a placeholder for actual verification
+    // In production, use a proper password hashing library
+    const hashedAttempt = `hashed:${plainTextPassword}`;
+    
+    return this.value === hashedAttempt;
   }
 }

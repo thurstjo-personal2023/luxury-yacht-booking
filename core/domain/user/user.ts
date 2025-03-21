@@ -1,161 +1,251 @@
 /**
  * User Domain Entity
  * 
- * This represents a user in the system with the core properties and behaviors.
+ * This represents a user in the domain model.
  */
 
 import { EmailAddress } from '../value-objects/email-address';
 import { PhoneNumber } from '../value-objects/phone-number';
+import { Password } from '../value-objects/password';
 import { UserRole } from './user-role';
 
 /**
- * User properties interface
+ * User properties
  */
 export interface UserProps {
   id: string;
   email: EmailAddress;
-  name: string;
-  role: UserRole;
+  firstName: string;
+  lastName: string;
   phone?: PhoneNumber;
-  emailVerified: boolean;
+  password?: Password;
+  role: UserRole;
+  isEmailVerified: boolean;
+  isPhoneVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
   lastLoginAt?: Date;
-  profileImageUrl?: string;
-  preferences?: Map<string, any>;
 }
 
 /**
- * User domain entity
+ * User entity
  */
 export class User {
   readonly id: string;
   readonly email: EmailAddress;
-  readonly name: string;
-  readonly role: UserRole;
+  readonly firstName: string;
+  readonly lastName: string;
   readonly phone?: PhoneNumber;
-  readonly emailVerified: boolean;
+  readonly password?: Password;
+  readonly role: UserRole;
+  readonly isEmailVerified: boolean;
+  readonly isPhoneVerified: boolean;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly lastLoginAt?: Date;
-  readonly profileImageUrl?: string;
-  readonly preferences: Map<string, any>;
   
   constructor(props: UserProps) {
     this.id = props.id;
     this.email = props.email;
-    this.name = props.name;
-    this.role = props.role;
+    this.firstName = props.firstName;
+    this.lastName = props.lastName;
     this.phone = props.phone;
-    this.emailVerified = props.emailVerified;
+    this.password = props.password;
+    this.role = props.role;
+    this.isEmailVerified = props.isEmailVerified;
+    this.isPhoneVerified = props.isPhoneVerified;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
     this.lastLoginAt = props.lastLoginAt;
-    this.profileImageUrl = props.profileImageUrl;
-    this.preferences = props.preferences || new Map<string, any>();
-  }
-  
-  /**
-   * Create a new user
-   */
-  static create(props: Omit<UserProps, 'createdAt' | 'updatedAt'> & { createdAt?: Date; updatedAt?: Date }): User {
-    const now = new Date();
     
-    return new User({
-      ...props,
-      createdAt: props.createdAt || now,
-      updatedAt: props.updatedAt || now
-    });
+    this.validate();
   }
   
   /**
-   * Update user properties
+   * Validate the user entity
    */
-  update(props: Partial<Omit<UserProps, 'id' | 'email' | 'createdAt'>>): User {
+  private validate(): void {
+    if (!this.id) {
+      throw new Error('User ID is required');
+    }
+    
+    if (!this.firstName) {
+      throw new Error('First name is required');
+    }
+    
+    if (!this.lastName) {
+      throw new Error('Last name is required');
+    }
+    
+    if (!this.role) {
+      throw new Error('User role is required');
+    }
+    
+    if (!(this.createdAt instanceof Date)) {
+      throw new Error('Created at must be a Date');
+    }
+    
+    if (!(this.updatedAt instanceof Date)) {
+      throw new Error('Updated at must be a Date');
+    }
+    
+    if (this.lastLoginAt && !(this.lastLoginAt instanceof Date)) {
+      throw new Error('Last login at must be a Date');
+    }
+  }
+  
+  /**
+   * Get the full name of the user
+   */
+  getFullName(): string {
+    return `${this.firstName} ${this.lastName}`;
+  }
+  
+  /**
+   * Check if the user has a verified email
+   */
+  hasVerifiedEmail(): boolean {
+    return this.isEmailVerified;
+  }
+  
+  /**
+   * Check if the user has a verified phone
+   */
+  hasVerifiedPhone(): boolean {
+    return this.isPhoneVerified && !!this.phone;
+  }
+  
+  /**
+   * Check if the user has a password
+   */
+  hasPassword(): boolean {
+    return !!this.password;
+  }
+  
+  /**
+   * Create a copy of the user with verified email
+   */
+  verifyEmail(): User {
     return new User({
       ...this,
-      ...props,
+      isEmailVerified: true,
       updatedAt: new Date()
     });
   }
   
   /**
-   * Mark email as verified
+   * Create a copy of the user with verified phone
    */
-  verifyEmail(): User {
-    return this.update({ emailVerified: true });
+  verifyPhone(): User {
+    if (!this.phone) {
+      throw new Error('Cannot verify phone: Phone number not set');
+    }
+    
+    return new User({
+      ...this,
+      isPhoneVerified: true,
+      updatedAt: new Date()
+    });
   }
   
   /**
-   * Update last login timestamp
-   */
-  recordLogin(): User {
-    return this.update({ lastLoginAt: new Date() });
-  }
-  
-  /**
-   * Update user phone number
+   * Create a copy of the user with a new phone number
    */
   updatePhone(phone: PhoneNumber): User {
-    return this.update({ phone });
+    return new User({
+      ...this,
+      phone,
+      isPhoneVerified: false,
+      updatedAt: new Date()
+    });
   }
   
   /**
-   * Update user profile image
+   * Create a copy of the user with a new password
    */
-  updateProfileImage(imageUrl: string): User {
-    return this.update({ profileImageUrl: imageUrl });
+  updatePassword(password: Password): User {
+    return new User({
+      ...this,
+      password,
+      updatedAt: new Date()
+    });
   }
   
   /**
-   * Set a preference value
+   * Create a copy of the user with a new email
    */
-  setPreference(key: string, value: any): User {
-    const newPreferences = new Map(this.preferences);
-    newPreferences.set(key, value);
+  updateEmail(email: EmailAddress): User {
+    return new User({
+      ...this,
+      email,
+      isEmailVerified: false,
+      updatedAt: new Date()
+    });
+  }
+  
+  /**
+   * Create a copy of the user with updated names
+   */
+  updateNames(firstName: string, lastName: string): User {
+    return new User({
+      ...this,
+      firstName,
+      lastName,
+      updatedAt: new Date()
+    });
+  }
+  
+  /**
+   * Create a copy of the user with a new role
+   */
+  updateRole(role: UserRole): User {
+    return new User({
+      ...this,
+      role,
+      updatedAt: new Date()
+    });
+  }
+  
+  /**
+   * Create a copy of the user with updated login time
+   */
+  recordLogin(): User {
+    return new User({
+      ...this,
+      lastLoginAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+  
+  /**
+   * Check if the user is an administrator
+   */
+  isAdmin(): boolean {
+    return this.role === UserRole.ADMINISTRATOR || this.role === UserRole.SUPER_ADMINISTRATOR;
+  }
+  
+  /**
+   * Check if the user is a super administrator
+   */
+  isSuperAdmin(): boolean {
+    return this.role === UserRole.SUPER_ADMINISTRATOR;
+  }
+  
+  /**
+   * Check if the user's email matches the provided email
+   */
+  hasEmail(email: string | EmailAddress): boolean {
+    const emailToCompare = typeof email === 'string' 
+      ? email.toLowerCase().trim() 
+      : email.getValue();
     
-    return this.update({ preferences: newPreferences });
+    return this.email.getValue() === emailToCompare;
   }
   
   /**
-   * Get a preference value
+   * Compare this user with another user
    */
-  getPreference(key: string): any {
-    return this.preferences.get(key);
-  }
-  
-  /**
-   * Check if user has a specific role
-   */
-  hasRole(role: UserRole): boolean {
-    return this.role === role;
-  }
-  
-  /**
-   * Check if the user is a regular user (not an admin)
-   */
-  isRegularUser(): boolean {
-    return this.role === UserRole.CONSUMER || 
-           this.role === UserRole.PRODUCER || 
-           this.role === UserRole.PARTNER;
-  }
-  
-  /**
-   * Convert to a plain object for data transfer
-   */
-  toObject(): Record<string, any> {
-    return {
-      id: this.id,
-      email: this.email.toString(),
-      name: this.name,
-      role: this.role,
-      phone: this.phone?.toString(),
-      emailVerified: this.emailVerified,
-      createdAt: this.createdAt,
-      updatedAt: this.updatedAt,
-      lastLoginAt: this.lastLoginAt,
-      profileImageUrl: this.profileImageUrl,
-      preferences: Object.fromEntries(this.preferences)
-    };
+  equals(other: User): boolean {
+    return this.id === other.id;
   }
 }

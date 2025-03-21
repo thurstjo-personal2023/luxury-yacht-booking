@@ -1,280 +1,352 @@
 /**
  * Administrator Domain Entity
  * 
- * This represents an administrator user in the system with additional properties and behaviors.
+ * This represents an administrator user in the domain model.
+ * It extends the base User entity with additional administrator-specific properties.
  */
 
 import { EmailAddress } from '../value-objects/email-address';
 import { PhoneNumber } from '../value-objects/phone-number';
-import { User, UserProps } from './user';
+import { Password } from '../value-objects/password';
 import { UserRole } from './user-role';
+import { User, UserProps } from './user';
 
 /**
- * Administrator properties interface
+ * Administrator approval status
  */
-export interface AdministratorProps extends UserProps {
-  mfaEnabled: boolean;
-  isApproved: boolean;
-  approvedBy?: string;
-  approvalDate?: Date;
-  invitedBy: string;
-  invitationDate: Date;
-  lastActivityDate?: Date;
-  permissions?: string[];
-  ipWhitelist?: string[];
-  accessLevel?: number; // 1: Basic, 2: Standard, 3: Super Admin
+export enum AdministratorApprovalStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected'
 }
 
 /**
- * Administrator domain entity
+ * Administrator properties
+ */
+export interface AdministratorProps extends UserProps {
+  employeeId?: string;
+  department?: string;
+  position?: string;
+  approvalStatus: AdministratorApprovalStatus;
+  approvedById?: string;
+  approvedAt?: Date;
+  rejectedById?: string;
+  rejectedAt?: Date;
+  rejectionReason?: string;
+  mfaEnabled: boolean;
+  mfaSecret?: string;
+  lastActivityAt?: Date;
+  invitationId?: string;
+  invitedBy?: string;
+  ipWhitelist?: string[];
+}
+
+/**
+ * Administrator entity
  */
 export class Administrator extends User {
+  readonly employeeId?: string;
+  readonly department?: string;
+  readonly position?: string;
+  readonly approvalStatus: AdministratorApprovalStatus;
+  readonly approvedById?: string;
+  readonly approvedAt?: Date;
+  readonly rejectedById?: string;
+  readonly rejectedAt?: Date;
+  readonly rejectionReason?: string;
   readonly mfaEnabled: boolean;
-  readonly isApproved: boolean;
-  readonly approvedBy?: string;
-  readonly approvalDate?: Date;
-  readonly invitedBy: string;
-  readonly invitationDate: Date;
-  readonly lastActivityDate?: Date;
-  readonly permissions: string[];
-  readonly ipWhitelist: string[];
-  readonly accessLevel: number;
+  readonly mfaSecret?: string;
+  readonly lastActivityAt?: Date;
+  readonly invitationId?: string;
+  readonly invitedBy?: string;
+  readonly ipWhitelist?: string[];
   
   constructor(props: AdministratorProps) {
-    super(props);
+    // Ensure the role is always an admin role
+    const role = props.role === UserRole.ADMINISTRATOR || props.role === UserRole.SUPER_ADMINISTRATOR
+      ? props.role
+      : UserRole.ADMINISTRATOR;
     
-    // Ensure the role is set to admin
-    if (props.role !== UserRole.ADMIN && props.role !== UserRole.SUPER_ADMIN) {
-      throw new Error('Invalid role for administrator');
-    }
+    const adminProps: AdministratorProps = {
+      ...props,
+      role
+    };
     
+    super(adminProps);
+    
+    this.employeeId = props.employeeId;
+    this.department = props.department;
+    this.position = props.position;
+    this.approvalStatus = props.approvalStatus;
+    this.approvedById = props.approvedById;
+    this.approvedAt = props.approvedAt;
+    this.rejectedById = props.rejectedById;
+    this.rejectedAt = props.rejectedAt;
+    this.rejectionReason = props.rejectionReason;
     this.mfaEnabled = props.mfaEnabled;
-    this.isApproved = props.isApproved;
-    this.approvedBy = props.approvedBy;
-    this.approvalDate = props.approvalDate;
+    this.mfaSecret = props.mfaSecret;
+    this.lastActivityAt = props.lastActivityAt;
+    this.invitationId = props.invitationId;
     this.invitedBy = props.invitedBy;
-    this.invitationDate = props.invitationDate;
-    this.lastActivityDate = props.lastActivityDate;
-    this.permissions = props.permissions || [];
-    this.ipWhitelist = props.ipWhitelist || [];
-    this.accessLevel = props.accessLevel || (props.role === UserRole.SUPER_ADMIN ? 3 : 1);
-  }
-  
-  /**
-   * Create a new administrator from invitation
-   */
-  static createFromInvitation(
-    id: string,
-    email: EmailAddress,
-    name: string,
-    invitedBy: string,
-    phone?: PhoneNumber
-  ): Administrator {
-    const now = new Date();
+    this.ipWhitelist = props.ipWhitelist;
     
-    return new Administrator({
-      id,
-      email,
-      name,
-      role: UserRole.ADMIN,
-      phone,
-      emailVerified: false,
-      mfaEnabled: false,
-      isApproved: false,
-      invitedBy,
-      invitationDate: now,
-      createdAt: now,
-      updatedAt: now,
-      preferences: new Map()
-    });
+    this.validateAdmin();
   }
   
   /**
-   * Enable multi-factor authentication
+   * Validate administrator-specific properties
    */
-  enableMfa(): Administrator {
-    if (this.mfaEnabled) {
+  private validateAdmin(): void {
+    if (this.approvalStatus === AdministratorApprovalStatus.APPROVED) {
+      if (!this.approvedById) {
+        throw new Error('Approved by ID is required for approved administrators');
+      }
+      
+      if (!this.approvedAt) {
+        throw new Error('Approved at is required for approved administrators');
+      }
+      
+      if (!(this.approvedAt instanceof Date)) {
+        throw new Error('Approved at must be a Date');
+      }
+    }
+    
+    if (this.approvalStatus === AdministratorApprovalStatus.REJECTED) {
+      if (!this.rejectedById) {
+        throw new Error('Rejected by ID is required for rejected administrators');
+      }
+      
+      if (!this.rejectedAt) {
+        throw new Error('Rejected at is required for rejected administrators');
+      }
+      
+      if (!(this.rejectedAt instanceof Date)) {
+        throw new Error('Rejected at must be a Date');
+      }
+      
+      if (!this.rejectionReason) {
+        throw new Error('Rejection reason is required for rejected administrators');
+      }
+    }
+    
+    if (this.lastActivityAt && !(this.lastActivityAt instanceof Date)) {
+      throw new Error('Last activity at must be a Date');
+    }
+  }
+  
+  /**
+   * Validate that the role is an admin role
+   */
+  private validateAdminRole(role: UserRole): UserRole {
+    if (role !== UserRole.ADMINISTRATOR && role !== UserRole.SUPER_ADMINISTRATOR) {
+      throw new Error('Administrator must have an admin role');
+    }
+    
+    return role;
+  }
+  
+  /**
+   * Check if the administrator is approved
+   */
+  isApproved(): boolean {
+    return this.approvalStatus === AdministratorApprovalStatus.APPROVED;
+  }
+  
+  /**
+   * Check if the administrator is pending approval
+   */
+  isPending(): boolean {
+    return this.approvalStatus === AdministratorApprovalStatus.PENDING;
+  }
+  
+  /**
+   * Check if the administrator is rejected
+   */
+  isRejected(): boolean {
+    return this.approvalStatus === AdministratorApprovalStatus.REJECTED;
+  }
+  
+  /**
+   * Check if the administrator has MFA enabled
+   */
+  hasMfaEnabled(): boolean {
+    return this.mfaEnabled;
+  }
+  
+  /**
+   * Check if the administrator has completed MFA setup
+   */
+  hasMfaSetup(): boolean {
+    return this.mfaEnabled && !!this.mfaSecret;
+  }
+  
+  /**
+   * Create a new administrator with approved status
+   */
+  approve(approvedById: string): Administrator {
+    if (this.isApproved()) {
       return this;
     }
     
-    return this.updateAdminProps({ mfaEnabled: true });
-  }
-  
-  /**
-   * Disable multi-factor authentication
-   * Only super admins can disable MFA for other admins
-   */
-  disableMfa(): Administrator {
-    if (!this.mfaEnabled) {
-      return this;
-    }
-    
-    return this.updateAdminProps({ mfaEnabled: false });
-  }
-  
-  /**
-   * Approve the administrator (by a super admin)
-   */
-  approve(approvedBy: string): Administrator {
-    if (this.isApproved) {
-      return this;
-    }
-    
-    return this.updateAdminProps({
-      isApproved: true,
-      approvedBy,
-      approvalDate: new Date()
-    });
-  }
-  
-  /**
-   * Record administrator activity (to prevent session timeout)
-   */
-  recordActivity(): Administrator {
-    return this.updateAdminProps({
-      lastActivityDate: new Date()
-    });
-  }
-  
-  /**
-   * Add a permission to the administrator
-   */
-  addPermission(permission: string): Administrator {
-    if (this.permissions.includes(permission)) {
-      return this;
-    }
-    
-    return this.updateAdminProps({
-      permissions: [...this.permissions, permission]
-    });
-  }
-  
-  /**
-   * Remove a permission from the administrator
-   */
-  removePermission(permission: string): Administrator {
-    if (!this.permissions.includes(permission)) {
-      return this;
-    }
-    
-    return this.updateAdminProps({
-      permissions: this.permissions.filter(p => p !== permission)
-    });
-  }
-  
-  /**
-   * Check if the administrator has a specific permission
-   */
-  hasPermission(permission: string): boolean {
-    return this.permissions.includes(permission);
-  }
-  
-  /**
-   * Add an IP address to the whitelist
-   */
-  addToIpWhitelist(ip: string): Administrator {
-    if (this.ipWhitelist.includes(ip)) {
-      return this;
-    }
-    
-    return this.updateAdminProps({
-      ipWhitelist: [...this.ipWhitelist, ip]
-    });
-  }
-  
-  /**
-   * Remove an IP address from the whitelist
-   */
-  removeFromIpWhitelist(ip: string): Administrator {
-    if (!this.ipWhitelist.includes(ip)) {
-      return this;
-    }
-    
-    return this.updateAdminProps({
-      ipWhitelist: this.ipWhitelist.filter(i => i !== ip)
-    });
-  }
-  
-  /**
-   * Check if an IP address is whitelisted
-   * Returns true if whitelist is empty
-   */
-  isIpWhitelisted(ip: string): boolean {
-    return this.ipWhitelist.length === 0 || this.ipWhitelist.includes(ip);
-  }
-  
-  /**
-   * Update administrator-specific properties
-   */
-  private updateAdminProps(props: Partial<Omit<AdministratorProps, keyof UserProps>>): Administrator {
     return new Administrator({
       ...this,
-      ...props,
+      approvalStatus: AdministratorApprovalStatus.APPROVED,
+      approvedById,
+      approvedAt: new Date(),
+      rejectedById: undefined,
+      rejectedAt: undefined,
+      rejectionReason: undefined,
       updatedAt: new Date()
     });
   }
   
   /**
-   * Update user properties (override from User)
+   * Create a new administrator with rejected status
    */
-  update(props: Partial<Omit<UserProps, 'id' | 'email' | 'createdAt' | 'role'>>): Administrator {
-    // Ensure role cannot be changed from admin
-    const userInstance = super.update(props);
+  reject(rejectedById: string, rejectionReason: string): Administrator {
+    if (this.isRejected()) {
+      return this;
+    }
     
     return new Administrator({
-      ...userInstance,
-      mfaEnabled: this.mfaEnabled,
-      isApproved: this.isApproved,
-      approvedBy: this.approvedBy,
-      approvalDate: this.approvalDate,
-      invitedBy: this.invitedBy,
-      invitationDate: this.invitationDate,
-      lastActivityDate: this.lastActivityDate,
-      permissions: this.permissions,
-      ipWhitelist: this.ipWhitelist,
-      accessLevel: this.accessLevel
+      ...this,
+      approvalStatus: AdministratorApprovalStatus.REJECTED,
+      rejectedById,
+      rejectedAt: new Date(),
+      rejectionReason,
+      approvedById: undefined,
+      approvedAt: undefined,
+      updatedAt: new Date()
     });
   }
   
   /**
-   * Check if this administrator is a super admin
+   * Create a new administrator with MFA enabled
    */
-  isSuperAdmin(): boolean {
-    return this.role === UserRole.SUPER_ADMIN;
+  enableMfa(mfaSecret: string): Administrator {
+    return new Administrator({
+      ...this,
+      mfaEnabled: true,
+      mfaSecret,
+      updatedAt: new Date()
+    });
   }
   
   /**
-   * Check if the session is active (not timed out)
-   * @param maxInactivityMinutes Maximum inactivity time in minutes
+   * Create a new administrator with MFA disabled
    */
-  isSessionActive(maxInactivityMinutes: number): boolean {
-    if (!this.lastActivityDate) {
+  disableMfa(): Administrator {
+    return new Administrator({
+      ...this,
+      mfaEnabled: false,
+      mfaSecret: undefined,
+      updatedAt: new Date()
+    });
+  }
+  
+  /**
+   * Create a new administrator with updated activity time
+   */
+  updateActivity(): Administrator {
+    return new Administrator({
+      ...this,
+      lastActivityAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+  
+  /**
+   * Create a new administrator with updated IP whitelist
+   */
+  updateIpWhitelist(ipWhitelist: string[]): Administrator {
+    return new Administrator({
+      ...this,
+      ipWhitelist,
+      updatedAt: new Date()
+    });
+  }
+  
+  /**
+   * Create a new administrator with added IP address to whitelist
+   */
+  addIpToWhitelist(ip: string): Administrator {
+    const currentWhitelist = this.ipWhitelist || [];
+    
+    if (currentWhitelist.includes(ip)) {
+      return this;
+    }
+    
+    return new Administrator({
+      ...this,
+      ipWhitelist: [...currentWhitelist, ip],
+      updatedAt: new Date()
+    });
+  }
+  
+  /**
+   * Create a new administrator with removed IP address from whitelist
+   */
+  removeIpFromWhitelist(ip: string): Administrator {
+    const currentWhitelist = this.ipWhitelist || [];
+    
+    if (!currentWhitelist.includes(ip)) {
+      return this;
+    }
+    
+    return new Administrator({
+      ...this,
+      ipWhitelist: currentWhitelist.filter(i => i !== ip),
+      updatedAt: new Date()
+    });
+  }
+  
+  /**
+   * Check if an IP address is in the whitelist
+   */
+  isIpWhitelisted(ip: string): boolean {
+    if (!this.ipWhitelist || this.ipWhitelist.length === 0) {
+      return true; // No whitelist means all IPs are allowed
+    }
+    
+    return this.ipWhitelist.includes(ip);
+  }
+  
+  /**
+   * Check if the administrator's session is active
+   */
+  isSessionActive(sessionTimeoutMinutes: number = 30): boolean {
+    if (!this.lastActivityAt) {
       return false;
     }
     
-    const now = new Date();
-    const diffMs = now.getTime() - this.lastActivityDate.getTime();
-    const diffMinutes = diffMs / (1000 * 60);
+    const currentTime = new Date();
+    const sessionTimeoutMs = sessionTimeoutMinutes * 60 * 1000;
+    const timeSinceLastActivity = currentTime.getTime() - this.lastActivityAt.getTime();
     
-    return diffMinutes < maxInactivityMinutes;
+    return timeSinceLastActivity < sessionTimeoutMs;
   }
   
   /**
-   * Convert to a plain object for data transfer (override from User)
+   * Create a new Administrator from User properties
    */
-  toObject(): Record<string, any> {
-    return {
-      ...super.toObject(),
-      mfaEnabled: this.mfaEnabled,
-      isApproved: this.isApproved,
-      approvedBy: this.approvedBy,
-      approvalDate: this.approvalDate,
-      invitedBy: this.invitedBy,
-      invitationDate: this.invitationDate,
-      lastActivityDate: this.lastActivityDate,
-      permissions: this.permissions,
-      ipWhitelist: this.ipWhitelist,
-      accessLevel: this.accessLevel
-    };
+  static fromUser(
+    user: User, 
+    adminProps: Omit<AdministratorProps, keyof UserProps>
+  ): Administrator {
+    return new Administrator({
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      password: user.password,
+      role: user.role,
+      isEmailVerified: user.isEmailVerified,
+      isPhoneVerified: user.isPhoneVerified,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      lastLoginAt: user.lastLoginAt,
+      ...adminProps
+    });
   }
 }
