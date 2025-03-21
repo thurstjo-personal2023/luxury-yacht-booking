@@ -1,105 +1,161 @@
 /**
  * User Domain Entity
  * 
- * This represents the core User entity in the domain layer,
- * independent of any frameworks or external dependencies.
+ * This represents a user in the system with the core properties and behaviors.
  */
 
-import { UserRole } from './user-role';
 import { EmailAddress } from '../value-objects/email-address';
 import { PhoneNumber } from '../value-objects/phone-number';
+import { UserRole } from './user-role';
 
+/**
+ * User properties interface
+ */
 export interface UserProps {
   id: string;
-  name: string;
   email: EmailAddress;
-  phone?: PhoneNumber;
+  name: string;
   role: UserRole;
+  phone?: PhoneNumber;
   emailVerified: boolean;
-  points: number;
   createdAt: Date;
   updatedAt: Date;
+  lastLoginAt?: Date;
+  profileImageUrl?: string;
+  preferences?: Map<string, any>;
 }
 
+/**
+ * User domain entity
+ */
 export class User {
   readonly id: string;
-  readonly name: string;
   readonly email: EmailAddress;
-  readonly phone?: PhoneNumber;
+  readonly name: string;
   readonly role: UserRole;
+  readonly phone?: PhoneNumber;
   readonly emailVerified: boolean;
-  readonly points: number;
   readonly createdAt: Date;
   readonly updatedAt: Date;
-
+  readonly lastLoginAt?: Date;
+  readonly profileImageUrl?: string;
+  readonly preferences: Map<string, any>;
+  
   constructor(props: UserProps) {
     this.id = props.id;
-    this.name = props.name;
     this.email = props.email;
-    this.phone = props.phone;
+    this.name = props.name;
     this.role = props.role;
+    this.phone = props.phone;
     this.emailVerified = props.emailVerified;
-    this.points = props.points;
     this.createdAt = props.createdAt;
     this.updatedAt = props.updatedAt;
+    this.lastLoginAt = props.lastLoginAt;
+    this.profileImageUrl = props.profileImageUrl;
+    this.preferences = props.preferences || new Map<string, any>();
   }
-
+  
   /**
-   * Factory method to create a new User
+   * Create a new user
    */
-  static create(props: Omit<UserProps, 'createdAt' | 'updatedAt' | 'points' | 'emailVerified'>): User {
-    return new User({
-      ...props,
-      points: 0,
-      emailVerified: false,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-  }
-
-  /**
-   * Verify the user's email
-   */
-  verifyEmail(): User {
-    return new User({
-      ...this,
-      emailVerified: true,
-      updatedAt: new Date()
-    });
-  }
-
-  /**
-   * Add loyalty points to the user
-   */
-  addPoints(points: number): User {
-    if (points < 0) {
-      throw new Error('Cannot add negative points');
-    }
+  static create(props: Omit<UserProps, 'createdAt' | 'updatedAt'> & { createdAt?: Date; updatedAt?: Date }): User {
+    const now = new Date();
     
     return new User({
+      ...props,
+      createdAt: props.createdAt || now,
+      updatedAt: props.updatedAt || now
+    });
+  }
+  
+  /**
+   * Update user properties
+   */
+  update(props: Partial<Omit<UserProps, 'id' | 'email' | 'createdAt'>>): User {
+    return new User({
       ...this,
-      points: this.points + points,
+      ...props,
       updatedAt: new Date()
     });
   }
-
+  
+  /**
+   * Mark email as verified
+   */
+  verifyEmail(): User {
+    return this.update({ emailVerified: true });
+  }
+  
+  /**
+   * Update last login timestamp
+   */
+  recordLogin(): User {
+    return this.update({ lastLoginAt: new Date() });
+  }
+  
+  /**
+   * Update user phone number
+   */
+  updatePhone(phone: PhoneNumber): User {
+    return this.update({ phone });
+  }
+  
+  /**
+   * Update user profile image
+   */
+  updateProfileImage(imageUrl: string): User {
+    return this.update({ profileImageUrl: imageUrl });
+  }
+  
+  /**
+   * Set a preference value
+   */
+  setPreference(key: string, value: any): User {
+    const newPreferences = new Map(this.preferences);
+    newPreferences.set(key, value);
+    
+    return this.update({ preferences: newPreferences });
+  }
+  
+  /**
+   * Get a preference value
+   */
+  getPreference(key: string): any {
+    return this.preferences.get(key);
+  }
+  
   /**
    * Check if user has a specific role
    */
   hasRole(role: UserRole): boolean {
     return this.role === role;
   }
-
+  
   /**
-   * Create a copy of this user with updated properties
+   * Check if the user is a regular user (not an admin)
    */
-  update(props: Partial<Omit<UserProps, 'id' | 'createdAt'>>): User {
-    return new User({
-      ...this,
-      ...props,
-      id: this.id, // Ensure ID cannot be changed
-      createdAt: this.createdAt, // Ensure createdAt cannot be changed
-      updatedAt: new Date() // Always update the updatedAt timestamp
-    });
+  isRegularUser(): boolean {
+    return this.role === UserRole.CONSUMER || 
+           this.role === UserRole.PRODUCER || 
+           this.role === UserRole.PARTNER;
+  }
+  
+  /**
+   * Convert to a plain object for data transfer
+   */
+  toObject(): Record<string, any> {
+    return {
+      id: this.id,
+      email: this.email.toString(),
+      name: this.name,
+      role: this.role,
+      phone: this.phone?.toString(),
+      emailVerified: this.emailVerified,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
+      lastLoginAt: this.lastLoginAt,
+      profileImageUrl: this.profileImageUrl,
+      preferences: Object.fromEntries(this.preferences)
+    };
   }
 }

@@ -1,77 +1,156 @@
 /**
  * Password Value Object
  * 
- * This represents a password with validation rules.
- * Note: This does not store the actual password value for security reasons,
- * but validates password strength and provides hashing capabilities.
+ * This value object encapsulates a password and its validation rules.
  */
 
+/**
+ * Password validation error types
+ */
+export enum PasswordValidationError {
+  EMPTY = 'Password cannot be empty',
+  LENGTH = 'Password must be at least 8 characters',
+  FORMAT = 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+  ADMIN_FORMAT = 'Admin password must contain at least one uppercase letter, one lowercase letter, one number, and one special character, and be at least 12 characters long'
+}
+
+/**
+ * Password strength levels
+ */
+export enum PasswordStrength {
+  WEAK = 'weak',
+  MEDIUM = 'medium',
+  STRONG = 'strong',
+  VERY_STRONG = 'very_strong'
+}
+
+/**
+ * Password value object
+ */
 export class Password {
+  private readonly value: string;
+  private readonly isHashed: boolean;
+  
+  // Validation patterns
+  private static readonly HAS_UPPERCASE = /[A-Z]/;
+  private static readonly HAS_LOWERCASE = /[a-z]/;
+  private static readonly HAS_NUMBER = /[0-9]/;
+  private static readonly HAS_SPECIAL = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/;
+  
+  // Minimum password lengths
   private static readonly MIN_LENGTH = 8;
-  private static readonly REQUIRES_UPPERCASE = true;
-  private static readonly REQUIRES_LOWERCASE = true;
-  private static readonly REQUIRES_NUMBER = true;
-  private static readonly REQUIRES_SPECIAL = true;
-
-  /**
-   * Validate password strength
-   */
-  public static validate(password: string): { isValid: boolean; errors: string[] } {
-    const errors: string[] = [];
-    
-    if (!password) {
-      errors.push('Password is required');
-      return { isValid: false, errors };
-    }
-    
-    if (password.length < this.MIN_LENGTH) {
-      errors.push(`Password must be at least ${this.MIN_LENGTH} characters long`);
-    }
-    
-    if (this.REQUIRES_UPPERCASE && !/[A-Z]/.test(password)) {
-      errors.push('Password must contain at least one uppercase letter');
-    }
-    
-    if (this.REQUIRES_LOWERCASE && !/[a-z]/.test(password)) {
-      errors.push('Password must contain at least one lowercase letter');
-    }
-    
-    if (this.REQUIRES_NUMBER && !/\d/.test(password)) {
-      errors.push('Password must contain at least one number');
-    }
-    
-    if (this.REQUIRES_SPECIAL && !/[^A-Za-z0-9]/.test(password)) {
-      errors.push('Password must contain at least one special character');
-    }
-    
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
+  private static readonly ADMIN_MIN_LENGTH = 12;
+  
+  private constructor(password: string, isHashed: boolean = false) {
+    this.value = password;
+    this.isHashed = isHashed;
   }
-
+  
   /**
-   * Calculate password strength score (0-100)
+   * Create a new Password value object
+   * @throws Error if the password is invalid
    */
-  public static calculateStrength(password: string): number {
-    if (!password) return 0;
+  static create(password: string, isAdmin: boolean = false): Password {
+    // Check if password is empty
+    if (!password) {
+      throw new Error(PasswordValidationError.EMPTY);
+    }
+    
+    // Check minimum length based on user type
+    const minLength = isAdmin ? Password.ADMIN_MIN_LENGTH : Password.MIN_LENGTH;
+    if (password.length < minLength) {
+      throw new Error(isAdmin ? PasswordValidationError.ADMIN_FORMAT : PasswordValidationError.LENGTH);
+    }
+    
+    // Check password complexity
+    const hasUppercase = Password.HAS_UPPERCASE.test(password);
+    const hasLowercase = Password.HAS_LOWERCASE.test(password);
+    const hasNumber = Password.HAS_NUMBER.test(password);
+    const hasSpecial = Password.HAS_SPECIAL.test(password);
+    
+    // For regular users, only enforce minimum length
+    if (!isAdmin) {
+      return new Password(password);
+    }
+    
+    // For admin users, enforce strict complexity requirements
+    if (!hasUppercase || !hasLowercase || !hasNumber || !hasSpecial) {
+      throw new Error(PasswordValidationError.ADMIN_FORMAT);
+    }
+    
+    return new Password(password);
+  }
+  
+  /**
+   * Create a password object from a hashed password
+   */
+  static createFromHashed(hashedPassword: string): Password {
+    return new Password(hashedPassword, true);
+  }
+  
+  /**
+   * Try to create a Password, return null if invalid
+   */
+  static tryCreate(password: string, isAdmin: boolean = false): Password | null {
+    try {
+      return Password.create(password, isAdmin);
+    } catch (error) {
+      return null;
+    }
+  }
+  
+  /**
+   * Check if a password is valid
+   */
+  static isValid(password: string, isAdmin: boolean = false): boolean {
+    try {
+      Password.create(password, isAdmin);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+  
+  /**
+   * Check password strength
+   */
+  static checkStrength(password: string): PasswordStrength {
+    // Empty password
+    if (!password) {
+      return PasswordStrength.WEAK;
+    }
     
     let score = 0;
     
-    // Length contribution (up to 40 points)
-    score += Math.min(40, password.length * 4);
+    // Length
+    if (password.length >= 8) score++;
+    if (password.length >= 12) score++;
+    if (password.length >= 16) score++;
     
-    // Character variety contribution
-    if (/[A-Z]/.test(password)) score += 10; // Uppercase
-    if (/[a-z]/.test(password)) score += 10; // Lowercase
-    if (/\d/.test(password)) score += 10;    // Numbers
-    if (/[^A-Za-z0-9]/.test(password)) score += 15; // Special characters
+    // Complexity
+    if (Password.HAS_UPPERCASE.test(password)) score++;
+    if (Password.HAS_LOWERCASE.test(password)) score++;
+    if (Password.HAS_NUMBER.test(password)) score++;
+    if (Password.HAS_SPECIAL.test(password)) score++;
     
-    // Variety of character types (up to 15 points)
-    const charTypes = [/[A-Z]/, /[a-z]/, /\d/, /[^A-Za-z0-9]/].filter(regex => regex.test(password)).length;
-    score += charTypes * 5;
-    
-    // Cap at 100
-    return Math.min(100, score);
+    // Convert score to strength level
+    if (score <= 3) return PasswordStrength.WEAK;
+    if (score <= 5) return PasswordStrength.MEDIUM;
+    if (score <= 7) return PasswordStrength.STRONG;
+    return PasswordStrength.VERY_STRONG;
+  }
+  
+  /**
+   * Get the password value
+   */
+  getValue(): string {
+    return this.value;
+  }
+  
+  /**
+   * Check if the password is hashed
+   */
+  getIsHashed(): boolean {
+    return this.isHashed;
   }
 }

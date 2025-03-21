@@ -1,7 +1,7 @@
 /**
  * User Repository Interface
  * 
- * This defines the contract for storing and retrieving User entities.
+ * This interface defines the contract for user persistence operations.
  */
 
 import { User } from '../../../core/domain/user/user';
@@ -9,58 +9,59 @@ import { EmailAddress } from '../../../core/domain/value-objects/email-address';
 import { UserRole } from '../../../core/domain/user/user-role';
 
 /**
- * Filters for retrieving users
- */
-export interface UserFilters {
-  role?: UserRole;
-  emailVerified?: boolean;
-  fromDate?: Date;
-  toDate?: Date;
-  searchTerm?: string;
-}
-
-/**
- * Paginated result for users
- */
-export interface PaginatedUsers {
-  users: User[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
-
-/**
  * User repository interface
  */
 export interface IUserRepository {
   /**
-   * Find a user by their ID
+   * Find a user by ID
    */
   findById(id: string): Promise<User | null>;
   
   /**
-   * Find a user by their email
+   * Find a user by email
    */
   findByEmail(email: EmailAddress): Promise<User | null>;
   
   /**
-   * Get users matching the given filters with pagination
+   * Find users by role
    */
-  findUsers(filters: UserFilters, page: number, pageSize: number): Promise<PaginatedUsers>;
+  findByRole(role: UserRole, limit?: number, offset?: number): Promise<User[]>;
   
   /**
-   * Save a user (create if doesn't exist, update if exists)
+   * Count users by role
+   */
+  countByRole(role: UserRole): Promise<number>;
+  
+  /**
+   * Save a user (create or update)
    */
   save(user: User): Promise<User>;
   
   /**
    * Delete a user
    */
-  delete(id: string): Promise<boolean>;
+  delete(userId: string): Promise<boolean>;
   
   /**
-   * Check if a user with the given email exists
+   * Search users by name and/or email
+   */
+  search(query: string, role?: UserRole, limit?: number, offset?: number): Promise<User[]>;
+  
+  /**
+   * Check if email exists
    */
   emailExists(email: EmailAddress): Promise<boolean>;
+  
+  /**
+   * Get users by IDs
+   */
+  findByIds(ids: string[]): Promise<User[]>;
+  
+  /**
+   * Find users with pagination
+   */
+  findAll(limit: number, offset: number): Promise<{
+    users: User[];
+    total: number;
+  }>;
 }

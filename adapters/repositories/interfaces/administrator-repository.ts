@@ -1,64 +1,124 @@
 /**
  * Administrator Repository Interface
  * 
- * This defines the contract for storing and retrieving Administrator entities.
+ * This interface defines the contract for administrator persistence operations.
  */
 
 import { Administrator } from '../../../core/domain/user/administrator';
-import { IUserRepository, UserFilters } from './user-repository';
+import { EmailAddress } from '../../../core/domain/value-objects/email-address';
 
 /**
- * Administrator specific filters
+ * Invitation data type
  */
-export interface AdministratorFilters extends UserFilters {
-  isApproved?: boolean;
-  mfaEnabled?: boolean;
-  isSuper?: boolean;
-  invitedBy?: string;
-}
-
-/**
- * Paginated result for administrators
- */
-export interface PaginatedAdministrators {
-  administrators: Administrator[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
+export interface AdminInvitation {
+  id: string;
+  code: string;
+  email: EmailAddress;
+  invitedBy: string;
+  createdAt: Date;
+  expiresAt: Date;
+  isUsed: boolean;
+  usedAt?: Date;
 }
 
 /**
  * Administrator repository interface
  */
-export interface IAdministratorRepository extends Omit<IUserRepository, 'findUsers'> {
+export interface IAdministratorRepository {
   /**
-   * Find administrators matching the given filters with pagination
+   * Find an administrator by ID
    */
-  findAdministrators(filters: AdministratorFilters, page: number, pageSize: number): Promise<PaginatedAdministrators>;
+  findById(id: string): Promise<Administrator | null>;
   
   /**
-   * Get pending administrator approvals
+   * Find an administrator by email
    */
-  getPendingApprovals(page: number, pageSize: number): Promise<PaginatedAdministrators>;
+  findByEmail(email: EmailAddress): Promise<Administrator | null>;
   
   /**
-   * Check if invitation code is valid
+   * Save an administrator (create or update)
    */
-  isInvitationValid(invitationCode: string): Promise<boolean>;
+  save(administrator: Administrator): Promise<Administrator>;
   
   /**
-   * Create an admin invitation
+   * Delete an administrator
    */
-  createInvitation(superAdminId: string, email: string): Promise<{ code: string; expiresAt: Date }>;
+  delete(adminId: string): Promise<boolean>;
   
   /**
-   * Get administrator by invitation code
+   * Find all administrators
    */
-  findByInvitationCode(code: string): Promise<Administrator | null>;
+  findAll(includeNotApproved?: boolean, limit?: number, offset?: number): Promise<{
+    administrators: Administrator[];
+    total: number;
+  }>;
   
   /**
-   * Save an administrator (create if doesn't exist, update if exists)
+   * Find pending approval administrators
    */
-  saveAdministrator(administrator: Administrator): Promise<Administrator>;
+  findPendingApproval(limit?: number, offset?: number): Promise<{
+    administrators: Administrator[];
+    total: number;
+  }>;
+  
+  /**
+   * Create an invitation
+   */
+  createInvitation(email: EmailAddress, invitedBy: string, expiresInHours?: number): Promise<AdminInvitation>;
+  
+  /**
+   * Find invitation by code
+   */
+  findInvitationByCode(code: string): Promise<AdminInvitation | null>;
+  
+  /**
+   * Mark invitation as used
+   */
+  markInvitationAsUsed(code: string): Promise<AdminInvitation | null>;
+  
+  /**
+   * Delete invitation
+   */
+  deleteInvitation(code: string): Promise<boolean>;
+  
+  /**
+   * Get all invitations
+   */
+  findAllInvitations(includeUsed?: boolean, limit?: number, offset?: number): Promise<{
+    invitations: AdminInvitation[];
+    total: number;
+  }>;
+  
+  /**
+   * Search administrators by name, email, or role
+   */
+  search(query: string, limit?: number, offset?: number): Promise<{
+    administrators: Administrator[];
+    total: number;
+  }>;
+  
+  /**
+   * Count total administrators
+   */
+  countAll(includeNotApproved?: boolean): Promise<number>;
+  
+  /**
+   * Count pending approvals
+   */
+  countPendingApproval(): Promise<number>;
+  
+  /**
+   * Count active invitations
+   */
+  countActiveInvitations(): Promise<number>;
+  
+  /**
+   * Record admin activity (to prevent session timeout)
+   */
+  recordActivity(adminId: string): Promise<boolean>;
+  
+  /**
+   * Get last activity timestamp for admin
+   */
+  getLastActivity(adminId: string): Promise<Date | null>;
 }

@@ -1,77 +1,162 @@
 /**
  * PhoneNumber Value Object
  * 
- * This represents a phone number with validation rules.
+ * This value object encapsulates a phone number and its validation rules.
  */
 
+/**
+ * Phone number validation error types
+ */
+export enum PhoneValidationError {
+  EMPTY = 'Phone number cannot be empty',
+  FORMAT = 'Phone number format is invalid',
+  LENGTH = 'Phone number length is invalid'
+}
+
+/**
+ * PhoneNumber value object
+ */
 export class PhoneNumber {
   private readonly value: string;
-
+  private readonly countryCode: string;
+  private readonly nationalNumber: string;
+  
   /**
-   * Create a new PhoneNumber
+   * Regular expression for international phone number format 
+   * Supports formats like +971 XX XXX XXXX or +1 (XXX) XXX-XXXX
+   */
+  private static readonly PHONE_PATTERN = /^\+[1-9]\d{0,2}[\s-]?\(?(?:\d{1,4})\)?[\s.-]?(?:\d{1,4})[\s.-]?(?:\d{1,4})$/;
+  
+  /**
+   * Minimum and maximum valid lengths for phone numbers (including country code)
+   */
+  private static readonly MIN_LENGTH = 8;  // Minimum viable international number
+  private static readonly MAX_LENGTH = 16; // Maximum practical length with formatting
+  
+  private constructor(phone: string) {
+    this.value = phone.trim();
+    
+    // Extract country code and national number
+    // This is a simplified extraction that works for standard formats
+    const matches = this.value.match(/^\+(\d+)[^0-9]+(.*)$/);
+    if (matches && matches.length >= 3) {
+      this.countryCode = matches[1];
+      this.nationalNumber = matches[2].replace(/[^0-9]/g, '');
+    } else {
+      this.countryCode = '';
+      this.nationalNumber = this.value.replace(/[^0-9]/g, '');
+    }
+  }
+  
+  /**
+   * Create a new PhoneNumber value object
    * @throws Error if the phone number is invalid
    */
-  private constructor(phone: string) {
-    if (!PhoneNumber.isValid(phone)) {
-      throw new Error(`Invalid phone number: ${phone}`);
+  static create(phone: string): PhoneNumber {
+    const trimmedPhone = phone.trim();
+    
+    // Check if phone is empty
+    if (!trimmedPhone) {
+      throw new Error(PhoneValidationError.EMPTY);
     }
-    this.value = PhoneNumber.normalize(phone);
+    
+    // Check phone length
+    if (trimmedPhone.length < PhoneNumber.MIN_LENGTH || 
+        trimmedPhone.length > PhoneNumber.MAX_LENGTH) {
+      throw new Error(PhoneValidationError.LENGTH);
+    }
+    
+    // Validate phone format
+    if (!PhoneNumber.PHONE_PATTERN.test(trimmedPhone)) {
+      throw new Error(PhoneValidationError.FORMAT);
+    }
+    
+    return new PhoneNumber(trimmedPhone);
   }
-
+  
+  /**
+   * Create a new PhoneNumber value object without validation
+   * Use with caution! Only when phone is already validated.
+   */
+  static createWithoutValidation(phone: string): PhoneNumber {
+    return new PhoneNumber(phone);
+  }
+  
+  /**
+   * Try to create a PhoneNumber, return null if invalid
+   */
+  static tryCreate(phone: string): PhoneNumber | null {
+    try {
+      return PhoneNumber.create(phone);
+    } catch (error) {
+      return null;
+    }
+  }
+  
   /**
    * Check if a phone string is valid
    */
-  public static isValid(phone: string): boolean {
-    if (!phone || typeof phone !== 'string') return false;
-    
-    // Remove all non-digit characters for validation
-    const digitsOnly = phone.replace(/\D/g, '');
-    
-    // Phone numbers should have at least 8 digits and not more than 15
-    // This is a simplified validation - real-world validation would be more complex
-    return digitsOnly.length >= 8 && digitsOnly.length <= 15;
+  static isValid(phone: string): boolean {
+    try {
+      PhoneNumber.create(phone);
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
-
+  
   /**
-   * Normalize a phone number by removing formatting but keeping the + prefix
+   * Get the raw string value of the phone number
    */
-  private static normalize(phone: string): string {
-    // Keep the + prefix if it exists
-    const hasPlus = phone.startsWith('+');
-    
-    // Remove all non-digit characters
-    const digitsOnly = phone.replace(/\D/g, '');
-    
-    // Re-add the + if it was present
-    return hasPlus ? `+${digitsOnly}` : digitsOnly;
-  }
-
-  /**
-   * Create a new PhoneNumber instance
-   * @throws Error if the phone number is invalid
-   */
-  public static create(phone: string): PhoneNumber {
-    return new PhoneNumber(phone);
-  }
-
-  /**
-   * Get the string value of the phone number
-   */
-  public getValue(): string {
+  toString(): string {
     return this.value;
   }
-
+  
   /**
-   * Compare two PhoneNumber objects for equality
+   * Check if this phone equals another phone
    */
-  public equals(other: PhoneNumber): boolean {
-    return this.value === other.value;
+  equals(other: PhoneNumber): boolean {
+    // Compare by normalizing both numbers (stripping non-digits)
+    const thisDigitsOnly = this.value.replace(/\D/g, '');
+    const otherDigitsOnly = other.value.replace(/\D/g, '');
+    return thisDigitsOnly === otherDigitsOnly;
   }
-
+  
   /**
-   * Convert to string representation
+   * Get the country code part
    */
-  public toString(): string {
-    return this.value;
+  getCountryCode(): string {
+    return this.countryCode;
+  }
+  
+  /**
+   * Get the national number part
+   */
+  getNationalNumber(): string {
+    return this.nationalNumber;
+  }
+  
+  /**
+   * Get digits-only format
+   */
+  getDigitsOnly(): string {
+    return this.value.replace(/\D/g, '');
+  }
+  
+  /**
+   * Create a masked version of the phone for display
+   * Example: +971 XX XXX 1234
+   */
+  getMasked(): string {
+    if (!this.countryCode || !this.nationalNumber) {
+      const digitsOnly = this.getDigitsOnly();
+      const lastFour = digitsOnly.slice(-4);
+      const masked = digitsOnly.slice(0, -4).replace(/\d/g, 'X');
+      return `${masked}${lastFour}`;
+    }
+    
+    const lastFour = this.nationalNumber.slice(-4);
+    const maskedNational = this.nationalNumber.slice(0, -4).replace(/\d/g, 'X');
+    return `+${this.countryCode} ${maskedNational}${lastFour}`;
   }
 }
