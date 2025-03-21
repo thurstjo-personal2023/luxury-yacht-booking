@@ -2,25 +2,74 @@
  * Media Repository Interface
  * 
  * This interface defines the contract for media repository implementations.
- * It specifies methods for storing, retrieving, and validating media.
+ * It is responsible for validating, storing, and retrieving media resources.
  */
 
 import { Media } from '../../../core/domain/media/media';
-import { MediaValidationResult } from '../../../core/domain/media/media-validation-service';
 
 /**
- * Document field path identifies a specific field in a document
+ * Media validation result
+ */
+export interface MediaValidationResult {
+  isValid: boolean;
+  status?: number;
+  statusText?: string;
+  contentType?: string;
+  error?: string;
+}
+
+/**
+ * Document field path
  */
 export interface DocumentFieldPath {
   collection: string;
   documentId: string;
-  fieldPath: string;
+  field: string;
 }
 
 /**
- * Collection summary in a media validation report
+ * Collection validation options
  */
-export interface CollectionSummary {
+export interface CollectionValidationOptions {
+  collection: string;
+  batchSize?: number;
+  mediaFieldPaths?: string[];
+  skipValidation?: boolean;
+  limit?: number;
+  validateNonImageUrls?: boolean;
+}
+
+/**
+ * Media URL validation result with document context
+ */
+export interface DocumentUrlValidationResult extends MediaValidationResult {
+  url: string;
+  collection: string;
+  documentId: string;
+  field: string;
+  mediaType: 'image' | 'video' | 'unknown';
+  isValid: boolean;
+  detectedType?: string;
+  expectedType?: string;
+}
+
+/**
+ * Document validation result
+ */
+export interface DocumentValidationResult {
+  collection: string;
+  documentId: string;
+  totalUrls: number;
+  validUrls: number;
+  invalidUrls: number;
+  missingUrls: number;
+  results: DocumentUrlValidationResult[];
+}
+
+/**
+ * Collection validation summary
+ */
+export interface CollectionValidationSummary {
   collection: string;
   totalUrls: number;
   validUrls: number;
@@ -32,9 +81,9 @@ export interface CollectionSummary {
 }
 
 /**
- * Media validation report
+ * Validation report
  */
-export interface MediaValidationReport {
+export interface ValidationReport {
   id: string;
   startTime: Date;
   endTime: Date;
@@ -44,43 +93,44 @@ export interface MediaValidationReport {
   validUrls: number;
   invalidUrls: number;
   missingUrls: number;
-  collectionSummaries: CollectionSummary[];
-  invalidResults: {
-    field: string;
-    url: string;
-    isValid: boolean;
-    status?: number;
-    statusText?: string;
-    error?: string;
-    collection: string;
-    documentId: string;
-  }[];
+  collectionSummaries: CollectionValidationSummary[];
+  invalidResults: DocumentUrlValidationResult[];
 }
 
 /**
- * Media repair report
+ * URL repair options
  */
-export interface MediaRepairReport {
+export interface UrlRepairOptions {
+  field: string;
+  collection: string;
+  documentId: string;
+  oldUrl: string;
+  newUrl: string;
+}
+
+/**
+ * URL repair result
+ */
+export interface UrlRepairResult {
+  success: boolean;
+  field: string;
+  collection: string;
+  documentId: string;
+  oldUrl: string;
+  newUrl: string;
+  error?: string;
+}
+
+/**
+ * Repair report
+ */
+export interface RepairReport {
   id: string;
-  startTime: Date;
-  endTime: Date;
-  duration: number;
-  totalRepairedUrls: number;
-  failedRepairs: number;
-  collectionSummaries: {
-    collection: string;
-    repairedUrls: number;
-    failedRepairs: number;
-  }[];
-  repairs: {
-    collection: string;
-    documentId: string;
-    field: string;
-    oldUrl: string;
-    newUrl: string;
-    success: boolean;
-    error?: string;
-  }[];
+  timestamp: Date;
+  totalAttempted: number;
+  totalSuccess: number;
+  totalFailed: number;
+  results: UrlRepairResult[];
 }
 
 /**
@@ -88,82 +138,110 @@ export interface MediaRepairReport {
  */
 export interface IMediaRepository {
   /**
-   * Save a media entry
+   * Save a media resource
    */
   saveMedia(media: Media): Promise<Media>;
   
   /**
-   * Find media by URL
+   * Get a media resource by ID
    */
-  findByUrl(url: string): Promise<Media | null>;
+  getMediaById(id: string): Promise<Media | null>;
   
   /**
-   * Delete media by URL
+   * Validate a media URL
    */
-  deleteByUrl(url: string): Promise<boolean>;
+  validateMediaUrl(url: string, mediaType?: 'image' | 'video'): Promise<MediaValidationResult>;
   
   /**
-   * Get all media URLs from all database collections
+   * Validate a document field containing a media URL
    */
-  getAllMediaUrls(): Promise<{ 
-    documentPaths: DocumentFieldPath[]; 
-    totalDocuments: number; 
-    totalFields: number; 
-  }>;
+  validateDocumentField(
+    collection: string,
+    documentId: string,
+    field: string
+  ): Promise<DocumentUrlValidationResult>;
   
   /**
-   * Validate a single media URL
+   * Validate all media URLs in a document
    */
-  validateMediaUrl(url: string, expectedType?: string): Promise<MediaValidationResult>;
+  validateDocument(
+    collection: string,
+    documentId: string
+  ): Promise<DocumentValidationResult>;
+  
+  /**
+   * Validate all media URLs in a collection
+   */
+  validateCollection(
+    options: CollectionValidationOptions
+  ): Promise<DocumentValidationResult[]>;
+  
+  /**
+   * Generate a validation report
+   */
+  generateReport(
+    results: DocumentValidationResult[],
+    startTime: Date,
+    endTime: Date
+  ): Promise<ValidationReport>;
   
   /**
    * Save a validation report
    */
-  saveValidationReport(report: Omit<MediaValidationReport, 'id'>): Promise<MediaValidationReport>;
-  
-  /**
-   * Get the most recent validation report
-   */
-  getLatestValidationReport(): Promise<MediaValidationReport | null>;
+  saveReport(report: ValidationReport): Promise<string>;
   
   /**
    * Get a validation report by ID
    */
-  getValidationReportById(reportId: string): Promise<MediaValidationReport | null>;
+  getReportById(id: string): Promise<ValidationReport | null>;
   
   /**
-   * List validation reports with pagination
+   * Get all validation reports
    */
-  listValidationReports(limit: number, offset: number): Promise<{
-    reports: MediaValidationReport[];
-    total: number;
-  }>;
+  getAllReports(): Promise<ValidationReport[]>;
   
   /**
-   * Repair invalid media URLs
+   * Repair a broken URL
    */
-  repairMediaUrls(invalidUrls: DocumentFieldPath[], placeholderUrl: string): Promise<MediaRepairReport>;
+  repairUrl(options: UrlRepairOptions): Promise<UrlRepairResult>;
   
   /**
-   * Get repair report by ID
+   * Repair multiple broken URLs
    */
-  getRepairReportById(reportId: string): Promise<MediaRepairReport | null>;
+  repairUrls(options: UrlRepairOptions[]): Promise<UrlRepairResult[]>;
   
   /**
-   * List repair reports with pagination
+   * Save a repair report
    */
-  listRepairReports(limit: number, offset: number): Promise<{
-    reports: MediaRepairReport[];
-    total: number;
-  }>;
+  saveRepairReport(report: RepairReport): Promise<string>;
   
   /**
-   * Resolve blob URLs to permanent storage URLs
+   * Get a repair report by ID
    */
-  resolveBlobUrls(blobUrls: DocumentFieldPath[]): Promise<MediaRepairReport>;
+  getRepairReportById(id: string): Promise<RepairReport | null>;
   
   /**
-   * Fix relative URLs by converting them to absolute URLs
+   * Get all repair reports
    */
-  fixRelativeUrls(relativeUrls: DocumentFieldPath[], baseUrl: string): Promise<MediaRepairReport>;
+  getAllRepairReports(): Promise<RepairReport[]>;
+  
+  /**
+   * Find all relative URLs in the database
+   */
+  findRelativeUrls(): Promise<DocumentUrlValidationResult[]>;
+  
+  /**
+   * Find all blob URLs in the database
+   */
+  findBlobUrls(): Promise<DocumentUrlValidationResult[]>;
+  
+  /**
+   * Fix relative URLs by adding base URL
+   */
+  fixRelativeUrls(baseUrl: string): Promise<UrlRepairResult[]>;
+  
+  /**
+   * Resolve blob URLs by replacing with placeholder
+   */
+  resolveBlobUrls(placeholderUrl: string): Promise<UrlRepairResult[]>;
 }

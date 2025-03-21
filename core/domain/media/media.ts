@@ -1,143 +1,294 @@
 /**
  * Media Domain Entity
  * 
- * This represents a media item in the domain model,
- * which can be an image or video.
+ * This module defines the Media entity and related types.
  */
 
-/**
- * Media types
- */
-export enum MediaType {
-  IMAGE = 'image',
-  VIDEO = 'video'
-}
+import { v4 as uuidv4 } from 'uuid';
 
 /**
- * Media entity properties
+ * Media type
+ */
+export type MediaType = 'image' | 'video' | 'audio' | 'document';
+
+/**
+ * Media source
+ */
+export type MediaSource = 'uploaded' | 'external' | 'generated';
+
+/**
+ * Storage provider
+ */
+export type StorageProvider = 'firebase' | 'cloudinary' | 'local' | 'external';
+
+/**
+ * Media status
+ */
+export type MediaStatus = 'pending' | 'processing' | 'available' | 'error';
+
+/**
+ * Media properties
  */
 export interface MediaProps {
+  id?: string;
   url: string;
   type: MediaType;
-  title?: string;
+  name?: string;
   description?: string;
-  sortOrder?: number;
-  isPrimary?: boolean;
-  uploadedAt: Date;
-  lastValidatedAt?: Date;
+  size?: number;
+  width?: number;
+  height?: number;
+  duration?: number;
+  mimeType?: string;
+  source?: MediaSource;
+  provider?: StorageProvider;
+  status?: MediaStatus;
+  ownerId?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  validatedAt?: Date;
   isValid?: boolean;
+  tags?: string[];
+  metadata?: Record<string, any>;
 }
 
 /**
  * Media entity
  */
 export class Media {
+  readonly id: string;
   readonly url: string;
   readonly type: MediaType;
-  readonly title?: string;
+  readonly name?: string;
   readonly description?: string;
-  readonly sortOrder: number;
-  readonly isPrimary: boolean;
-  readonly uploadedAt: Date;
-  readonly lastValidatedAt?: Date;
+  readonly size?: number;
+  readonly width?: number;
+  readonly height?: number;
+  readonly duration?: number;
+  readonly mimeType?: string;
+  readonly source: MediaSource;
+  readonly provider: StorageProvider;
+  readonly status: MediaStatus;
+  readonly ownerId?: string;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+  readonly validatedAt?: Date;
   readonly isValid?: boolean;
+  readonly tags: string[];
+  readonly metadata: Record<string, any>;
   
   constructor(props: MediaProps) {
+    this.id = props.id || uuidv4();
     this.url = props.url;
     this.type = props.type;
-    this.title = props.title;
+    this.name = props.name;
     this.description = props.description;
-    this.sortOrder = props.sortOrder || 0;
-    this.isPrimary = props.isPrimary || false;
-    this.uploadedAt = props.uploadedAt;
-    this.lastValidatedAt = props.lastValidatedAt;
+    this.size = props.size;
+    this.width = props.width;
+    this.height = props.height;
+    this.duration = props.duration;
+    this.mimeType = props.mimeType;
+    this.source = props.source || 'external';
+    this.provider = props.provider || 'external';
+    this.status = props.status || 'available';
+    this.ownerId = props.ownerId;
+    this.createdAt = props.createdAt || new Date();
+    this.updatedAt = props.updatedAt || new Date();
+    this.validatedAt = props.validatedAt;
     this.isValid = props.isValid;
+    this.tags = props.tags || [];
+    this.metadata = props.metadata || {};
     
-    this.validate();
+    this.validateMedia();
   }
   
   /**
-   * Validate the media entity
+   * Validate media properties
    */
-  private validate(): void {
+  private validateMedia(): void {
     if (!this.url) {
       throw new Error('Media URL is required');
     }
     
-    if (!Object.values(MediaType).includes(this.type)) {
-      throw new Error(`Invalid media type: ${this.type}`);
+    if (!this.type) {
+      throw new Error('Media type is required');
     }
     
-    if (!(this.uploadedAt instanceof Date)) {
-      throw new Error('Media uploadedAt must be a Date');
-    }
-    
-    if (this.lastValidatedAt && !(this.lastValidatedAt instanceof Date)) {
-      throw new Error('Media lastValidatedAt must be a Date');
+    if (!['image', 'video', 'audio', 'document'].includes(this.type)) {
+      throw new Error('Invalid media type');
     }
   }
   
   /**
-   * Check if the media is an image
+   * Check if media is an image
    */
   isImage(): boolean {
-    return this.type === MediaType.IMAGE;
+    return this.type === 'image';
   }
   
   /**
-   * Check if the media is a video
+   * Check if media is a video
    */
   isVideo(): boolean {
-    return this.type === MediaType.VIDEO;
+    return this.type === 'video';
   }
   
   /**
-   * Mark media as valid
+   * Check if media is an audio
    */
-  markAsValid(validatedAt: Date = new Date()): Media {
-    return new Media({
-      ...this,
-      isValid: true,
-      lastValidatedAt: validatedAt
-    });
+  isAudio(): boolean {
+    return this.type === 'audio';
   }
   
   /**
-   * Mark media as invalid
+   * Check if media is a document
    */
-  markAsInvalid(validatedAt: Date = new Date()): Media {
-    return new Media({
-      ...this,
-      isValid: false,
-      lastValidatedAt: validatedAt
-    });
+  isDocument(): boolean {
+    return this.type === 'document';
   }
   
   /**
-   * Update the media properties
+   * Check if media has been validated
+   */
+  hasBeenValidated(): boolean {
+    return this.validatedAt !== undefined;
+  }
+  
+  /**
+   * Check if media is ready (available status)
+   */
+  isReady(): boolean {
+    return this.status === 'available';
+  }
+  
+  /**
+   * Check if media is processing
+   */
+  isProcessing(): boolean {
+    return this.status === 'processing';
+  }
+  
+  /**
+   * Check if media has an error
+   */
+  hasError(): boolean {
+    return this.status === 'error';
+  }
+  
+  /**
+   * Create a new media with updated properties
    */
   update(props: Partial<MediaProps>): Media {
     return new Media({
-      url: this.url,
-      type: this.type,
-      title: this.title,
-      description: this.description,
-      sortOrder: this.sortOrder,
-      isPrimary: this.isPrimary,
-      uploadedAt: this.uploadedAt,
-      lastValidatedAt: this.lastValidatedAt,
-      isValid: this.isValid,
-      ...props
+      ...this,
+      ...props,
+      updatedAt: new Date()
     });
   }
   
   /**
-   * Create a new media entity with the same URL but different properties
+   * Create a new media marked as valid
    */
-  static createWithSameUrl(url: string, props: Omit<MediaProps, 'url'>): Media {
+  markAsValid(): Media {
+    return this.update({
+      isValid: true,
+      validatedAt: new Date(),
+      status: 'available'
+    });
+  }
+  
+  /**
+   * Create a new media marked as invalid
+   */
+  markAsInvalid(): Media {
+    return this.update({
+      isValid: false,
+      validatedAt: new Date(),
+      status: 'error'
+    });
+  }
+  
+  /**
+   * Create a new media with processing status
+   */
+  markAsProcessing(): Media {
+    return this.update({
+      status: 'processing'
+    });
+  }
+  
+  /**
+   * Create a new media with available status
+   */
+  markAsAvailable(): Media {
+    return this.update({
+      status: 'available'
+    });
+  }
+  
+  /**
+   * Create a new media with error status
+   */
+  markAsError(): Media {
+    return this.update({
+      status: 'error'
+    });
+  }
+  
+  /**
+   * Create a new media with additional tags
+   */
+  addTags(tags: string[]): Media {
+    const uniqueTags = [...new Set([...this.tags, ...tags])];
+    
+    return this.update({
+      tags: uniqueTags
+    });
+  }
+  
+  /**
+   * Create a new media with removed tags
+   */
+  removeTags(tags: string[]): Media {
+    const updatedTags = this.tags.filter(tag => !tags.includes(tag));
+    
+    return this.update({
+      tags: updatedTags
+    });
+  }
+  
+  /**
+   * Create a new media with updated metadata
+   */
+  updateMetadata(metadata: Record<string, any>): Media {
+    return this.update({
+      metadata: {
+        ...this.metadata,
+        ...metadata
+      }
+    });
+  }
+  
+  /**
+   * Create a placeholder media object
+   */
+  static createPlaceholder(type: MediaType): Media {
+    const placeholderUrl = type === 'video' 
+      ? '/video-placeholder.mp4' 
+      : '/image-placeholder.jpg';
+    
     return new Media({
-      url,
-      ...props
+      url: placeholderUrl,
+      type,
+      name: `Placeholder ${type}`,
+      source: 'generated',
+      provider: 'local',
+      status: 'available',
+      isValid: true,
+      validatedAt: new Date(),
+      metadata: {
+        isPlaceholder: true
+      }
     });
   }
 }

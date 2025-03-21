@@ -1,243 +1,379 @@
 /**
- * Google Cloud Pub/Sub Media Validation Queue
+ * PubSub Media Validation Queue
  * 
- * This class implements a message queue for media validation using Google Cloud Pub/Sub.
- * It handles the background processing of media validation tasks.
+ * This module provides a Google Cloud Pub/Sub implementation for the media validation queue.
+ * It handles sending and receiving messages for media validation and repair tasks.
  */
 
-import { PubSub, Topic, Subscription, Message } from '@google-cloud/pubsub';
-import { MediaValidationService } from '../../core/application/media/media-validation-service';
+import { PubSub, Message, Subscription } from '@google-cloud/pubsub';
+import { MediaValidationTask, MediaValidationTaskResult, UrlRepairTask, UrlRepairTaskResult } from '../../core/application/media/media-validation-worker';
 
 /**
- * Media validation message types
+ * Message types
  */
-export enum MediaValidationMessageType {
-  VALIDATE_ALL = 'validateAll',
-  VALIDATE_COLLECTION = 'validateCollection',
-  REPAIR_INVALID = 'repairInvalid',
-  RESOLVE_BLOBS = 'resolveBlobs',
-  FIX_RELATIVE_URLS = 'fixRelativeUrls',
-  VALIDATE_URL = 'validateUrl'
+export enum MessageType {
+  VALIDATION_TASK = 'VALIDATION_TASK',
+  REPAIR_TASK = 'REPAIR_TASK'
 }
 
 /**
  * Media validation message
  */
 export interface MediaValidationMessage {
-  type: MediaValidationMessageType;
-  data?: {
-    collectionName?: string;
-    url?: string;
-    reportId?: string;
-    baseUrl?: string;
-  };
-  timestamp: number;
+  id: string;
+  type: MessageType;
+  timestamp: string;
+  payload: MediaValidationTask | UrlRepairTask;
 }
 
 /**
- * Media validation queue configuration
+ * PubSub configuration
  */
-export interface PubSubMediaValidationQueueConfig {
+export interface PubSubConfig {
   projectId: string;
-  topicName: string;
-  subscriptionName: string;
-  credentialsPath?: string;
+  validationTopicName: string;
+  validationSubscriptionName: string;
+  repairTopicName: string;
+  repairSubscriptionName: string;
+  resultTopicName: string;
+  resultSubscriptionName: string;
 }
 
 /**
- * Media validation queue implementation with Google Cloud Pub/Sub
+ * Message handler
+ */
+export type MessageHandler = (message: MediaValidationMessage) => Promise<void>;
+
+/**
+ * PubSub media validation queue
  */
 export class PubSubMediaValidationQueue {
   private pubsub: PubSub;
-  private topic: Topic;
-  private subscription: Subscription;
-  private mediaValidationService: MediaValidationService;
-  private isProcessing: boolean = false;
-  private config: PubSubMediaValidationQueueConfig;
+  private validationSubscription?: Subscription;
+  private repairSubscription?: Subscription;
+  private resultSubscription?: Subscription;
+  private isListening: boolean = false;
   
-  constructor(config: PubSubMediaValidationQueueConfig, mediaValidationService: MediaValidationService) {
-    this.config = config;
-    this.mediaValidationService = mediaValidationService;
-    
-    // Initialize PubSub client
+  constructor(private readonly config: PubSubConfig) {
     this.pubsub = new PubSub({
-      projectId: config.projectId,
-      keyFilename: config.credentialsPath
+      projectId: config.projectId
     });
-    
-    this.topic = this.pubsub.topic(config.topicName);
-    this.subscription = this.topic.subscription(config.subscriptionName);
   }
   
   /**
    * Initialize the queue
    */
   async initialize(): Promise<void> {
-    // Check if topic exists, create if not
-    const [topicExists] = await this.topic.exists();
-    if (!topicExists) {
-      await this.topic.create();
-    }
-    
-    // Check if subscription exists, create if not
-    const [subscriptionExists] = await this.subscription.exists();
-    if (!subscriptionExists) {
-      await this.topic.createSubscription(this.config.subscriptionName, {
-        ackDeadlineSeconds: 300, // 5 minutes
-        expirationPolicy: { ttl: { seconds: 86400 * 30 } } // 30 days
-      });
-      this.subscription = this.topic.subscription(this.config.subscriptionName);
-    }
-  }
-  
-  /**
-   * Start processing messages from the queue
-   */
-  startProcessing(): void {
-    if (this.isProcessing) {
-      return;
-    }
-    
-    this.isProcessing = true;
-    
-    // Set up message handler
-    this.subscription.on('message', this.handleMessage.bind(this));
-    
-    // Set up error handler
-    this.subscription.on('error', (error) => {
-      console.error('PubSub subscription error:', error);
-      this.isProcessing = false;
-    });
-  }
-  
-  /**
-   * Stop processing messages from the queue
-   */
-  stopProcessing(): void {
-    if (!this.isProcessing) {
-      return;
-    }
-    
-    this.subscription.removeAllListeners('message');
-    this.subscription.removeAllListeners('error');
-    this.isProcessing = false;
-  }
-  
-  /**
-   * Handle incoming messages
-   */
-  private async handleMessage(message: Message): Promise<void> {
     try {
-      // Parse message data
-      const messageData = JSON.parse(message.data.toString()) as MediaValidationMessage;
+      // Ensure topics exist
+      await this.ensureTopicExists(this.config.validationTopicName);
+      await this.ensureTopicExists(this.config.repairTopicName);
+      await this.ensureTopicExists(this.config.resultTopicName);
       
-      // Process message based on type
-      switch (messageData.type) {
-        case MediaValidationMessageType.VALIDATE_ALL:
-          await this.mediaValidationService.startValidation();
-          break;
-          
-        case MediaValidationMessageType.VALIDATE_COLLECTION:
-          // Collection validation is handled by the worker inside startValidation
-          // It scans specific collections defined in the repository
-          await this.mediaValidationService.startValidation();
-          break;
-          
-        case MediaValidationMessageType.REPAIR_INVALID:
-          await this.mediaValidationService.repairInvalidMediaUrls();
-          break;
-          
-        case MediaValidationMessageType.RESOLVE_BLOBS:
-          await this.mediaValidationService.resolveBlobUrls();
-          break;
-          
-        case MediaValidationMessageType.FIX_RELATIVE_URLS:
-          await this.mediaValidationService.fixRelativeUrls();
-          break;
-          
-        case MediaValidationMessageType.VALIDATE_URL:
-          // Single URL validation is not exposed as a service method
-          // The worker handles this internally
-          console.log(`Received validate URL request: ${messageData.data?.url}`);
-          break;
-          
-        default:
-          console.warn(`Unknown message type: ${messageData.type}`);
-      }
+      // Ensure subscriptions exist
+      await this.ensureSubscriptionExists(
+        this.config.validationTopicName, 
+        this.config.validationSubscriptionName
+      );
+      await this.ensureSubscriptionExists(
+        this.config.repairTopicName, 
+        this.config.repairSubscriptionName
+      );
+      await this.ensureSubscriptionExists(
+        this.config.resultTopicName, 
+        this.config.resultSubscriptionName
+      );
       
-      // Acknowledge message after successful processing
-      message.ack();
+      // Set up subscription objects
+      this.validationSubscription = this.pubsub.subscription(
+        this.config.validationSubscriptionName
+      );
+      this.repairSubscription = this.pubsub.subscription(
+        this.config.repairSubscriptionName
+      );
+      this.resultSubscription = this.pubsub.subscription(
+        this.config.resultSubscriptionName
+      );
+      
+      console.log('PubSub media validation queue initialized');
     } catch (error) {
-      console.error('Error processing message:', error);
-      
-      // Negative acknowledgment to reprocess later
-      message.nack();
+      console.error('Error initializing PubSub queue:', error);
+      throw error;
     }
   }
   
   /**
-   * Publish a message to the queue
+   * Ensure a topic exists
    */
-  async publishMessage(type: MediaValidationMessageType, data?: any): Promise<string> {
-    const message: MediaValidationMessage = {
-      type,
-      data,
-      timestamp: Date.now()
+  private async ensureTopicExists(topicName: string): Promise<void> {
+    try {
+      const [exists] = await this.pubsub.topic(topicName).exists();
+      
+      if (!exists) {
+        await this.pubsub.createTopic(topicName);
+        console.log(`Topic ${topicName} created`);
+      }
+    } catch (error) {
+      console.error(`Error ensuring topic ${topicName} exists:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Ensure a subscription exists
+   */
+  private async ensureSubscriptionExists(
+    topicName: string,
+    subscriptionName: string
+  ): Promise<void> {
+    try {
+      const [exists] = await this.pubsub.subscription(subscriptionName).exists();
+      
+      if (!exists) {
+        await this.pubsub.topic(topicName).createSubscription(subscriptionName);
+        console.log(`Subscription ${subscriptionName} created`);
+      }
+    } catch (error) {
+      console.error(`Error ensuring subscription ${subscriptionName} exists:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Publish a validation task message
+   */
+  async publishValidationTask(task: MediaValidationTask): Promise<string> {
+    try {
+      const id = Date.now().toString();
+      const message: MediaValidationMessage = {
+        id,
+        type: MessageType.VALIDATION_TASK,
+        timestamp: new Date().toISOString(),
+        payload: task
+      };
+      
+      const messageId = await this.publishMessage(
+        this.config.validationTopicName,
+        message
+      );
+      
+      console.log(`Validation task published with ID: ${messageId}`);
+      return id;
+    } catch (error) {
+      console.error('Error publishing validation task:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Publish a repair task message
+   */
+  async publishRepairTask(task: UrlRepairTask): Promise<string> {
+    try {
+      const id = Date.now().toString();
+      const message: MediaValidationMessage = {
+        id,
+        type: MessageType.REPAIR_TASK,
+        timestamp: new Date().toISOString(),
+        payload: task
+      };
+      
+      const messageId = await this.publishMessage(
+        this.config.repairTopicName,
+        message
+      );
+      
+      console.log(`Repair task published with ID: ${messageId}`);
+      return id;
+    } catch (error) {
+      console.error('Error publishing repair task:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Publish a result message
+   */
+  async publishResult(
+    result: MediaValidationTaskResult | UrlRepairTaskResult
+  ): Promise<string> {
+    try {
+      const message = {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        result
+      };
+      
+      const messageId = await this.publishMessage(
+        this.config.resultTopicName,
+        message
+      );
+      
+      console.log(`Result published with ID: ${messageId}`);
+      return messageId;
+    } catch (error) {
+      console.error('Error publishing result:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Publish a message to a topic
+   */
+  private async publishMessage(
+    topicName: string,
+    message: any
+  ): Promise<string> {
+    try {
+      const data = Buffer.from(JSON.stringify(message));
+      const messageId = await this.pubsub.topic(topicName).publish(data);
+      return messageId;
+    } catch (error) {
+      console.error(`Error publishing message to ${topicName}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Start listening for validation messages
+   */
+  async startListeningForValidationTasks(handler: MessageHandler): Promise<void> {
+    if (!this.validationSubscription) {
+      throw new Error('Queue not initialized');
+    }
+    
+    this.isListening = true;
+    
+    this.validationSubscription.on('message', async (message: Message) => {
+      try {
+        const data = JSON.parse(message.data.toString());
+        await handler(data);
+        message.ack();
+      } catch (error) {
+        console.error('Error processing validation message:', error);
+        message.nack();
+      }
+    });
+    
+    this.validationSubscription.on('error', (error) => {
+      console.error('Validation subscription error:', error);
+    });
+    
+    console.log('Started listening for validation tasks');
+  }
+  
+  /**
+   * Start listening for repair messages
+   */
+  async startListeningForRepairTasks(handler: MessageHandler): Promise<void> {
+    if (!this.repairSubscription) {
+      throw new Error('Queue not initialized');
+    }
+    
+    this.isListening = true;
+    
+    this.repairSubscription.on('message', async (message: Message) => {
+      try {
+        const data = JSON.parse(message.data.toString());
+        await handler(data);
+        message.ack();
+      } catch (error) {
+        console.error('Error processing repair message:', error);
+        message.nack();
+      }
+    });
+    
+    this.repairSubscription.on('error', (error) => {
+      console.error('Repair subscription error:', error);
+    });
+    
+    console.log('Started listening for repair tasks');
+  }
+  
+  /**
+   * Start listening for result messages
+   */
+  async startListeningForResults(handler: MessageHandler): Promise<void> {
+    if (!this.resultSubscription) {
+      throw new Error('Queue not initialized');
+    }
+    
+    this.isListening = true;
+    
+    this.resultSubscription.on('message', async (message: Message) => {
+      try {
+        const data = JSON.parse(message.data.toString());
+        await handler(data);
+        message.ack();
+      } catch (error) {
+        console.error('Error processing result message:', error);
+        message.nack();
+      }
+    });
+    
+    this.resultSubscription.on('error', (error) => {
+      console.error('Result subscription error:', error);
+    });
+    
+    console.log('Started listening for results');
+  }
+  
+  /**
+   * Stop listening for messages
+   */
+  async stopListening(): Promise<void> {
+    if (!this.isListening) {
+      return;
+    }
+    
+    if (this.validationSubscription) {
+      this.validationSubscription.removeAllListeners();
+    }
+    
+    if (this.repairSubscription) {
+      this.repairSubscription.removeAllListeners();
+    }
+    
+    if (this.resultSubscription) {
+      this.resultSubscription.removeAllListeners();
+    }
+    
+    this.isListening = false;
+    console.log('Stopped listening for messages');
+  }
+  
+  /**
+   * Create a media validation worker that processes messages from the queue
+   * This is a convenience method to quickly set up a worker
+   */
+  async createWorker(
+    validationHandler: (task: MediaValidationTask) => Promise<MediaValidationTaskResult>,
+    repairHandler: (task: UrlRepairTask) => Promise<UrlRepairTaskResult>
+  ): Promise<void> {
+    await this.initialize();
+    
+    // Handler for validation tasks
+    const handleValidationMessage = async (message: MediaValidationMessage) => {
+      if (message.type === MessageType.VALIDATION_TASK) {
+        const task = message.payload as MediaValidationTask;
+        const result = await validationHandler(task);
+        await this.publishResult(result);
+      }
     };
     
-    const messageBuffer = Buffer.from(JSON.stringify(message));
-    const messageId = await this.topic.publish(messageBuffer);
+    // Handler for repair tasks
+    const handleRepairMessage = async (message: MediaValidationMessage) => {
+      if (message.type === MessageType.REPAIR_TASK) {
+        const task = message.payload as UrlRepairTask;
+        const result = await repairHandler(task);
+        await this.publishResult(result);
+      }
+    };
     
-    return messageId;
-  }
-  
-  /**
-   * Enqueue a validation task for all media
-   */
-  async enqueueValidateAll(): Promise<string> {
-    return this.publishMessage(MediaValidationMessageType.VALIDATE_ALL);
-  }
-  
-  /**
-   * Enqueue a validation task for a specific collection
-   */
-  async enqueueValidateCollection(collectionName: string): Promise<string> {
-    return this.publishMessage(MediaValidationMessageType.VALIDATE_COLLECTION, {
-      collectionName
-    });
-  }
-  
-  /**
-   * Enqueue a repair task for invalid media
-   */
-  async enqueueRepairInvalidMedia(reportId?: string): Promise<string> {
-    return this.publishMessage(MediaValidationMessageType.REPAIR_INVALID, {
-      reportId
-    });
-  }
-  
-  /**
-   * Enqueue a task to resolve blob URLs
-   */
-  async enqueueResolveBlobUrls(): Promise<string> {
-    return this.publishMessage(MediaValidationMessageType.RESOLVE_BLOBS);
-  }
-  
-  /**
-   * Enqueue a task to fix relative URLs
-   */
-  async enqueueFixRelativeUrls(baseUrl: string): Promise<string> {
-    return this.publishMessage(MediaValidationMessageType.FIX_RELATIVE_URLS, {
-      baseUrl
-    });
-  }
-  
-  /**
-   * Enqueue a validation task for a specific URL
-   */
-  async enqueueValidateUrl(url: string): Promise<string> {
-    return this.publishMessage(MediaValidationMessageType.VALIDATE_URL, {
-      url
-    });
+    // Start listening for messages
+    await this.startListeningForValidationTasks(handleValidationMessage);
+    await this.startListeningForRepairTasks(handleRepairMessage);
+    
+    console.log('Media validation worker created and started');
   }
 }

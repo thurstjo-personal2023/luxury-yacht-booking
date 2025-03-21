@@ -1,229 +1,246 @@
 /**
  * Media Validation Controller
  * 
- * This controller handles HTTP requests related to media validation.
- * It exposes RESTful endpoints for validating and repairing media.
+ * This controller handles media validation API endpoints.
+ * It serves as the interface between the HTTP layer and the application/domain layers.
  */
 
 import { Request, Response } from 'express';
-import { MediaValidationService } from '../../core/application/media/media-validation-service';
-import { MediaValidationReport, MediaRepairReport } from '../repositories/interfaces/media-repository';
-import { PubSubMediaValidationQueue } from '../../infrastructure/messaging/pubsub-media-validation-queue';
+import { IMediaRepository, ValidationReport, RepairReport } from '../repositories/interfaces/media-repository';
+import { IMediaValidationWorker, MediaValidationTask, UrlRepairTask } from '../../core/application/media/media-validation-worker';
 
 /**
  * Media validation controller
  */
 export class MediaValidationController {
-  private validationService: MediaValidationService;
-  private validationQueue: PubSubMediaValidationQueue;
-  
-  constructor(validationService: MediaValidationService, validationQueue: PubSubMediaValidationQueue) {
-    this.validationService = validationService;
-    this.validationQueue = validationQueue;
-  }
+  constructor(
+    private readonly mediaRepository: IMediaRepository,
+    private readonly mediaValidationWorker: IMediaValidationWorker
+  ) {}
   
   /**
-   * Register all routes with the Express application
+   * Validate all media across specified collections
    */
-  registerRoutes(app: any): void {
-    // Validation routes
-    app.get('/api/admin/validate-media', this.validateAllMedia.bind(this));
-    app.get('/api/admin/validate-media/status', this.getValidationStatus.bind(this));
-    app.post('/api/admin/validate-media/stop', this.stopValidation.bind(this));
-    app.post('/api/admin/validate-media/resume', this.resumeValidation.bind(this));
-    
-    // Report routes
-    app.get('/api/admin/media-validation-reports', this.getValidationReports.bind(this));
-    app.get('/api/admin/media-validation-reports/:reportId', this.getValidationReportById.bind(this));
-    
-    // Repair routes
-    app.post('/api/admin/repair-media', this.repairInvalidMedia.bind(this));
-    app.post('/api/admin/resolve-blob-urls', this.resolveBlobUrls.bind(this));
-    app.post('/api/admin/fix-relative-urls', this.fixRelativeUrls.bind(this));
-    
-    // Repair report routes
-    app.get('/api/admin/media-repair-reports', this.getRepairReports.bind(this));
-    app.get('/api/admin/media-repair-reports/:reportId', this.getRepairReportById.bind(this));
-    
-    // Comprehensive validation route
-    app.post('/api/admin/comprehensive-media-validation', this.runComprehensiveValidation.bind(this));
-    
-    // Background task routes
-    app.post('/api/admin/queue-validation', this.queueValidation.bind(this));
-    app.post('/api/admin/queue-repair', this.queueRepair.bind(this));
-  }
-  
-  /**
-   * Validate all media
-   */
-  async validateAllMedia(req: Request, res: Response): Promise<void> {
+  async validateAll(req: Request, res: Response): Promise<void> {
     try {
-      const useQueue = req.query.queue === 'true';
+      const { collections, validateNonImageUrls, autoRepair } = req.body;
       
-      if (useQueue) {
-        // Use background queue for processing
-        const messageId = await this.validationQueue.enqueueValidateAll();
-        res.status(202).json({
-          message: 'Media validation task queued successfully',
-          messageId
-        });
-      } else {
-        // Process synchronously
-        const report = await this.validationService.startValidation();
-        res.status(200).json(report);
-      }
+      // Create and queue a validation task
+      const task: MediaValidationTask = {
+        collections,
+        validateNonImageUrls,
+        autoRepair
+      };
+      
+      const taskId = await this.mediaValidationWorker.queueValidationTask(task);
+      
+      res.status(202).json({
+        success: true,
+        message: 'Media validation task queued successfully',
+        taskId
+      });
     } catch (error) {
+      console.error('Error validating media:', error);
+      
       res.status(500).json({
-        error: 'Failed to start media validation',
-        message: error.message
+        success: false,
+        message: 'Error validating media',
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }
   
   /**
-   * Get validation status
+   * Validate a specific collection
    */
-  async getValidationStatus(req: Request, res: Response): Promise<void> {
+  async validateCollection(req: Request, res: Response): Promise<void> {
     try {
-      const progress = this.validationService.getValidationProgress();
-      res.status(200).json(progress);
-    } catch (error) {
-      res.status(500).json({
-        error: 'Failed to get validation status',
-        message: error.message
-      });
-    }
-  }
-  
-  /**
-   * Stop ongoing validation
-   */
-  async stopValidation(req: Request, res: Response): Promise<void> {
-    try {
-      this.validationService.stopValidation();
+      const { collection } = req.params;
+      const { validateNonImageUrls, batchSize } = req.query;
+      
+      const results = await this.mediaValidationWorker.validateCollection(
+        collection,
+        {
+          validateNonImageUrls: validateNonImageUrls === 'true',
+          batchSize: batchSize ? Number(batchSize) : undefined
+        }
+      );
+      
+      const startTime = new Date();
+      const endTime = new Date();
+      const report = await this.mediaRepository.generateReport(results, startTime, endTime);
+      const reportId = await this.mediaRepository.saveReport(report);
+      
       res.status(200).json({
-        message: 'Validation stopped successfully'
+        success: true,
+        reportId,
+        totalDocuments: results.length,
+        totalUrls: report.totalFields,
+        validUrls: report.validUrls,
+        invalidUrls: report.invalidUrls,
+        missingUrls: report.missingUrls
       });
     } catch (error) {
-      res.status(500).json({
-        error: 'Failed to stop validation',
-        message: error.message
-      });
-    }
-  }
-  
-  /**
-   * Resume paused validation
-   */
-  async resumeValidation(req: Request, res: Response): Promise<void> {
-    try {
-      const report = await this.validationService.resumeValidation();
-      res.status(200).json(report);
-    } catch (error) {
-      res.status(500).json({
-        error: 'Failed to resume validation',
-        message: error.message
-      });
-    }
-  }
-  
-  /**
-   * Get validation reports with pagination
-   */
-  async getValidationReports(req: Request, res: Response): Promise<void> {
-    try {
-      const page = parseInt(req.query.page as string) || 1;
-      const pageSize = parseInt(req.query.pageSize as string) || 10;
+      console.error('Error validating collection:', error);
       
-      const result = await this.validationService.listValidationReports(page, pageSize);
-      res.status(200).json(result);
-    } catch (error) {
       res.status(500).json({
-        error: 'Failed to get validation reports',
-        message: error.message
+        success: false,
+        message: 'Error validating collection',
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }
   
   /**
-   * Get validation report by ID
+   * Get all validation reports
    */
-  async getValidationReportById(req: Request, res: Response): Promise<void> {
+  async getReports(req: Request, res: Response): Promise<void> {
     try {
-      const reportId = req.params.reportId;
-      const report = await this.validationService.getValidationReportById(reportId);
+      const reports = await this.mediaRepository.getAllReports();
+      
+      res.status(200).json({
+        success: true,
+        reports: reports.map(report => ({
+          id: report.id,
+          startTime: report.startTime,
+          endTime: report.endTime,
+          duration: report.duration,
+          totalDocuments: report.totalDocuments,
+          totalFields: report.totalFields,
+          validUrls: report.validUrls,
+          invalidUrls: report.invalidUrls,
+          missingUrls: report.missingUrls
+        }))
+      });
+    } catch (error) {
+      console.error('Error getting validation reports:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: 'Error getting validation reports',
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+  
+  /**
+   * Get a specific validation report
+   */
+  async getReport(req: Request, res: Response): Promise<void> {
+    try {
+      const { reportId } = req.params;
+      const report = await this.mediaRepository.getReportById(reportId);
       
       if (!report) {
         res.status(404).json({
-          error: 'Validation report not found',
-          reportId
+          success: false,
+          message: `Report not found: ${reportId}`
         });
         return;
       }
       
-      res.status(200).json(report);
+      res.status(200).json({
+        success: true,
+        report
+      });
     } catch (error) {
+      console.error('Error getting validation report:', error);
+      
       res.status(500).json({
-        error: 'Failed to get validation report',
-        message: error.message
+        success: false,
+        message: 'Error getting validation report',
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }
   
   /**
-   * Repair invalid media
+   * Repair invalid URLs identified in a report
    */
-  async repairInvalidMedia(req: Request, res: Response): Promise<void> {
+  async repairUrls(req: Request, res: Response): Promise<void> {
     try {
-      const useQueue = req.query.queue === 'true';
+      const { reportId } = req.params;
+      const { urls } = req.body;
       
-      if (useQueue) {
-        // Use background queue for processing
-        const messageId = await this.validationQueue.enqueueRepairInvalidMedia();
-        res.status(202).json({
-          message: 'Media repair task queued successfully',
-          messageId
-        });
-      } else {
-        // Process synchronously
-        await this.validationService.repairInvalidMediaUrls();
-        res.status(200).json({
-          message: 'Media repair completed successfully'
-        });
-      }
+      // Create and queue a repair task
+      const task: UrlRepairTask = {
+        reportId,
+        urls
+      };
+      
+      const taskId = await this.mediaValidationWorker.queueRepairTask(task);
+      
+      res.status(202).json({
+        success: true,
+        message: 'URL repair task queued successfully',
+        taskId
+      });
     } catch (error) {
+      console.error('Error repairing URLs:', error);
+      
       res.status(500).json({
-        error: 'Failed to repair invalid media',
-        message: error.message
+        success: false,
+        message: 'Error repairing URLs',
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }
   
   /**
-   * Resolve blob URLs
+   * Get all repair reports
    */
-  async resolveBlobUrls(req: Request, res: Response): Promise<void> {
+  async getRepairReports(req: Request, res: Response): Promise<void> {
     try {
-      const useQueue = req.query.queue === 'true';
+      const reports = await this.mediaRepository.getAllRepairReports();
       
-      if (useQueue) {
-        // Use background queue for processing
-        const messageId = await this.validationQueue.enqueueResolveBlobUrls();
-        res.status(202).json({
-          message: 'Blob URL resolution task queued successfully',
-          messageId
-        });
-      } else {
-        // Process synchronously
-        await this.validationService.resolveBlobUrls();
-        res.status(200).json({
-          message: 'Blob URL resolution completed successfully'
-        });
-      }
+      res.status(200).json({
+        success: true,
+        reports: reports.map(report => ({
+          id: report.id,
+          timestamp: report.timestamp,
+          totalAttempted: report.totalAttempted,
+          totalSuccess: report.totalSuccess,
+          totalFailed: report.totalFailed
+        }))
+      });
     } catch (error) {
+      console.error('Error getting repair reports:', error);
+      
       res.status(500).json({
-        error: 'Failed to resolve blob URLs',
-        message: error.message
+        success: false,
+        message: 'Error getting repair reports',
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+  
+  /**
+   * Get a specific repair report
+   */
+  async getRepairReport(req: Request, res: Response): Promise<void> {
+    try {
+      const { reportId } = req.params;
+      const report = await this.mediaRepository.getRepairReportById(reportId);
+      
+      if (!report) {
+        res.status(404).json({
+          success: false,
+          message: `Repair report not found: ${reportId}`
+        });
+        return;
+      }
+      
+      res.status(200).json({
+        success: true,
+        report
+      });
+    } catch (error) {
+      console.error('Error getting repair report:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: 'Error getting repair report',
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }
@@ -233,131 +250,111 @@ export class MediaValidationController {
    */
   async fixRelativeUrls(req: Request, res: Response): Promise<void> {
     try {
-      const baseUrl = req.body.baseUrl || 'https://etoile-yachts.com';
-      const useQueue = req.query.queue === 'true';
+      const result = await this.mediaValidationWorker.fixRelativeUrls();
       
-      if (useQueue) {
-        // Use background queue for processing
-        const messageId = await this.validationQueue.enqueueFixRelativeUrls(baseUrl);
-        res.status(202).json({
-          message: 'Relative URL fix task queued successfully',
-          messageId
-        });
-      } else {
-        // Process synchronously
-        await this.validationService.fixRelativeUrls();
-        res.status(200).json({
-          message: 'Relative URL fixes completed successfully'
-        });
-      }
+      res.status(200).json({
+        success: true,
+        repairedCount: result.repairedCount,
+        failedCount: result.failedCount,
+        reportId: result.reportId
+      });
     } catch (error) {
+      console.error('Error fixing relative URLs:', error);
+      
       res.status(500).json({
-        error: 'Failed to fix relative URLs',
-        message: error.message
+        success: false,
+        message: 'Error fixing relative URLs',
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }
   
   /**
-   * Get repair reports
+   * Resolve blob URLs
    */
-  async getRepairReports(req: Request, res: Response): Promise<void> {
+  async resolveBlobUrls(req: Request, res: Response): Promise<void> {
     try {
-      const page = parseInt(req.query.page as string) || 1;
-      const pageSize = parseInt(req.query.pageSize as string) || 10;
+      const result = await this.mediaValidationWorker.resolveBlobUrls();
       
-      const result = await this.validationService.listRepairReports(page, pageSize);
-      res.status(200).json(result);
+      res.status(200).json({
+        success: true,
+        repairedCount: result.repairedCount,
+        failedCount: result.failedCount,
+        reportId: result.reportId
+      });
     } catch (error) {
+      console.error('Error resolving blob URLs:', error);
+      
       res.status(500).json({
-        error: 'Failed to get repair reports',
-        message: error.message
+        success: false,
+        message: 'Error resolving blob URLs',
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }
   
   /**
-   * Get repair report by ID
+   * Get worker status
    */
-  async getRepairReportById(req: Request, res: Response): Promise<void> {
+  async getWorkerStatus(req: Request, res: Response): Promise<void> {
     try {
-      const reportId = req.params.reportId;
-      const report = await this.validationService.getRepairReportById(reportId);
+      const status = this.mediaValidationWorker.getStatus();
       
-      if (!report) {
-        res.status(404).json({
-          error: 'Repair report not found',
-          reportId
-        });
-        return;
-      }
-      
-      res.status(200).json(report);
+      res.status(200).json({
+        success: true,
+        status
+      });
     } catch (error) {
+      console.error('Error getting worker status:', error);
+      
       res.status(500).json({
-        error: 'Failed to get repair report',
-        message: error.message
+        success: false,
+        message: 'Error getting worker status',
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }
   
   /**
-   * Run comprehensive validation
+   * Start worker
    */
-  async runComprehensiveValidation(req: Request, res: Response): Promise<void> {
+  async startWorker(req: Request, res: Response): Promise<void> {
     try {
-      const result = await this.validationService.runComprehensiveValidation();
-      res.status(200).json(result);
+      await this.mediaValidationWorker.start();
+      
+      res.status(200).json({
+        success: true,
+        message: 'Media validation worker started successfully'
+      });
     } catch (error) {
+      console.error('Error starting worker:', error);
+      
       res.status(500).json({
-        error: 'Failed to run comprehensive validation',
-        message: error.message
+        success: false,
+        message: 'Error starting worker',
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }
   
   /**
-   * Queue validation task
+   * Stop worker
    */
-  async queueValidation(req: Request, res: Response): Promise<void> {
+  async stopWorker(req: Request, res: Response): Promise<void> {
     try {
-      const collectionName = req.body.collectionName;
-      let messageId: string;
+      await this.mediaValidationWorker.stop();
       
-      if (collectionName) {
-        messageId = await this.validationQueue.enqueueValidateCollection(collectionName);
-      } else {
-        messageId = await this.validationQueue.enqueueValidateAll();
-      }
-      
-      res.status(202).json({
-        message: 'Validation task queued successfully',
-        messageId
+      res.status(200).json({
+        success: true,
+        message: 'Media validation worker stopped successfully'
       });
     } catch (error) {
-      res.status(500).json({
-        error: 'Failed to queue validation task',
-        message: error.message
-      });
-    }
-  }
-  
-  /**
-   * Queue repair task
-   */
-  async queueRepair(req: Request, res: Response): Promise<void> {
-    try {
-      const reportId = req.body.reportId;
-      const messageId = await this.validationQueue.enqueueRepairInvalidMedia(reportId);
+      console.error('Error stopping worker:', error);
       
-      res.status(202).json({
-        message: 'Repair task queued successfully',
-        messageId
-      });
-    } catch (error) {
       res.status(500).json({
-        error: 'Failed to queue repair task',
-        message: error.message
+        success: false,
+        message: 'Error stopping worker',
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }

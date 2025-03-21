@@ -1,30 +1,55 @@
 /**
  * Authentication Service Interface
  * 
- * Defines the contract for authentication operations.
- * This abstract interface separates business logic from the actual authentication implementation.
+ * This interface defines the contract for authentication service implementations.
+ * It is responsible for authenticating users, managing sessions, and handling
+ * authentication-related operations.
  */
 
 import { User } from '../../domain/user/user';
 import { EmailAddress } from '../../domain/value-objects/email-address';
+import { Password } from '../../domain/value-objects/password';
+import { PhoneNumber } from '../../domain/value-objects/phone-number';
+import { UserRole } from '../../domain/user/user-role';
 
 /**
- * Authentication result containing user and token
+ * Authentication result
  */
 export interface AuthResult {
-  user: User;
-  token: string;
+  success: boolean;
+  user?: User;
+  token?: string;
   refreshToken?: string;
   expiresAt?: Date;
+  error?: string;
 }
 
 /**
- * MFA setup result
+ * Token verification result
  */
-export interface MfaSetupResult {
-  secretKey: string;
-  qrCodeUrl: string;
-  backupCodes?: string[];
+export interface TokenVerificationResult {
+  isValid: boolean;
+  userId?: string;
+  email?: string;
+  role?: UserRole;
+  error?: string;
+}
+
+/**
+ * Email verification options
+ */
+export interface EmailVerificationOptions {
+  redirectUrl?: string;
+  templateId?: string;
+}
+
+/**
+ * Password reset options
+ */
+export interface PasswordResetOptions {
+  redirectUrl?: string;
+  templateId?: string;
+  expiration?: number; // In seconds
 }
 
 /**
@@ -32,87 +57,94 @@ export interface MfaSetupResult {
  */
 export interface IAuthService {
   /**
-   * Register a new user with email and password
+   * Register a new user
    */
-  registerWithEmailAndPassword(
-    email: EmailAddress, 
-    password: string, 
-    userData: Partial<Omit<User, 'id' | 'email' | 'emailVerified' | 'createdAt' | 'updatedAt'>>
-  ): Promise<User>;
+  register(
+    email: EmailAddress,
+    password: Password,
+    firstName: string,
+    lastName: string,
+    role: UserRole,
+    phone?: PhoneNumber
+  ): Promise<AuthResult>;
   
   /**
    * Login with email and password
    */
-  loginWithEmailAndPassword(
-    email: EmailAddress, 
-    password: string
-  ): Promise<AuthResult>;
+  login(email: EmailAddress | string, password: string): Promise<AuthResult>;
   
   /**
-   * Login with OAuth provider
-   */
-  loginWithOAuth(
-    provider: 'google' | 'facebook' | 'apple',
-    token: string
-  ): Promise<AuthResult>;
-  
-  /**
-   * Verify email address
-   */
-  verifyEmail(verificationToken: string): Promise<boolean>;
-  
-  /**
-   * Send password reset email
-   */
-  sendPasswordResetEmail(email: EmailAddress): Promise<boolean>;
-  
-  /**
-   * Reset password with token
-   */
-  resetPassword(token: string, newPassword: string): Promise<boolean>;
-  
-  /**
-   * Change password (when user is logged in)
-   */
-  changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean>;
-  
-  /**
-   * Log out the current user
+   * Logout a user
    */
   logout(token: string): Promise<boolean>;
   
   /**
-   * Refresh authentication token
+   * Refresh an authentication token
    */
-  refreshToken(refreshToken: string): Promise<Omit<AuthResult, 'user'>>;
+  refreshToken(refreshToken: string): Promise<AuthResult>;
   
   /**
-   * Get current user from token
+   * Verify an authentication token
    */
-  getUserFromToken(token: string): Promise<User | null>;
+  verifyToken(token: string): Promise<TokenVerificationResult>;
   
   /**
-   * Setup multi-factor authentication
+   * Send an email verification link
    */
-  setupMfa(userId: string): Promise<MfaSetupResult>;
+  sendEmailVerification(
+    userId: string,
+    options?: EmailVerificationOptions
+  ): Promise<boolean>;
   
   /**
-   * Verify MFA code during setup
+   * Verify an email verification token
    */
-  verifyMfaSetup(userId: string, code: string): Promise<boolean>;
+  verifyEmail(token: string): Promise<boolean>;
   
   /**
-   * Verify MFA code during login
+   * Send a password reset email
    */
-  verifyMfaLogin(userId: string, code: string): Promise<AuthResult>;
+  sendPasswordReset(
+    email: EmailAddress | string,
+    options?: PasswordResetOptions
+  ): Promise<boolean>;
   
   /**
-   * Disable MFA for a user
+   * Reset a password using a reset token
    */
-  disableMfa(userId: string, adminId?: string): Promise<boolean>;
+  resetPassword(token: string, newPassword: Password): Promise<boolean>;
   
   /**
-   * Check if a token is valid
+   * Change a user's password
    */
-  validateToken(token: string): Promise<boolean>;
+  changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: Password
+  ): Promise<boolean>;
+  
+  /**
+   * Update a user's email
+   */
+  updateEmail(userId: string, newEmail: EmailAddress): Promise<boolean>;
+  
+  /**
+   * Get the currently authenticated user
+   */
+  getCurrentUser(token: string): Promise<User | null>;
+  
+  /**
+   * Check if a user is authenticated
+   */
+  isAuthenticated(token: string): Promise<boolean>;
+  
+  /**
+   * Check if a user has a specific role
+   */
+  hasRole(token: string, role: UserRole): Promise<boolean>;
+  
+  /**
+   * Check if a user has a specific permission
+   */
+  hasPermission(token: string, permission: string): Promise<boolean>;
 }
