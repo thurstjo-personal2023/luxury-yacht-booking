@@ -3,7 +3,6 @@
  * 
  * This module registers admin profile management routes for the Express server.
  */
-
 import { Request, Response, NextFunction, Express } from 'express';
 import { adminDb, verifyAuth } from './firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
@@ -12,39 +11,39 @@ import { Timestamp } from 'firebase-admin/firestore';
  * Verify that a user has admin privileges
  */
 export const verifyAdminRole = async (req: Request, res: Response, next: NextFunction) => {
-  // First check regular authentication
-  verifyAuth(req, res, async () => {
-    try {
-      // Extract user claims from request
+  try {
+    // Verify authentication first
+    verifyAuth(req, res, async () => {
       const uid = req.user?.uid;
       
       if (!uid) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       
-      // Check if user has admin role
-      const userDoc = await adminDb.collection('admin_users').doc(uid as string).get();
+      // Get admin user document
+      const adminDoc = await adminDb.collection('admin_users').doc(uid).get();
       
-      // Check if admin user exists and has active status
-      if (!userDoc.exists) {
-        return res.status(403).json({ error: 'Forbidden: Not an administrator' });
+      if (!adminDoc.exists) {
+        return res.status(403).json({ error: 'Forbidden - not an administrator' });
       }
       
-      const userData = userDoc.data();
-      if (userData?.status !== 'active') {
+      const adminData = adminDoc.data();
+      
+      // Check approval status
+      if (adminData?.status !== 'active') {
         return res.status(403).json({ 
-          error: 'Forbidden: Admin account not active', 
-          status: userData?.status || 'unknown'
+          error: 'Forbidden - admin account not active',
+          status: adminData?.status
         });
       }
       
-      // User is authenticated and has admin role, proceed
+      // Admin is verified, continue
       next();
-    } catch (error) {
-      console.error('Error verifying admin role:', error);
-      return res.status(500).json({ error: 'Internal server error' });
-    }
-  });
+    });
+  } catch (error) {
+    console.error('Error verifying admin role:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 };
 
 /**
@@ -57,51 +56,88 @@ export function registerAdminProfileRoutes(app: Express) {
    */
   app.post('/api/admin/create-profile', verifyAuth, async (req: Request, res: Response) => {
     try {
-      const { name, email, phone, invitationId, status = 'pending_approval' } = req.body;
       const uid = req.user?.uid;
       
       if (!uid) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       
-      // Validate required fields
-      if (!name || !email) {
-        return res.status(400).json({ error: 'Name and email are required' });
+      // Check if user already has an admin profile
+      const existingProfile = await adminDb.collection('admin_users').doc(uid).get();
+      
+      if (existingProfile.exists) {
+        return res.status(409).json({ error: 'Admin profile already exists' });
       }
       
-      // Create the admin user document
-      const adminUserData = {
+      const { 
+        fullName, 
+        phone, 
+        jobTitle, 
+        department,
+        invitationCode 
+      } = req.body;
+      
+      // Validate required fields
+      if (!fullName || !phone || !invitationCode) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      
+      // Verify invitation code
+      const inviteSnapshot = await adminDb.collection('admin_invitations')
+        .where('code', '==', invitationCode)
+        .where('status', '==', 'pending')
+        .get();
+      
+      if (inviteSnapshot.empty) {
+        return res.status(400).json({ error: 'Invalid or expired invitation code' });
+      }
+      
+      const inviteDoc = inviteSnapshot.docs[0];
+      const inviteData = inviteDoc.data();
+      
+      // Create admin profile
+      await adminDb.collection('admin_users').doc(uid).set({
         uid,
-        name,
-        email,
-        phone: phone || null,
-        role: 'admin',
+        fullName,
+        phone,
+        jobTitle: jobTitle || '',
+        department: department || '',
+        email: req.user?.email || '',
+        role: inviteData.role || 'admin',
+        permissions: inviteData.permissions || [],
+        status: 'pending_approval', // Needs approval before becoming active
+        invitedBy: inviteData.createdBy,
+        mfaEnabled: false,
+        mfaVerified: false,
         createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-        status,  // pending_approval, active, or suspended
-        invitationId: invitationId || null,
-        approvedBy: null,
-        approvedAt: null,
-        lastLoginAt: null,
-        permissions: ['view_admin_dashboard'],  // Default basic permissions
-        mfaEnabled: false,  // Will be set to true during MFA setup
-      };
+        updatedAt: Timestamp.now()
+      });
       
-      // Save to admin_users collection
-      await adminDb.collection('admin_users').doc(uid as string).set(adminUserData);
+      // Update invitation status
+      await adminDb.collection('admin_invitations').doc(inviteDoc.id).update({
+        status: 'used',
+        usedBy: uid,
+        usedAt: Timestamp.now()
+      });
       
-      // Return success
-      res.status(201).json({
+      // Create approval request
+      await adminDb.collection('admin_approval_requests').add({
+        adminId: uid,
+        fullName,
+        email: req.user?.email || '',
+        role: inviteData.role || 'admin',
+        status: 'pending',
+        invitedBy: inviteData.createdBy,
+        createdAt: Timestamp.now()
+      });
+      
+      res.status(201).json({ 
         success: true,
-        message: 'Admin profile created successfully',
-        userId: uid
+        message: 'Admin profile created and awaiting approval'
       });
     } catch (error) {
       console.error('Error creating admin profile:', error);
-      res.status(500).json({ 
-        error: 'Failed to create admin profile', 
-        details: error instanceof Error ? error.message : String(error)
-      });
+      res.status(500).json({ error: 'Failed to create admin profile' });
     }
   });
 
@@ -117,38 +153,23 @@ export function registerAdminProfileRoutes(app: Express) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       
-      // Get the admin profile
-      const adminDoc = await adminDb.collection('admin_users').doc(uid as string).get();
+      // Get admin user document
+      const adminDoc = await adminDb.collection('admin_users').doc(uid).get();
       
       if (!adminDoc.exists) {
         return res.status(404).json({ error: 'Admin profile not found' });
       }
       
-      // Return the admin profile with sensitive fields removed
+      // Return profile data (excluding sensitive fields)
       const adminData = adminDoc.data();
-      const safeAdminData = {
-        uid: adminData?.uid,
-        name: adminData?.name,
-        email: adminData?.email,
-        phone: adminData?.phone,
-        role: adminData?.role,
-        status: adminData?.status,
-        createdAt: adminData?.createdAt,
-        lastLoginAt: adminData?.lastLoginAt,
-        permissions: adminData?.permissions,
-        mfaEnabled: adminData?.mfaEnabled,
-      };
       
-      res.json({
-        success: true,
-        profile: safeAdminData
-      });
+      // Filter out sensitive data
+      delete adminData.mfaSecret;
+      
+      res.json(adminData);
     } catch (error) {
-      console.error('Error retrieving admin profile:', error);
-      res.status(500).json({ 
-        error: 'Failed to retrieve admin profile',
-        details: error instanceof Error ? error.message : String(error)
-      });
+      console.error('Error getting admin profile:', error);
+      res.status(500).json({ error: 'Failed to get admin profile' });
     }
   });
 
@@ -164,29 +185,34 @@ export function registerAdminProfileRoutes(app: Express) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       
-      const { name, phone } = req.body;
+      const { 
+        fullName, 
+        phone, 
+        jobTitle, 
+        department 
+      } = req.body;
       
-      // Create update object with only allowed fields
-      const updateData: any = {
+      // Validate required fields
+      if (!fullName || !phone) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      
+      // Update profile
+      await adminDb.collection('admin_users').doc(uid).update({
+        fullName,
+        phone,
+        jobTitle: jobTitle || '',
+        department: department || '',
         updatedAt: Timestamp.now()
-      };
+      });
       
-      if (name) updateData.name = name;
-      if (phone) updateData.phone = phone;
-      
-      // Update the admin profile
-      await adminDb.collection('admin_users').doc(uid as string).update(updateData);
-      
-      res.json({
+      res.json({ 
         success: true,
-        message: 'Admin profile updated successfully'
+        message: 'Profile updated successfully'
       });
     } catch (error) {
       console.error('Error updating admin profile:', error);
-      res.status(500).json({ 
-        error: 'Failed to update admin profile',
-        details: error instanceof Error ? error.message : String(error)
-      });
+      res.status(500).json({ error: 'Failed to update admin profile' });
     }
   });
 
@@ -200,45 +226,31 @@ export function registerAdminProfileRoutes(app: Express) {
       const uid = req.user?.uid;
       
       if (!uid) {
-        return res.status(401).json({ error: 'Unauthorized: User ID missing' });
+        return res.status(401).json({ error: 'Unauthorized' });
       }
       
-      // Verify super admin status
-      const adminDoc = await adminDb.collection('admin_users').doc(uid as string).get();
-      const adminData = adminDoc.data();
+      // Verify super admin role
+      const adminDoc = await adminDb.collection('admin_users').doc(uid).get();
       
-      if (!adminData?.permissions.includes('approve_admins')) {
-        return res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
+      if (!adminDoc.exists || adminDoc.data().role !== 'super_admin') {
+        return res.status(403).json({ error: 'Forbidden - requires super admin privileges' });
       }
       
-      // Get pending admin profiles
-      const pendingAdmins = await adminDb.collection('admin_users')
-        .where('status', '==', 'pending_approval')
-        .orderBy('createdAt', 'asc')
+      // Get pending approval requests
+      const approvalSnapshot = await adminDb.collection('admin_approval_requests')
+        .where('status', '==', 'pending')
+        .orderBy('createdAt', 'desc')
         .get();
       
-      const pendingProfiles = pendingAdmins.docs.map(doc => {
-        const data = doc.data();
-        return {
-          uid: data.uid,
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          createdAt: data.createdAt,
-          invitationId: data.invitationId
-        };
-      });
+      const pendingApprovals = approvalSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
       
-      res.json({
-        success: true,
-        pendingProfiles
-      });
+      res.json(pendingApprovals);
     } catch (error) {
-      console.error('Error retrieving pending admin approvals:', error);
-      res.status(500).json({ 
-        error: 'Failed to retrieve pending admin approvals',
-        details: error instanceof Error ? error.message : String(error)
-      });
+      console.error('Error getting pending approvals:', error);
+      res.status(500).json({ error: 'Failed to get pending approvals' });
     }
   });
 
@@ -248,57 +260,81 @@ export function registerAdminProfileRoutes(app: Express) {
    */
   app.post('/api/admin/process-approval', verifyAdminRole, async (req: Request, res: Response) => {
     try {
-      const approverUid = req.user?.uid;
-      const { adminUid, status, notes } = req.body;
+      const uid = req.user?.uid;
       
-      if (!approverUid) {
-        return res.status(401).json({ error: 'Unauthorized: User ID missing' });
+      if (!uid) {
+        return res.status(401).json({ error: 'Unauthorized' });
       }
       
-      if (!adminUid || !status) {
-        return res.status(400).json({ error: 'Admin UID and status are required' });
+      // Verify super admin role
+      const adminDoc = await adminDb.collection('admin_users').doc(uid).get();
+      
+      if (!adminDoc.exists || adminDoc.data().role !== 'super_admin') {
+        return res.status(403).json({ error: 'Forbidden - requires super admin privileges' });
       }
       
-      if (status !== 'active' && status !== 'rejected') {
-        return res.status(400).json({ error: 'Status must be either "active" or "rejected"' });
+      const { approvalId, adminId, action, notes } = req.body;
+      
+      // Validate required fields
+      if (!approvalId || !adminId || !action) {
+        return res.status(400).json({ error: 'Missing required fields' });
       }
       
-      // Verify super admin status
-      const approverDoc = await adminDb.collection('admin_users').doc(approverUid as string).get();
-      const approverData = approverDoc.data();
-      
-      if (!approverData?.permissions.includes('approve_admins')) {
-        return res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
+      if (action !== 'approve' && action !== 'reject') {
+        return res.status(400).json({ error: 'Invalid action' });
       }
       
-      // Check if admin exists
-      const adminDoc = await adminDb.collection('admin_users').doc(adminUid as string).get();
+      // Get the approval request
+      const approvalDoc = await adminDb.collection('admin_approval_requests').doc(approvalId).get();
       
-      if (!adminDoc.exists) {
+      if (!approvalDoc.exists) {
+        return res.status(404).json({ error: 'Approval request not found' });
+      }
+      
+      if (approvalDoc.data().status !== 'pending') {
+        return res.status(409).json({ error: 'Approval request already processed' });
+      }
+      
+      // Get the admin user
+      const targetAdminDoc = await adminDb.collection('admin_users').doc(adminId).get();
+      
+      if (!targetAdminDoc.exists) {
         return res.status(404).json({ error: 'Admin user not found' });
       }
       
-      // Update admin status
-      await adminDb.collection('admin_users').doc(adminUid as string).update({
-        status,
-        approvedBy: approverUid,
-        approvedAt: Timestamp.now(),
-        approvalNotes: notes || null,
+      // Update approval request
+      await adminDb.collection('admin_approval_requests').doc(approvalId).update({
+        status: action === 'approve' ? 'approved' : 'rejected',
+        processedBy: uid,
+        processedAt: Timestamp.now(),
+        notes: notes || ''
+      });
+      
+      // Update admin user status
+      await adminDb.collection('admin_users').doc(adminId).update({
+        status: action === 'approve' ? 'active' : 'rejected',
         updatedAt: Timestamp.now()
       });
       
-      // TODO: Send notification email to the admin
-
-      res.json({
+      // Log the approval action
+      await adminDb.collection('admin_logs').add({
+        action: `admin_${action}`,
+        performedBy: uid,
+        targetAdminId: adminId,
+        timestamp: Timestamp.now(),
+        details: {
+          approvalId,
+          notes: notes || ''
+        }
+      });
+      
+      res.json({ 
         success: true,
-        message: `Admin account ${status === 'active' ? 'approved' : 'rejected'} successfully`
+        message: `Admin account ${action === 'approve' ? 'approved' : 'rejected'} successfully`
       });
     } catch (error) {
       console.error('Error processing admin approval:', error);
-      res.status(500).json({ 
-        error: 'Failed to process admin approval',
-        details: error instanceof Error ? error.message : String(error)
-      });
+      res.status(500).json({ error: 'Failed to process admin approval' });
     }
   });
 
@@ -314,22 +350,26 @@ export function registerAdminProfileRoutes(app: Express) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
       
-      // Update MFA status
-      await adminDb.collection('admin_users').doc(uid as string).update({
-        mfaEnabled: true,
+      const { phone, verificationCode, mfaEnabled } = req.body;
+      
+      // For now, just simulate MFA setup
+      // In a real implementation, this would verify the OTP and set up MFA
+
+      // Update admin profile to mark MFA as set up
+      await adminDb.collection('admin_users').doc(uid).update({
+        phone: phone || null,
+        mfaEnabled: !!mfaEnabled,
+        mfaVerified: !!mfaEnabled,
         updatedAt: Timestamp.now()
       });
       
-      res.json({
+      res.json({ 
         success: true,
         message: 'MFA setup completed successfully'
       });
     } catch (error) {
       console.error('Error setting up MFA:', error);
-      res.status(500).json({ 
-        error: 'Failed to setup MFA',
-        details: error instanceof Error ? error.message : String(error)
-      });
+      res.status(500).json({ error: 'Failed to set up MFA' });
     }
   });
 }
