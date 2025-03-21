@@ -31,28 +31,44 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import request from 'supertest';
 import { registerAdminProfileRoutes } from '../server/admin-profile-routes';
 
+// Define test user data
+const TEST_ADMIN_USER = {
+  email: `admin-${Date.now()}@example.com`,
+  password: 'Admin1234!',
+  role: 'admin',
+  name: 'Test Admin'
+};
+
+const TEST_SUPER_ADMIN = {
+  email: `super-admin-${Date.now()}@example.com`,
+  password: 'Super1234!',
+  role: 'superAdmin',
+  name: 'Test Super Admin',
+  permissions: ['approve_admins', 'create_invitations']
+};
+
 describe('Administrator Registration & Validation', () => {
-  // Test environment variables
-  let firebaseApp: firebase.FirebaseApp;
+  // Firebase instances
+  let app: firebase.FirebaseApp;
   let auth: Auth;
   let db: Firestore;
   let expressApp: Express;
   
-  // Setup before all tests
+  // Set up Firebase before tests
   beforeAll(async () => {
     // Initialize Firebase with test config
-    firebaseApp = firebase.initializeApp({
+    app = firebase.initializeApp({
       apiKey: 'fake-api-key',
       authDomain: 'localhost',
-      projectId: 'etoile-yachts-test',
+      projectId: 'etoile-yachts',
       storageBucket: '',
       messagingSenderId: '',
       appId: ''
     });
     
     // Get auth and Firestore instances
-    auth = getAuth(firebaseApp);
-    db = getFirestore(firebaseApp);
+    auth = getAuth(app);
+    db = getFirestore(app);
     
     // Connect to Firebase Auth Emulator
     connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
@@ -71,46 +87,6 @@ describe('Administrator Registration & Validation', () => {
     const mockVerifyAuth = (req: Request, res: Response, next: NextFunction) => {
       req.user = { uid: 'test-user-id', role: 'admin' };
       next();
-    };
-    
-    // Mock the adminDb object used in routes
-    const mockAdminDb = {
-      collection: (collectionName: string) => {
-        return {
-          doc: (docId: string) => {
-            return {
-              get: jest.fn().mockResolvedValue({
-                exists: true,
-                data: () => ({
-                  uid: docId,
-                  role: 'admin',
-                  status: 'active',
-                  permissions: ['approve_admins']
-                })
-              }),
-              set: jest.fn().mockResolvedValue(true),
-              update: jest.fn().mockResolvedValue(true)
-            };
-          },
-          where: () => ({
-            limit: () => ({
-              get: jest.fn().mockResolvedValue({
-                empty: false,
-                docs: [{
-                  ref: {
-                    update: jest.fn().mockResolvedValue(true)
-                  },
-                  data: () => ({
-                    token: 'valid-test-token',
-                    email: 'test-admin@example.com',
-                    role: 'admin'
-                  })
-                }]
-              })
-            })
-          })
-        };
-      }
     };
     
     // Register routes with mock dependencies
@@ -155,14 +131,17 @@ describe('Administrator Registration & Validation', () => {
   
   // Cleanup after all tests
   afterAll(async () => {
+    // Sign out after tests
     await signOut(auth).catch(() => {});
-    // Any additional cleanup needed
+    
+    // In Firebase v9, we don't need to explicitly delete the app
+    // as it will be cleaned up when the tests complete
   });
   
   // Reset before each test
   beforeEach(async () => {
+    // Sign out before each test
     await signOut(auth).catch(() => {});
-    // Clear relevant collections for clean testing state
   });
   
   // Mock the Firebase Cloud Functions

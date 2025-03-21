@@ -70,11 +70,18 @@ const config: Config.InitialOptions = {
       displayName: 'emulator',
       testMatch: [
         '<rootDir>/tests/auth.test.ts',
-        '<rootDir>/tests/firestore.test.ts',
-        '<rootDir>/tests/admin-registration.test.ts'
+        '<rootDir>/tests/firestore.test.ts'
       ],
       testEnvironment: 'node',
       setupFilesAfterEnv: ['<rootDir>/tests/setup-emulator.ts'],
+    },
+    {
+      displayName: 'admin',
+      testMatch: [
+        '<rootDir>/tests/admin-registration.test.ts'
+      ],
+      testEnvironment: 'node',
+      setupFilesAfterEnv: ['<rootDir>/tests/setup-node.ts'],
     }
   ],
   globals: {
