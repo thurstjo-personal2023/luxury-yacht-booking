@@ -7,130 +7,110 @@ import { MfaStatus, MfaStatusType } from '../../../../../core/domain/admin/mfa-s
 describe('MfaStatus Value Object', () => {
   it('should create valid MFA status objects', () => {
     // Arrange & Act
-    const disabled = new MfaStatus(MfaStatusType.DISABLED);
     const enabled = new MfaStatus(MfaStatusType.ENABLED);
+    const disabled = new MfaStatus(MfaStatusType.DISABLED);
     const required = new MfaStatus(MfaStatusType.REQUIRED);
-    const pendingSetup = new MfaStatus(MfaStatusType.PENDING_SETUP);
     
     // Assert
-    expect(disabled).toBeInstanceOf(MfaStatus);
     expect(enabled).toBeInstanceOf(MfaStatus);
+    expect(disabled).toBeInstanceOf(MfaStatus);
     expect(required).toBeInstanceOf(MfaStatus);
-    expect(pendingSetup).toBeInstanceOf(MfaStatus);
-    
-    expect(disabled.type).toBe(MfaStatusType.DISABLED);
-    expect(enabled.type).toBe(MfaStatusType.ENABLED);
-    expect(required.type).toBe(MfaStatusType.REQUIRED);
-    expect(pendingSetup.type).toBe(MfaStatusType.PENDING_SETUP);
   });
   
-  it('should correctly handle setup date and last verified date', () => {
+  it('should convert status to strings', () => {
     // Arrange
-    const setupDate = new Date();
-    const lastVerifiedDate = new Date();
-    
-    // Act
-    const status = new MfaStatus(
-      MfaStatusType.ENABLED, 
-      setupDate, 
-      lastVerifiedDate
-    );
-    
-    // Assert
-    expect(status.setupDate).toEqual(setupDate);
-    expect(status.lastVerifiedDate).toEqual(lastVerifiedDate);
-  });
-  
-  it('should correctly identify enabled status', () => {
-    // Arrange
-    const disabled = new MfaStatus(MfaStatusType.DISABLED);
     const enabled = new MfaStatus(MfaStatusType.ENABLED);
+    const disabled = new MfaStatus(MfaStatusType.DISABLED);
     const required = new MfaStatus(MfaStatusType.REQUIRED);
-    const pendingSetup = new MfaStatus(MfaStatusType.PENDING_SETUP);
     
     // Act & Assert
-    expect(disabled.isEnabled()).toBe(false);
+    expect(enabled.toString()).toBe(MfaStatusType.ENABLED);
+    expect(disabled.toString()).toBe(MfaStatusType.DISABLED);
+    expect(required.toString()).toBe(MfaStatusType.REQUIRED);
+    
+    expect(enabled.toString()).not.toBe(MfaStatusType.DISABLED);
+    expect(disabled.toString()).not.toBe(MfaStatusType.REQUIRED);
+    expect(required.toString()).not.toBe(MfaStatusType.ENABLED);
+  });
+  
+  it('should check if MFA is enabled', () => {
+    // Arrange
+    const enabled = new MfaStatus(MfaStatusType.ENABLED);
+    const disabled = new MfaStatus(MfaStatusType.DISABLED);
+    const required = new MfaStatus(MfaStatusType.REQUIRED);
+    
+    // Act & Assert
     expect(enabled.isEnabled()).toBe(true);
-    expect(required.isEnabled()).toBe(true);
-    expect(pendingSetup.isEnabled()).toBe(false);
+    expect(disabled.isEnabled()).toBe(false);
+    expect(required.isEnabled()).toBe(false);
   });
   
-  it('should correctly identify required status', () => {
+  it('should check if MFA is disabled', () => {
     // Arrange
-    const disabled = new MfaStatus(MfaStatusType.DISABLED);
     const enabled = new MfaStatus(MfaStatusType.ENABLED);
+    const disabled = new MfaStatus(MfaStatusType.DISABLED);
     const required = new MfaStatus(MfaStatusType.REQUIRED);
     
     // Act & Assert
-    expect(disabled.isRequired()).toBe(false);
+    expect(enabled.isDisabled()).toBe(false);
+    expect(disabled.isDisabled()).toBe(true);
+    expect(required.isDisabled()).toBe(false);
+  });
+  
+  it('should check if MFA is required', () => {
+    // Arrange
+    const enabled = new MfaStatus(MfaStatusType.ENABLED);
+    const disabled = new MfaStatus(MfaStatusType.DISABLED);
+    const required = new MfaStatus(MfaStatusType.REQUIRED);
+    
+    // Act & Assert
     expect(enabled.isRequired()).toBe(false);
+    expect(disabled.isRequired()).toBe(false);
     expect(required.isRequired()).toBe(true);
   });
   
-  it('should correctly identify pending setup status', () => {
+  it('should create status from string values', () => {
+    // Arrange & Act
+    const enabled = MfaStatus.fromString(MfaStatusType.ENABLED);
+    const disabled = MfaStatus.fromString(MfaStatusType.DISABLED);
+    const required = MfaStatus.fromString(MfaStatusType.REQUIRED);
+    
+    // Assert
+    expect(enabled).toBeInstanceOf(MfaStatus);
+    expect(disabled).toBeInstanceOf(MfaStatus);
+    expect(required).toBeInstanceOf(MfaStatus);
+  });
+  
+  it('should throw error for invalid status strings', () => {
+    // Arrange & Act & Assert
+    expect(() => {
+      MfaStatus.fromString('invalid_status');
+    }).toThrow('Invalid MFA status: invalid_status');
+  });
+  
+  it('should correctly serialize to and deserialize from data', () => {
     // Arrange
+    const original = new MfaStatus(MfaStatusType.ENABLED);
+    
+    // Act
+    const data = original.toData();
+    const recreated = MfaStatus.fromData(data);
+    
+    // Assert
+    expect(recreated.type).toBe(original.type);
+    expect(recreated.isEnabled()).toBe(original.isEnabled());
+    expect(recreated.toString()).toBe(original.toString());
+  });
+  
+  it('should handle equality comparisons correctly', () => {
+    // Arrange
+    const enabled1 = new MfaStatus(MfaStatusType.ENABLED);
+    const enabled2 = new MfaStatus(MfaStatusType.ENABLED);
     const disabled = new MfaStatus(MfaStatusType.DISABLED);
-    const pendingSetup = new MfaStatus(MfaStatusType.PENDING_SETUP);
     
     // Act & Assert
-    expect(disabled.isPendingSetup()).toBe(false);
-    expect(pendingSetup.isPendingSetup()).toBe(true);
-  });
-  
-  it('should create MFA status from data object', () => {
-    // Arrange
-    const setupDate = new Date();
-    const lastVerifiedDate = new Date();
-    const data = {
-      type: MfaStatusType.ENABLED,
-      setupDate: setupDate.toISOString(),
-      lastVerifiedDate: lastVerifiedDate.toISOString()
-    };
-    
-    // Act
-    const status = MfaStatus.fromData(data);
-    
-    // Assert
-    expect(status).toBeInstanceOf(MfaStatus);
-    expect(status.type).toBe(MfaStatusType.ENABLED);
-    expect(status.setupDate?.getTime()).toBe(setupDate.getTime());
-    expect(status.lastVerifiedDate?.getTime()).toBe(lastVerifiedDate.getTime());
-  });
-  
-  it('should handle Date objects in fromData', () => {
-    // Arrange
-    const setupDate = new Date();
-    const lastVerifiedDate = new Date();
-    const data = {
-      type: MfaStatusType.ENABLED,
-      setupDate: setupDate,
-      lastVerifiedDate: lastVerifiedDate
-    };
-    
-    // Act
-    const status = MfaStatus.fromData(data);
-    
-    // Assert
-    expect(status.setupDate?.getTime()).toBe(setupDate.getTime());
-    expect(status.lastVerifiedDate?.getTime()).toBe(lastVerifiedDate.getTime());
-  });
-  
-  it('should convert to a data object', () => {
-    // Arrange
-    const setupDate = new Date();
-    const lastVerifiedDate = new Date();
-    const status = new MfaStatus(
-      MfaStatusType.ENABLED, 
-      setupDate, 
-      lastVerifiedDate
-    );
-    
-    // Act
-    const data = status.toData();
-    
-    // Assert
-    expect(data.type).toBe(MfaStatusType.ENABLED);
-    expect(data.setupDate).toBe(setupDate.toISOString());
-    expect(data.lastVerifiedDate).toBe(lastVerifiedDate.toISOString());
+    expect(enabled1.equals(enabled2)).toBe(true);
+    expect(enabled1.equals(disabled)).toBe(false);
+    expect(disabled.equals(enabled1)).toBe(false);
   });
 });

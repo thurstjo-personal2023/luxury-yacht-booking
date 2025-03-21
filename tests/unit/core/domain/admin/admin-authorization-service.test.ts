@@ -2,10 +2,11 @@
  * Unit tests for AdminAuthorizationService
  */
 import { describe, expect, it, beforeEach } from '@jest/globals';
-import { AdminAuthorizationService } from '../../../../../core/domain/admin/admin-authorization-service';
+import { AdminAuthorizationService, AuthorizationResult } from '../../../../../core/domain/admin/admin-authorization-service';
 import { AdminUser } from '../../../../../core/domain/admin/admin-user';
 import { AdminRole } from '../../../../../core/domain/admin/admin-role';
-import { Permission } from '../../../../../core/domain/admin/permission';
+import { Permission, PermissionCategory, PermissionAction } from '../../../../../core/domain/admin/permission';
+import { MfaStatus } from '../../../../../core/domain/admin/mfa-status';
 
 describe('AdminAuthorizationService', () => {
   let authorizationService: AdminAuthorizationService;
@@ -15,353 +16,321 @@ describe('AdminAuthorizationService', () => {
     authorizationService = new AdminAuthorizationService();
   });
   
-  describe('hasPermission', () => {
-    it('should grant all permissions to super admin', () => {
+  describe('verifyPermission', () => {
+    it('should grant permission to an active admin with the required permission', () => {
       // Arrange
-      const superAdmin = new AdminUser({
-        id: 'super-admin-123',
-        email: 'superadmin@example.com',
-        name: 'Super Admin',
-        role: AdminRole.SUPER_ADMIN
-      });
+      const superAdmin = new AdminUser(
+        'super-admin-123',
+        'superadmin@example.com',
+        'Super Admin',
+        new AdminRole('super_admin'),
+        true,
+        new MfaStatus('enabled'),
+        [
+          new Permission(PermissionCategory.USER_MANAGEMENT, PermissionAction.VIEW),
+          new Permission(PermissionCategory.SYSTEM_SETTINGS, PermissionAction.EDIT)
+        ],
+        true,
+        []
+      );
       
-      // Act & Assert
-      expect(authorizationService.hasPermission(superAdmin, Permission.MANAGE_ADMINS)).toBe(true);
-      expect(authorizationService.hasPermission(superAdmin, Permission.MANAGE_CONTENT)).toBe(true);
-      expect(authorizationService.hasPermission(superAdmin, Permission.VIEW_ANALYTICS)).toBe(true);
-      expect(authorizationService.hasPermission(superAdmin, Permission.MANAGE_MEDIA)).toBe(true);
-      expect(authorizationService.hasPermission(superAdmin, Permission.MANAGE_SETTINGS)).toBe(true);
+      // Act
+      const result = authorizationService.verifyPermission(
+        superAdmin,
+        PermissionCategory.SYSTEM_SETTINGS,
+        PermissionAction.EDIT
+      );
+      
+      // Assert
+      expect(result.authorized).toBe(true);
     });
     
-    it('should grant limited permissions to admin', () => {
+    it('should deny permission to an active admin without the required permission', () => {
       // Arrange
-      const admin = new AdminUser({
-        id: 'admin-123',
-        email: 'admin@example.com',
-        name: 'Regular Admin',
-        role: AdminRole.ADMIN
-      });
+      const admin = new AdminUser(
+        'admin-123',
+        'admin@example.com',
+        'Regular Admin',
+        new AdminRole('admin'),
+        true,
+        new MfaStatus('enabled'),
+        [
+          new Permission(PermissionCategory.CONTENT_MANAGEMENT, PermissionAction.EDIT)
+        ],
+        true,
+        []
+      );
       
-      // Act & Assert
-      expect(authorizationService.hasPermission(admin, Permission.MANAGE_ADMINS)).toBe(false);
-      expect(authorizationService.hasPermission(admin, Permission.MANAGE_CONTENT)).toBe(true);
-      expect(authorizationService.hasPermission(admin, Permission.VIEW_ANALYTICS)).toBe(true);
-      expect(authorizationService.hasPermission(admin, Permission.MANAGE_MEDIA)).toBe(true);
-      expect(authorizationService.hasPermission(admin, Permission.MANAGE_SETTINGS)).toBe(false);
+      // Act
+      const result = authorizationService.verifyPermission(
+        admin,
+        PermissionCategory.SYSTEM_SETTINGS,
+        PermissionAction.EDIT
+      );
+      
+      // Assert
+      expect(result.authorized).toBe(false);
+      expect(result.reason).toContain('Missing permission');
     });
     
-    it('should grant minimal permissions to moderator', () => {
+    it('should deny permission to an inactive admin', () => {
       // Arrange
-      const moderator = new AdminUser({
-        id: 'moderator-123',
-        email: 'moderator@example.com',
-        name: 'Moderator',
-        role: AdminRole.MODERATOR
-      });
+      const inactiveAdmin = new AdminUser(
+        'admin-123',
+        'admin@example.com',
+        'Inactive Admin',
+        new AdminRole('admin'),
+        false, // inactive
+        new MfaStatus('enabled'),
+        [
+          new Permission(PermissionCategory.SYSTEM_SETTINGS, PermissionAction.EDIT)
+        ],
+        true,
+        []
+      );
       
-      // Act & Assert
-      expect(authorizationService.hasPermission(moderator, Permission.MANAGE_ADMINS)).toBe(false);
-      expect(authorizationService.hasPermission(moderator, Permission.MANAGE_CONTENT)).toBe(false);
-      expect(authorizationService.hasPermission(moderator, Permission.VIEW_ANALYTICS)).toBe(true);
-      expect(authorizationService.hasPermission(moderator, Permission.MANAGE_MEDIA)).toBe(false);
-      expect(authorizationService.hasPermission(moderator, Permission.MANAGE_SETTINGS)).toBe(false);
+      // Act
+      const result = authorizationService.verifyPermission(
+        inactiveAdmin,
+        PermissionCategory.SYSTEM_SETTINGS,
+        PermissionAction.EDIT
+      );
+      
+      // Assert
+      expect(result.authorized).toBe(false);
+      expect(result.reason).toBe('Account is not active');
     });
   });
   
-  describe('canManageUser', () => {
-    it('should allow super admin to manage any user', () => {
+  describe('verifyAnyPermission', () => {
+    it('should allow access if admin has at least one of the required permissions', () => {
       // Arrange
-      const superAdmin = new AdminUser({
-        id: 'super-admin-123',
-        email: 'superadmin@example.com',
-        name: 'Super Admin',
-        role: AdminRole.SUPER_ADMIN
-      });
+      const admin = new AdminUser(
+        'admin-123',
+        'admin@example.com',
+        'Admin',
+        new AdminRole('admin'),
+        true,
+        new MfaStatus('enabled'),
+        [
+          new Permission(PermissionCategory.CONTENT_MANAGEMENT, PermissionAction.EDIT)
+        ],
+        true,
+        []
+      );
       
-      const otherSuperAdmin = new AdminUser({
-        id: 'other-super-admin',
-        email: 'othersuperadmin@example.com',
-        name: 'Other Super Admin',
-        role: AdminRole.SUPER_ADMIN
-      });
+      // Act
+      const result = authorizationService.verifyAnyPermission(
+        admin,
+        [
+          { category: PermissionCategory.SYSTEM_SETTINGS, action: PermissionAction.EDIT },
+          { category: PermissionCategory.CONTENT_MANAGEMENT, action: PermissionAction.EDIT }
+        ]
+      );
       
-      const admin = new AdminUser({
-        id: 'admin-123',
-        email: 'admin@example.com',
-        name: 'Regular Admin',
-        role: AdminRole.ADMIN
-      });
-      
-      const moderator = new AdminUser({
-        id: 'moderator-123',
-        email: 'moderator@example.com',
-        name: 'Moderator',
-        role: AdminRole.MODERATOR
-      });
-      
-      // Act & Assert
-      expect(authorizationService.canManageUser(superAdmin, otherSuperAdmin)).toBe(true);
-      expect(authorizationService.canManageUser(superAdmin, admin)).toBe(true);
-      expect(authorizationService.canManageUser(superAdmin, moderator)).toBe(true);
+      // Assert
+      expect(result.authorized).toBe(true);
     });
     
-    it('should allow admin to manage only moderators', () => {
+    it('should deny access if admin has none of the required permissions', () => {
       // Arrange
-      const admin = new AdminUser({
-        id: 'admin-123',
-        email: 'admin@example.com',
-        name: 'Regular Admin',
-        role: AdminRole.ADMIN
-      });
+      const admin = new AdminUser(
+        'admin-123',
+        'admin@example.com',
+        'Admin',
+        new AdminRole('admin'),
+        true,
+        new MfaStatus('enabled'),
+        [
+          new Permission(PermissionCategory.CONTENT_MANAGEMENT, PermissionAction.VIEW)
+        ],
+        true,
+        []
+      );
       
-      const superAdmin = new AdminUser({
-        id: 'super-admin-123',
-        email: 'superadmin@example.com',
-        name: 'Super Admin',
-        role: AdminRole.SUPER_ADMIN
-      });
+      // Act
+      const result = authorizationService.verifyAnyPermission(
+        admin,
+        [
+          { category: PermissionCategory.SYSTEM_SETTINGS, action: PermissionAction.EDIT },
+          { category: PermissionCategory.CONTENT_MANAGEMENT, action: PermissionAction.EDIT }
+        ]
+      );
       
-      const otherAdmin = new AdminUser({
-        id: 'other-admin',
-        email: 'otheradmin@example.com',
-        name: 'Other Admin',
-        role: AdminRole.ADMIN
-      });
-      
-      const moderator = new AdminUser({
-        id: 'moderator-123',
-        email: 'moderator@example.com',
-        name: 'Moderator',
-        role: AdminRole.MODERATOR
-      });
-      
-      // Act & Assert
-      expect(authorizationService.canManageUser(admin, superAdmin)).toBe(false);
-      expect(authorizationService.canManageUser(admin, otherAdmin)).toBe(false);
-      expect(authorizationService.canManageUser(admin, moderator)).toBe(true);
-    });
-    
-    it('should not allow moderator to manage any user', () => {
-      // Arrange
-      const moderator = new AdminUser({
-        id: 'moderator-123',
-        email: 'moderator@example.com',
-        name: 'Moderator',
-        role: AdminRole.MODERATOR
-      });
-      
-      const superAdmin = new AdminUser({
-        id: 'super-admin-123',
-        email: 'superadmin@example.com',
-        name: 'Super Admin',
-        role: AdminRole.SUPER_ADMIN
-      });
-      
-      const admin = new AdminUser({
-        id: 'admin-123',
-        email: 'admin@example.com',
-        name: 'Regular Admin',
-        role: AdminRole.ADMIN
-      });
-      
-      const otherModerator = new AdminUser({
-        id: 'other-moderator',
-        email: 'othermoderator@example.com',
-        name: 'Other Moderator',
-        role: AdminRole.MODERATOR
-      });
-      
-      // Act & Assert
-      expect(authorizationService.canManageUser(moderator, superAdmin)).toBe(false);
-      expect(authorizationService.canManageUser(moderator, admin)).toBe(false);
-      expect(authorizationService.canManageUser(moderator, otherModerator)).toBe(false);
+      // Assert
+      expect(result.authorized).toBe(false);
+      expect(result.reason).toBe('Missing required permissions');
     });
   });
   
-  describe('canCreateInvitationWithRole', () => {
-    it('should allow super admin to create invitations for any role', () => {
+  describe('validateRole', () => {
+    it('should grant access to super_admin when the required role is super_admin', () => {
       // Arrange
-      const superAdmin = new AdminUser({
-        id: 'super-admin-123',
-        email: 'superadmin@example.com',
-        name: 'Super Admin',
-        role: AdminRole.SUPER_ADMIN
-      });
+      const superAdmin = new AdminUser(
+        'super-admin-123',
+        'superadmin@example.com',
+        'Super Admin',
+        new AdminRole('super_admin'),
+        true,
+        new MfaStatus('enabled'),
+        [],
+        true,
+        []
+      );
       
-      // Act & Assert
-      expect(authorizationService.canCreateInvitationWithRole(superAdmin, AdminRole.SUPER_ADMIN)).toBe(true);
-      expect(authorizationService.canCreateInvitationWithRole(superAdmin, AdminRole.ADMIN)).toBe(true);
-      expect(authorizationService.canCreateInvitationWithRole(superAdmin, AdminRole.MODERATOR)).toBe(true);
+      // Act
+      const result = authorizationService.validateRole(superAdmin, 'super_admin');
+      
+      // Assert
+      expect(result.authorized).toBe(true);
     });
     
-    it('should allow admin to create invitations only for moderators', () => {
+    it('should grant access to super_admin when the required role is admin', () => {
       // Arrange
-      const admin = new AdminUser({
-        id: 'admin-123',
-        email: 'admin@example.com',
-        name: 'Regular Admin',
-        role: AdminRole.ADMIN
-      });
+      const superAdmin = new AdminUser(
+        'super-admin-123',
+        'superadmin@example.com',
+        'Super Admin',
+        new AdminRole('super_admin'),
+        true,
+        new MfaStatus('enabled'),
+        [],
+        true,
+        []
+      );
       
-      // Act & Assert
-      expect(authorizationService.canCreateInvitationWithRole(admin, AdminRole.SUPER_ADMIN)).toBe(false);
-      expect(authorizationService.canCreateInvitationWithRole(admin, AdminRole.ADMIN)).toBe(false);
-      expect(authorizationService.canCreateInvitationWithRole(admin, AdminRole.MODERATOR)).toBe(true);
+      // Act
+      const result = authorizationService.validateRole(superAdmin, 'admin');
+      
+      // Assert
+      expect(result.authorized).toBe(true);
     });
     
-    it('should not allow moderator to create any invitations', () => {
+    it('should deny access to admin when the required role is super_admin', () => {
       // Arrange
-      const moderator = new AdminUser({
-        id: 'moderator-123',
-        email: 'moderator@example.com',
-        name: 'Moderator',
-        role: AdminRole.MODERATOR
-      });
+      const admin = new AdminUser(
+        'admin-123',
+        'admin@example.com',
+        'Admin',
+        new AdminRole('admin'),
+        true,
+        new MfaStatus('enabled'),
+        [],
+        true,
+        []
+      );
       
-      // Act & Assert
-      expect(authorizationService.canCreateInvitationWithRole(moderator, AdminRole.SUPER_ADMIN)).toBe(false);
-      expect(authorizationService.canCreateInvitationWithRole(moderator, AdminRole.ADMIN)).toBe(false);
-      expect(authorizationService.canCreateInvitationWithRole(moderator, AdminRole.MODERATOR)).toBe(false);
+      // Act
+      const result = authorizationService.validateRole(admin, 'super_admin');
+      
+      // Assert
+      expect(result.authorized).toBe(false);
+      expect(result.reason).toBe('Requires super_admin role');
+    });
+    
+    it('should deny access to moderator when the required role is admin', () => {
+      // Arrange
+      const moderator = new AdminUser(
+        'mod-123',
+        'mod@example.com',
+        'Moderator',
+        new AdminRole('moderator'),
+        true,
+        new MfaStatus('enabled'),
+        [],
+        true,
+        []
+      );
+      
+      // Act
+      const result = authorizationService.validateRole(moderator, 'admin');
+      
+      // Assert
+      expect(result.authorized).toBe(false);
+      expect(result.reason).toBe('Requires admin role');
     });
   });
   
-  describe('canApproveUser', () => {
-    it('should allow super admin to approve any role', () => {
+  describe('checkIpAllowed', () => {
+    it('should allow access if the IP address is whitelisted', () => {
       // Arrange
-      const superAdmin = new AdminUser({
-        id: 'super-admin-123',
-        email: 'superadmin@example.com',
-        name: 'Super Admin',
-        role: AdminRole.SUPER_ADMIN
-      });
+      const admin = new AdminUser(
+        'admin-123',
+        'admin@example.com',
+        'Admin',
+        new AdminRole('admin'),
+        true,
+        new MfaStatus('enabled'),
+        [],
+        true,
+        ['192.168.1.1', '10.0.0.1']
+      );
       
-      const pendingSuperAdmin = new AdminUser({
-        id: 'pending-super-admin',
-        email: 'pendingsuperadmin@example.com',
-        name: 'Pending Super Admin',
-        role: AdminRole.SUPER_ADMIN,
-        isApproved: false
-      });
+      // Act
+      const result = authorizationService.checkIpAllowed(admin, '192.168.1.1');
       
-      const pendingAdmin = new AdminUser({
-        id: 'pending-admin',
-        email: 'pendingadmin@example.com',
-        name: 'Pending Admin',
-        role: AdminRole.ADMIN,
-        isApproved: false
-      });
-      
-      const pendingModerator = new AdminUser({
-        id: 'pending-moderator',
-        email: 'pendingmoderator@example.com',
-        name: 'Pending Moderator',
-        role: AdminRole.MODERATOR,
-        isApproved: false
-      });
-      
-      // Act & Assert
-      expect(authorizationService.canApproveUser(superAdmin, pendingSuperAdmin)).toBe(true);
-      expect(authorizationService.canApproveUser(superAdmin, pendingAdmin)).toBe(true);
-      expect(authorizationService.canApproveUser(superAdmin, pendingModerator)).toBe(true);
+      // Assert
+      expect(result.authorized).toBe(true);
     });
     
-    it('should allow admin to approve only moderators', () => {
+    it('should deny access if the IP address is not whitelisted', () => {
       // Arrange
-      const admin = new AdminUser({
-        id: 'admin-123',
-        email: 'admin@example.com',
-        name: 'Regular Admin',
-        role: AdminRole.ADMIN
-      });
+      const admin = new AdminUser(
+        'admin-123',
+        'admin@example.com',
+        'Admin',
+        new AdminRole('admin'),
+        true,
+        new MfaStatus('enabled'),
+        [],
+        true,
+        ['192.168.1.1', '10.0.0.1']
+      );
       
-      const pendingSuperAdmin = new AdminUser({
-        id: 'pending-super-admin',
-        email: 'pendingsuperadmin@example.com',
-        name: 'Pending Super Admin',
-        role: AdminRole.SUPER_ADMIN,
-        isApproved: false
-      });
+      // Act
+      const result = authorizationService.checkIpAllowed(admin, '172.16.0.1');
       
-      const pendingAdmin = new AdminUser({
-        id: 'pending-admin',
-        email: 'pendingadmin@example.com',
-        name: 'Pending Admin',
-        role: AdminRole.ADMIN,
-        isApproved: false
-      });
+      // Assert
+      expect(result.authorized).toBe(false);
+      expect(result.reason).toBe('IP address is not authorized');
+    });
+  });
+  
+  describe('getDefaultPermissions', () => {
+    it('should return a basic set of permissions for moderator role', () => {
+      // Act
+      const permissions = authorizationService.getDefaultPermissions('moderator');
       
-      const pendingModerator = new AdminUser({
-        id: 'pending-moderator',
-        email: 'pendingmoderator@example.com',
-        name: 'Pending Moderator',
-        role: AdminRole.MODERATOR,
-        isApproved: false
-      });
-      
-      // Act & Assert
-      expect(authorizationService.canApproveUser(admin, pendingSuperAdmin)).toBe(false);
-      expect(authorizationService.canApproveUser(admin, pendingAdmin)).toBe(false);
-      expect(authorizationService.canApproveUser(admin, pendingModerator)).toBe(true);
+      // Assert
+      expect(permissions.length).toBeGreaterThan(0);
+      // Check that it has view permissions
+      const hasViewPermissions = permissions.some(p => 
+        p.action === PermissionAction.VIEW && p.category === PermissionCategory.USER_MANAGEMENT);
+      expect(hasViewPermissions).toBe(true);
     });
     
-    it('should not allow moderator to approve any user', () => {
-      // Arrange
-      const moderator = new AdminUser({
-        id: 'moderator-123',
-        email: 'moderator@example.com',
-        name: 'Moderator',
-        role: AdminRole.MODERATOR
-      });
+    it('should return extended permissions for admin role', () => {
+      // Act
+      const permissions = authorizationService.getDefaultPermissions('admin');
       
-      const pendingSuperAdmin = new AdminUser({
-        id: 'pending-super-admin',
-        email: 'pendingsuperadmin@example.com',
-        name: 'Pending Super Admin',
-        role: AdminRole.SUPER_ADMIN,
-        isApproved: false
-      });
-      
-      const pendingAdmin = new AdminUser({
-        id: 'pending-admin',
-        email: 'pendingadmin@example.com',
-        name: 'Pending Admin',
-        role: AdminRole.ADMIN,
-        isApproved: false
-      });
-      
-      const pendingModerator = new AdminUser({
-        id: 'pending-moderator',
-        email: 'pendingmoderator@example.com',
-        name: 'Pending Moderator',
-        role: AdminRole.MODERATOR,
-        isApproved: false
-      });
-      
-      // Act & Assert
-      expect(authorizationService.canApproveUser(moderator, pendingSuperAdmin)).toBe(false);
-      expect(authorizationService.canApproveUser(moderator, pendingAdmin)).toBe(false);
-      expect(authorizationService.canApproveUser(moderator, pendingModerator)).toBe(false);
+      // Assert
+      expect(permissions.length).toBeGreaterThan(3);
+      // Check that it has edit permissions
+      const hasEditPermissions = permissions.some(p => 
+        p.action === PermissionAction.EDIT && p.category === PermissionCategory.CONTENT_MANAGEMENT);
+      expect(hasEditPermissions).toBe(true);
     });
     
-    it('should not allow approving already approved users', () => {
-      // Arrange
-      const superAdmin = new AdminUser({
-        id: 'super-admin-123',
-        email: 'superadmin@example.com',
-        name: 'Super Admin',
-        role: AdminRole.SUPER_ADMIN
-      });
+    it('should return all permissions for super_admin role', () => {
+      // Act
+      const permissions = authorizationService.getDefaultPermissions('super_admin');
       
-      const approvedAdmin = new AdminUser({
-        id: 'approved-admin',
-        email: 'approvedadmin@example.com',
-        name: 'Approved Admin',
-        role: AdminRole.ADMIN,
-        isApproved: true
-      });
-      
-      // Act & Assert
-      expect(authorizationService.canApproveUser(superAdmin, approvedAdmin)).toBe(false);
+      // Assert
+      expect(permissions.length).toBeGreaterThan(7);
+      // Check that it has delete permissions
+      const hasDeletePermissions = permissions.some(p => 
+        p.action === PermissionAction.DELETE && p.category === PermissionCategory.USER_MANAGEMENT);
+      expect(hasDeletePermissions).toBe(true);
     });
   });
 });

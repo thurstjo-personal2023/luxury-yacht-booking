@@ -1,283 +1,411 @@
 /**
  * Unit tests for AdminAuthenticationService
  */
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
-import { AdminAuthenticationService } from '../../../../../core/domain/admin/admin-authentication-service';
-import { IAuthProvider } from '../../../../../core/application/interfaces/auth/auth-provider';
+import { describe, expect, it, beforeEach } from '@jest/globals';
+import { AdminAuthenticationService, AuthenticationResult } from '../../../../../core/domain/admin/admin-authentication-service';
+import { AdminCredentials } from '../../../../../core/domain/admin/admin-credentials';
 
 describe('AdminAuthenticationService', () => {
-  let authProvider: IAuthProvider;
   let authService: AdminAuthenticationService;
   
   beforeEach(() => {
-    // Mock auth provider
-    authProvider = {
-      authenticateWithEmailPassword: jest.fn(),
-      createUserWithEmailPassword: jest.fn(),
-      verifyMfaCode: jest.fn(),
-      generateMfaSecret: jest.fn(),
-      validatePassword: jest.fn(),
-      getUserById: jest.fn(),
-      updateUser: jest.fn(),
-      deleteUser: jest.fn(),
-      generatePasswordHash: jest.fn()
-    };
-    
     // Create service
-    authService = new AdminAuthenticationService(authProvider);
+    authService = new AdminAuthenticationService();
   });
   
-  describe('authenticateAdmin', () => {
-    it('should authenticate admin with valid credentials', async () => {
+  describe('validatePassword', () => {
+    it('should validate a strong password', () => {
       // Arrange
-      const email = 'admin@example.com';
-      const password = 'valid-password';
-      const userId = 'admin-123';
-      const token = 'valid-token';
-      
-      (authProvider.authenticateWithEmailPassword as jest.Mock).mockResolvedValue({
-        userId,
-        token
-      });
+      const password = 'StrongP@ssw0rd';
       
       // Act
-      const result = await authService.authenticateAdmin(email, password);
+      const result = authService.validatePassword(password);
       
       // Assert
-      expect(result.success).toBe(true);
-      expect(result.userId).toBe(userId);
-      expect(result.token).toBe(token);
-      expect(authProvider.authenticateWithEmailPassword).toHaveBeenCalledWith(email, password);
+      expect(result.valid).toBe(true);
+      expect(result.errors.length).toBe(0);
     });
     
-    it('should return failure for invalid credentials', async () => {
+    it('should reject a password that is too short', () => {
       // Arrange
-      const email = 'admin@example.com';
-      const password = 'invalid-password';
-      
-      (authProvider.authenticateWithEmailPassword as jest.Mock).mockRejectedValue(
-        new Error('Invalid credentials')
-      );
+      const password = 'Short1!';
       
       // Act
-      const result = await authService.authenticateAdmin(email, password);
+      const result = authService.validatePassword(password);
       
       // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Invalid credentials');
-      expect(result.userId).toBeUndefined();
-      expect(result.token).toBeUndefined();
+      expect(result.valid).toBe(false);
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(result.errors[0]).toContain('at least 10 characters');
+    });
+    
+    it('should reject a password without uppercase letters', () => {
+      // Arrange
+      const password = 'nouppercase123!';
+      
+      // Act
+      const result = authService.validatePassword(password);
+      
+      // Assert
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.includes('uppercase'))).toBe(true);
+    });
+    
+    it('should reject a password without lowercase letters', () => {
+      // Arrange
+      const password = 'NOLOWERCASE123!';
+      
+      // Act
+      const result = authService.validatePassword(password);
+      
+      // Assert
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.includes('lowercase'))).toBe(true);
+    });
+    
+    it('should reject a password without numbers', () => {
+      // Arrange
+      const password = 'NoNumbersHere!';
+      
+      // Act
+      const result = authService.validatePassword(password);
+      
+      // Assert
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.includes('number'))).toBe(true);
+    });
+    
+    it('should reject a password without special characters', () => {
+      // Arrange
+      const password = 'NoSpecialChars123';
+      
+      // Act
+      const result = authService.validatePassword(password);
+      
+      // Assert
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.includes('special character'))).toBe(true);
     });
   });
   
-  describe('verifyMfaCode', () => {
-    it('should verify valid MFA code', async () => {
+  describe('hashPassword and verifyPassword', () => {
+    it('should hash a password and verify it successfully', () => {
       // Arrange
-      const userId = 'admin-123';
-      const mfaCode = '123456';
-      const mfaSecret = 'mfa-secret';
-      
-      (authProvider.getUserById as jest.Mock).mockResolvedValue({
-        mfaSecret
-      });
-      
-      (authProvider.verifyMfaCode as jest.Mock).mockResolvedValue(true);
+      const password = 'SecureP@ssw0rd123';
       
       // Act
-      const result = await authService.verifyMfaCode(userId, mfaCode);
+      const hash = authService.hashPassword(password);
+      const isValid = authService.verifyPassword(password, hash);
       
       // Assert
-      expect(result.success).toBe(true);
-      expect(authProvider.getUserById).toHaveBeenCalledWith(userId);
-      expect(authProvider.verifyMfaCode).toHaveBeenCalledWith(userId, mfaCode, mfaSecret);
+      expect(hash).toContain(':'); // Basic format check
+      expect(isValid).toBe(true);
     });
     
-    it('should return failure for invalid MFA code', async () => {
+    it('should not verify an incorrect password', () => {
       // Arrange
-      const userId = 'admin-123';
-      const mfaCode = 'invalid-code';
-      const mfaSecret = 'mfa-secret';
-      
-      (authProvider.getUserById as jest.Mock).mockResolvedValue({
-        mfaSecret
-      });
-      
-      (authProvider.verifyMfaCode as jest.Mock).mockResolvedValue(false);
+      const password = 'SecureP@ssw0rd123';
+      const wrongPassword = 'WrongP@ssw0rd456';
       
       // Act
-      const result = await authService.verifyMfaCode(userId, mfaCode);
+      const hash = authService.hashPassword(password);
+      const isValid = authService.verifyPassword(wrongPassword, hash);
       
       // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Invalid MFA code');
-    });
-    
-    it('should return failure when MFA secret is missing', async () => {
-      // Arrange
-      const userId = 'admin-123';
-      const mfaCode = '123456';
-      
-      (authProvider.getUserById as jest.Mock).mockResolvedValue({
-        // No mfaSecret
-      });
-      
-      // Act
-      const result = await authService.verifyMfaCode(userId, mfaCode);
-      
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('MFA is not properly configured for this account');
-    });
-    
-    it('should handle auth provider errors', async () => {
-      // Arrange
-      const userId = 'admin-123';
-      const mfaCode = '123456';
-      
-      (authProvider.getUserById as jest.Mock).mockRejectedValue(
-        new Error('User not found')
-      );
-      
-      // Act
-      const result = await authService.verifyMfaCode(userId, mfaCode);
-      
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('User not found');
+      expect(isValid).toBe(false);
     });
   });
   
   describe('generateMfaSecret', () => {
-    it('should generate MFA secret and update user', async () => {
-      // Arrange
-      const userId = 'admin-123';
-      const mfaSecret = 'generated-mfa-secret';
-      const qrCodeUrl = 'qr-code-url';
-      
-      (authProvider.generateMfaSecret as jest.Mock).mockResolvedValue({
-        mfaSecret,
-        qrCodeUrl
-      });
-      
-      (authProvider.updateUser as jest.Mock).mockResolvedValue({
-        success: true
-      });
-      
+    it('should generate a valid MFA secret', () => {
       // Act
-      const result = await authService.generateMfaSecret(userId, 'admin@example.com');
+      const secret = authService.generateMfaSecret();
       
       // Assert
-      expect(result.success).toBe(true);
-      expect(result.secret).toBe(mfaSecret);
-      expect(result.qrCodeUrl).toBe(qrCodeUrl);
-      expect(authProvider.generateMfaSecret).toHaveBeenCalled();
-      expect(authProvider.updateUser).toHaveBeenCalledWith(userId, { mfaSecret });
-    });
-    
-    it('should handle errors during MFA secret generation', async () => {
-      // Arrange
-      const userId = 'admin-123';
-      
-      (authProvider.generateMfaSecret as jest.Mock).mockRejectedValue(
-        new Error('Failed to generate MFA secret')
-      );
-      
-      // Act
-      const result = await authService.generateMfaSecret(userId, 'admin@example.com');
-      
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Failed to generate MFA secret');
+      expect(secret).toBeTruthy();
+      expect(typeof secret).toBe('string');
+      expect(secret.length).toBeGreaterThan(20); // Basic length check
     });
   });
   
-  describe('validatePassword', () => {
-    it('should validate a strong password', async () => {
+  describe('validateMfaToken', () => {
+    it('should validate a correct format MFA token', () => {
       // Arrange
-      const password = 'StrongP@ssw0rd';
-      
-      (authProvider.validatePassword as jest.Mock).mockResolvedValue(true);
+      const token = '123456';
+      const secret = authService.generateMfaSecret();
       
       // Act
-      const result = await authService.validatePassword(password);
+      const isValid = authService.validateMfaToken(token, secret);
       
       // Assert
-      expect(result).toBe(true);
-      expect(authProvider.validatePassword).toHaveBeenCalledWith(password);
+      expect(isValid).toBe(true);
     });
     
-    it('should reject a weak password', async () => {
+    it('should reject an invalid format MFA token', () => {
       // Arrange
-      const password = 'weak';
-      
-      (authProvider.validatePassword as jest.Mock).mockResolvedValue(false);
+      const token = '12345'; // Too short
+      const secret = authService.generateMfaSecret();
       
       // Act
-      const result = await authService.validatePassword(password);
+      const isValid = authService.validateMfaToken(token, secret);
       
       // Assert
-      expect(result).toBe(false);
+      expect(isValid).toBe(false);
+    });
+    
+    it('should reject a non-numeric MFA token', () => {
+      // Arrange
+      const token = 'ABCDEF'; // Not numbers
+      const secret = authService.generateMfaSecret();
+      
+      // Act
+      const isValid = authService.validateMfaToken(token, secret);
+      
+      // Assert
+      expect(isValid).toBe(false);
     });
   });
   
-  describe('createAdmin', () => {
-    it('should create admin account with valid data', async () => {
+  describe('generateSecureToken', () => {
+    it('should generate a token with the expected format', () => {
       // Arrange
-      const email = 'newadmin@example.com';
-      const password = 'SecureP@ssw0rd';
-      const userId = 'new-admin-123';
-      
-      (authProvider.validatePassword as jest.Mock).mockResolvedValue(true);
-      
-      (authProvider.createUserWithEmailPassword as jest.Mock).mockResolvedValue({
-        userId,
-        success: true
-      });
+      const payload = { userId: 'admin-123', email: 'admin@example.com' };
       
       // Act
-      const result = await authService.createAdmin(email, password);
+      const token = authService.generateSecureToken(payload);
       
       // Assert
-      expect(result.success).toBe(true);
-      expect(result.userId).toBe(userId);
-      expect(authProvider.validatePassword).toHaveBeenCalledWith(password);
-      expect(authProvider.createUserWithEmailPassword).toHaveBeenCalledWith(email, password);
+      expect(token).toBeTruthy();
+      expect(token.split('.').length).toBe(3); // Check JWT-like format
     });
     
-    it('should fail when password is weak', async () => {
+    it('should generate different tokens for different payloads', () => {
       // Arrange
-      const email = 'newadmin@example.com';
-      const password = 'weak';
-      
-      (authProvider.validatePassword as jest.Mock).mockResolvedValue(false);
+      const payload1 = { userId: 'admin-1', email: 'admin1@example.com' };
+      const payload2 = { userId: 'admin-2', email: 'admin2@example.com' };
       
       // Act
-      const result = await authService.createAdmin(email, password);
+      const token1 = authService.generateSecureToken(payload1);
+      const token2 = authService.generateSecureToken(payload2);
       
       // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Password does not meet security requirements');
-      expect(result.userId).toBeUndefined();
+      expect(token1).not.toBe(token2);
     });
-    
-    it('should handle auth provider errors', async () => {
+  });
+  
+  describe('authenticate', () => {
+    it('should successfully authenticate with correct credentials and no MFA', () => {
       // Arrange
-      const email = 'newadmin@example.com';
       const password = 'SecureP@ssw0rd';
+      const hash = authService.hashPassword(password);
       
-      (authProvider.validatePassword as jest.Mock).mockResolvedValue(true);
-      
-      (authProvider.createUserWithEmailPassword as jest.Mock).mockRejectedValue(
-        new Error('Email already in use')
+      // Create admin credentials mock with no MFA
+      const credentials = new AdminCredentials(
+        'admin-123',
+        'admin@example.com',
+        new Date(),
+        hash
       );
       
       // Act
-      const result = await authService.createAdmin(email, password);
+      const result = authService.authenticate(credentials, password);
+      
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.requiresMfa).toBe(false);
+    });
+    
+    it('should require MFA verification when MFA is set up', () => {
+      // Arrange
+      const password = 'SecureP@ssw0rd';
+      const hash = authService.hashPassword(password);
+      const mfaSecret = authService.generateMfaSecret();
+      
+      // Create admin credentials mock with MFA
+      const credentials = new AdminCredentials(
+        'admin-123',
+        'admin@example.com',
+        new Date(),
+        hash,
+        mfaSecret
+      );
+      
+      // Act
+      const result = authService.authenticate(credentials, password);
+      
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.requiresMfa).toBe(true);
+      expect(result.temporaryToken).toBeTruthy();
+    });
+    
+    it('should fail authentication with incorrect password', () => {
+      // Arrange
+      const password = 'SecureP@ssw0rd';
+      const wrongPassword = 'WrongP@ssw0rd';
+      const hash = authService.hashPassword(password);
+      
+      // Create admin credentials mock
+      const credentials = new AdminCredentials(
+        'admin-123',
+        'admin@example.com',
+        new Date(),
+        hash
+      );
+      
+      // Act
+      const result = authService.authenticate(credentials, wrongPassword);
       
       // Assert
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Email already in use');
-      expect(result.userId).toBeUndefined();
+      expect(result.error).toBe('Invalid password');
+    });
+    
+    it('should fail authentication when credentials are null', () => {
+      // Arrange
+      const password = 'SecureP@ssw0rd';
+      
+      // Act
+      const result = authService.authenticate(null, password);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid credentials');
+    });
+    
+    it('should fail authentication when password is not set', () => {
+      // Arrange
+      const password = 'SecureP@ssw0rd';
+      
+      // Create admin credentials mock without password
+      const credentials = new AdminCredentials(
+        'admin-123',
+        'admin@example.com',
+        new Date()
+      );
+      
+      // Act
+      const result = authService.authenticate(credentials, password);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Password not set');
+    });
+  });
+  
+  describe('verifyMfa', () => {
+    it('should successfully verify a valid MFA token', () => {
+      // Arrange
+      const password = 'SecureP@ssw0rd';
+      const hash = authService.hashPassword(password);
+      const mfaSecret = authService.generateMfaSecret();
+      const mfaToken = '123456'; // Valid format based on our mock validation
+      
+      // Create admin credentials with MFA
+      const credentials = new AdminCredentials(
+        'admin-123',
+        'admin@example.com',
+        new Date(),
+        hash,
+        mfaSecret
+      );
+      
+      // First authenticate to get temporary token
+      const authResult = authService.authenticate(credentials, password);
+      const temporaryToken = authResult.temporaryToken!;
+      
+      // Act
+      const result = authService.verifyMfa(credentials, mfaToken, temporaryToken);
+      
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.requiresMfa).toBe(false);
+    });
+    
+    it('should fail verification with invalid MFA token', () => {
+      // Arrange
+      const password = 'SecureP@ssw0rd';
+      const hash = authService.hashPassword(password);
+      const mfaSecret = authService.generateMfaSecret();
+      const invalidMfaToken = 'ABCDEF'; // Invalid format (not numeric)
+      
+      // Create admin credentials with MFA
+      const credentials = new AdminCredentials(
+        'admin-123',
+        'admin@example.com',
+        new Date(),
+        hash,
+        mfaSecret
+      );
+      
+      // First authenticate to get temporary token
+      const authResult = authService.authenticate(credentials, password);
+      const temporaryToken = authResult.temporaryToken!;
+      
+      // Act
+      const result = authService.verifyMfa(credentials, invalidMfaToken, temporaryToken);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.requiresMfa).toBe(true);
+      expect(result.error).toBe('Invalid MFA token');
+    });
+    
+    it('should fail verification with invalid temporary token', () => {
+      // Arrange
+      const password = 'SecureP@ssw0rd';
+      const hash = authService.hashPassword(password);
+      const mfaSecret = authService.generateMfaSecret();
+      const mfaToken = '123456';
+      const invalidTempToken = 'invalid-token';
+      
+      // Create admin credentials with MFA
+      const credentials = new AdminCredentials(
+        'admin-123',
+        'admin@example.com',
+        new Date(),
+        hash,
+        mfaSecret
+      );
+      
+      // Act
+      const result = authService.verifyMfa(credentials, mfaToken, invalidTempToken);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.requiresMfa).toBe(true);
+      expect(result.error).toBe('Invalid or expired temporary token');
+    });
+    
+    it('should fail verification when MFA is not set up', () => {
+      // Arrange
+      const password = 'SecureP@ssw0rd';
+      const hash = authService.hashPassword(password);
+      const mfaToken = '123456';
+      
+      // Create admin credentials without MFA
+      const credentials = new AdminCredentials(
+        'admin-123',
+        'admin@example.com',
+        new Date(),
+        hash
+      );
+      
+      // Act
+      const result = authService.verifyMfa(credentials, mfaToken, 'temp-token');
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('MFA not set up');
+    });
+    
+    it('should fail verification when credentials are null', () => {
+      // Act
+      const result = authService.verifyMfa(null, '123456', 'temp-token');
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid credentials');
     });
   });
 });
