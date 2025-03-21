@@ -23,7 +23,7 @@ export const verifyAdminRole = async (req: Request, res: Response, next: NextFun
       }
       
       // Check if user has admin role
-      const userDoc = await adminDb.collection('admin_users').doc(uid).get();
+      const userDoc = await adminDb.collection('admin_users').doc(uid as string).get();
       
       // Check if admin user exists and has active status
       if (!userDoc.exists) {
@@ -88,7 +88,7 @@ export function registerAdminProfileRoutes(app: Express) {
       };
       
       // Save to admin_users collection
-      await adminDb.collection('admin_users').doc(uid).set(adminUserData);
+      await adminDb.collection('admin_users').doc(uid as string).set(adminUserData);
       
       // Return success
       res.status(201).json({
@@ -264,7 +264,7 @@ export function registerAdminProfileRoutes(app: Express) {
       }
       
       // Verify super admin status
-      const approverDoc = await adminDb.collection('admin_users').doc(approverUid).get();
+      const approverDoc = await adminDb.collection('admin_users').doc(approverUid as string).get();
       const approverData = approverDoc.data();
       
       if (!approverData?.permissions.includes('approve_admins')) {
@@ -272,14 +272,14 @@ export function registerAdminProfileRoutes(app: Express) {
       }
       
       // Check if admin exists
-      const adminDoc = await adminDb.collection('admin_users').doc(adminUid).get();
+      const adminDoc = await adminDb.collection('admin_users').doc(adminUid as string).get();
       
       if (!adminDoc.exists) {
         return res.status(404).json({ error: 'Admin user not found' });
       }
       
       // Update admin status
-      await adminDb.collection('admin_users').doc(adminUid).update({
+      await adminDb.collection('admin_users').doc(adminUid as string).update({
         status,
         approvedBy: approverUid,
         approvedAt: Timestamp.now(),
@@ -315,7 +315,7 @@ export function registerAdminProfileRoutes(app: Express) {
       }
       
       // Update MFA status
-      await adminDb.collection('admin_users').doc(uid).update({
+      await adminDb.collection('admin_users').doc(uid as string).update({
         mfaEnabled: true,
         updatedAt: Timestamp.now()
       });
