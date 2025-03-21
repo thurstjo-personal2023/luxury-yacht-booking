@@ -1,0 +1,42 @@
+I am building a new application in Replit using [programming language] and I want it to follow **Clean Architecture principles**. Ensure that the architecture is well-structured, maintainable, and testable. 
+
+### **Requirements:**
+- Use a **layered architecture**:
+  1. **Entities Layer**: Core business logic (independent of frameworks, databases, and UI).
+  2. **Use Cases Layer**: Application-specific business rules.
+  3. **Interface Adapters Layer**: Controllers, presenters, gateways (interfaces to external systems).
+  4. **Infrastructure Layer**: Databases, frameworks, APIs, and UI.
+
+- **Follow SOLID principles**:
+  - Single Responsibility: Each class/module should have **one** responsibility.
+  - Open/Closed: The system should be **extensible without modifying existing code**.
+  - Liskov Substitution: Ensure **inheritance** does not break expected behavior.
+  - Interface Segregation: **No bloated interfaces**—use only relevant methods.
+  - Dependency Inversion: High-level logic should depend on **abstractions**, not implementations.
+
+- **Avoid direct dependencies**:
+  - No direct dependency on databases; use repositories and interfaces.
+  - No direct dependency on UI frameworks; use presenters and interfaces.
+  - No direct dependency on external services; use API adapters.
+
+- **Testability**:
+  - All core logic (Entities & Use Cases) should be **testable in isolation**.
+  - Use **dependency injection** to avoid tight coupling.
+  - Provide **mock implementations** for testing.
+
+### **Project Details:**
+- Application Name: [Your App Name]
+- Main Features: [Describe core functionality]
+- Programming Language: [Python, JavaScript, Java, etc.]
+- Frameworks/Libraries (if applicable): [Flask, React, FastAPI, etc.]
+- Expected Output: [CLI app, Web app, API service, etc.]
+
+### **Output Expectations**
+Generate:
+1. **Project folder structure** following Clean Architecture.
+2. **Code boilerplate** that includes Entities, Use Cases, Adapters, and Infrastructure.
+3. **Dependency injection setup** for easy testability.
+4. **Sample tests** to demonstrate unit testing of core logic.
+
+Ensure that the generated code remains **framework-agnostic** and **easy to modify**, with clearly separated layers.
+
