@@ -4,11 +4,33 @@
  * This module registers routes for add-on management and bundling.
  */
 
-import { Express } from 'express';
+import { Express, Request, Response, NextFunction } from 'express';
 import { AddonController } from '../controllers/addon-controller';
 import { AddonBundleController } from '../controllers/addon-bundle-controller';
-import { verifyAuth } from '../../../server/auth-middleware';
-import { verifyRole } from '../../../server/role-middleware';
+import { verifyAuth } from '../../../server/firebase-admin';
+
+// Role verification middleware
+const verifyRole = (allowedRoles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    // Check if user exists and has a role
+    if (!req.user || !req.user.role) {
+      return res.status(403).json({ 
+        error: 'Forbidden', 
+        details: 'User role not available or authenticated' 
+      });
+    }
+    
+    // Check if user's role is in the allowed list
+    if (allowedRoles.includes(req.user.role)) {
+      return next();
+    }
+    
+    return res.status(403).json({ 
+      error: 'Forbidden', 
+      details: `Access denied. Required role: ${allowedRoles.join(' or ')}` 
+    });
+  };
+};
 
 /**
  * Register add-on routes for the API

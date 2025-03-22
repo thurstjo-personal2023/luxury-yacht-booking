@@ -8,6 +8,7 @@ import path from "path";
 import { FieldValue } from "firebase-admin/firestore";
 import { standardizeUser, UserType } from "../shared/user-schema";
 import { registerUserProfileRoutes } from "./user-profile-routes";
+import { registerAddOnRoutes } from "./addon-routes";
 import { createAllYachtExperiences, fixGrandTourYacht } from './create-yacht-experiences';
 import { ServiceProviderProfile } from "../shared/harmonized-user-schema";
 
@@ -3434,6 +3435,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register User Profile routes
   registerUserProfileRoutes(app);
+
+  // Register Partner Add-on routes
+  registerAddOnRoutes(app);
 
   // Register Stripe-related routes
   registerStripeRoutes(app);
