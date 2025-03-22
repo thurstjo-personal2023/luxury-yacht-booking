@@ -5,15 +5,15 @@
  * the Firebase Emulator Suite in tests.
  */
 
-import firebase from 'firebase/compat/app';
-import 'firebase/compat/auth';
-import 'firebase/compat/firestore';
-import 'firebase/compat/storage';
-import { Firestore } from 'firebase/firestore';
-import { Auth } from 'firebase/auth';
-import axios from 'axios';
+import * as firebase from 'firebase/app';
+import { getAuth, Auth, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
 
-// Emulator hosts and ports
+// Reference to our type handling strategy for Firebase
+// Since Firebase types are complex, we use @ts-ignore in specific places
+// See './types/firebase-augmentation.ts' for details
+
 export const EMULATOR_HOST = 'localhost';
 export const EMULATOR_PORTS = {
   auth: 9099,
@@ -46,10 +46,11 @@ export interface EmulatorConfig {
  * Firebase emulator instance
  */
 export interface EmulatorInstance {
-  app: firebase.app.App;
+  app: firebase.FirebaseApp;
   auth?: Auth;
   firestore?: Firestore;
   storage?: any; // Using 'any' to avoid TypeScript errors
+  cleanup: () => Promise<void>;
 }
 
 /**
@@ -57,70 +58,78 @@ export interface EmulatorInstance {
  */
 export const defaultFirebaseConfig = {
   apiKey: 'fake-api-key',
-  authDomain: 'localhost',
+  authDomain: 'test-project.firebaseapp.com',
   projectId: 'test-project',
   storageBucket: 'test-project.appspot.com',
-  messagingSenderId: '123456789',
-  appId: '1:123456789:web:abcdef1234567890'
+  messagingSenderId: '123456789012',
+  appId: '1:123456789012:web:abcdef1234567890'
 };
 
 /**
  * Initialize the Firebase emulators for testing
  */
 export function initializeTestEnvironment(config: EmulatorConfig): EmulatorInstance {
-  // Set up Firebase app
-  const firebaseConfig = {
+  const appConfig = {
     ...defaultFirebaseConfig,
     projectId: config.projectId
   };
+
+  // Initialize Firebase app
+  const app = firebase.initializeApp(appConfig, `test-${Date.now()}`);
   
-  const host = config.host || EMULATOR_HOST;
-  const ports = {
-    auth: config.ports?.auth || EMULATOR_PORTS.auth,
-    firestore: config.ports?.firestore || EMULATOR_PORTS.firestore,
-    storage: config.ports?.storage || EMULATOR_PORTS.storage
+  // Connect to Auth emulator if needed
+  let auth: Auth | undefined;
+  if (config.useAuth !== false) {
+    auth = getAuth(app);
+    connectAuthEmulator(
+      auth,
+      `http://${config.host || EMULATOR_HOST}:${config.ports?.auth || EMULATOR_PORTS.auth}`, 
+      { disableWarnings: config.disableWarnings || false }
+    );
+  }
+
+  // Connect to Firestore emulator if needed
+  let firestore: Firestore | undefined;
+  if (config.useFirestore !== false) {
+    firestore = getFirestore(app);
+    connectFirestoreEmulator(
+      firestore,
+      config.host || EMULATOR_HOST,
+      config.ports?.firestore || EMULATOR_PORTS.firestore
+    );
+  }
+
+  // Connect to Storage emulator if needed
+  let storage: any | undefined;
+  if (config.useStorage) {
+    storage = getStorage(app);
+    connectStorageEmulator(
+      storage,
+      config.host || EMULATOR_HOST,
+      config.ports?.storage || EMULATOR_PORTS.storage
+    );
+  }
+
+  // Create the instance object
+  const instance: EmulatorInstance = { 
+    app,
+    auth,
+    firestore,
+    storage,
+    cleanup: async () => {
+      try {
+        if (firestore) {
+          await (firestore as any).terminate();
+        }
+        // The FirebaseApp.delete() method is not properly typed in the current Firebase typings
+        // but it exists at runtime
+        await (app as any).delete();
+      } catch (error) {
+        console.error('Error cleaning up Firebase app:', error);
+      }
+    }
   };
-  
-  // Initialize the app if no apps exist or get the existing one
-  const app = !firebase.apps.length
-    ? firebase.initializeApp(firebaseConfig)
-    : firebase.app();
-  
-  // Set up emulators
-  if (config.useAuth !== false) {
-    app.auth().useEmulator(`http://${host}:${ports.auth}`);
-    console.log(`Using Auth emulator at http://${host}:${ports.auth}`);
-  }
-  
-  if (config.useFirestore !== false) {
-    app.firestore().useEmulator(host, ports.firestore);
-    app.firestore().settings({
-      experimentalForceLongPolling: true,
-      merge: true
-    });
-    console.log(`Using Firestore emulator at http://${host}:${ports.firestore}`);
-  }
-  
-  if (config.useStorage !== false) {
-    app.storage().useEmulator(host, ports.storage);
-    console.log(`Using Storage emulator at http://${host}:${ports.storage}`);
-  }
-  
-  const instance: EmulatorInstance = { app };
-  
-  // Create ready-to-use instances
-  if (config.useAuth !== false) {
-    instance.auth = app.auth() as unknown as Auth;
-  }
-  
-  if (config.useFirestore !== false) {
-    instance.firestore = app.firestore() as unknown as Firestore;
-  }
-  
-  if (config.useStorage !== false) {
-    instance.storage = app.storage();
-  }
-  
+
   return instance;
 }
 
@@ -128,11 +137,7 @@ export function initializeTestEnvironment(config: EmulatorConfig): EmulatorInsta
  * Clean up the Firebase emulator instance
  */
 export async function cleanupTestEnvironment(instance: EmulatorInstance): Promise<void> {
-  if (instance.auth) {
-    await instance.auth.signOut();
-  }
-  
-  await instance.app.delete();
+  await instance.cleanup();
 }
 
 /**
@@ -145,18 +150,18 @@ export function generateTestId(prefix = 'test'): string {
 /**
  * Check if Firebase emulators are running
  */
-export async function checkEmulators(config: EmulatorConfig): Promise<boolean> {
-  const host = config.host || EMULATOR_HOST;
-  const ports = {
-    firestore: config.ports?.firestore || EMULATOR_PORTS.firestore
-  };
-  
+export async function checkEmulators(config: EmulatorConfig = { projectId: 'test-project' }): Promise<boolean> {
   try {
-    // Try to connect to the Firestore emulator
-    await axios.get(`http://${host}:${ports.firestore}/`, { timeout: 2000 });
+    const instance = initializeTestEnvironment({
+      ...config,
+      useAuth: true,
+      useFirestore: true,
+      disableWarnings: true
+    });
+
+    await cleanupTestEnvironment(instance);
     return true;
   } catch (error) {
-    console.error('Failed to connect to Firebase emulators:', error);
     return false;
   }
 }
