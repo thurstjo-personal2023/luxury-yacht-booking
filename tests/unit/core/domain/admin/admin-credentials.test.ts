@@ -228,16 +228,17 @@ describe('AdminCredentials Entity', () => {
       tokenExpiry
     );
     
-    // Mock the Timestamp conversions
-    jest.spyOn(credentials, 'toData').mockReturnValue({
-      userId,
-      email,
-      passwordHash,
-      mfaSecret,
-      temporaryToken,
-      tokenExpiry: { toDate: () => tokenExpiry },
-      updatedAt: { toDate: () => updatedAt }
-    });
+    // Create mock Timestamp functionality
+    const mockTimestamp = {
+      fromDate: (date: Date) => ({ 
+        toDate: () => date 
+      })
+    };
+    
+    // Replace global Timestamp with our mock version
+    jest.mock('firebase/firestore', () => ({
+      Timestamp: mockTimestamp
+    }));
     
     // Act
     const data = credentials.toData();
