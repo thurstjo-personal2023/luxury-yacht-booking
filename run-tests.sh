@@ -14,6 +14,11 @@ echo -e "${BLUE}=== Etoile Yachts Testing Suite ===${NC}"
 echo -e "${BLUE}Running all test types in sequence...${NC}"
 echo 
 
+# Set up Google Cloud credentials for Firebase
+export GOOGLE_APPLICATION_CREDENTIALS="./etoile-yachts-9322f3c69d91.json"
+echo -e "${GREEN}Using Google Cloud service account for authentication: $(cat $GOOGLE_APPLICATION_CREDENTIALS | grep client_email | sed 's/.*: "\(.*\)".*/\1/')${NC}"
+echo
+
 # Run unit tests first (these don't need emulators)
 echo -e "${YELLOW}Step 1: Running unit tests${NC}"
 ./run-unit-tests.sh

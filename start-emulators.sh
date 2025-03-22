@@ -22,6 +22,10 @@ fi
 export NODE_ENV=test
 export $(grep -v '^#' .env.test | xargs)
 
+# Set up Google Cloud credentials for Firebase
+export GOOGLE_APPLICATION_CREDENTIALS="./etoile-yachts-9322f3c69d91.json"
+echo -e "${GREEN}Using Google Cloud service account for authentication: $(cat $GOOGLE_APPLICATION_CREDENTIALS | grep client_email | sed 's/.*: "\(.*\)".*/\1/')${NC}"
+
 # Start emulators
 echo -e "${YELLOW}Starting Firebase emulators...${NC}"
 echo -e "${BLUE}This will block the terminal. Open another terminal to run tests.${NC}"
