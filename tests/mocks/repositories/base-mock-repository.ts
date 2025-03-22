@@ -91,15 +91,20 @@ export abstract class BaseMockRepository {
   /**
    * Execute method with configured behavior
    * @param method Method name
-   * @param defaultValue Default return value if no behavior is configured
+   * @param args Arguments passed to the method
+   * @param defaultFn Default function to execute if no behavior is configured
    */
-  protected async executeMethod<T>(method: string, args: any[], defaultValue: T): Promise<T> {
+  protected async executeMethod<T>(
+    method: string, 
+    args: any[], 
+    defaultFn: () => T
+  ): Promise<T> {
     this.recordMethodCall(method, args);
     
     const behavior = this.getMethodBehavior<T>(method);
     
     if (!behavior) {
-      return defaultValue;
+      return defaultFn();
     }
     
     if (behavior.delay) {
@@ -110,6 +115,6 @@ export abstract class BaseMockRepository {
       throw behavior.error;
     }
     
-    return behavior.returnValue !== undefined ? behavior.returnValue : defaultValue;
+    return behavior.returnValue !== undefined ? behavior.returnValue : defaultFn();
   }
 }
