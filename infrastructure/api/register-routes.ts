@@ -9,6 +9,7 @@ import { Firestore } from 'firebase/firestore';
 
 import { createBookingRoutes } from './routes/booking-routes';
 import { createMigrationRoutes } from './routes/migration-routes';
+import { registerPaymentRoutes } from './routes/payment-routes';
 
 /**
  * Register API routes with the Express app
@@ -19,6 +20,9 @@ export function registerApiRoutes(app: Express, firestore: Firestore) {
   
   // Register migration routes (admin only)
   app.use('/api/migration', createMigrationRoutes(firestore));
+  
+  // Register payment routes
+  registerPaymentRoutes(app);
   
   // Register other routes as needed
   // app.use('/api/users', createUserRoutes(firestore));

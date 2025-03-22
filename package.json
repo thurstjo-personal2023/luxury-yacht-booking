@@ -101,6 +101,7 @@
     "react-pannellum": "^0.2.16",
     "react-resizable-panels": "^2.1.4",
     "recharts": "^2.13.0",
+    "stripe": "^17.7.0",
     "supertest": "^7.0.0",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7",
