@@ -1,203 +1,204 @@
 /**
  * Payment Hook
  * 
- * This hook provides functions and state for interacting with the payment service.
+ * Custom React hook for integrating with the payment service.
+ * Provides methods for creating and managing payment intents.
  */
 
 import { useState } from 'react';
-import { PaymentService, CreatePaymentIntentRequest, PaymentIntent, PaymentStatus } from '../lib/payment-service';
+import { PaymentService } from '@/lib/payment-service';
+import { useToast } from '@/hooks/use-toast';
 
-interface UsePaymentOptions {
-  onSuccess?: (paymentIntent: PaymentIntent) => void;
-  onError?: (error: string) => void;
+// Payment creation parameters
+export interface CreatePaymentParams {
+  amount: number;
+  currency: string;
+  metadata: {
+    bookingId: string;
+    customerId?: string;
+    yachtId?: string;
+    packageId?: string;
+  };
+  description?: string;
 }
 
-interface UsePaymentReturn {
-  // State
-  paymentIntent: PaymentIntent | null;
-  isLoading: boolean;
-  error: string | null;
-  
-  // Functions
-  createPaymentIntent: (data: CreatePaymentIntentRequest) => Promise<PaymentIntent | null>;
-  getPaymentIntent: (paymentIntentId: string) => Promise<PaymentIntent | null>;
-  cancelPaymentIntent: (paymentIntentId: string) => Promise<boolean>;
-  
-  // Utility functions
-  isPaymentCompleted: () => boolean;
-  isPending: () => boolean;
-  isProcessing: () => boolean;
-  isFailed: () => boolean;
-  isCancelled: () => boolean;
+// Payment intent data
+export interface PaymentIntent {
+  id: string;
+  clientSecret: string;
+  amount: number;
+  currency: string;
+  status: string;
 }
+
+// Payment processing parameters
+export interface ProcessPaymentParams {
+  paymentIntentId: string;
+  paymentMethodId: string;
+}
+
+// Payment result 
+export interface PaymentResult {
+  paymentIntentId: string;
+  status: string;
+  success: boolean;
+  amount: number;
+  currency: string;
+  processingDate: Date;
+}
+
+// Payment service instance
+const paymentService = new PaymentService();
 
 /**
- * Hook for interacting with the payment service
+ * Payment hook for managing payment operations
  */
-export function usePayment(options?: UsePaymentOptions): UsePaymentReturn {
-  const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+export function usePayment() {
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  const { onSuccess, onError } = options || {};
-  
+  const { toast } = useToast();
+
   /**
    * Create a payment intent
+   * @param params Payment creation parameters
+   * @returns Payment intent data or null if error
    */
-  const createPaymentIntent = async (data: CreatePaymentIntentRequest): Promise<PaymentIntent | null> => {
-    setIsLoading(true);
+  const createPaymentIntent = async (params: CreatePaymentParams): Promise<PaymentIntent | null> => {
+    setLoading(true);
     setError(null);
     
     try {
-      const response = await PaymentService.createPaymentIntent(data);
+      const paymentIntent = await paymentService.createPaymentIntent({
+        amount: params.amount,
+        currency: params.currency,
+        metadata: params.metadata,
+        description: params.description
+      });
       
-      if (response.success && response.paymentIntent) {
-        setPaymentIntent(response.paymentIntent);
-        onSuccess?.(response.paymentIntent);
-        return response.paymentIntent;
-      }
-      
-      if (response.error) {
-        setError(response.error);
-        onError?.(response.error);
-      } else {
-        setError('Failed to create payment intent');
-        onError?.('Failed to create payment intent');
-      }
-      
-      return null;
+      return paymentIntent;
     } catch (err) {
-      const errorMessage = (err as Error).message || 'An unexpected error occurred';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create payment intent';
       setError(errorMessage);
-      onError?.(errorMessage);
+      toast({
+        title: 'Payment Error',
+        description: errorMessage,
+        variant: 'destructive'
+      });
       return null;
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-  
+
   /**
-   * Get a payment intent
+   * Process a payment using the payment method
+   * @param params Payment processing parameters
+   * @returns Payment result or null if error
    */
-  const getPaymentIntent = async (paymentIntentId: string): Promise<PaymentIntent | null> => {
-    setIsLoading(true);
+  const processPayment = async (params: ProcessPaymentParams): Promise<PaymentResult | null> => {
+    setLoading(true);
     setError(null);
     
     try {
-      const response = await PaymentService.getPaymentIntent(paymentIntentId);
+      const result = await paymentService.processPayment(
+        params.paymentIntentId,
+        params.paymentMethodId
+      );
       
-      if (response.success && response.paymentIntent) {
-        setPaymentIntent(response.paymentIntent);
-        return response.paymentIntent;
-      }
-      
-      if (response.error) {
-        setError(response.error);
-        onError?.(response.error);
+      if (result.success) {
+        toast({
+          title: 'Payment Successful',
+          description: `Your payment of ${result.amount} ${result.currency} was successful.`,
+          variant: 'default'
+        });
       } else {
-        setError('Failed to retrieve payment intent');
-        onError?.('Failed to retrieve payment intent');
+        toast({
+          title: 'Payment Failed',
+          description: `Payment could not be processed: ${result.status}`,
+          variant: 'destructive'
+        });
       }
       
-      return null;
+      return result;
     } catch (err) {
-      const errorMessage = (err as Error).message || 'An unexpected error occurred';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to process payment';
       setError(errorMessage);
-      onError?.(errorMessage);
+      toast({
+        title: 'Payment Error',
+        description: errorMessage,
+        variant: 'destructive'
+      });
       return null;
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-  
+
   /**
-   * Cancel a payment intent
+   * Cancel an existing payment intent
+   * @param paymentIntentId ID of the payment intent to cancel
+   * @returns Success status
    */
   const cancelPaymentIntent = async (paymentIntentId: string): Promise<boolean> => {
-    setIsLoading(true);
+    setLoading(true);
     setError(null);
     
     try {
-      const response = await PaymentService.cancelPaymentIntent(paymentIntentId);
+      await paymentService.cancelPaymentIntent(paymentIntentId);
       
-      if (response.success) {
-        // If we have the current payment intent and it matches the cancelled one,
-        // update its status
-        if (paymentIntent && paymentIntent.id === paymentIntentId) {
-          setPaymentIntent({
-            ...paymentIntent,
-            status: PaymentStatus.CANCELLED
-          });
-        }
-        
-        return true;
-      }
+      toast({
+        title: 'Payment Cancelled',
+        description: 'The payment has been cancelled.',
+        variant: 'default'
+      });
       
-      if (response.error) {
-        setError(response.error);
-        onError?.(response.error);
-      } else {
-        setError('Failed to cancel payment intent');
-        onError?.('Failed to cancel payment intent');
-      }
-      
-      return false;
+      return true;
     } catch (err) {
-      const errorMessage = (err as Error).message || 'An unexpected error occurred';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to cancel payment';
       setError(errorMessage);
-      onError?.(errorMessage);
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive'
+      });
       return false;
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-  
+
   /**
-   * Check if the payment is completed
+   * Retrieve payment intent details
+   * @param paymentIntentId ID of the payment intent
+   * @returns Payment intent data or null if error
    */
-  const isPaymentCompleted = (): boolean => {
-    return !!paymentIntent && paymentIntent.status === PaymentStatus.COMPLETED;
+  const getPaymentIntent = async (paymentIntentId: string): Promise<PaymentIntent | null> => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const paymentIntent = await paymentService.getPaymentIntent(paymentIntentId);
+      return paymentIntent;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to retrieve payment intent';
+      setError(errorMessage);
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive'
+      });
+      return null;
+    } finally {
+      setLoading(false);
+    }
   };
-  
-  /**
-   * Check if the payment is pending
-   */
-  const isPending = (): boolean => {
-    return !!paymentIntent && paymentIntent.status === PaymentStatus.PENDING;
-  };
-  
-  /**
-   * Check if the payment is processing
-   */
-  const isProcessing = (): boolean => {
-    return !!paymentIntent && paymentIntent.status === PaymentStatus.PROCESSING;
-  };
-  
-  /**
-   * Check if the payment has failed
-   */
-  const isFailed = (): boolean => {
-    return !!paymentIntent && paymentIntent.status === PaymentStatus.FAILED;
-  };
-  
-  /**
-   * Check if the payment has been cancelled
-   */
-  const isCancelled = (): boolean => {
-    return !!paymentIntent && paymentIntent.status === PaymentStatus.CANCELLED;
-  };
-  
+
   return {
-    paymentIntent,
-    isLoading,
-    error,
     createPaymentIntent,
-    getPaymentIntent,
+    processPayment,
     cancelPaymentIntent,
-    isPaymentCompleted,
-    isPending,
-    isProcessing,
-    isFailed,
-    isCancelled
+    getPaymentIntent,
+    loading,
+    error
   };
 }

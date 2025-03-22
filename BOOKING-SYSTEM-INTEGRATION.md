@@ -1,138 +1,167 @@
 # Booking System Integration Guide
 
-This document provides instructions for integrating the new Clean Architecture-based booking system with the existing application.
+This document provides a comprehensive guide for integrating the clean architecture booking system with the existing Etoile Yachts platform.
 
 ## Overview
 
-The booking system has been refactored using Clean Architecture principles, which separates the codebase into distinct layers:
+The booking system has been refactored following clean architecture principles to improve maintainability, testability, and scalability. The implementation follows these layers:
 
-1. **Domain Layer**: Core business entities, value objects, and business rules
-2. **Application Layer**: Use cases that orchestrate domain entities
-3. **Adapter Layer**: Implementations of repository interfaces
-4. **Infrastructure Layer**: External frameworks and database integration
+1. **Domain Layer**: Core business entities and rules
+2. **Application Layer**: Use cases that orchestrate domain entities 
+3. **Adapter Layer**: Implementations of interfaces defined in the domain/application layers
+4. **Infrastructure Layer**: External frameworks and tools
 
 ## Integration Steps
 
-### 1. Integrate with Express Server
+### 1. Add Domain Entities to Your Application
 
-Add the following code to `server/index.ts` to integrate the clean architecture API routes:
+The domain layer contains the core business entities and rules. Integrate these files into your application:
+
+- `core/domain/booking/booking.ts`: The Booking entity
+- `core/domain/booking/booking-status.ts`: Enumeration of booking states
+- `core/domain/yacht/yacht.ts`: The Yacht entity
+- `core/domain/booking/payment-details.ts`: Payment information value object
+
+### 2. Implement Repository Interfaces
+
+The application layer defines repository interfaces that must be implemented:
+
+- `core/application/ports/repositories/booking-repository.ts`
+- `core/application/ports/repositories/yacht-repository.ts`
+
+### 3. Add Use Cases
+
+Integrate the following use cases from the application layer:
+
+- `core/application/use-cases/booking/create-booking-use-case.ts`
+- `core/application/use-cases/booking/cancel-booking-use-case.ts`
+- `core/application/use-cases/booking/get-booking-use-case.ts`
+- `core/application/use-cases/booking/list-bookings-use-case.ts`
+- `core/application/use-cases/booking/confirm-booking-use-case.ts`
+
+### 4. Implement Repository Adapters
+
+The adapter layer contains concrete implementations of the repository interfaces:
+
+- `adapters/repositories/firestore/firestore-booking-repository.ts`
+- `adapters/repositories/firestore/firestore-yacht-repository.ts`
+
+### 5. Set Up Controllers and Routes
+
+The infrastructure layer includes controllers and Express routes:
+
+- `infrastructure/api/controllers/booking-controller.ts`
+- `infrastructure/api/routes/booking-routes.ts`
+
+### 6. Register Routes with Express
+
+Add the following code to your Express app setup:
 
 ```typescript
-import { integrateCleanArchitectureApi } from '../infrastructure/api/integration';
+import { registerBookingRoutes } from './infrastructure/api/routes/booking-routes';
 
-// After setting up the Express app and middleware:
+// In your main Express setup file:
+const app = express();
 
-// Integrate Clean Architecture API
-const { firestore } = integrateCleanArchitectureApi(app);
+// Register booking routes
+registerBookingRoutes(app);
 ```
 
-### 2. Run Data Migration
+## Payment Integration
 
-After integrating the API, you can migrate existing bookings to the new structure by making an authenticated request to:
+The payment system is designed to work alongside the booking system:
 
-```
-POST /api/migration/bookings
-```
+1. Implement the payment service interface: `core/domain/services/payment-service.ts`
+2. Add the Stripe payment adapter: `adapters/payment/stripe-payment-service.ts`
+3. Create a factory for payment services: `adapters/payment/payment-service-factory.ts`
+4. Register payment routes: `infrastructure/api/routes/payment-routes.ts`
 
-This endpoint is only accessible to administrators.
+## Client-Side Integration
 
-## Testing the Integration
+For the frontend:
 
-### 1. Test API Endpoints
+1. Add the payment client service: `client/src/lib/payment-service.ts`
+2. Implement the payment hook: `client/src/hooks/use-payment.ts`
+3. Create payment components: `client/src/components/payment/payment-card.tsx`
 
-After integration, you can test that the new booking endpoints work as expected:
+## Example Usage
 
-- `GET /api/bookings` - List bookings with search criteria
-- `GET /api/bookings/:id` - Get a specific booking
-- `POST /api/bookings` - Create a new booking
-- `POST /api/bookings/:id/confirm` - Confirm a booking
-- `POST /api/bookings/:id/cancel` - Cancel a booking
-- `POST /api/bookings/check-availability` - Check yacht or package availability
-
-### 2. Verification Queries
-
-You can verify that new bookings are being created and managed properly using these Firestore queries:
+### Creating a Booking (Backend)
 
 ```typescript
-// List all bookings
-const bookings = await getDocs(collection(firestore, 'bookings'));
-console.log('Total bookings:', bookings.size);
+// Dependency injection
+const bookingRepository = new FirestoreBookingRepository();
+const yachtRepository = new FirestoreYachtRepository();
+const createBookingUseCase = new CreateBookingUseCase(bookingRepository, yachtRepository);
 
-// Check for migrated bookings
-const migratedBookings = await getDocs(
-  query(
-    collection(firestore, 'bookings'),
-    where('metadata._migrated', '==', true)
-  )
-);
-console.log('Migrated bookings:', migratedBookings.size);
+// Using the use case
+const newBooking = await createBookingUseCase.execute({
+  yachtId: 'yacht-123',
+  userId: 'user-456',
+  startDate: '2025-04-01',
+  endDate: '2025-04-03',
+  guestCount: 4,
+  specialRequests: 'Please prepare champagne.'
+});
 ```
 
-## Rollback Plan
+### Processing a Payment (Frontend)
 
-If issues are encountered during integration, you can temporarily revert to the original implementation by:
+```typescript
+// In a React component
+const { createPaymentIntent, processPayment } = usePayment();
 
-1. Commenting out the integration code in `server/index.ts`
-2. Restarting the server
+// When user initiates payment
+const paymentIntent = await createPaymentIntent({
+  amount: booking.totalPrice,
+  currency: 'AED',
+  metadata: { bookingId: booking.id }
+});
 
-## Known Issues and Limitations
+// Later, when payment form is submitted
+const result = await processPayment({
+  paymentIntentId: paymentIntent.id,
+  paymentMethodId: paymentMethodId
+});
 
-- Some TypeScript errors may exist in the current implementation due to interface mismatches that need to be resolved
-- The migration process only handles basic booking data; more complex scenarios may require manual intervention
-- Performance testing with large datasets has not been conducted yet
-
-## Testing
-
-### Unit Tests
-
-This project includes unit tests for all components of the booking system:
-
-1. **Domain Entities and Services**:
-   - Tests for Booking, BookingItem, TimeSlot entities
-   - Tests for BookingService, PricingService
-
-2. **Repository Adapters**:
-   - Tests for FirestoreBookingRepository
-   - Tests for FirestoreYachtRepository
-   - Tests for RepositoryFactory
-
-3. **Controllers**:
-   - Tests for BookingController
-
-To run tests for the clean architecture components, update the Jest configuration in `jest.config.js`:
-
-```javascript
-module.exports = {
-  // ... existing config
-  testMatch: [
-    // ... existing patterns
-    "**/tests/unit/core/**/*.test.ts",
-    "**/tests/unit/adapters/**/*.test.ts",
-    "**/tests/unit/infrastructure/**/*.test.ts"
-  ],
+if (result.status === 'succeeded') {
+  // Handle successful payment
 }
 ```
 
-Then run the tests with:
+## Database Migrations
 
-```bash
-npm test
-```
+When integrating with an existing database, you may need to migrate data to match the new schema:
 
-Or test specific components:
+1. Use the scripts in `infrastructure/migrations/` to transform existing data
+2. Run migration scripts in a controlled environment
+3. Validate data integrity after migration
 
-```bash
-npx jest tests/unit/adapters/repositories/firestore-booking-repository.test.ts
-```
+## Testing
 
-### Integration Tests
+A comprehensive test suite is available:
 
-For integration testing of the booking system, use the endpoints described in the "Test API Endpoints" section above with real data.
+1. Unit tests for domain entities and use cases
+2. Integration tests for repositories
+3. E2E tests for API endpoints
 
-## Future Improvements
+Run tests with: `npm run test`
 
-- Add more comprehensive input validation using Zod schemas
-- Implement batch processing for large datasets
-- Add event publishing for domain events to enable features like notifications
-- Create a dashboard UI specific to the new booking architecture
-- Add E2E tests for the booking flow
+## Troubleshooting
+
+Common issues and their solutions:
+
+1. **Missing Dependencies**: Ensure all required packages are installed
+2. **Type Errors**: Check that your implementations match the interface definitions
+3. **Repository Errors**: Validate Firestore collection references
+
+For more help, refer to the detailed documentation in each module.
+
+## Future Enhancements
+
+Planned improvements:
+
+1. Add notification service integration for booking confirmations
+2. Implement booking analytics dashboards
+3. Add support for recurring bookings
+4. Enhance payment processing with more providers
