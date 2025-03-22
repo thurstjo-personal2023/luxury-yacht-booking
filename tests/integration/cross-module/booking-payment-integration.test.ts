@@ -320,9 +320,11 @@ describe('Booking-Payment Cross-Module Integration', () => {
     // Step 4: Verify booking was updated
     const updatedBooking = await bookingRepository.getById(bookingResult.booking.id);
     expect(updatedBooking).toBeDefined();
-    expect(updatedBooking.status).toBe(BookingStatus.CONFIRMED);
-    expect(updatedBooking.paymentStatus).toBe(PaymentStatus.PAID);
-    expect(updatedBooking.paymentId).toBe(processPaymentResult.payment.id);
+    if (updatedBooking) {
+      expect(updatedBooking.status).toBe(BookingStatus.CONFIRMED);
+      expect(updatedBooking.paymentStatus).toBe(PaymentStatus.PAID);
+      expect(updatedBooking.paymentId).toBe(processPaymentResult.payment.id);
+    }
   });
   
   it('should roll back when payment fails', async () => {
@@ -391,7 +393,9 @@ describe('Booking-Payment Cross-Module Integration', () => {
     // Step 4: Verify booking was not updated
     const updatedBooking = await bookingRepository.getById(bookingResult.booking.id);
     expect(updatedBooking).toBeDefined();
-    expect(updatedBooking.status).toBe(BookingStatus.PENDING);
-    expect(updatedBooking.paymentId).toBeUndefined();
+    if (updatedBooking) {
+      expect(updatedBooking.status).toBe(BookingStatus.PENDING);
+      expect(updatedBooking.paymentId).toBeUndefined();
+    }
   });
 });

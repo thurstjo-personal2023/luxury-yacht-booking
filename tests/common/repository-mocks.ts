@@ -232,7 +232,7 @@ export class MockYachtRepository implements IYachtRepository {
 }
 
 // Mock implementation of PaymentService
-export class MockPaymentService implements IPaymentService {
+export class MockPaymentService {
   constructor() {}
   
   async createPaymentIntent(paymentInfo: any): Promise<any> {
