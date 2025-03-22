@@ -43,7 +43,8 @@ const ValidationResult = {
    * Check if a result is valid
    */
   isValid: function(result) {
-    return result && result.isValid === true;
+    if (!result) return false;
+    return result.isValid === true;
   },
   
   /**
