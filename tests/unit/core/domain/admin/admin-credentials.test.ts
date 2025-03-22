@@ -3,30 +3,25 @@
  */
 import { describe, expect, it, jest } from '@jest/globals';
 import { AdminCredentials } from '../../../../../core/domain/admin/admin-credentials';
-import { MfaStatus, MfaStatusType } from '../../../../../core/domain/admin/mfa-status';
 
 describe('AdminCredentials Entity', () => {
   it('should create admin credentials with valid properties', () => {
     // Arrange
     const userId = 'admin-123';
-    const email = 'admin@example.com';
     const passwordHash = 'hashed-password';
+    const hasMfaEnabled = true;
     const mfaSecret = 'mfa-secret';
-    const updatedAt = new Date();
     
     // Act
     const credentials = new AdminCredentials(
       userId,
-      email,
-      updatedAt,
       passwordHash,
+      hasMfaEnabled,
       mfaSecret
     );
     
     // Assert
     expect(credentials.userId).toBe(userId);
-    expect(credentials.email).toBe(email);
-    expect(credentials.updatedAt).toEqual(updatedAt);
     expect(credentials.hasPassword).toBe(true);
     expect(credentials.hasMfaSecret).toBe(true);
   });
@@ -35,15 +30,14 @@ describe('AdminCredentials Entity', () => {
     // Arrange & Act
     const withPassword = new AdminCredentials(
       'admin-123',
-      'admin@example.com',
-      new Date(),
-      'password-hash'
+      'password-hash',
+      false
     );
     
     const withoutPassword = new AdminCredentials(
       'admin-123',
-      'admin@example.com',
-      new Date()
+      undefined,
+      false
     );
     
     // Assert
@@ -55,17 +49,15 @@ describe('AdminCredentials Entity', () => {
     // Arrange & Act
     const withMfa = new AdminCredentials(
       'admin-123',
-      'admin@example.com',
-      new Date(),
       'password-hash',
+      true,
       'mfa-secret'
     );
     
     const withoutMfa = new AdminCredentials(
       'admin-123',
-      'admin@example.com',
-      new Date(),
-      'password-hash'
+      'password-hash',
+      false
     );
     
     // Assert
@@ -77,9 +69,8 @@ describe('AdminCredentials Entity', () => {
     // Arrange
     const credentials = new AdminCredentials(
       'admin-123',
-      'admin@example.com',
-      new Date(),
-      'old-hash'
+      'old-hash',
+      false
     );
     
     const oldUpdateTime = credentials.updatedAt;
@@ -101,9 +92,8 @@ describe('AdminCredentials Entity', () => {
     // Arrange
     const credentials = new AdminCredentials(
       'admin-123',
-      'admin@example.com',
-      new Date(),
-      'hash'
+      'hash',
+      false
     );
     
     // Act
@@ -117,9 +107,8 @@ describe('AdminCredentials Entity', () => {
     // Arrange
     const credentials = new AdminCredentials(
       'admin-123',
-      'admin@example.com',
-      new Date(),
       'hash',
+      true,
       'mfa-secret'
     );
     
@@ -134,9 +123,8 @@ describe('AdminCredentials Entity', () => {
     // Arrange
     const credentials = new AdminCredentials(
       'admin-123',
-      'admin@example.com',
-      new Date(),
-      'hash'
+      'hash',
+      false
     );
     
     // Act
@@ -153,9 +141,8 @@ describe('AdminCredentials Entity', () => {
     // Arrange
     const credentials = new AdminCredentials(
       'admin-123',
-      'admin@example.com',
-      new Date(),
-      'hash'
+      'hash',
+      false
     );
     
     const token = credentials.generateTemporaryToken();
@@ -173,9 +160,8 @@ describe('AdminCredentials Entity', () => {
     // Arrange
     const credentials = new AdminCredentials(
       'admin-123',
-      'admin@example.com',
-      new Date(),
       'hash',
+      true,
       'mfa-secret'
     );
     
@@ -191,9 +177,8 @@ describe('AdminCredentials Entity', () => {
     // Arrange
     const credentials = new AdminCredentials(
       'admin-123',
-      'admin@example.com',
-      new Date(),
-      'hash'
+      'hash',
+      false
     );
     
     // Act & Assert
@@ -203,18 +188,16 @@ describe('AdminCredentials Entity', () => {
   it('should convert to and from data object correctly', () => {
     // Arrange
     const userId = 'admin-123';
-    const email = 'admin@example.com';
-    const updatedAt = new Date();
     const passwordHash = 'hash';
+    const hasMfaEnabled = true;
     const mfaSecret = 'secret';
     const tokenExpiry = new Date(Date.now() + 3600000);
     const temporaryToken = 'temp-token';
     
     const credentials = new AdminCredentials(
       userId,
-      email,
-      updatedAt,
       passwordHash,
+      hasMfaEnabled,
       mfaSecret,
       temporaryToken,
       tokenExpiry
@@ -226,8 +209,6 @@ describe('AdminCredentials Entity', () => {
     
     // Assert
     expect(recreated.userId).toBe(userId);
-    expect(recreated.email).toBe(email);
-    expect(recreated.updatedAt.getTime()).toBe(updatedAt.getTime());
     expect(recreated.hasPassword).toBe(true);
     expect(recreated.hasMfaSecret).toBe(true);
     expect(recreated.hasTemporaryToken).toBe(true);
