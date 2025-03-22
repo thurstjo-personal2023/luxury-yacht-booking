@@ -81,9 +81,58 @@ If issues are encountered during integration, you can temporarily revert to the 
 - The migration process only handles basic booking data; more complex scenarios may require manual intervention
 - Performance testing with large datasets has not been conducted yet
 
+## Testing
+
+### Unit Tests
+
+This project includes unit tests for all components of the booking system:
+
+1. **Domain Entities and Services**:
+   - Tests for Booking, BookingItem, TimeSlot entities
+   - Tests for BookingService, PricingService
+
+2. **Repository Adapters**:
+   - Tests for FirestoreBookingRepository
+   - Tests for FirestoreYachtRepository
+   - Tests for RepositoryFactory
+
+3. **Controllers**:
+   - Tests for BookingController
+
+To run tests for the clean architecture components, update the Jest configuration in `jest.config.js`:
+
+```javascript
+module.exports = {
+  // ... existing config
+  testMatch: [
+    // ... existing patterns
+    "**/tests/unit/core/**/*.test.ts",
+    "**/tests/unit/adapters/**/*.test.ts",
+    "**/tests/unit/infrastructure/**/*.test.ts"
+  ],
+}
+```
+
+Then run the tests with:
+
+```bash
+npm test
+```
+
+Or test specific components:
+
+```bash
+npx jest tests/unit/adapters/repositories/firestore-booking-repository.test.ts
+```
+
+### Integration Tests
+
+For integration testing of the booking system, use the endpoints described in the "Test API Endpoints" section above with real data.
+
 ## Future Improvements
 
 - Add more comprehensive input validation using Zod schemas
 - Implement batch processing for large datasets
 - Add event publishing for domain events to enable features like notifications
 - Create a dashboard UI specific to the new booking architecture
+- Add E2E tests for the booking flow
