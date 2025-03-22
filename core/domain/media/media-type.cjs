@@ -9,30 +9,32 @@ const MediaType = {
   VIDEO: 'video',
   DOCUMENT: 'document',
   AUDIO: 'audio',
+  UNKNOWN: 'unknown',
   
   /**
    * Determine media type from URL and content type
    */
   fromUrl: function(url, contentType = null) {
-    if (!url) {
+    if (url === null || url === undefined) {
       return null;
     }
     
+    // Convert to lowercase for case-insensitive matching
     url = url.toLowerCase();
     
-    // Use content type if available
+    // Use content type if available (takes precedence over URL patterns)
     if (contentType) {
-      if (contentType.startsWith('image/')) {
+      if (contentType.toLowerCase().startsWith('image/')) {
         return this.IMAGE;
-      } else if (contentType.startsWith('video/')) {
+      } else if (contentType.toLowerCase().startsWith('video/')) {
         return this.VIDEO;
-      } else if (contentType.startsWith('audio/')) {
+      } else if (contentType.toLowerCase().startsWith('audio/')) {
         return this.AUDIO;
       } else if (
-        contentType.startsWith('application/pdf') ||
-        contentType.startsWith('application/msword') ||
-        contentType.startsWith('application/vnd.openxmlformats-officedocument') ||
-        contentType.startsWith('text/plain')
+        contentType.toLowerCase().startsWith('application/pdf') ||
+        contentType.toLowerCase().startsWith('application/msword') ||
+        contentType.toLowerCase().startsWith('application/vnd.openxmlformats-officedocument') ||
+        contentType.toLowerCase().includes('text/plain')
       ) {
         return this.DOCUMENT;
       }
@@ -94,6 +96,9 @@ const MediaType = {
    * Check if a media type matches the expected type
    */
   matches: function(expected, actual) {
+    if (!expected || !actual) {
+      return false;
+    }
     return expected === actual;
   }
 };
@@ -102,6 +107,10 @@ const MediaType = {
  * Check if a value is a valid media type
  */
 function isValidMediaType(type) {
+  if (typeof type !== 'string') {
+    return false;
+  }
+  
   return type === MediaType.IMAGE || 
          type === MediaType.VIDEO || 
          type === MediaType.DOCUMENT || 
