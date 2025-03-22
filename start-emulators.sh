@@ -30,7 +30,7 @@ echo
 
 # Use test configuration if available
 if [ -f "firebase.test.json" ]; then
-  firebase emulators:start --config firebase.test.json
+  firebase emulators:start --config firebase.test.json --project etoile-yachts
 else
-  firebase emulators:start
+  firebase emulators:start --project etoile-yachts
 fi

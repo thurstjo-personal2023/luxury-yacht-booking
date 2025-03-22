@@ -10,7 +10,7 @@ if [ $? -eq 0 ]; then
   RUNNING=true
 else
   echo -e "\033[0;31mFirebase emulators are not running.\033[0m"
-  echo "Please start the emulators with 'firebase emulators:start' in another terminal."
+  echo "Please start the emulators with './start-emulators.sh' in another terminal."
   exit 1
 fi
 
