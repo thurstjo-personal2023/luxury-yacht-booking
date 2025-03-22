@@ -10,23 +10,30 @@ We encountered issues running TypeScript tests in our mixed ESM/CommonJS environ
 
 ## Solution
 
-### Basic Testing Approach
+Our testing approach has two main strategies:
 
-For basic tests that don't require complex module imports:
+1. **Domain Model Testing**: Using CommonJS for isolated testing of domain models
+2. **Integration Testing**: Using Firebase Emulators for testing integrations
+
+### Domain Model Testing
+
+For basic tests that don't require Firebase dependencies:
 1. Use `.cjs` extension for test files
 2. Create corresponding Jest configuration files with `.cjs` extension
 3. Use `testEnvironment: 'node'` in the Jest configuration
 4. Run tests with `npx jest --config jest.*.config.cjs`
 
-### TypeScript Module Testing
+### Integration Testing with Firebase Emulators
 
-For tests involving TypeScript modules:
-1. Create CommonJS versions of critical domain models (`*.cjs`)
-2. Export the models using `module.exports`
-3. Import in tests using `require()`
-4. Configure Jest with `verbose: true` and appropriate `testTimeout`
+For tests that require Firebase services:
+1. Set up Firebase Emulators
+2. Configure authentication with service account credentials
+3. Set environment variables for emulator connections
+4. Run the tests with proper timeout configurations
 
-### Example Implementation
+## Implementation Examples
+
+### Domain Model Testing
 
 **Domain Model (CommonJS version):**
 ```javascript
@@ -74,20 +81,66 @@ module.exports = {
 };
 ```
 
+### Firebase Emulator Testing
+
+**Environment Setup:**
+```bash
+# Set up environment for testing
+export NODE_ENV=test
+export FIRESTORE_EMULATOR_HOST="localhost:8080"
+export FIREBASE_AUTH_EMULATOR_HOST="localhost:9099"
+export FIREBASE_STORAGE_EMULATOR_HOST="localhost:9199"
+
+# Set the Google Application Credentials for authentication
+export GOOGLE_APPLICATION_CREDENTIALS="./etoile-yachts-9322f3c69d91.json"
+```
+
+**Jest Configuration:**
+```javascript
+// jest.integration.config.js
+module.exports = {
+  testEnvironment: 'node',
+  testMatch: [
+    '<rootDir>/tests/integration/**/*.test.ts'
+  ],
+  transform: {
+    '^.+\\.tsx?$': ['ts-jest', { /* options */ }]
+  },
+  setupFilesAfterEnv: [
+    '<rootDir>/tests/setup-integration.ts'
+  ],
+  testTimeout: 30000
+};
+```
+
 ## Running Tests
 
 Use the provided shell scripts:
-- `./run-simple-test.sh` - Run basic tests
-- `./run-payment-tests.sh` - Run payment domain tests
+- `./run-all-tests.sh` - Run all domain model tests
+- `./run-emulator-tests.sh` - Run tests requiring Firebase emulators
+
+## Automated Testing Tools
+
+We've created a tool to automatically convert TypeScript domain models to CommonJS for testing:
+
+```bash
+node create-test-modules.js core/domain/your-model.ts tests/unit/core/domain/your-folder
+```
+
+This will:
+- Create a CommonJS version of your domain model
+- Generate a basic test file
+- Update the Jest configuration
 
 ## Known Limitations
 
 1. This approach requires maintaining dual versions of critical domain models
 2. TypeScript type checking is not available in the CommonJS versions
-3. Tests requiring Firebase emulators still need additional configuration
+3. Integration tests require the Firebase Emulator Suite to be running
 
-## Future Improvements
+## Best Practices
 
-1. Implement automatic conversion of TypeScript modules to CommonJS format
-2. Create a unified testing framework that handles both ESM and CommonJS modules
-3. Add CI/CD integration with proper test environment setup
+1. Use the CommonJS approach for testing pure domain logic
+2. Use the Firebase Emulator approach for testing integrations
+3. Keep the CommonJS versions in sync with TypeScript using the automation tool
+4. Run domain tests frequently (they're fast), and integration tests less frequently
