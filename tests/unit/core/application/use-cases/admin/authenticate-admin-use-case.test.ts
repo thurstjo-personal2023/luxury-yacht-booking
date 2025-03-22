@@ -6,10 +6,12 @@ import { AuthenticateAdminUseCase } from '../../../../../../core/application/use
 import { IAdminRepository } from '../../../../../../core/application/interfaces/repositories/admin-repository';
 import { IAdminCredentialsRepository } from '../../../../../../core/application/interfaces/repositories/admin-credentials-repository';
 import { IAuthProvider } from '../../../../../../core/application/interfaces/auth/auth-provider';
-import { AdminAuthenticationService } from '../../../../../../core/domain/admin/admin-authentication-service';
-import { AdminUser } from '../../../../../../core/domain/admin/admin-user';
-import { AdminRoleType } from '../../../../../../core/domain/admin/admin-role';
-import { MfaStatusType } from '../../../../../../core/domain/admin/mfa-status';
+import { AdminAuthenticationService, AuthenticationResult } from '../../../../../../core/domain/admin/admin-authentication-service';
+import { AdminUser, AdminUserStatus } from '../../../../../../core/domain/admin/admin-user';
+import { AdminRole, AdminRoleType } from '../../../../../../core/domain/admin/admin-role';
+import { MfaStatus, MfaStatusType } from '../../../../../../core/domain/admin/mfa-status';
+import { Permission } from '../../../../../../core/domain/admin/permission';
+import { AdminCredentials } from '../../../../../../core/domain/admin/admin-credentials';
 
 describe('AuthenticateAdminUseCase', () => {
   let adminRepository: jest.Mocked<IAdminRepository>;
@@ -23,22 +25,23 @@ describe('AuthenticateAdminUseCase', () => {
     adminRepository = {
       findById: jest.fn(),
       findByEmail: jest.fn(),
-      findByAuthId: jest.fn(),
-      save: jest.fn(),
+      create: jest.fn(),
       update: jest.fn(),
-      delete: jest.fn(),
-      findAll: jest.fn(),
-      findByStatus: jest.fn(),
-      findByRole: jest.fn(),
-      count: jest.fn()
+      delete: jest.fn()
     } as unknown as jest.Mocked<IAdminRepository>;
     
     credentialsRepository = {
-      findByAdminId: jest.fn(),
-      findByEmail: jest.fn(),
-      save: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn()
+      getCredentials: jest.fn(),
+      getCredentialsByEmail: jest.fn(),
+      createCredentials: jest.fn(),
+      updateCredentials: jest.fn(),
+      updatePassword: jest.fn(),
+      setupMfa: jest.fn(),
+      disableMfa: jest.fn(),
+      storeTemporaryToken: jest.fn(),
+      validateTemporaryToken: jest.fn(),
+      clearTemporaryToken: jest.fn(),
+      deleteCredentials: jest.fn()
     } as unknown as jest.Mocked<IAdminCredentialsRepository>;
     
     authProvider = {
@@ -58,7 +61,14 @@ describe('AuthenticateAdminUseCase', () => {
     
     // Create mock authentication service
     authService = {
-      verifyCredentials: jest.fn()
+      validatePassword: jest.fn(),
+      hashPassword: jest.fn(),
+      verifyPassword: jest.fn(),
+      generateMfaSecret: jest.fn(),
+      validateMfaToken: jest.fn(),
+      generateSecureToken: jest.fn(),
+      authenticate: jest.fn(),
+      verifyMfa: jest.fn()
     } as unknown as jest.Mocked<AdminAuthenticationService>;
     
     // Create use case
@@ -76,6 +86,21 @@ describe('AuthenticateAdminUseCase', () => {
     const password = 'correct-password';
     const adminId = 'admin-123';
     const token = 'auth-token-123';
+    const createdDate = new Date();
+    const updatedDate = new Date();
+    
+    // Create a proper AdminUser instance with all required parameters
+    const admin = new AdminUser(
+      adminId,
+      email,
+      'Test Admin',
+      new AdminRole(AdminRoleType.ADMIN),
+      [], // permissions
+      new MfaStatus(MfaStatusType.DISABLED),
+      AdminUserStatus.ACTIVE,
+      createdDate,
+      updatedDate
+    );
     
     // Mock getUserByEmail
     authProvider.getUserByEmail.mockResolvedValue({
@@ -92,27 +117,24 @@ describe('AuthenticateAdminUseCase', () => {
     });
     
     // Mock admin repository response
-    const admin = new AdminUser(
+    adminRepository.findById.mockResolvedValue(admin);
+    
+    // Create a proper AdminCredentials instance
+    const credentials = new AdminCredentials(
       adminId,
       email,
-      'Test Admin',
-      AdminRoleType.ADMIN,
-      MfaStatusType.DISABLED,
-      'active',
-      new Date()
+      updatedDate,
+      'hashed-password'
     );
-    admin.lastLoginAt = new Date();
     
-    adminRepository.findByAuthId.mockResolvedValue(admin);
+    // Mock credentials repository
+    credentialsRepository.getCredentials.mockResolvedValue(credentials);
     
-    // Mock credentials
-    credentialsRepository.findByAdminId.mockResolvedValue({
-      id: 'cred-123',
-      adminId
+    // Mock authentication service
+    authService.authenticate.mockReturnValue({
+      success: true,
+      requiresMfa: false
     });
-    
-    // Mock authentication verification
-    authService.verifyCredentials.mockResolvedValue(true);
     
     // Act
     const result = await useCase.execute(email, password);
@@ -123,9 +145,9 @@ describe('AuthenticateAdminUseCase', () => {
     expect(result.token).toBe(token);
     expect(result.requiresMfa).toBe(false);
     expect(authProvider.getUserByEmail).toHaveBeenCalledWith(email);
-    expect(adminRepository.findByAuthId).toHaveBeenCalledWith(adminId);
-    expect(credentialsRepository.findByAdminId).toHaveBeenCalledWith(adminId);
-    expect(authService.verifyCredentials).toHaveBeenCalledWith(adminId, password);
+    expect(adminRepository.findById).toHaveBeenCalledWith(adminId);
+    expect(credentialsRepository.getCredentials).toHaveBeenCalledWith(adminId);
+    expect(authService.authenticate).toHaveBeenCalledWith(credentials, password);
   });
   
   it('should indicate MFA is required for admins with MFA enabled', async () => {
@@ -133,6 +155,22 @@ describe('AuthenticateAdminUseCase', () => {
     const email = 'admin@example.com';
     const password = 'correct-password';
     const adminId = 'admin-123';
+    const token = 'auth-token-123';
+    const createdDate = new Date();
+    const updatedDate = new Date();
+    
+    // Create a proper AdminUser instance with MFA enabled
+    const admin = new AdminUser(
+      adminId,
+      email,
+      'Test Admin',
+      new AdminRole(AdminRoleType.ADMIN),
+      [], // permissions
+      new MfaStatus(MfaStatusType.ENABLED),
+      AdminUserStatus.ACTIVE,
+      createdDate,
+      updatedDate
+    );
     
     // Mock getUserByEmail
     authProvider.getUserByEmail.mockResolvedValue({
@@ -144,32 +182,31 @@ describe('AuthenticateAdminUseCase', () => {
     
     // Mock generateToken
     authProvider.generateToken.mockResolvedValue({
-      token: 'auth-token-123',
+      token,
       expiresIn: 3600
     });
     
-    // Mock admin repository response with MFA enabled
-    const admin = new AdminUser(
+    // Mock admin repository response
+    adminRepository.findById.mockResolvedValue(admin);
+    
+    // Create a proper AdminCredentials instance with MFA secret
+    const credentials = new AdminCredentials(
       adminId,
       email,
-      'Test Admin',
-      AdminRoleType.ADMIN,
-      MfaStatusType.ENABLED,
-      'active',
-      new Date()
+      updatedDate,
+      'hashed-password',
+      'mfa-secret'
     );
-    admin.lastLoginAt = new Date();
     
-    adminRepository.findByAuthId.mockResolvedValue(admin);
+    // Mock credentials repository
+    credentialsRepository.getCredentials.mockResolvedValue(credentials);
     
-    // Mock credentials
-    credentialsRepository.findByAdminId.mockResolvedValue({
-      id: 'cred-123',
-      adminId
+    // Mock authentication service to indicate MFA is required
+    authService.authenticate.mockReturnValue({
+      success: true,
+      requiresMfa: true,
+      temporaryToken: 'temp-token-123'
     });
-    
-    // Mock authentication verification
-    authService.verifyCredentials.mockResolvedValue(true);
     
     // Act
     const result = await useCase.execute(email, password);
@@ -177,8 +214,9 @@ describe('AuthenticateAdminUseCase', () => {
     // Assert
     expect(result.success).toBe(true);
     expect(result.admin).toBe(admin);
-    expect(result.token).toBe('auth-token-123');
+    expect(result.token).toBe(token);
     expect(result.requiresMfa).toBe(true);
+    expect(authService.authenticate).toHaveBeenCalledWith(credentials, password);
   });
   
   it('should fail for non-existent admin user', async () => {
@@ -214,7 +252,7 @@ describe('AuthenticateAdminUseCase', () => {
     });
     
     // Mock admin repository to return null (not an admin)
-    adminRepository.findByAuthId.mockResolvedValue(null);
+    adminRepository.findById.mockResolvedValue(null);
     
     // Act
     const result = await useCase.execute(email, password);
@@ -231,6 +269,21 @@ describe('AuthenticateAdminUseCase', () => {
     const email = 'admin@example.com';
     const password = 'wrong-password';
     const adminId = 'admin-123';
+    const createdDate = new Date();
+    const updatedDate = new Date();
+    
+    // Create a proper AdminUser instance
+    const admin = new AdminUser(
+      adminId,
+      email,
+      'Test Admin',
+      new AdminRole(AdminRoleType.ADMIN),
+      [], // permissions
+      new MfaStatus(MfaStatusType.DISABLED),
+      AdminUserStatus.ACTIVE,
+      createdDate,
+      updatedDate
+    );
     
     // Mock getUserByEmail
     authProvider.getUserByEmail.mockResolvedValue({
@@ -241,26 +294,25 @@ describe('AuthenticateAdminUseCase', () => {
     });
     
     // Mock admin repository response
-    const admin = new AdminUser(
+    adminRepository.findById.mockResolvedValue(admin);
+    
+    // Create a proper AdminCredentials instance
+    const credentials = new AdminCredentials(
       adminId,
       email,
-      'Test Admin',
-      AdminRoleType.ADMIN,
-      MfaStatusType.DISABLED,
-      'active',
-      new Date()
+      updatedDate,
+      'hashed-password'
     );
     
-    adminRepository.findByAuthId.mockResolvedValue(admin);
+    // Mock credentials repository
+    credentialsRepository.getCredentials.mockResolvedValue(credentials);
     
-    // Mock credentials
-    credentialsRepository.findByAdminId.mockResolvedValue({
-      id: 'cred-123',
-      adminId
+    // Mock authentication service to indicate invalid credentials
+    authService.authenticate.mockReturnValue({
+      success: false,
+      requiresMfa: false,
+      error: 'Invalid password'
     });
-    
-    // Mock authentication verification to fail
-    authService.verifyCredentials.mockResolvedValue(false);
     
     // Act
     const result = await useCase.execute(email, password);
@@ -276,6 +328,21 @@ describe('AuthenticateAdminUseCase', () => {
     const email = 'admin@example.com';
     const password = 'password123';
     const adminId = 'admin-123';
+    const createdDate = new Date();
+    const updatedDate = new Date();
+    
+    // Create a proper AdminUser instance
+    const admin = new AdminUser(
+      adminId,
+      email,
+      'Test Admin',
+      new AdminRole(AdminRoleType.ADMIN),
+      [], // permissions
+      new MfaStatus(MfaStatusType.DISABLED),
+      AdminUserStatus.ACTIVE,
+      createdDate,
+      updatedDate
+    );
     
     // Mock getUserByEmail
     authProvider.getUserByEmail.mockResolvedValue({
@@ -286,20 +353,17 @@ describe('AuthenticateAdminUseCase', () => {
     });
     
     // Mock admin repository response
-    const admin = new AdminUser(
-      adminId,
-      email,
-      'Test Admin',
-      AdminRoleType.ADMIN,
-      MfaStatusType.DISABLED,
-      'active',
-      new Date()
-    );
-    
-    adminRepository.findByAuthId.mockResolvedValue(admin);
+    adminRepository.findById.mockResolvedValue(admin);
     
     // Mock credentials repository to return null (credentials not found)
-    credentialsRepository.findByAdminId.mockResolvedValue(null);
+    credentialsRepository.getCredentials.mockResolvedValue(null);
+    
+    // Mock authentication service for missing credentials
+    authService.authenticate.mockReturnValue({
+      success: false,
+      requiresMfa: false,
+      error: 'Invalid credentials'
+    });
     
     // Act
     const result = await useCase.execute(email, password);
@@ -324,7 +388,7 @@ describe('AuthenticateAdminUseCase', () => {
     });
     
     // Mock admin repository to throw an error
-    adminRepository.findByAuthId.mockRejectedValue(new Error('Database connection error'));
+    adminRepository.findById.mockRejectedValue(new Error('Database connection error'));
     
     // Act
     const result = await useCase.execute(email, password);
