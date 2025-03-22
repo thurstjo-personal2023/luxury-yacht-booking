@@ -12,9 +12,11 @@ NC="\033[0m" # No Color
 
 # Set up environment for testing
 export NODE_ENV=test
-export FIRESTORE_EMULATOR_HOST="localhost:8080"
-export FIREBASE_AUTH_EMULATOR_HOST="localhost:9099"
-export FIREBASE_STORAGE_EMULATOR_HOST="localhost:9199"
+export FIRESTORE_EMULATOR_HOST="localhost:8081"
+export FIREBASE_AUTH_EMULATOR_HOST="localhost:9091"
+export FIREBASE_STORAGE_EMULATOR_HOST="localhost:9191"
+export FIREBASE_PUBSUB_EMULATOR_HOST="localhost:8086"
+export FIREBASE_FUNCTIONS_EMULATOR_HOST="localhost:5002"
 
 # Set the Google Application Credentials
 export GOOGLE_APPLICATION_CREDENTIALS="./etoile-yachts-9322f3c69d91.json"
@@ -25,11 +27,11 @@ check_emulators() {
   echo -e "${BLUE}Checking if Firebase emulators are running...${NC}"
   
   # Check Firestore emulator
-  curl -s http://localhost:8080 > /dev/null
+  curl -s http://localhost:8081 > /dev/null
   firestore_status=$?
   
   # Check Auth emulator
-  curl -s http://localhost:9099 > /dev/null
+  curl -s http://localhost:9091 > /dev/null
   auth_status=$?
   
   if [ $firestore_status -eq 0 ] && [ $auth_status -eq 0 ]; then
@@ -37,7 +39,7 @@ check_emulators() {
     return 0
   else
     echo -e "${RED}Firebase emulators are not running. Please start the emulators:${NC}"
-    echo -e "  ${YELLOW}firebase emulators:start${NC}"
+    echo -e "  ${YELLOW}firebase emulators:start --config=firebase.test.json${NC}"
     return 1
   fi
 }

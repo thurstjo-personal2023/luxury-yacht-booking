@@ -16,10 +16,10 @@ import { getStorage, connectStorageEmulator } from 'firebase/storage';
 
 export const EMULATOR_HOST = 'localhost';
 export const EMULATOR_PORTS = {
-  auth: 9099,
-  firestore: 8080,
-  storage: 9199,
-  functions: 5001,
+  auth: 9091,
+  firestore: 8081,
+  storage: 9191,
+  functions: 5002,
   database: 9000
 };
 
