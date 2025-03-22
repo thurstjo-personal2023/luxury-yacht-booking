@@ -7,10 +7,8 @@ import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import { FirebaseAdminRepository } from '../../../../../adapters/repositories/firebase/firebase-admin-repository';
 import { AdminUser, AdminUserStatus } from '../../../../../core/domain/admin/admin-user';
 import { AdminRole, AdminRoleType } from '../../../../../core/domain/admin/admin-role';
-import { Permission } from '../../../../../core/domain/admin/permission';
 import { MfaStatus, MfaStatusType } from '../../../../../core/domain/admin/mfa-status';
 import { Timestamp } from 'firebase-admin/firestore';
-import { IAdminRepository, AdminSearchOptions, AdminSearchResult } from '../../../../../core/application/interfaces/repositories/admin-repository';
 
 describe('FirebaseAdminRepository', () => {
   let mockFirestore: any;
@@ -19,9 +17,9 @@ describe('FirebaseAdminRepository', () => {
   let mockQuery: any;
   let mockWhere: any;
   let mockLimit: any;
-  let mockOrderBy: any;
-  let mockOffset: any;
+  let mockCount: any;
   let mockQuerySnapshot: any;
+  let mockCountSnapshot: any;
   let repository: FirebaseAdminRepository;
   
   beforeEach(() => {
@@ -36,25 +34,28 @@ describe('FirebaseAdminRepository', () => {
     
     // Create mock query functions
     mockLimit = jest.fn().mockReturnValue(mockQuery);
-    mockOrderBy = jest.fn().mockReturnValue(mockQuery);
-    mockOffset = jest.fn().mockReturnValue(mockQuery);
     mockWhere = jest.fn().mockReturnValue(mockQuery);
+    
+    // Create mock count function
+    mockCount = jest.fn().mockReturnValue({
+      get: jest.fn().mockResolvedValue({
+        data: jest.fn().mockReturnValue({ count: 5 })
+      })
+    });
     
     // Create mock query with chainable methods
     mockQuery = {
       get: jest.fn(),
       where: mockWhere,
       limit: mockLimit,
-      orderBy: mockOrderBy,
-      offset: mockOffset
     };
     
     // Create mock collection reference
     mockCollection = {
       doc: jest.fn().mockReturnValue(mockDoc),
       where: mockWhere,
-      add: jest.fn(),
-      get: jest.fn()
+      get: jest.fn(),
+      count: mockCount
     };
     
     // Create mock Firestore
@@ -66,7 +67,6 @@ describe('FirebaseAdminRepository', () => {
     mockQuerySnapshot = {
       empty: false,
       docs: [],
-      size: 0,
       forEach: jest.fn()
     };
     
@@ -88,14 +88,8 @@ describe('FirebaseAdminRepository', () => {
         status: AdminUserStatus.ACTIVE,
         phoneNumber: '+1234567890',
         createdAt: Timestamp.fromDate(new Date()),
-        updatedAt: Timestamp.fromDate(new Date()),
         lastLoginAt: null,
-        mfaStatus: {
-          type: 'disabled'
-        },
-        permissions: ['content_management.view', 'media_management.view'],
-        lastLoginAttempts: [],
-        whitelistedIps: []
+        mfaStatus: { type: 'disabled' }
       })
     };
     
@@ -146,14 +140,8 @@ describe('FirebaseAdminRepository', () => {
         status: AdminUserStatus.ACTIVE,
         phoneNumber: '+1234567890',
         createdAt: Timestamp.fromDate(new Date()),
-        updatedAt: Timestamp.fromDate(new Date()),
         lastLoginAt: null,
-        mfaStatus: {
-          type: 'disabled'
-        },
-        permissions: ['content_management.view', 'media_management.view'],
-        lastLoginAttempts: [],
-        whitelistedIps: []
+        mfaStatus: { type: 'disabled' }
       })
     };
     
@@ -190,94 +178,62 @@ describe('FirebaseAdminRepository', () => {
     expect(admin).toBeNull();
   });
   
-  it('should create a new admin', async () => {
+  it('should save a new admin', async () => {
     // Arrange
     const adminId = 'new-admin-123';
-    const createdDate = new Date();
-    const updatedDate = new Date();
-    
-    const admin = new AdminUser(
-      adminId,
-      'newadmin@example.com',
-      'New Admin',
-      new AdminRole(AdminRoleType.ADMIN),
-      [],
-      new MfaStatus(MfaStatusType.DISABLED),
-      AdminUserStatus.PENDING_APPROVAL,
-      createdDate,
-      updatedDate
-    );
-    
-    jest.spyOn(admin, 'toData').mockReturnValue({
+    const mockAdmin = {
       id: adminId,
+      authId: adminId,
       email: 'newadmin@example.com',
       name: 'New Admin',
-      role: 'admin',
-      permissions: [],
-      mfaStatus: { type: 'disabled' },
+      role: AdminRoleType.ADMIN,
       status: AdminUserStatus.PENDING_APPROVAL,
-      createdAt: Timestamp.fromDate(createdDate),
-      updatedAt: Timestamp.fromDate(updatedDate),
+      phoneNumber: '+1234567890',
+      createdAt: new Date(),
       lastLoginAt: null,
-      lastLoginAttempts: [],
-      whitelistedIps: []
-    });
+      mfaStatus: MfaStatusType.DISABLED
+    };
     
     mockDoc.set.mockResolvedValue({});
     
     // Act
-    const createdAdmin = await repository.create(admin);
+    const result = await repository.save(mockAdmin as any);
     
     // Assert
     expect(mockFirestore.collection).toHaveBeenCalledWith('admin_users');
     expect(mockCollection.doc).toHaveBeenCalledWith(adminId);
     expect(mockDoc.set).toHaveBeenCalled();
-    expect(createdAdmin).toBe(admin);
+    expect(result).toEqual(expect.objectContaining({
+      id: adminId
+    }));
   });
   
   it('should update an existing admin', async () => {
     // Arrange
     const adminId = 'admin-123';
-    const createdDate = new Date();
-    const updatedDate = new Date();
-    
-    const admin = new AdminUser(
-      adminId,
-      'admin@example.com',
-      'Updated Admin',
-      new AdminRole(AdminRoleType.ADMIN),
-      [],
-      new MfaStatus(MfaStatusType.DISABLED),
-      AdminUserStatus.ACTIVE,
-      createdDate,
-      updatedDate
-    );
-    
-    jest.spyOn(admin, 'toData').mockReturnValue({
+    const mockAdmin = {
       id: adminId,
+      authId: adminId,
       email: 'admin@example.com',
       name: 'Updated Admin',
-      role: 'admin',
-      permissions: [],
-      mfaStatus: { type: 'disabled' },
+      role: AdminRoleType.ADMIN,
       status: AdminUserStatus.ACTIVE,
-      createdAt: Timestamp.fromDate(createdDate),
-      updatedAt: Timestamp.fromDate(updatedDate),
+      phoneNumber: '+9876543210',
+      createdAt: new Date(),
       lastLoginAt: null,
-      lastLoginAttempts: [],
-      whitelistedIps: []
-    });
+      mfaStatus: MfaStatusType.DISABLED
+    };
     
     mockDoc.update.mockResolvedValue({});
     
     // Act
-    const updatedAdmin = await repository.update(admin);
+    const result = await repository.update(mockAdmin as any);
     
     // Assert
     expect(mockFirestore.collection).toHaveBeenCalledWith('admin_users');
     expect(mockCollection.doc).toHaveBeenCalledWith(adminId);
     expect(mockDoc.update).toHaveBeenCalled();
-    expect(updatedAdmin).toBe(admin);
+    expect(result).toBe(mockAdmin);
   });
   
   it('should delete an admin', async () => {
@@ -296,7 +252,7 @@ describe('FirebaseAdminRepository', () => {
     expect(result).toBe(true);
   });
   
-  it('should list admins with pagination and filtering', async () => {
+  it('should find all admins', async () => {
     // Arrange
     const mockDocSnapshot1 = {
       id: 'admin-1',
@@ -307,11 +263,7 @@ describe('FirebaseAdminRepository', () => {
         role: 'admin',
         status: AdminUserStatus.ACTIVE,
         createdAt: Timestamp.fromDate(new Date()),
-        updatedAt: Timestamp.fromDate(new Date()),
-        mfaStatus: { type: 'disabled' },
-        permissions: [],
-        lastLoginAttempts: [],
-        whitelistedIps: []
+        mfaStatus: { type: 'disabled' }
       })
     };
     
@@ -324,47 +276,26 @@ describe('FirebaseAdminRepository', () => {
         role: 'moderator',
         status: AdminUserStatus.ACTIVE,
         createdAt: Timestamp.fromDate(new Date()),
-        updatedAt: Timestamp.fromDate(new Date()),
-        mfaStatus: { type: 'enabled' },
-        permissions: [],
-        lastLoginAttempts: [],
-        whitelistedIps: []
+        mfaStatus: { type: 'enabled' }
       })
     };
     
     mockQuerySnapshot.docs = [mockDocSnapshot1, mockDocSnapshot2];
-    mockQuerySnapshot.size = 2;
     
-    mockQuery.get.mockResolvedValue(mockQuerySnapshot);
-    
-    const options: AdminSearchOptions = {
-      status: AdminUserStatus.ACTIVE,
-      role: 'admin',
-      limit: 10,
-      offset: 0
-    };
+    mockCollection.get.mockResolvedValue(mockQuerySnapshot);
     
     // Act
-    const result = await repository.list(options);
+    const admins = await repository.findAll();
     
     // Assert
     expect(mockFirestore.collection).toHaveBeenCalledWith('admin_users');
-    expect(mockCollection.where).toHaveBeenCalledWith('status', '==', AdminUserStatus.ACTIVE);
-    expect(mockQuery.where).toHaveBeenCalledWith('role', '==', 'admin');
-    expect(mockQuery.limit).toHaveBeenCalledWith(10);
-    expect(mockQuery.offset).toHaveBeenCalledWith(0);
-    expect(mockQuery.get).toHaveBeenCalled();
-    
-    expect(result).toMatchObject({
-      admins: expect.any(Array),
-      total: 2,
-      limit: 10,
-      offset: 0
-    });
-    expect(result.admins.length).toBe(2);
+    expect(mockCollection.get).toHaveBeenCalled();
+    expect(admins).toHaveLength(2);
+    expect(admins[0].id).toBe('admin-1');
+    expect(admins[1].id).toBe('admin-2');
   });
   
-  it('should list pending admin approvals', async () => {
+  it('should find admins by status', async () => {
     // Arrange
     const mockDocSnapshot = {
       id: 'pending-admin',
@@ -375,51 +306,92 @@ describe('FirebaseAdminRepository', () => {
         role: 'admin',
         status: AdminUserStatus.PENDING_APPROVAL,
         createdAt: Timestamp.fromDate(new Date()),
-        updatedAt: Timestamp.fromDate(new Date()),
-        mfaStatus: { type: 'disabled' },
-        permissions: [],
-        lastLoginAttempts: [],
-        whitelistedIps: []
+        mfaStatus: { type: 'disabled' }
       })
     };
     
     mockQuerySnapshot.docs = [mockDocSnapshot];
-    mockQuerySnapshot.size = 1;
     
     mockQuery.get.mockResolvedValue(mockQuerySnapshot);
     
     // Act
-    const result = await repository.listPendingApprovals(10, 0);
+    const admins = await repository.findByStatus(AdminUserStatus.PENDING_APPROVAL);
     
     // Assert
     expect(mockFirestore.collection).toHaveBeenCalledWith('admin_users');
     expect(mockCollection.where).toHaveBeenCalledWith('status', '==', AdminUserStatus.PENDING_APPROVAL);
-    expect(mockQuery.limit).toHaveBeenCalledWith(10);
-    expect(mockQuery.offset).toHaveBeenCalledWith(0);
     expect(mockQuery.get).toHaveBeenCalled();
-    
-    expect(result).toMatchObject({
-      admins: expect.any(Array),
-      total: 1,
-      limit: 10,
-      offset: 0
-    });
-    expect(result.admins.length).toBe(1);
-    expect(result.admins[0].status).toBe(AdminUserStatus.PENDING_APPROVAL);
+    expect(admins).toHaveLength(1);
+    expect(admins[0].status).toBe(AdminUserStatus.PENDING_APPROVAL);
   });
   
-  it('should count admins by status', async () => {
+  it('should find admins by role', async () => {
     // Arrange
-    mockQuerySnapshot.size = 5;
+    const mockDocSnapshot = {
+      id: 'admin-user',
+      data: jest.fn().mockReturnValue({
+        authId: 'admin-user',
+        email: 'admin@example.com',
+        name: 'Admin User',
+        role: AdminRoleType.ADMIN,
+        status: AdminUserStatus.ACTIVE,
+        createdAt: Timestamp.fromDate(new Date()),
+        mfaStatus: { type: 'enabled' }
+      })
+    };
+    
+    mockQuerySnapshot.docs = [mockDocSnapshot];
+    
     mockQuery.get.mockResolvedValue(mockQuerySnapshot);
     
     // Act
-    const count = await repository.countByStatus(AdminUserStatus.ACTIVE);
+    const admins = await repository.findByRole(AdminRoleType.ADMIN as any);
     
     // Assert
     expect(mockFirestore.collection).toHaveBeenCalledWith('admin_users');
-    expect(mockCollection.where).toHaveBeenCalledWith('status', '==', AdminUserStatus.ACTIVE);
+    expect(mockCollection.where).toHaveBeenCalledWith('role', '==', AdminRoleType.ADMIN);
     expect(mockQuery.get).toHaveBeenCalled();
+    expect(admins).toHaveLength(1);
+    expect(admins[0].role).toBe(AdminRoleType.ADMIN);
+  });
+  
+  it('should count all admins', async () => {
+    // Act
+    const count = await repository.count();
+    
+    // Assert
+    expect(mockFirestore.collection).toHaveBeenCalledWith('admin_users');
+    expect(mockCollection.count).toHaveBeenCalled();
     expect(count).toBe(5);
+  });
+  
+  it('should handle errors in findById method', async () => {
+    // Arrange
+    mockDoc.get.mockRejectedValue(new Error('Database error'));
+    
+    // Act
+    const result = await repository.findById('admin-123');
+    
+    // Assert
+    expect(result).toBeNull();
+  });
+  
+  it('should handle errors in findByEmail method', async () => {
+    // Arrange
+    mockQuery.get.mockRejectedValue(new Error('Database error'));
+    
+    // Act
+    const result = await repository.findByEmail('admin@example.com');
+    
+    // Assert
+    expect(result).toBeNull();
+  });
+  
+  it('should throw errors in save method', async () => {
+    // Arrange
+    mockDoc.set.mockRejectedValue(new Error('Database error'));
+    
+    // Act and Assert
+    await expect(repository.save({ id: 'admin-123' } as any)).rejects.toThrow('Database error');
   });
 });
