@@ -116,15 +116,19 @@ const DocumentValidationResult = {
         
         for (const [field, result] of fields.entries()) {
           if (!result.isValid) {
-            invalidFields.push({
+            const invalidField = {
               field,
               url: result.url,
-              isValid: result.isValid,
-              status: result.status,
-              statusText: result.statusText,
-              contentType: result.contentType,
-              error: result.error
-            });
+              isValid: result.isValid
+            };
+            
+            // Only add properties that exist
+            if (result.status !== undefined) invalidField.status = result.status;
+            if (result.statusText !== undefined) invalidField.statusText = result.statusText;
+            if (result.contentType !== undefined) invalidField.contentType = result.contentType;
+            if (result.error !== undefined) invalidField.error = result.error;
+            
+            invalidFields.push(invalidField);
           }
         }
         
