@@ -11,7 +11,7 @@ NC="\033[0m" # No Color
 
 echo -e "${BLUE}Running simple test without dependencies...${NC}"
 
-npx jest --config jest.simple.config.js
+npx jest --config jest.simple.config.cjs
 
 # Check exit code
 if [ $? -eq 0 ]; then
