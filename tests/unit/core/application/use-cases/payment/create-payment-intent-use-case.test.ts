@@ -5,205 +5,254 @@
  */
 
 import { CreatePaymentIntentUseCase } from '../../../../../../core/application/use-cases/payment/create-payment-intent-use-case';
-import { IPaymentService } from '../../../../../../core/domain/services/payment-service';
-import { PaymentStatus } from '../../../../../../core/domain/booking/payment-status';
+import { PaymentDetails } from '../../../../../../core/domain/payment/payment-details';
 import { IBookingRepository } from '../../../../../../core/application/ports/repositories/booking-repository';
+import { IPaymentRepository } from '../../../../../../core/application/ports/repositories/payment-repository';
+import { IPaymentService } from '../../../../../../core/application/ports/services/payment-service';
+import { Booking } from '../../../../../../core/domain/booking/booking';
+import { BookingStatus } from '../../../../../../core/domain/booking/booking-status';
+import { PaymentStatus } from '../../../../../../core/domain/payment/payment-status';
+import { MockRepositoryFactory } from '../../../../../mocks/repositories/mock-repository-factory';
+import { BaseUseCaseTest } from '../../../../../utils/base-use-case-test';
 
-// Mock repositories and services
-const mockPaymentService: jest.Mocked<IPaymentService> = {
-  createPaymentIntent: jest.fn(),
-  getPaymentIntent: jest.fn(),
-  cancelPaymentIntent: jest.fn(),
-  processWebhookEvent: jest.fn()
-};
+class CreatePaymentIntentTests extends BaseUseCaseTest<CreatePaymentIntentUseCase> {
+  constructor() {
+    super((repositoryFactory) => new CreatePaymentIntentUseCase(
+      repositoryFactory.getBookingRepository(),
+      repositoryFactory.getPaymentRepository(),
+      {
+        createPaymentIntent: jest.fn(),
+        getPaymentIntent: jest.fn(),
+        cancelPaymentIntent: jest.fn(),
+        processWebhookEvent: jest.fn()
+      }
+    ));
+  }
 
-const mockBookingRepository: jest.Mocked<IBookingRepository> = {
-  create: jest.fn(),
-  getById: jest.fn(),
-  update: jest.fn(),
-  delete: jest.fn(),
-  findAll: jest.fn(),
-  findByCustomer: jest.fn(),
-  findByYacht: jest.fn(),
-  findByDateRange: jest.fn(),
-  findByStatus: jest.fn(),
-  updateStatus: jest.fn(),
-  confirm: jest.fn(),
-  cancel: jest.fn(),
-  updatePaymentDetails: jest.fn()
-};
+  getBookingRepository(): jest.Mocked<IBookingRepository> {
+    return this.repositoryFactory.getBookingRepository() as jest.Mocked<IBookingRepository>;
+  }
+
+  getPaymentRepository(): jest.Mocked<IPaymentRepository> {
+    return this.repositoryFactory.getPaymentRepository() as jest.Mocked<IPaymentRepository>;
+  }
+
+  getPaymentService(): jest.Mocked<IPaymentService> {
+    return (this.useCase as any).paymentService as jest.Mocked<IPaymentService>;
+  }
+}
 
 describe('CreatePaymentIntentUseCase', () => {
-  let useCase: CreatePaymentIntentUseCase;
+  let tests: CreatePaymentIntentTests;
   
   beforeEach(() => {
-    jest.clearAllMocks();
-    useCase = new CreatePaymentIntentUseCase(mockPaymentService, mockBookingRepository);
+    tests = new CreatePaymentIntentTests();
   });
   
-  it('should create a payment intent for a valid booking', async () => {
-    // Arrange
-    const bookingId = 'booking-123';
-    const customerId = 'customer-456';
-    const amount = 150.00;
-    const currency = 'USD';
-    const description = 'Yacht booking payment';
-    
-    // Mock booking repository to return a booking
-    mockBookingRepository.getById.mockResolvedValue({
-      id: bookingId,
-      yachtId: 'yacht-789',
-      customerId,
-      totalPrice: amount,
-      status: 'pending',
-      startDate: '2025-04-01',
-      endDate: '2025-04-03'
-    } as any);
-    
-    // Mock payment service to return a payment intent
-    mockPaymentService.createPaymentIntent.mockResolvedValue({
-      id: 'pi_123456789',
-      clientSecret: 'pi_123456789_secret_987654321',
-      amount,
-      currency,
-      status: PaymentStatus.PENDING
-    });
-    
-    // Act
-    const result = await useCase.execute({
-      bookingId,
-      currency,
-      description
-    });
-    
-    // Assert
-    expect(result.success).toBe(true);
-    expect(result.paymentIntent).toBeDefined();
-    expect(result.paymentIntent?.id).toBe('pi_123456789');
-    expect(result.paymentIntent?.clientSecret).toBe('pi_123456789_secret_987654321');
-    expect(result.paymentIntent?.amount).toBe(amount);
-    expect(result.paymentIntent?.currency).toBe(currency);
-    expect(result.paymentIntent?.status).toBe(PaymentStatus.PENDING);
-    
-    // Verify repository and service calls
-    expect(mockBookingRepository.getById).toHaveBeenCalledWith(bookingId);
-    expect(mockPaymentService.createPaymentIntent).toHaveBeenCalledWith({
-      amount,
-      currency,
-      metadata: {
+  describe('execute method', () => {
+    it('should create a payment intent for a valid booking', async () => {
+      // Arrange
+      const bookingId = 'booking-123';
+      const userId = 'user-456';
+      const now = new Date();
+      const startDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const endDate = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+      
+      const booking = new Booking({
+        id: bookingId,
+        userId,
+        yachtId: 'yacht-789',
+        status: BookingStatus.PENDING,
+        startDate,
+        endDate,
+        totalAmount: 5000,
+        createdAt: now
+      });
+      
+      const paymentIntentData = {
+        id: 'pi_123456789',
+        clientSecret: 'cs_test_123456789',
+        amount: 5000,
+        currency: 'USD',
+        status: 'requires_payment_method'
+      };
+      
+      tests.getBookingRepository().getById.mockResolvedValue(booking);
+      tests.getPaymentService().createPaymentIntent.mockResolvedValue(paymentIntentData);
+      
+      // Act
+      const result = await tests.useCase.execute({
         bookingId,
-        customerId,
-        yachtId: 'yacht-789'
-      },
-      description
-    });
-    expect(mockBookingRepository.updatePaymentDetails).toHaveBeenCalled();
-  });
-  
-  it('should return error when booking does not exist', async () => {
-    // Arrange
-    const bookingId = 'non-existent-booking';
-    const currency = 'USD';
-    
-    // Mock booking repository to return null (booking not found)
-    mockBookingRepository.getById.mockResolvedValue(null);
-    
-    // Act
-    const result = await useCase.execute({
-      bookingId,
-      currency
-    });
-    
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('Booking not found');
-    expect(result.paymentIntent).toBeNull();
-    
-    // Verify the payment service was not called
-    expect(mockPaymentService.createPaymentIntent).not.toHaveBeenCalled();
-    expect(mockBookingRepository.updatePaymentDetails).not.toHaveBeenCalled();
-  });
-  
-  it('should handle payment service errors', async () => {
-    // Arrange
-    const bookingId = 'booking-123';
-    const currency = 'USD';
-    
-    // Mock booking repository to return a booking
-    mockBookingRepository.getById.mockResolvedValue({
-      id: bookingId,
-      yachtId: 'yacht-789',
-      customerId: 'customer-456',
-      totalPrice: 150.00,
-      status: 'pending',
-      startDate: '2025-04-01',
-      endDate: '2025-04-03'
-    } as any);
-    
-    // Mock payment service to throw an error
-    const errorMessage = 'Payment service unavailable';
-    mockPaymentService.createPaymentIntent.mockRejectedValue(new Error(errorMessage));
-    
-    // Act
-    const result = await useCase.execute({
-      bookingId,
-      currency
+        userId
+      });
+      
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.paymentIntent).toBeDefined();
+      expect(result.paymentIntent?.id).toBe('pi_123456789');
+      expect(result.paymentIntent?.clientSecret).toBe('cs_test_123456789');
+      
+      expect(tests.getBookingRepository().getById).toHaveBeenCalledWith(bookingId);
+      expect(tests.getPaymentService().createPaymentIntent).toHaveBeenCalledWith({
+        bookingId,
+        amount: 5000,
+        currency: 'USD',
+        description: expect.any(String),
+        metadata: expect.objectContaining({
+          bookingId,
+          userId
+        })
+      });
+      
+      // Should update the booking with payment details
+      expect(tests.getBookingRepository().update).toHaveBeenCalledWith(expect.objectContaining({
+        id: bookingId,
+        paymentStatus: PaymentStatus.PENDING,
+        paymentId: 'pi_123456789'
+      }));
+      
+      // Should save the payment details
+      expect(tests.getPaymentRepository().save).toHaveBeenCalledWith(expect.any(PaymentDetails));
     });
     
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toContain(errorMessage);
-    expect(result.paymentIntent).toBeNull();
-    
-    // Verify the booking was not updated
-    expect(mockBookingRepository.updatePaymentDetails).not.toHaveBeenCalled();
-  });
-  
-  it('should use custom amount if provided', async () => {
-    // Arrange
-    const bookingId = 'booking-123';
-    const customerId = 'customer-456';
-    const amount = 200.00; // Custom amount different from booking price
-    const currency = 'USD';
-    
-    // Mock booking repository to return a booking
-    mockBookingRepository.getById.mockResolvedValue({
-      id: bookingId,
-      yachtId: 'yacht-789',
-      customerId,
-      totalPrice: 150.00, // Original booking price
-      status: 'pending',
-      startDate: '2025-04-01',
-      endDate: '2025-04-03'
-    } as any);
-    
-    // Mock payment service to return a payment intent
-    mockPaymentService.createPaymentIntent.mockResolvedValue({
-      id: 'pi_123456789',
-      clientSecret: 'pi_123456789_secret_987654321',
-      amount,
-      currency,
-      status: PaymentStatus.PENDING
+    it('should return an error if booking is not found', async () => {
+      // Arrange
+      const bookingId = 'booking-123';
+      const userId = 'user-456';
+      
+      tests.getBookingRepository().getById.mockResolvedValue(null);
+      
+      // Act
+      const result = await tests.useCase.execute({
+        bookingId,
+        userId
+      });
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('not found');
+      
+      expect(tests.getBookingRepository().getById).toHaveBeenCalledWith(bookingId);
+      expect(tests.getPaymentService().createPaymentIntent).not.toHaveBeenCalled();
+      expect(tests.getBookingRepository().update).not.toHaveBeenCalled();
+      expect(tests.getPaymentRepository().save).not.toHaveBeenCalled();
     });
     
-    // Act
-    const result = await useCase.execute({
-      bookingId,
-      currency,
-      amount
+    it('should return an error if user does not own the booking', async () => {
+      // Arrange
+      const bookingId = 'booking-123';
+      const userId = 'user-456';
+      const wrongUserId = 'user-789';
+      const now = new Date();
+      const startDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const endDate = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+      
+      const booking = new Booking({
+        id: bookingId,
+        userId: wrongUserId, // Different user ID
+        yachtId: 'yacht-789',
+        status: BookingStatus.PENDING,
+        startDate,
+        endDate,
+        totalAmount: 5000,
+        createdAt: now
+      });
+      
+      tests.getBookingRepository().getById.mockResolvedValue(booking);
+      
+      // Act
+      const result = await tests.useCase.execute({
+        bookingId,
+        userId
+      });
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('not authorized');
+      
+      expect(tests.getBookingRepository().getById).toHaveBeenCalledWith(bookingId);
+      expect(tests.getPaymentService().createPaymentIntent).not.toHaveBeenCalled();
+      expect(tests.getBookingRepository().update).not.toHaveBeenCalled();
+      expect(tests.getPaymentRepository().save).not.toHaveBeenCalled();
     });
     
-    // Assert
-    expect(result.success).toBe(true);
-    expect(result.paymentIntent).toBeDefined();
-    expect(result.paymentIntent?.amount).toBe(amount); // Should use custom amount
+    it('should return an error if booking has no total amount', async () => {
+      // Arrange
+      const bookingId = 'booking-123';
+      const userId = 'user-456';
+      const now = new Date();
+      const startDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const endDate = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+      
+      const booking = new Booking({
+        id: bookingId,
+        userId,
+        yachtId: 'yacht-789',
+        status: BookingStatus.PENDING,
+        startDate,
+        endDate,
+        // No totalAmount specified
+        createdAt: now
+      });
+      
+      tests.getBookingRepository().getById.mockResolvedValue(booking);
+      
+      // Act
+      const result = await tests.useCase.execute({
+        bookingId,
+        userId
+      });
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('amount');
+      
+      expect(tests.getBookingRepository().getById).toHaveBeenCalledWith(bookingId);
+      expect(tests.getPaymentService().createPaymentIntent).not.toHaveBeenCalled();
+      expect(tests.getBookingRepository().update).not.toHaveBeenCalled();
+      expect(tests.getPaymentRepository().save).not.toHaveBeenCalled();
+    });
     
-    // Verify payment service was called with custom amount
-    expect(mockPaymentService.createPaymentIntent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        amount,
-        currency
-      })
-    );
+    it('should return an error if payment service fails', async () => {
+      // Arrange
+      const bookingId = 'booking-123';
+      const userId = 'user-456';
+      const now = new Date();
+      const startDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const endDate = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+      
+      const booking = new Booking({
+        id: bookingId,
+        userId,
+        yachtId: 'yacht-789',
+        status: BookingStatus.PENDING,
+        startDate,
+        endDate,
+        totalAmount: 5000,
+        createdAt: now
+      });
+      
+      tests.getBookingRepository().getById.mockResolvedValue(booking);
+      tests.getPaymentService().createPaymentIntent.mockRejectedValue(new Error('Payment service error'));
+      
+      // Act
+      const result = await tests.useCase.execute({
+        bookingId,
+        userId
+      });
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('Payment service error');
+      
+      expect(tests.getBookingRepository().getById).toHaveBeenCalledWith(bookingId);
+      expect(tests.getPaymentService().createPaymentIntent).toHaveBeenCalled();
+      expect(tests.getBookingRepository().update).not.toHaveBeenCalled();
+      expect(tests.getPaymentRepository().save).not.toHaveBeenCalled();
+    });
   });
 });
