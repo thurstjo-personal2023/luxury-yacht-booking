@@ -7,72 +7,122 @@ import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import { FirebaseAdminCredentialsRepository } from '../../../../../adapters/repositories/firebase/firebase-admin-credentials-repository';
 import { AdminCredentials } from '../../../../../core/domain/admin/admin-credentials';
 import { IAdminCredentialsRepository } from '../../../../../core/application/interfaces/repositories/admin-credentials-repository';
-import { Firestore } from 'firebase-admin/firestore';
+import { Firestore, DocumentData, CollectionReference, DocumentReference, DocumentSnapshot, QueryDocumentSnapshot, Query } from 'firebase-admin/firestore';
 
 describe('FirebaseAdminCredentialsRepository', () => {
+  // Define properly typed mocks
   let mockFirestore: jest.Mocked<Firestore>;
-  let mockCollection: any;
-  let mockDoc: any;
-  let mockQuery: any;
-  let mockLimit: any;
-  let mockWhere: any;
-  let mockQuerySnapshot: any;
-  let mockDocSnapshot: any;
-  let repository: IAdminCredentialsRepository;
+  let mockCollection: jest.Mocked<CollectionReference<DocumentData>>;
+  let mockDoc: jest.Mocked<DocumentReference<DocumentData>>;
+  let mockQuery: jest.Mocked<Query<DocumentData>>;
+  let mockDocSnapshot: jest.Mocked<DocumentSnapshot<DocumentData>>;
+  let mockQueryDocSnapshot: jest.Mocked<QueryDocumentSnapshot<DocumentData>>;
+  let repository: FirebaseAdminCredentialsRepository;
   
   beforeEach(() => {
     // Create mock document reference
     mockDoc = {
-      id: 'credentials-123',
+      id: 'admin-123',
       get: jest.fn(),
       set: jest.fn(),
       update: jest.fn(),
-      delete: jest.fn()
-    };
+      delete: jest.fn(),
+      collection: jest.fn(),
+      path: 'admin_credentials/admin-123',
+      parent: null as any,
+      isEqual: jest.fn(),
+      withConverter: jest.fn(),
+      listCollections: jest.fn(),
+      create: jest.fn(),
+      onSnapshot: jest.fn()
+    } as unknown as jest.Mocked<DocumentReference<DocumentData>>;
     
     // Create mock document snapshot
     mockDocSnapshot = {
       exists: true,
-      id: 'credentials-123',
+      id: 'admin-123',
       data: jest.fn().mockReturnValue({
-        adminId: 'admin-123',
+        id: 'admin-123',
+        email: 'admin@example.com',
+        passwordHash: 'hashed-password',
         passwordLastChanged: { toDate: () => new Date() },
         mfaEnabled: true,
-        mfaMethod: 'totp',
-        mfaSecret: 'mfa-secret'
+        mfaSecret: 'mfa-secret',
+        tempToken: null,
+        tempTokenExpiry: null
+      }),
+      get: jest.fn(),
+      ref: mockDoc,
+      isEqual: jest.fn()
+    } as unknown as jest.Mocked<DocumentSnapshot<DocumentData>>;
+    
+    // Create mock query document snapshot
+    mockQueryDocSnapshot = {
+      ...mockDocSnapshot,
+      data: jest.fn().mockReturnValue({
+        id: 'admin-123',
+        email: 'admin@example.com',
+        passwordHash: 'hashed-password',
+        passwordLastChanged: { toDate: () => new Date() },
+        mfaEnabled: true,
+        mfaSecret: 'mfa-secret',
+        tempToken: null,
+        tempTokenExpiry: null
       })
-    };
+    } as unknown as jest.Mocked<QueryDocumentSnapshot<DocumentData>>;
     
     // Create mock query
-    mockLimit = {
+    mockQuery = {
       get: jest.fn().mockResolvedValue({
         empty: false,
-        docs: [mockDocSnapshot]
-      })
-    };
-    
-    // Create mock where function
-    mockWhere = {
-      limit: jest.fn().mockReturnValue(mockLimit)
-    };
+        size: 1,
+        docs: [mockQueryDocSnapshot],
+        forEach: jest.fn()
+      }),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      startAfter: jest.fn().mockReturnThis(),
+      startAt: jest.fn().mockReturnThis(),
+      endBefore: jest.fn().mockReturnThis(),
+      endAt: jest.fn().mockReturnThis(),
+      isEqual: jest.fn(),
+      stream: jest.fn(),
+      onSnapshot: jest.fn(),
+      withConverter: jest.fn()
+    } as unknown as jest.Mocked<Query<DocumentData>>;
     
     // Create mock collection reference
     mockCollection = {
+      id: 'admin_credentials',
       doc: jest.fn().mockReturnValue(mockDoc),
-      where: jest.fn().mockReturnValue(mockWhere)
-    };
+      get: jest.fn(),
+      add: jest.fn(),
+      where: jest.fn().mockReturnValue(mockQuery),
+      orderBy: jest.fn().mockReturnValue(mockQuery),
+      limit: jest.fn().mockReturnValue(mockQuery),
+      parent: null as any,
+      path: 'admin_credentials',
+      isEqual: jest.fn(),
+      withConverter: jest.fn(),
+      listDocuments: jest.fn(),
+      onSnapshot: jest.fn(),
+      stream: jest.fn()
+    } as unknown as jest.Mocked<CollectionReference<DocumentData>>;
     
     // Create mock Firestore
     mockFirestore = {
-      collection: jest.fn().mockReturnValue(mockCollection)
+      collection: jest.fn().mockReturnValue(mockCollection),
+      doc: jest.fn(),
+      getAll: jest.fn(),
+      runTransaction: jest.fn(),
+      batch: jest.fn(),
+      settings: jest.fn(),
+      terminate: jest.fn(),
+      listCollections: jest.fn(),
+      recursiveDelete: jest.fn(),
+      bulkWriter: jest.fn()
     } as unknown as jest.Mocked<Firestore>;
-    
-    // Create mock query snapshot
-    mockQuerySnapshot = {
-      empty: false,
-      docs: [mockDocSnapshot],
-      forEach: jest.fn()
-    };
     
     // Create repository with mock Firestore
     repository = new FirebaseAdminCredentialsRepository(mockFirestore);
@@ -92,17 +142,13 @@ describe('FirebaseAdminCredentialsRepository', () => {
     expect(mockCollection.doc).toHaveBeenCalledWith(userId);
     expect(mockDoc.get).toHaveBeenCalled();
     expect(credentials).not.toBeNull();
-    expect(credentials?.adminId).toBe(userId);
+    expect(credentials).toBeInstanceOf(AdminCredentials);
+    expect(credentials?.id).toBe(userId);
   });
   
   it('should get credentials by email', async () => {
     // Arrange
     const email = 'admin@example.com';
-    
-    mockLimit.get.mockResolvedValue({
-      empty: false,
-      docs: [mockDocSnapshot]
-    });
     
     // Act
     const credentials = await repository.getCredentialsByEmail(email);
@@ -110,17 +156,20 @@ describe('FirebaseAdminCredentialsRepository', () => {
     // Assert
     expect(mockFirestore.collection).toHaveBeenCalledWith('admin_credentials');
     expect(mockCollection.where).toHaveBeenCalledWith('email', '==', email);
-    expect(mockWhere.limit).toHaveBeenCalledWith(1);
+    expect(mockQuery.limit).toHaveBeenCalledWith(1);
     expect(credentials).not.toBeNull();
+    expect(credentials).toBeInstanceOf(AdminCredentials);
   });
   
   it('should return null when no credentials found by email', async () => {
     // Arrange
     const email = 'nonexistent@example.com';
     
-    mockLimit.get.mockResolvedValue({
+    mockQuery.get.mockResolvedValueOnce({
       empty: true,
-      docs: []
+      size: 0,
+      docs: [],
+      forEach: jest.fn()
     });
     
     // Act
@@ -133,44 +182,65 @@ describe('FirebaseAdminCredentialsRepository', () => {
   it('should create new credentials', async () => {
     // Arrange
     const adminId = 'admin-123';
+    const email = 'admin@example.com';
+    const updatedDate = new Date();
+    const passwordHash = 'hashed-password';
+    
     const credentials = new AdminCredentials(
       adminId,
-      'admin@example.com',
-      new Date(),
-      'hashed-password'
+      email,
+      updatedDate,
+      passwordHash
     );
     
-    mockDoc.set.mockResolvedValue({});
+    mockDoc.set.mockResolvedValue({} as any);
     
     // Act
-    const createdCredentials = await repository.createCredentials(credentials);
+    const result = await repository.createCredentials(credentials);
     
     // Assert
     expect(mockFirestore.collection).toHaveBeenCalledWith('admin_credentials');
-    expect(mockDoc.set).toHaveBeenCalled();
-    expect(createdCredentials).toBeTruthy();
+    expect(mockCollection.doc).toHaveBeenCalledWith(adminId);
+    expect(mockDoc.set).toHaveBeenCalledWith(expect.objectContaining({
+      id: adminId,
+      email: email,
+      passwordHash: passwordHash,
+      passwordLastChanged: updatedDate
+    }));
+    expect(result).toBe(true);
   });
   
   it('should update existing credentials', async () => {
     // Arrange
     const adminId = 'admin-123';
+    const email = 'admin@example.com';
+    const updatedDate = new Date();
+    const passwordHash = 'updated-password-hash';
+    const mfaSecret = 'updated-mfa-secret';
+    
     const credentials = new AdminCredentials(
       adminId,
-      'admin@example.com',
-      new Date(),
-      'updated-password-hash',
-      'updated-mfa-secret'
+      email,
+      updatedDate,
+      passwordHash,
+      mfaSecret
     );
     
-    mockDoc.update.mockResolvedValue({});
+    mockDoc.update.mockResolvedValue({} as any);
     
     // Act
-    const updatedCredentials = await repository.updateCredentials(credentials);
+    const result = await repository.updateCredentials(credentials);
     
     // Assert
     expect(mockFirestore.collection).toHaveBeenCalledWith('admin_credentials');
-    expect(mockDoc.update).toHaveBeenCalled();
-    expect(updatedCredentials).toBeTruthy();
+    expect(mockCollection.doc).toHaveBeenCalledWith(adminId);
+    expect(mockDoc.update).toHaveBeenCalledWith(expect.objectContaining({
+      email: email,
+      passwordHash: passwordHash,
+      mfaSecret: mfaSecret,
+      passwordLastChanged: updatedDate
+    }));
+    expect(result).toBe(true);
   });
   
   it('should update password correctly', async () => {
@@ -178,8 +248,7 @@ describe('FirebaseAdminCredentialsRepository', () => {
     const userId = 'admin-123';
     const passwordHash = 'new-password-hash';
     
-    mockDoc.get.mockResolvedValue(mockDocSnapshot);
-    mockDoc.update.mockResolvedValue({});
+    mockDoc.update.mockResolvedValue({} as any);
     
     // Act
     const result = await repository.updatePassword(userId, passwordHash);
@@ -187,7 +256,10 @@ describe('FirebaseAdminCredentialsRepository', () => {
     // Assert
     expect(mockFirestore.collection).toHaveBeenCalledWith('admin_credentials');
     expect(mockCollection.doc).toHaveBeenCalledWith(userId);
-    expect(mockDoc.update).toHaveBeenCalled();
+    expect(mockDoc.update).toHaveBeenCalledWith(expect.objectContaining({
+      passwordHash: passwordHash,
+      passwordLastChanged: expect.any(Date)
+    }));
     expect(result).toBe(true);
   });
   
@@ -196,8 +268,7 @@ describe('FirebaseAdminCredentialsRepository', () => {
     const userId = 'admin-123';
     const mfaSecret = 'new-mfa-secret';
     
-    mockDoc.get.mockResolvedValue(mockDocSnapshot);
-    mockDoc.update.mockResolvedValue({});
+    mockDoc.update.mockResolvedValue({} as any);
     
     // Act
     const result = await repository.setupMfa(userId, mfaSecret);
@@ -205,7 +276,10 @@ describe('FirebaseAdminCredentialsRepository', () => {
     // Assert
     expect(mockFirestore.collection).toHaveBeenCalledWith('admin_credentials');
     expect(mockCollection.doc).toHaveBeenCalledWith(userId);
-    expect(mockDoc.update).toHaveBeenCalled();
+    expect(mockDoc.update).toHaveBeenCalledWith(expect.objectContaining({
+      mfaEnabled: true,
+      mfaSecret: mfaSecret
+    }));
     expect(result).toBe(true);
   });
   
@@ -213,8 +287,7 @@ describe('FirebaseAdminCredentialsRepository', () => {
     // Arrange
     const userId = 'admin-123';
     
-    mockDoc.get.mockResolvedValue(mockDocSnapshot);
-    mockDoc.update.mockResolvedValue({});
+    mockDoc.update.mockResolvedValue({} as any);
     
     // Act
     const result = await repository.disableMfa(userId);
@@ -222,7 +295,10 @@ describe('FirebaseAdminCredentialsRepository', () => {
     // Assert
     expect(mockFirestore.collection).toHaveBeenCalledWith('admin_credentials');
     expect(mockCollection.doc).toHaveBeenCalledWith(userId);
-    expect(mockDoc.update).toHaveBeenCalled();
+    expect(mockDoc.update).toHaveBeenCalledWith(expect.objectContaining({
+      mfaEnabled: false,
+      mfaSecret: null
+    }));
     expect(result).toBe(true);
   });
   
@@ -232,8 +308,7 @@ describe('FirebaseAdminCredentialsRepository', () => {
     const token = 'temp-token';
     const expiryDate = new Date();
     
-    mockDoc.get.mockResolvedValue(mockDocSnapshot);
-    mockDoc.update.mockResolvedValue({});
+    mockDoc.update.mockResolvedValue({} as any);
     
     // Act
     const result = await repository.storeTemporaryToken(userId, token, expiryDate);
@@ -241,7 +316,78 @@ describe('FirebaseAdminCredentialsRepository', () => {
     // Assert
     expect(mockFirestore.collection).toHaveBeenCalledWith('admin_credentials');
     expect(mockCollection.doc).toHaveBeenCalledWith(userId);
-    expect(mockDoc.update).toHaveBeenCalled();
+    expect(mockDoc.update).toHaveBeenCalledWith(expect.objectContaining({
+      tempToken: token,
+      tempTokenExpiry: expiryDate
+    }));
+    expect(result).toBe(true);
+  });
+  
+  it('should validate temporary token correctly', async () => {
+    // Arrange
+    const userId = 'admin-123';
+    const token = 'temp-token';
+    const expiryDate = new Date(Date.now() + 3600000); // 1 hour in the future
+    
+    // Mock the document snapshot with a valid token
+    mockDocSnapshot.data.mockReturnValueOnce({
+      id: 'admin-123',
+      email: 'admin@example.com',
+      tempToken: token,
+      tempTokenExpiry: { toDate: () => expiryDate }
+    });
+    
+    mockDoc.get.mockResolvedValue(mockDocSnapshot);
+    
+    // Act
+    const result = await repository.validateTemporaryToken(userId, token);
+    
+    // Assert
+    expect(mockFirestore.collection).toHaveBeenCalledWith('admin_credentials');
+    expect(mockCollection.doc).toHaveBeenCalledWith(userId);
+    expect(mockDoc.get).toHaveBeenCalled();
+    expect(result).toBe(true);
+  });
+  
+  it('should return false for expired temporary token', async () => {
+    // Arrange
+    const userId = 'admin-123';
+    const token = 'temp-token';
+    const expiryDate = new Date(Date.now() - 3600000); // 1 hour in the past
+    
+    // Mock the document snapshot with an expired token
+    mockDocSnapshot.data.mockReturnValueOnce({
+      id: 'admin-123',
+      email: 'admin@example.com',
+      tempToken: token,
+      tempTokenExpiry: { toDate: () => expiryDate }
+    });
+    
+    mockDoc.get.mockResolvedValue(mockDocSnapshot);
+    
+    // Act
+    const result = await repository.validateTemporaryToken(userId, token);
+    
+    // Assert
+    expect(result).toBe(false);
+  });
+  
+  it('should clear temporary token correctly', async () => {
+    // Arrange
+    const userId = 'admin-123';
+    
+    mockDoc.update.mockResolvedValue({} as any);
+    
+    // Act
+    const result = await repository.clearTemporaryToken(userId);
+    
+    // Assert
+    expect(mockFirestore.collection).toHaveBeenCalledWith('admin_credentials');
+    expect(mockCollection.doc).toHaveBeenCalledWith(userId);
+    expect(mockDoc.update).toHaveBeenCalledWith(expect.objectContaining({
+      tempToken: null,
+      tempTokenExpiry: null
+    }));
     expect(result).toBe(true);
   });
   
@@ -249,7 +395,7 @@ describe('FirebaseAdminCredentialsRepository', () => {
     // Arrange
     const userId = 'admin-123';
     
-    mockDoc.delete.mockResolvedValue({});
+    mockDoc.delete.mockResolvedValue({} as any);
     
     // Act
     const result = await repository.deleteCredentials(userId);
