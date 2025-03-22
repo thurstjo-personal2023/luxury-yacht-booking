@@ -1,165 +1,81 @@
 #!/bin/bash
 
-# Colors for output
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Main test script for Etoile Yachts Platform
+# This script runs all types of tests in sequence
 
-# Banner
-echo -e "${BLUE}====================================================${NC}"
-echo -e "${BLUE}   Etoile Yachts Platform Test Suite Runner          ${NC}"
-echo -e "${BLUE}====================================================${NC}"
+# Color codes for output
+GREEN="\033[0;32m"
+RED="\033[0;31m"
+YELLOW="\033[0;33m"
+BLUE="\033[0;34m"
+NC="\033[0m" # No Color
 
-# Function to check if firebase emulators are running
-check_emulators() {
-  echo -e "${YELLOW}Checking if Firebase emulators are running...${NC}"
-  curl -s http://localhost:4000 > /dev/null
-  if [ $? -ne 0 ]; then
-    echo -e "${RED}Firebase emulators are not running.${NC}"
-    echo -e "${YELLOW}Please start the emulators with 'firebase emulators:start' in another terminal.${NC}"
-    return 1
-  else
-    echo -e "${GREEN}Firebase emulators are running!${NC}"
-    return 0
-  fi
-}
+echo -e "${BLUE}=== Etoile Yachts Testing Suite ===${NC}"
+echo -e "${BLUE}Running all test types in sequence...${NC}"
+echo 
 
-# Function to run a test category
-run_tests() {
-  local test_type=$1
-  local test_path=$2
-  local config_file=$3
+# Run unit tests first (these don't need emulators)
+echo -e "${YELLOW}Step 1: Running unit tests${NC}"
+./run-unit-tests.sh
+UNIT_RESULT=$?
 
-  echo -e "${BLUE}====================================================${NC}"
-  echo -e "${YELLOW}Running $test_type tests...${NC}"
-  echo -e "${BLUE}====================================================${NC}"
-  
-  if [ ! -z "$config_file" ]; then
-    npx jest --config=$config_file $test_path
-  else
-    npx jest $test_path
-  fi
-
-  if [ $? -eq 0 ]; then
-    echo -e "${GREEN}$test_type tests completed successfully!${NC}"
-    return 0
-  else
-    echo -e "${RED}$test_type tests failed!${NC}"
-    return 1
-  fi
-}
-
-# Function to print help
-print_help() {
-  echo -e "${YELLOW}Usage:${NC}"
-  echo -e "  ./run-tests.sh [options]"
-  echo -e ""
-  echo -e "${YELLOW}Options:${NC}"
-  echo -e "  --unit        Run unit tests only"
-  echo -e "  --integration Run integration tests only"
-  echo -e "  --e2e         Run end-to-end tests only"
-  echo -e "  --all         Run all tests (default)"
-  echo -e "  --help        Show this help message"
-  echo -e ""
-  echo -e "${YELLOW}Examples:${NC}"
-  echo -e "  ./run-tests.sh --unit"
-  echo -e "  ./run-tests.sh --integration"
-  echo -e "  ./run-tests.sh --all"
-}
-
-# Default values
-RUN_UNIT=false
-RUN_INTEGRATION=false
-RUN_E2E=false
-
-# Parse arguments
-if [ $# -eq 0 ]; then
-  RUN_UNIT=true
-  RUN_INTEGRATION=true
-  RUN_E2E=true
-else
-  for arg in "$@"; do
-    case $arg in
-      --unit)
-        RUN_UNIT=true
-        ;;
-      --integration)
-        RUN_INTEGRATION=true
-        ;;
-      --e2e)
-        RUN_E2E=true
-        ;;
-      --all)
-        RUN_UNIT=true
-        RUN_INTEGRATION=true
-        RUN_E2E=true
-        ;;
-      --help)
-        print_help
-        exit 0
-        ;;
-      *)
-        echo -e "${RED}Unknown option: $arg${NC}"
-        print_help
-        exit 1
-        ;;
-    esac
-  done
-fi
-
-# Check if firebase emulators are running if we need to run integration or e2e tests
-if [ "$RUN_INTEGRATION" = true ] || [ "$RUN_E2E" = true ]; then
-  check_emulators
-  if [ $? -ne 0 ]; then
-    echo -e "${YELLOW}Would you like to run unit tests only? (y/n)${NC}"
-    read -r response
-    if [ "$response" != "y" ]; then
-      echo -e "${RED}Tests aborted.${NC}"
-      exit 1
-    else
-      RUN_INTEGRATION=false
-      RUN_E2E=false
-      RUN_UNIT=true
-    fi
-  fi
-fi
-
-# Run tests
-EXIT_CODE=0
-
-# Run unit tests
-if [ "$RUN_UNIT" = true ]; then
-  run_tests "Unit" "tests/unit" "jest.config.js"
-  if [ $? -ne 0 ]; then
-    EXIT_CODE=1
+# Check if unit tests passed
+if [ $UNIT_RESULT -ne 0 ]; then
+  echo -e "${RED}Unit tests failed. Fixing these issues is recommended before running other test types.${NC}"
+  echo -e "${YELLOW}Do you want to continue with integration tests? (y/N)${NC}"
+  read -r CONTINUE
+  if [ "$CONTINUE" != "y" ] && [ "$CONTINUE" != "Y" ]; then
+    echo -e "${BLUE}Testing stopped. Please fix unit test failures.${NC}"
+    exit 1
   fi
 fi
 
 # Run integration tests
-if [ "$RUN_INTEGRATION" = true ]; then
-  run_tests "Integration" "tests/integration" "jest.integration.config.js"
-  if [ $? -ne 0 ]; then
-    EXIT_CODE=1
+echo -e "\n${YELLOW}Step 2: Running integration tests${NC}"
+./run-integration-tests.sh
+INTEGRATION_RESULT=$?
+
+# Check if integration tests passed
+if [ $INTEGRATION_RESULT -ne 0 ]; then
+  echo -e "${RED}Integration tests failed. Fixing these issues is recommended before running E2E tests.${NC}"
+  echo -e "${YELLOW}Do you want to continue with E2E tests? (y/N)${NC}"
+  read -r CONTINUE
+  if [ "$CONTINUE" != "y" ] && [ "$CONTINUE" != "Y" ]; then
+    echo -e "${BLUE}Testing stopped. Please fix integration test failures.${NC}"
+    exit 1
   fi
 fi
 
-# Run e2e tests
-if [ "$RUN_E2E" = true ]; then
-  run_tests "End-to-End" "tests/e2e" "jest.integration.config.js"
-  if [ $? -ne 0 ]; then
-    EXIT_CODE=1
-  fi
-fi
+# Run E2E tests
+echo -e "\n${YELLOW}Step 3: Running end-to-end tests${NC}"
+./run-e2e-tests.sh
+E2E_RESULT=$?
 
-# Print summary
-echo -e "${BLUE}====================================================${NC}"
-if [ $EXIT_CODE -eq 0 ]; then
-  echo -e "${GREEN}All tests completed successfully!${NC}"
+# Show summary
+echo -e "\n${BLUE}=== Test Results Summary ===${NC}"
+if [ $UNIT_RESULT -eq 0 ]; then
+  echo -e "${GREEN}✓ Unit Tests: PASSED${NC}"
 else
-  echo -e "${RED}Some tests failed. Please check the output above for details.${NC}"
+  echo -e "${RED}✗ Unit Tests: FAILED${NC}"
 fi
-echo -e "${BLUE}====================================================${NC}"
 
-exit $EXIT_CODE
+if [ $INTEGRATION_RESULT -eq 0 ]; then
+  echo -e "${GREEN}✓ Integration Tests: PASSED${NC}"
+else
+  echo -e "${RED}✗ Integration Tests: FAILED${NC}"
+fi
+
+if [ $E2E_RESULT -eq 0 ]; then
+  echo -e "${GREEN}✓ End-to-End Tests: PASSED${NC}"
+else
+  echo -e "${RED}✗ End-to-End Tests: FAILED${NC}"
+fi
+
+# Overall result
+if [ $UNIT_RESULT -eq 0 ] && [ $INTEGRATION_RESULT -eq 0 ] && [ $E2E_RESULT -eq 0 ]; then
+  echo -e "\n${GREEN}All tests passed successfully!${NC}"
+  exit 0
+else
+  echo -e "\n${RED}Some tests failed. Please check the logs for details.${NC}"
+  exit 1
+fi

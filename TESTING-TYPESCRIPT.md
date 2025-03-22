@@ -1,50 +1,98 @@
-# TypeScript in Testing
+# TypeScript Testing Configuration for Firebase
 
-This document outlines our approach to handling TypeScript type issues in test files, particularly with Firebase-related tests.
+This document explains how we handle TypeScript type issues when testing with Firebase.
 
-## Firebase Type Challenges
+## Common TypeScript Issues with Firebase in Tests
 
-We encountered several TypeScript issues when working with Firebase in our tests:
+When testing with Firebase, especially with the Firebase emulators, you may encounter TypeScript errors like:
 
-1. **Missing Methods**: The Firebase type definitions don't match the actual JavaScript implementation. Methods like `Firestore.collection()`, `CollectionReference.doc()`, and `FirebaseApp.delete()` exist at runtime but are not properly typed.
+```
+Property 'collection' does not exist on type 'Firestore'.
+Property 'batch' does not exist on type 'Firestore'.
+```
 
-2. **Generic Type Parameters**: Firebase uses complex generic type parameters that are difficult to extend or override, especially with module augmentation.
+These errors occur because the TypeScript definitions for Firebase don't fully reflect the runtime capabilities when using the emulator or certain Firebase versions.
 
-3. **Type Compatibility Issues**: Using a query result as a collection reference or converting between different Firebase types often causes type incompatibilities.
+## Our Approach to Resolving These Issues
 
-## Our Solution
+Rather than implementing complex TypeScript overrides or module augmentations, we've taken a pragmatic approach:
 
-Rather than fighting with complex type augmentations, we've adopted a pragmatic approach:
+1. We document the known issues
+2. We use `//@ts-ignore` comments in test files when necessary
+3. We've created a basic type augmentation file (see below)
 
-1. **Explicit Type Casts**: Use `as any` or more specific type casts in test files where needed:
+The rationale behind this approach is that test code doesn't ship to production, so type safety in tests is less critical than in production code.
+
+## Type Augmentation File
+
+We've created a basic type augmentation file at `tests/types/firebase-augmentation.ts`:
+
+```typescript
+/**
+ * Type augmentations for Firebase
+ * 
+ * This file adds missing types to Firebase classes for testing purposes.
+ * These augmentations allow our tests to work without TypeScript errors.
+ */
+
+import { Firestore, DocumentData, Query } from 'firebase/firestore';
+
+declare module 'firebase/firestore' {
+  interface Firestore {
+    collection(path: string): any;
+    batch(): {
+      set(docRef: any, data: any): any;
+      update(docRef: any, data: any): any;
+      delete(docRef: any): any;
+      commit(): Promise<void>;
+    };
+  }
+  
+  interface DocumentReference<T = DocumentData> {
+    collection(collectionPath: string): any;
+  }
+  
+  interface Query<T = DocumentData> {
+    get(): Promise<any>;
+  }
+}
+```
+
+## Using `//@ts-ignore` Comments
+
+When TypeScript errors persist despite our augmentations, we use `//@ts-ignore` comments. While not ideal, this approach allows us to focus on test functionality rather than type definitions.
+
+Example usage:
+```typescript
+// @ts-ignore - Firestore collection method not recognized by TypeScript
+const usersCollection = db.collection('users');
+```
+
+## Best Practices for Test Files
+
+1. Import the augmentation file at the top of your test file:
    ```typescript
-   // Example: Using Firestore.collection() which exists at runtime but not in types
-   const collection = (db as any).collection('users');
-   
-   // Example: Using app.delete() which exists at runtime but not in types
-   await (app as any).delete();
+   import '../types/firebase-augmentation';
    ```
 
-2. **`// @ts-ignore` Comments**: In cases where type casts won't work or would make the code less readable, we use `// @ts-ignore` comments to bypass type checking for specific lines:
+2. Use explicit types for Firebase objects when destructuring:
    ```typescript
-   // Example: Using a query as a collection
-   // @ts-ignore - Firebase typing issue, this works at runtime
-   const result = query.where('status', '==', 'active');
+   const { collection, doc, getDoc } = firestore as any;
    ```
 
-3. **Documentation**: We document each case where we bypass type checking to make it clear why this approach was necessary.
+3. When creating mock objects, type them properly:
+   ```typescript
+   const mockDoc = { exists: () => true, data: () => ({ name: 'Test' }) } as any;
+   ```
 
-## Type Definition Files
-
-We've created several type definition files to improve the testing experience:
-
-1. `tests/test-utils.d.ts`: Type definitions for our mock Firestore utilities
-2. `tests/types/firebase-augmentation.ts`: Documentation of our approach to Firebase typing issues
+4. For persistent issues, use `//@ts-ignore` with a clear comment explaining why
 
 ## Future Improvements
 
-As Firebase updates its type definitions or as we refine our testing approach, we should revisit this strategy. Some potential improvements:
+We may consider more robust type augmentation solutions in the future, such as:
 
-1. Create proper type augmentations that correctly model the Firebase JavaScript API
-2. Create test-specific wrapper functions that hide the type inconsistencies
-3. Use a typed mock library specifically designed for Firebase
+1. Creating a more comprehensive type declaration file
+2. Using a third-party package that provides better Firebase type definitions
+3. Creating wrapper functions that handle the type casting internally
+
+For now, our pragmatic approach allows us to move forward with testing while acknowledging the type system limitations.
