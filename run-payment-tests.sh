@@ -1,24 +1,27 @@
 #!/bin/bash
 
+# Run payment tests with CJS configuration
+
+# Color codes for output
+GREEN="\033[0;32m"
+RED="\033[0;31m"
+YELLOW="\033[0;33m"
+BLUE="\033[0;34m"
+NC="\033[0m" # No Color
+
 # Set up environment for testing
 export NODE_ENV=test
 export $(grep -v '^#' .env.test | xargs)
 
-# Check if payment test configuration exists
-if [ ! -f "jest.payment.config.cjs" ]; then
-  echo "Creating payment test configuration file..."
-  node create-payment-test-files.js
-fi
+echo -e "${BLUE}Running payment tests with CommonJS configuration...${NC}"
 
-# Run Jest with the payment test config
-echo "Running payment integration tests..."
-npx jest --config jest.payment.config.cjs
+npx jest --config jest.payment-tests.config.cjs
 
 # Check exit code
 if [ $? -eq 0 ]; then
-  echo -e "\033[0;32mPayment tests passed successfully!\033[0m"
+  echo -e "${GREEN}Payment tests passed successfully!${NC}"
   exit 0
 else
-  echo -e "\033[0;31mSome payment tests failed.\033[0m"
+  echo -e "${RED}Some payment tests failed.${NC}"
   exit 1
 fi

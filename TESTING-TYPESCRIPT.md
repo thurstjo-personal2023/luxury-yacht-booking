@@ -1,98 +1,93 @@
-# TypeScript Testing Configuration for Firebase
+# TypeScript Testing Configuration Guide
 
-This document explains how we handle TypeScript type issues when testing with Firebase.
+## Problem Description
 
-## Common TypeScript Issues with Firebase in Tests
+We encountered issues running TypeScript tests in our mixed ESM/CommonJS environment. The main problems were:
 
-When testing with Firebase, especially with the Firebase emulators, you may encounter TypeScript errors like:
+1. Jest configuration files needed to use the `.cjs` extension to support CommonJS module format
+2. Test timeouts occurred when trying to load TypeScript modules directly
+3. Firebase dependencies caused additional complications
 
-```
-Property 'collection' does not exist on type 'Firestore'.
-Property 'batch' does not exist on type 'Firestore'.
-```
+## Solution
 
-These errors occur because the TypeScript definitions for Firebase don't fully reflect the runtime capabilities when using the emulator or certain Firebase versions.
+### Basic Testing Approach
 
-## Our Approach to Resolving These Issues
+For basic tests that don't require complex module imports:
+1. Use `.cjs` extension for test files
+2. Create corresponding Jest configuration files with `.cjs` extension
+3. Use `testEnvironment: 'node'` in the Jest configuration
+4. Run tests with `npx jest --config jest.*.config.cjs`
 
-Rather than implementing complex TypeScript overrides or module augmentations, we've taken a pragmatic approach:
+### TypeScript Module Testing
 
-1. We document the known issues
-2. We use `//@ts-ignore` comments in test files when necessary
-3. We've created a basic type augmentation file (see below)
+For tests involving TypeScript modules:
+1. Create CommonJS versions of critical domain models (`*.cjs`)
+2. Export the models using `module.exports`
+3. Import in tests using `require()`
+4. Configure Jest with `verbose: true` and appropriate `testTimeout`
 
-The rationale behind this approach is that test code doesn't ship to production, so type safety in tests is less critical than in production code.
+### Example Implementation
 
-## Type Augmentation File
-
-We've created a basic type augmentation file at `tests/types/firebase-augmentation.ts`:
-
-```typescript
-/**
- * Type augmentations for Firebase
- * 
- * This file adds missing types to Firebase classes for testing purposes.
- * These augmentations allow our tests to work without TypeScript errors.
- */
-
-import { Firestore, DocumentData, Query } from 'firebase/firestore';
-
-declare module 'firebase/firestore' {
-  interface Firestore {
-    collection(path: string): any;
-    batch(): {
-      set(docRef: any, data: any): any;
-      update(docRef: any, data: any): any;
-      delete(docRef: any): any;
-      commit(): Promise<void>;
-    };
-  }
+**Domain Model (CommonJS version):**
+```javascript
+// core/domain/payment/payment-status.cjs
+const PaymentStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  // ... other values
   
-  interface DocumentReference<T = DocumentData> {
-    collection(collectionPath: string): any;
+  fromStripeStatus: function(stripeStatus) {
+    // Implementation
   }
-  
-  interface Query<T = DocumentData> {
-    get(): Promise<any>;
-  }
+};
+
+function isValidPaymentStatus(status) {
+  // Implementation
 }
+
+module.exports = {
+  PaymentStatus,
+  isValidPaymentStatus
+};
 ```
 
-## Using `//@ts-ignore` Comments
+**Test File:**
+```javascript
+// tests/payment-status-test.cjs
+const { PaymentStatus, isValidPaymentStatus } = require('../core/domain/payment/payment-status.cjs');
 
-When TypeScript errors persist despite our augmentations, we use `//@ts-ignore` comments. While not ideal, this approach allows us to focus on test functionality rather than type definitions.
-
-Example usage:
-```typescript
-// @ts-ignore - Firestore collection method not recognized by TypeScript
-const usersCollection = db.collection('users');
+describe('PaymentStatus', () => {
+  // Test cases
+});
 ```
 
-## Best Practices for Test Files
+**Jest Configuration:**
+```javascript
+// jest.payment-tests.config.cjs
+module.exports = {
+  testEnvironment: 'node',
+  testMatch: [
+    '<rootDir>/tests/payment-status-test.cjs'
+  ],
+  verbose: true,
+  testTimeout: 10000
+};
+```
 
-1. Import the augmentation file at the top of your test file:
-   ```typescript
-   import '../types/firebase-augmentation';
-   ```
+## Running Tests
 
-2. Use explicit types for Firebase objects when destructuring:
-   ```typescript
-   const { collection, doc, getDoc } = firestore as any;
-   ```
+Use the provided shell scripts:
+- `./run-simple-test.sh` - Run basic tests
+- `./run-payment-tests.sh` - Run payment domain tests
 
-3. When creating mock objects, type them properly:
-   ```typescript
-   const mockDoc = { exists: () => true, data: () => ({ name: 'Test' }) } as any;
-   ```
+## Known Limitations
 
-4. For persistent issues, use `//@ts-ignore` with a clear comment explaining why
+1. This approach requires maintaining dual versions of critical domain models
+2. TypeScript type checking is not available in the CommonJS versions
+3. Tests requiring Firebase emulators still need additional configuration
 
 ## Future Improvements
 
-We may consider more robust type augmentation solutions in the future, such as:
-
-1. Creating a more comprehensive type declaration file
-2. Using a third-party package that provides better Firebase type definitions
-3. Creating wrapper functions that handle the type casting internally
-
-For now, our pragmatic approach allows us to move forward with testing while acknowledging the type system limitations.
+1. Implement automatic conversion of TypeScript modules to CommonJS format
+2. Create a unified testing framework that handles both ESM and CommonJS modules
+3. Add CI/CD integration with proper test environment setup
