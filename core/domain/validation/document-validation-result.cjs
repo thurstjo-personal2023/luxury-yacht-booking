@@ -21,12 +21,13 @@ const DocumentValidationResult = {
     // Convert field results to ValidationResult objects
     const fields = new Map();
     for (const [field, result] of props.fields.entries()) {
-      // Check if the result is already valid or invalid
-      if (result.isValid === true) {
-        fields.set(field, ValidationResult.valid(result.url, result.status, result.statusText, result.contentType));
-      } else {
-        fields.set(field, ValidationResult.invalid(result.url, result.status, result.statusText, result.error, result.contentType));
-      }
+      // Use the original result object directly since we need to preserve all properties
+      fields.set(field, {
+        ...result,
+        field,
+        collectionId: collection,
+        documentId: documentId
+      });
     }
     
     // Calculate statistics
