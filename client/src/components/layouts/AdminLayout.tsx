@@ -12,6 +12,7 @@ import {
   SettingsIcon,
   HomeIcon,
   LogOutIcon,
+  FileWarningIcon,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboardIcon },
     { name: 'Users', href: '/admin/users', icon: UsersIcon },
     { name: 'Media Management', href: '/admin/media', icon: ImageIcon },
+    { name: 'Media Validation', href: '/admin/media-validation', icon: FileWarningIcon },
     { name: 'Analytics', href: '/admin/analytics', icon: BarChartIcon },
     { name: 'Issues', href: '/admin/issues', icon: AlertTriangleIcon },
     { name: 'Settings', href: '/admin/settings', icon: SettingsIcon },

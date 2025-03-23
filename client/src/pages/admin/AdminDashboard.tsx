@@ -8,7 +8,9 @@ import {
   ShieldAlert, 
   Users,
   Menu,
-  X 
+  X,
+  FileWarning,
+  Image 
 } from 'lucide-react';
 
 // UI Components
@@ -96,9 +98,12 @@ export default function AdminDashboard() {
         return (
           <>
             <div className="flex flex-col md:flex-row gap-4 mb-4">
-              <Card className="flex-1">
+              <Card className="flex-1 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/admin/media-validation')}>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Media Validation Status</CardTitle>
+                  <CardTitle className="text-lg flex items-center">
+                    <FileWarning className="h-5 w-5 mr-2 text-primary" />
+                    Media Validation Status
+                  </CardTitle>
                   <CardDescription>Monitoring media integrity across all collections</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -115,6 +120,9 @@ export default function AdminDashboard() {
                       <div className="text-3xl font-bold text-red-500">5%</div>
                       <div className="text-xs text-muted-foreground">Broken URLs</div>
                     </div>
+                  </div>
+                  <div className="mt-2 text-xs text-primary text-right font-medium">
+                    View Media Validation →
                   </div>
                 </CardContent>
               </Card>
@@ -232,6 +240,12 @@ export default function AdminDashboard() {
               onClick={() => handleNavigation('dashboard')}
             />
             <SidebarLink
+              icon={<FileWarning className="h-5 w-5" />}
+              label="Media Validation"
+              active={activeSection === 'media-validation'}
+              onClick={() => setLocation('/admin/media-validation')}
+            />
+            <SidebarLink
               icon={<BarChart3 className="h-5 w-5" />}
               label="Analytics"
               active={activeSection === 'analytics'}
@@ -296,6 +310,15 @@ export default function AdminDashboard() {
                   label="Dashboard"
                   active={activeSection === 'dashboard'}
                   onClick={() => handleNavigation('dashboard')}
+                />
+                <SidebarLink
+                  icon={<FileWarning className="h-5 w-5" />}
+                  label="Media Validation"
+                  active={activeSection === 'media-validation'}
+                  onClick={() => {
+                    setLocation('/admin/media-validation');
+                    setMobileMenuOpen(false);
+                  }}
                 />
                 <SidebarLink
                   icon={<BarChart3 className="h-5 w-5" />}
