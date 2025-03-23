@@ -3,24 +3,20 @@
  Removing unpermitted intrinsics
  CONTENT_SHELL: Page allowed. Skipping shell injection blocks
  TSS: excluded result:  true
- Browsing Topics API removed
  DFP: Breach notification feature flag is enabled. true
- [vite] connecting...
- [vite] connected.
- Firebase initialized in PRODUCTION mode
- Setting up auth state listener for Firebase...
+ Browsing Topics API removed
+client:495 [vite] connecting...
+client:614 [vite] connected.
+firebase.ts:25 Firebase initialized in PRODUCTION mode
+firebase.ts:47 Setting up auth state listener for Firebase...
 firebase.ts:144 Using PRODUCTION Firebase services - skipping emulator connection
 firebase.ts:375 Using production Firebase services - emulator connection disabled
 firestore-init.ts:31 Using production Firebase services - emulator connection disabled
-use-auth.ts:371 Auth context: No role available from user object
 firestore-init.ts:71 Initializing Firestore collections in production mode...
 firestore-init.ts:75 Skipping collection verification during initialization (will verify after authentication)
 firebase.ts:50 Firebase Auth state changed: User signed out
 firebase.ts:115 Auth state change: User signed out
 firebase.ts:119 Auth token removed from localStorage
-use-auth.ts:124 🔵 Auth state change: User signed out
-use-auth.ts:126 ✅ Auth token removed from localStorage
-use-auth.ts:371 Auth context: No role available from user object
 firebase.ts:40 Firebase auth persistence set to LOCAL
 injection-tss-mv3.js:1 injection-tss TSS: hosted page injected
 injection-tss-mv3.js:1 injection-tss MBTSS: Nonce:  nonce
