@@ -18,7 +18,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from "@/lib/firebase";
-import { sendPasswordResetEmail } from "firebase/auth";
+import { User as FirebaseUser, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { collectionRefs } from "@/lib/firestore-init";
 import { UserRole, UserRoleType, UserType, standardizeUser } from "@shared/user-schema";
@@ -78,8 +78,41 @@ export default function Login() {
 
       console.log(`Login component: Attempting login for email: ${data.email}`);
       
-      // Use our enhanced auth context login method
-      const user = await login(data.email, data.password);
+      // Verify auth context is properly initialized
+      if (!login) {
+        console.error("Login component: Auth context not properly initialized");
+        throw new Error("Authentication system is not ready. Please refresh the page and try again.");
+      }
+      
+      // Use our enhanced auth context login method with better error handling
+      let user;
+      try {
+        // Attempt to login with a timeout in case Firebase is unresponsive
+        const loginPromise = login(data.email, data.password);
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("Login timed out. Please try again.")), 15000);
+        });
+        
+        user = await Promise.race([loginPromise, timeoutPromise]) as FirebaseUser;
+      } catch (loginError: any) {
+        console.error("Login component: Error during login:", loginError);
+        
+        // Handle specific login errors with more user-friendly messages
+        if (loginError.code === 'auth/network-request-failed') {
+          throw new Error("Network error. Please check your internet connection and try again.");
+        } else if (loginError.code === 'auth/too-many-requests') {
+          throw new Error("Too many unsuccessful login attempts. Please try again later or reset your password.");
+        } else if (loginError.message?.includes("timed out")) {
+          throw new Error("Login request timed out. Please try again.");
+        }
+        
+        // Rethrow the original error if not handled above
+        throw loginError;
+      }
+      
+      if (!user) {
+        throw new Error("Login failed. Please try again.");
+      }
       
       console.log(`Login component: Successfully logged in user: ${user.uid}`);
       
