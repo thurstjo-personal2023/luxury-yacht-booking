@@ -20,6 +20,8 @@ import { Separator } from '@/components/ui/separator';
 import { SessionTimer } from '@/components/admin/SessionTimer';
 import { useAdminAuth } from '@/hooks/use-admin-auth';
 import { useToast } from '@/hooks/use-toast';
+import MediaValidationSummary from '@/components/admin/MediaValidationSummary';
+import MediaValidationActivity from '@/components/admin/MediaValidationActivity';
 
 // Sidebar link item
 interface SidebarLinkProps {
@@ -98,34 +100,9 @@ export default function AdminDashboard() {
         return (
           <>
             <div className="flex flex-col md:flex-row gap-4 mb-4">
-              <Card className="flex-1 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation('/admin/media-validation')}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center">
-                    <FileWarning className="h-5 w-5 mr-2 text-primary" />
-                    Media Validation Status
-                  </CardTitle>
-                  <CardDescription>Monitoring media integrity across all collections</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div>
-                      <div className="text-3xl font-bold text-green-500">85%</div>
-                      <div className="text-xs text-muted-foreground">Valid URLs</div>
-                    </div>
-                    <div>
-                      <div className="text-3xl font-bold text-orange-500">10%</div>
-                      <div className="text-xs text-muted-foreground">Format Issues</div>
-                    </div>
-                    <div>
-                      <div className="text-3xl font-bold text-red-500">5%</div>
-                      <div className="text-xs text-muted-foreground">Broken URLs</div>
-                    </div>
-                  </div>
-                  <div className="mt-2 text-xs text-primary text-right font-medium">
-                    View Media Validation →
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="flex-1">
+                <MediaValidationSummary />
+              </div>
               
               <Card className="flex-1">
                 <CardHeader className="pb-2">
@@ -155,13 +132,7 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="border-l-4 border-blue-500 pl-4 py-1">
-                      <div className="font-medium">Media Validation</div>
-                      <div className="text-sm text-muted-foreground">
-                        Completed full validation scan of 5 collections
-                      </div>
-                      <div className="text-xs text-muted-foreground">10 minutes ago</div>
-                    </div>
+                    <MediaValidationActivity />
                     <div className="border-l-4 border-green-500 pl-4 py-1">
                       <div className="font-medium">User Registration</div>
                       <div className="text-sm text-muted-foreground">
