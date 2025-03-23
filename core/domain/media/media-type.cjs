@@ -1,7 +1,7 @@
 /**
- * Media Type (CommonJS Version)
+ * Media Type
  * 
- * This is a CommonJS version of the MediaType module for testing.
+ * This module defines media type constants and helper functions.
  */
 
 const MediaType = {

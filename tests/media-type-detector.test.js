@@ -5,7 +5,7 @@
  */
 
 const { MediaTypeDetector } = require('../core/domain/media/media-type-detector');
-const { MediaType } = require('../core/domain/media/media-type');
+const { MediaType } = require('../core/domain/media/media-type.cjs');
 
 describe('MediaTypeDetector', () => {
   let detector;

@@ -7,7 +7,7 @@
 const { MediaRepairService } = require('../core/domain/media/media-repair-service');
 const { UrlResolverService } = require('../core/domain/media/url-resolver');
 const { MediaTypeDetector } = require('../core/domain/media/media-type-detector');
-const { MediaType } = require('../core/domain/media/media-type');
+const { MediaType } = require('../core/domain/media/media-type.cjs');
 
 describe('MediaRepairService', () => {
   let service;

@@ -5,7 +5,7 @@
  * for files and URLs to ensure proper categorization as images or videos.
  */
 
-const { MediaType } = require('./media-type');
+const { MediaType } = require('./media-type.cjs');
 
 // Common image extensions and patterns
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.tiff', '.ico'];
