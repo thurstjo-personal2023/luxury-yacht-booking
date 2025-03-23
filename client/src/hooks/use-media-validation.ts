@@ -71,7 +71,7 @@ export const useMediaValidation = (): MediaValidationProps => {
 
   // Fetch validation reports
   const { 
-    data: reports = [],
+    data: reportsData = { reports: [] },
     isLoading: isLoadingReports,
     refetch: refetchReports 
   } = useQuery({
@@ -83,18 +83,21 @@ export const useMediaValidation = (): MediaValidationProps => {
           throw new Error(`Failed to fetch validation reports: ${response.status} ${response.statusText}`);
         }
         const data = await response.json();
-        return transformReports(data);
+        return data;
       } catch (error) {
         setError(`Error fetching reports: ${error instanceof Error ? error.message : String(error)}`);
-        return [];
+        return { reports: [] };
       }
     },
     refetchInterval: 10000, // Refresh every 10 seconds to get updates during validation
   });
 
+  // Transform and process the reports
+  const reports: ValidationReport[] = reportsData.reports ? transformReports(reportsData.reports) : [];
+  
   // Get the latest report
   const latestReport = reports.length > 0 
-    ? reports.sort((a, b) => b.endTime.getTime() - a.endTime.getTime())[0]
+    ? reports.sort((a: ValidationReport, b: ValidationReport) => b.endTime.getTime() - a.endTime.getTime())[0]
     : null;
 
   // Check if validation is in progress

@@ -497,11 +497,15 @@ export function registerAdminRoutes(app: Express) {
       const results = await runMediaValidationTest();
       console.log(`[${new Date().toISOString()}] Media validation test completed successfully`);
       
+      // Calculate success rate from results
+      const successRate = results.success ? 100 : 0;
+      
       // Return success response with results
       res.json({
         success: true,
         results,
-        message: `Media validation test completed with ${results.successRate}% success rate`
+        successRate,
+        message: `Media validation test completed with ${successRate}% success rate`
       });
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : String(error);
