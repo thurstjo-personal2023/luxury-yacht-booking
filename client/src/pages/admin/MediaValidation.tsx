@@ -46,7 +46,7 @@ export default function MediaValidation() {
                 <Link href="/admin/pubsub-validation">
                   <CloudIcon className="mr-2 h-4 w-4" />
                   PubSub Validation
-                  <ArrowRightIcon className="ml-2 h-4 w-4" />
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
             </div>
