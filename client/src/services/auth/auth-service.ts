@@ -414,6 +414,9 @@ export class AuthService {
       const unsubscribe = onAuthStateChanged(this.auth, (user) => {
         console.log('AuthService: Auth state changed:', user ? 'User signed in' : 'User signed out');
         
+        // IMPORTANT: Do not manipulate token storage here to avoid race conditions
+        // Token storage is handled in the ID token change listener
+        
         // Notify all listeners
         this.authStateListeners.forEach(listener => {
           try {
@@ -422,17 +425,6 @@ export class AuthService {
             console.error('AuthService: Error in auth state listener:', error);
           }
         });
-        
-        // Update storage
-        if (user) {
-          user.getIdToken().then(token => {
-            localStorage.setItem('authToken', token);
-          }).catch(error => {
-            console.error('AuthService: Error getting token during auth state change:', error);
-          });
-        } else {
-          localStorage.removeItem('authToken');
-        }
       });
       
       // Store the unsubscribe function

@@ -69,59 +69,61 @@ const LoadingSpinner = () => (
 /**
  * Enhanced PrivateRoute component that handles authentication and role-based protection
  * 
- * This implementation fixes several issues:
- * 1. Uses proper routing (useLocation hook) instead of direct window.location changes
- * 2. Performs token validation before rendering protected components
- * 3. Implements a caching mechanism to avoid unnecessary token checks
- * 4. Preserves React state and prevents full page reloads
- * 5. Uses our new auth service implementation
+ * This implementation includes the following improvements:
+ * 1. Uses the centralized AuthService directly
+ * 2. Performs proper token validation with clear state management
+ * 3. Provides detailed logging for debugging authentication flows
+ * 4. Uses proper React Router navigation
+ * 5. Adds support for role-specific routes
  */
 function PrivateRoute({ component: Component, ...rest }: any) {
-  const { isAuthenticated, isLoading, user, refreshUserData } = useAuthService();
+  const { isAuthenticated, isLoading, user, profileData, refreshUserData } = useAuthService();
   const [, setLocation] = useLocation();
-  const [isTokenValid, setIsTokenValid] = useState<boolean>(false);
-  const [checkingToken, setCheckingToken] = useState<boolean>(true);
+  const [tokenValid, setTokenValid] = useState<boolean>(false);
+  const [tokenValidated, setTokenValidated] = useState<boolean>(false);
   
-  // Verify token freshness when user is authenticated
+  // Validate token when component mounts and authentication state changes
   useEffect(() => {
-    const validateToken = async () => {
+    const validateUserToken = async () => {
+      console.log('PrivateRoute: Validating token...');
+      
       if (!isAuthenticated || !user) {
-        setIsTokenValid(false);
-        setCheckingToken(false);
+        console.log('PrivateRoute: No authenticated user to validate');
+        setTokenValid(false);
+        setTokenValidated(true);
         return;
       }
       
       try {
-        // Using our auth service's API to refresh the token
+        // Force a token refresh to ensure it's still valid
         await refreshUserData();
         
-        // Update state to indicate token is valid
-        setIsTokenValid(true);
+        // If we got here, token is valid
+        console.log('PrivateRoute: Token successfully validated');
+        setTokenValid(true);
+        setTokenValidated(true);
       } catch (error) {
-        console.error('PrivateRoute: Error validating token:', error);
-        setIsTokenValid(false);
-      } finally {
-        setCheckingToken(false);
+        console.error('PrivateRoute: Token validation failed:', error);
+        setTokenValid(false);
+        setTokenValidated(true);
       }
     };
     
-    validateToken();
-  }, [isAuthenticated, user, refreshUserData]);
+    if (!tokenValidated) {
+      validateUserToken();
+    }
+  }, [isAuthenticated, user, refreshUserData, tokenValidated]);
   
-  // Show loading state while we check authentication or token
-  if (isLoading || checkingToken) {
-    return <LoadingSpinner />;
-  }
-  
-  // Handle unauthenticated or invalid token states
-  if (!isAuthenticated || !user || !isTokenValid) {
-    console.log('PrivateRoute: Access denied - User authenticated:', isAuthenticated, 'Token valid:', isTokenValid);
-    
-    // Use React Router's navigation to preserve state
-    setTimeout(() => {
+  // Handle navigation when authentication state is determined
+  useEffect(() => {
+    if (tokenValidated && (!isAuthenticated || !tokenValid)) {
+      console.log('PrivateRoute: Authentication check failed, redirecting to login');
       setLocation('/login');
-    }, 100);
-    
+    }
+  }, [tokenValidated, isAuthenticated, tokenValid, setLocation]);
+  
+  // Show loading spinner while token is being validated
+  if (isLoading || !tokenValidated) {
     return <LoadingSpinner />;
   }
   
