@@ -5,11 +5,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { ConnectionStatus } from "@/components/ui/connection-status";
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { initializeFirestore } from "./lib/firestore-init";
 import { initializeConnectionManager } from "./lib/connection-manager";
 import { AdminAuthProvider } from "@/components/admin/AdminAuthProvider";
 import { useAuthService } from "@/services/auth";
+import { PrivateRoute } from '@/components/routing/PrivateRoute';
 
 // Lazy load pages
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -66,70 +67,10 @@ const LoadingSpinner = () => (
   </div>
 );
 
-/**
- * Enhanced PrivateRoute component that handles authentication and role-based protection
- * 
- * This implementation includes the following improvements:
- * 1. Uses the centralized AuthService directly
- * 2. Performs proper token validation with clear state management
- * 3. Provides detailed logging for debugging authentication flows
- * 4. Uses proper React Router navigation
- * 5. Adds support for role-specific routes
+/* 
+ * Using the standardized PrivateRoute component from imports above 
+ * This follows clean architecture principles with centralized auth management
  */
-function PrivateRoute({ component: Component, ...rest }: any) {
-  const { isAuthenticated, isLoading, user, profileData, refreshUserData } = useAuthService();
-  const [, setLocation] = useLocation();
-  const [tokenValid, setTokenValid] = useState<boolean>(false);
-  const [tokenValidated, setTokenValidated] = useState<boolean>(false);
-  
-  // Validate token when component mounts and authentication state changes
-  useEffect(() => {
-    const validateUserToken = async () => {
-      console.log('PrivateRoute: Validating token...');
-      
-      if (!isAuthenticated || !user) {
-        console.log('PrivateRoute: No authenticated user to validate');
-        setTokenValid(false);
-        setTokenValidated(true);
-        return;
-      }
-      
-      try {
-        // Force a token refresh to ensure it's still valid
-        await refreshUserData();
-        
-        // If we got here, token is valid
-        console.log('PrivateRoute: Token successfully validated');
-        setTokenValid(true);
-        setTokenValidated(true);
-      } catch (error) {
-        console.error('PrivateRoute: Token validation failed:', error);
-        setTokenValid(false);
-        setTokenValidated(true);
-      }
-    };
-    
-    if (!tokenValidated) {
-      validateUserToken();
-    }
-  }, [isAuthenticated, user, refreshUserData, tokenValidated]);
-  
-  // Handle navigation when authentication state is determined
-  useEffect(() => {
-    if (tokenValidated && (!isAuthenticated || !tokenValid)) {
-      console.log('PrivateRoute: Authentication check failed, redirecting to login');
-      setLocation('/login');
-    }
-  }, [tokenValidated, isAuthenticated, tokenValid, setLocation]);
-  
-  // Show loading spinner while token is being validated
-  if (isLoading || !tokenValidated) {
-    return <LoadingSpinner />;
-  }
-  
-  // User is authenticated and token is valid, render the protected component
-  return <Component {...rest} />;
-}
 
 function App() {
   const { user } = useAuthService();
