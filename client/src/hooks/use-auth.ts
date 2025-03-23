@@ -1,25 +1,24 @@
 /**
  * Auth Hook
  * 
- * This hook provides access to the authentication context.
- * It's a convenience wrapper around the useAuth hook from the auth provider.
+ * This hook provides access to the authentication functionality.
+ * It's now a direct wrapper around the useAuthService hook from our new clean architecture.
+ * This maintains API compatibility for components that haven't been updated yet.
  */
 
-import { useAuth as useAuthProvider } from '../providers/auth-provider';
+import { useAuthService } from '@/services/auth';
 
 /**
- * Hook for accessing auth context
+ * Hook for accessing auth functionality
  * 
  * This hook provides access to all authentication-related functionality:
- * - Current user and admin state
+ * - Current user state
  * - Authentication status
  * - Sign in/out methods
- * - MFA verification
  * - Token refreshing
  */
 export const useAuth = () => {
-  const auth = useAuthProvider();
-  return auth;
+  return useAuthService();
 };
 
 export default useAuth;
