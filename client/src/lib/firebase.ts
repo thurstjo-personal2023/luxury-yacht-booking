@@ -18,11 +18,56 @@ import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 // Import environment configuration
 import { FIREBASE_CONFIG, USE_FIREBASE_EMULATORS } from "./env-config";
 
-// Initialize Firebase and export the app instance
-export const app = initializeApp(FIREBASE_CONFIG);
+// Singleton pattern for Firebase app instance
+let firebaseAppInstance: ReturnType<typeof initializeApp> | null = null;
 
-// Log initialization mode
-console.log(`Firebase initialized in ${USE_FIREBASE_EMULATORS ? 'EMULATOR' : 'PRODUCTION'} mode`);
+// Initialize Firebase only once and export the app instance
+export const app = (() => {
+  // Check if we already have an instance
+  if (firebaseAppInstance) {
+    console.log('Using existing Firebase app instance (singleton)');
+    return firebaseAppInstance;
+  }
+  
+  // No instance exists, create a new one
+  try {
+    // Get any potential existing app
+    const existingApp = (window as any).__FIREBASE_APP_INSTANCE__;
+    
+    if (existingApp) {
+      console.log('Reusing existing Firebase app instance from window object');
+      firebaseAppInstance = existingApp;
+      return existingApp;
+    }
+    
+    // Create new instance
+    console.log('Creating new Firebase app instance');
+    firebaseAppInstance = initializeApp(FIREBASE_CONFIG);
+    
+    // Store reference for potential reuse
+    (window as any).__FIREBASE_APP_INSTANCE__ = firebaseAppInstance;
+    
+    // Log initialization mode
+    console.log(`Firebase initialized in ${USE_FIREBASE_EMULATORS ? 'EMULATOR' : 'PRODUCTION'} mode`);
+    
+    return firebaseAppInstance;
+  } catch (error) {
+    // If initialization fails with "already exists" error, get the existing app
+    if (error instanceof Error && error.message.includes('already exists')) {
+      console.warn('Firebase app already exists, retrieving existing instance');
+      // @ts-ignore - getApp is needed but not imported, so we access directly from window.firebase
+      const existingApp = (window as any).firebase?.app();
+      
+      if (existingApp) {
+        firebaseAppInstance = existingApp;
+        return existingApp;
+      }
+    }
+    
+    console.error('Error initializing Firebase app:', error);
+    throw error;
+  }
+})();
 
 // Initialize Firestore
 export const db = getFirestore(app);
@@ -33,15 +78,7 @@ export const storage = getStorage(app);
 export const functions = getFunctions(app);
 export const rtdb = getDatabase(app);
 
-// Set persistence to LOCAL to ensure the session is maintained across page reloads
-(async () => {
-  try {
-    await setPersistence(auth, browserLocalPersistence);
-    console.log("Firebase auth persistence set to LOCAL");
-  } catch (persistenceError) {
-    console.error("Failed to set Firebase auth persistence to LOCAL:", persistenceError);
-  }
-})();
+// Persistence will be set inside auth-context.tsx useEffect to prevent duplicate calls
 
 // Initialize auth state listener to manage tokens
 console.log('Setting up auth state listener for Firebase...');
