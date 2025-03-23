@@ -31,7 +31,7 @@ interface NavItem {
 }
 
 export function AdminLayout({ children }: AdminLayoutProps) {
-  const { user, signOut } = useAuthService();
+  const { user, logout } = useAuthService();
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
 
@@ -115,7 +115,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   variant="ghost"
                   className="flex items-center justify-start px-4 py-3 rounded-md w-full hover:bg-muted mt-4"
                   onClick={() => {
-                    signOut();
+                    logout();
                     closeSheet();
                   }}
                 >
@@ -136,7 +136,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <Button
             variant="outline"
             className="text-primary-foreground border-primary-foreground hover:bg-primary-foreground/10"
-            onClick={signOut}
+            onClick={() => logout()}
           >
             <LogOut className="mr-2 h-4 w-4" />
             Sign Out

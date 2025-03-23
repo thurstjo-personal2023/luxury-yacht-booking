@@ -6,7 +6,7 @@
 /**
  * User role string literals
  */
-export type UserRoleType = 'consumer' | 'producer' | 'partner';
+export type UserRoleType = 'consumer' | 'producer' | 'partner' | 'admin';
 
 /**
  * Legacy enum for backward compatibility
@@ -14,7 +14,8 @@ export type UserRoleType = 'consumer' | 'producer' | 'partner';
 export enum UserRole {
   CONSUMER = "consumer",
   PRODUCER = "producer",
-  PARTNER = "partner"
+  PARTNER = "partner",
+  ADMIN = "admin"
 }
 
 /**
@@ -82,9 +83,22 @@ export interface PartnerUser extends User {
 }
 
 /**
+ * Admin-specific user interface
+ */
+export interface AdminUser extends User {
+  role: 'admin';
+  
+  // Admin-specific fields
+  adminId?: string; // Always matches id
+  permissions?: string[];
+  accessLevel?: 'standard' | 'superadmin';
+  department?: string;
+}
+
+/**
  * Union type for all user types
  */
-export type UserType = ConsumerUser | ProducerUser | PartnerUser;
+export type UserType = ConsumerUser | ProducerUser | PartnerUser | AdminUser;
 
 /**
  * Convert a raw user object to the standardized schema
@@ -127,6 +141,15 @@ export function standardizeUser(user: any): UserType {
         partnerId: user.partnerId || user.id || user.uid || '',
         businessName: user.businessName || '',
         serviceTypes: user.serviceTypes || []
+      };
+    case 'admin':
+      return {
+        ...baseUser,
+        role: 'admin',
+        adminId: user.adminId || user.id || user.uid || '',
+        permissions: user.permissions || [],
+        accessLevel: user.accessLevel || 'standard',
+        department: user.department || 'General'
       };
     case 'consumer':
     default:

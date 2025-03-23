@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useAuthService } from '@/services/auth';
-import { checkPermission, checkMultiplePermissions, checkAnyPermission } from '@/lib/role-verification';
+import { checkPermission, checkMultiplePermissions, checkAnyPermission } from '@/lib/auth-permissions';
 
 interface PermissionGuardProps {
   children: ReactNode;
