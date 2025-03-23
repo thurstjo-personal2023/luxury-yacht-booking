@@ -42,9 +42,15 @@ export interface AuthResult {
  * User profile data interface
  */
 export interface UserProfileData {
+  // Basic user data
   harmonizedUser: HarmonizedUser | null;
   touristProfile: TouristProfile | null;
   serviceProviderProfile: ServiceProviderProfile | null;
+  
+  // Role information (extracted and normalized from profile data)
+  role?: string;
+  userId?: string;
+  displayName?: string;
 }
 
 /**
@@ -327,31 +333,45 @@ export class AuthService {
   async fetchUserProfile(userId?: string): Promise<UserProfileData> {
     try {
       // Use provided userId or current user's ID
-      const uid = userId || this.getCurrentUser()?.uid;
+      const userIdToFetch = userId || this.getCurrentUser()?.uid;
       
-      if (!uid) {
+      if (!userIdToFetch) {
         console.error('AuthService: Cannot fetch profile - no user ID available');
         throw new Error('No user ID available');
       }
       
-      const profileData = await getUserProfileById(uid);
+      const profileData = await getUserProfileById(userIdToFetch);
       
       if (!profileData) {
-        console.warn('AuthService: No profile data found for user:', uid);
+        console.warn('AuthService: No profile data found for user:', userIdToFetch);
         return {
           harmonizedUser: null,
           touristProfile: null,
-          serviceProviderProfile: null
+          serviceProviderProfile: null,
+          role: '',
+          userId: userIdToFetch || '',
+          displayName: this.getCurrentUser()?.displayName || ''
         };
       }
       
       // Check for role mismatch and synchronize if needed
       await this.checkAndSyncRoles(profileData.core);
       
+      // Extract normalized data from profiles
+      const role = profileData.core?.role?.toLowerCase() || '';
+      const userId = profileData.core?.id || '';
+      const displayName = profileData.core?.name || profileData.core?.displayName || '';
+      
       return {
+        // Original profile data
         harmonizedUser: profileData.core,
         touristProfile: profileData.touristProfile || null,
-        serviceProviderProfile: profileData.serviceProviderProfile || null
+        serviceProviderProfile: profileData.serviceProviderProfile || null,
+        
+        // Normalized data for easy access
+        role,
+        userId,
+        displayName
       };
     } catch (error) {
       console.error('AuthService: Error fetching user profile:', error);

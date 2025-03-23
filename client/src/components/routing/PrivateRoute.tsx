@@ -10,6 +10,7 @@ import React, { ReactNode, useEffect, useState } from 'react';
 import { Redirect } from 'wouter';
 import { Loader2 } from 'lucide-react';
 import { useAuthService } from '@/services/auth';
+import { getDashboardUrlForRole } from '@/lib/auth-permissions';
 
 // Different types of protected routes
 export type RouteType = 'user' | 'admin' | 'producer' | 'partner' | 'consumer';
@@ -68,48 +69,39 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({
     return <Redirect to="/login" />;
   }
   
-  // Admin routes check
-  if (routeType === 'admin') {
-    // Get admin status from user claims
-    const checkAdminRole = async () => {
-      try {
-        const tokenResult = await user.getIdTokenResult();
-        return tokenResult.claims.role === 'admin';
-      } catch (error) {
-        console.error('Error checking admin role:', error);
-        return false;
-      }
-    };
+  // Get user role from profile data
+  const userRole = profileData?.role?.toLowerCase();
+  
+  // Handle route type checks
+  if (routeType !== 'user') {
+    // If no role data is available, we can't make role-based decisions
+    if (!userRole) {
+      console.error('PrivateRoute: No user role data available');
+      return <Redirect to="/login" />;
+    }
     
-    // If not admin, redirect to admin login
-    if (!checkAdminRole()) {
+    // Admin routes check
+    if (routeType === 'admin' && userRole !== 'admin') {
       console.log('PrivateRoute: Redirecting to admin login - not an authenticated admin');
       return <Redirect to="/admin/login" />;
     }
-  }
-  
-  // Role-specific routes for regular users
-  // Only check these if we have the profile data
-  if (profileData) {
-    const userRole = profileData.role?.toLowerCase();
     
     // Producer route check
-    if (routeType === 'producer' && userRole !== 'producer') {
+    if (routeType === 'producer' && userRole !== 'producer' && userRole !== 'admin') {
       console.log(`PrivateRoute: User role ${userRole} doesn't match required role producer`);
-      return <Redirect to="/dashboard/consumer" />;
+      return <Redirect to={getDashboardUrlForRole(userRole)} />;
     }
     
     // Partner route check
-    if (routeType === 'partner' && userRole !== 'partner') {
+    if (routeType === 'partner' && userRole !== 'partner' && userRole !== 'admin') {
       console.log(`PrivateRoute: User role ${userRole} doesn't match required role partner`);
-      return <Redirect to="/dashboard/consumer" />;
+      return <Redirect to={getDashboardUrlForRole(userRole)} />;
     }
     
     // Consumer route check
-    if (routeType === 'consumer' && userRole !== 'consumer') {
+    if (routeType === 'consumer' && userRole !== 'consumer' && userRole !== 'admin') {
       console.log(`PrivateRoute: User role ${userRole} doesn't match required role consumer`);
-      // Redirect to the appropriate dashboard
-      return <Redirect to={`/dashboard/${userRole}`} />;
+      return <Redirect to={getDashboardUrlForRole(userRole)} />;
     }
   }
   
