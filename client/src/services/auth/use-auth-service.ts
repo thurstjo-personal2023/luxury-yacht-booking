@@ -98,16 +98,15 @@ export function useAuthService(): AuthServiceHookResult {
     // Set up token change listener to refresh profile data when claims change
     const unsubscribeTokenChange = authService.onIdTokenChanged((tokenUser) => {
       if (tokenUser) {
-        // Only refresh profile if user is already set (avoid duplicate fetches during login)
-        if (user && user.uid === tokenUser.uid) {
-          authService.fetchUserProfile(tokenUser.uid)
-            .then(data => {
-              setProfileData(data);
-            })
-            .catch(err => {
-              console.error('useAuthService: Error fetching profile data on token change:', err);
-            });
-        }
+        // Check against tokenUser's uid directly rather than depending on the user state
+        // This prevents unnecessary re-renders and potential stale closures
+        authService.fetchUserProfile(tokenUser.uid)
+          .then(data => {
+            setProfileData(data);
+          })
+          .catch(err => {
+            console.error('useAuthService: Error fetching profile data on token change:', err);
+          });
       }
     });
     
@@ -116,7 +115,7 @@ export function useAuthService(): AuthServiceHookResult {
       unsubscribeAuthState();
       unsubscribeTokenChange();
     };
-  }, [user]);
+  }, []); // Empty dependency array to run only once on mount
   
   /**
    * Clear current error

@@ -32,26 +32,39 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({
   const { user, isLoading, isAuthenticated, profileData, refreshUserData } = useAuthService();
   const [tokenValidated, setTokenValidated] = useState(false);
   
-  // Validate token and refresh user data when component mounts
+  // Validate token and refresh user data when component mounts or auth state changes
   useEffect(() => {
+    let isMounted = true;
+    
     const validateAndRefresh = async () => {
+      // Always reset token validation when auth state changes
+      if (isMounted) setTokenValidated(false);
+      
       if (!isAuthenticated || !user) {
-        setTokenValidated(true);
+        if (isMounted) setTokenValidated(true);
         return;
       }
       
       try {
         // Force a refresh of user data
         await refreshUserData();
-        setTokenValidated(true);
+        if (isMounted) setTokenValidated(true);
       } catch (error) {
         console.error('PrivateRoute: Error refreshing user data:', error);
-        setTokenValidated(true);
+        if (isMounted) setTokenValidated(true);
       }
     };
     
+    // Execute immediately
     validateAndRefresh();
-  }, [isAuthenticated, user, refreshUserData]);
+    
+    // Cleanup function to prevent state updates on unmounted component
+    return () => {
+      isMounted = false;
+    };
+  // Only depend on isAuthenticated and user to prevent unnecessary re-renders
+  // refreshUserData is excluded because it changes on every render
+  }, [isAuthenticated, user]);
   
   // Show loading state with improved UI
   if (isLoading || !tokenValidated) {

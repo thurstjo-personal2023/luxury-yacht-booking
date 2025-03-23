@@ -330,26 +330,26 @@ export class AuthService {
    * @param userId User ID to fetch profile for
    * @returns Promise resolving to UserProfileData
    */
-  async fetchUserProfile(userId?: string): Promise<UserProfileData> {
+  async fetchUserProfile(userIdParam?: string): Promise<UserProfileData> {
     try {
       // Use provided userId or current user's ID
-      const userIdToFetch = userId || this.getCurrentUser()?.uid;
+      const fetchUserId = userIdParam || this.getCurrentUser()?.uid;
       
-      if (!userIdToFetch) {
+      if (!fetchUserId) {
         console.error('AuthService: Cannot fetch profile - no user ID available');
         throw new Error('No user ID available');
       }
       
-      const profileData = await getUserProfileById(userIdToFetch);
+      const profileData = await getUserProfileById(fetchUserId);
       
       if (!profileData) {
-        console.warn('AuthService: No profile data found for user:', userIdToFetch);
+        console.warn('AuthService: No profile data found for user:', fetchUserId);
         return {
           harmonizedUser: null,
           touristProfile: null,
           serviceProviderProfile: null,
           role: '',
-          userId: userIdToFetch || '',
+          userId: fetchUserId || '',
           displayName: this.getCurrentUser()?.displayName || ''
         };
       }
@@ -359,7 +359,7 @@ export class AuthService {
       
       // Extract normalized data from profiles
       const role = profileData.core?.role?.toLowerCase() || '';
-      const userId = profileData.core?.id || '';
+      const userIdFromProfile = profileData.core?.id || '';
       const displayName = profileData.core?.name || profileData.core?.displayName || '';
       
       return {
@@ -370,7 +370,7 @@ export class AuthService {
         
         // Normalized data for easy access
         role,
-        userId,
+        userId: userIdFromProfile,
         displayName
       };
     } catch (error) {
