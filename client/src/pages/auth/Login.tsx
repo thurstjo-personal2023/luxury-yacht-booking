@@ -50,125 +50,62 @@ export default function Login() {
       setIsLoading(true);
       setError(null);
 
-      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
-
-      if (!userCredential.user.emailVerified) {
-        throw new Error("Please verify your email before logging in. Check your inbox for the verification link.");
-      }
-
-      // Get user profile from Firestore using the harmonized users collection
-      // Add retry mechanism for getting user data
-      let rawUserData = null;
-      let retryCount = 0;
-      const maxRetries = 3;
+      // Import authentication service for clean login flow
+      const { authenticateUser, redirectUserBasedOnRole } = await import('@/services/auth-service');
       
-      while (!rawUserData && retryCount < maxRetries) {
-        try {
-          const userDoc = await getDoc(doc(collectionRefs.users, userCredential.user.uid));
-          rawUserData = userDoc.data();
-          
-          if (!rawUserData && retryCount < maxRetries - 1) {
-            console.log(`User data not found, retrying (${retryCount + 1}/${maxRetries})...`);
-            // Wait before retry (increasing delay)
-            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-          }
-        } catch (fetchError) {
-          console.error(`Error fetching user data (attempt ${retryCount + 1}/${maxRetries}):`, fetchError);
-          if (retryCount < maxRetries - 1) {
-            // Wait before retry (increasing delay)
-            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-          }
-        }
-        retryCount++;
+      // Use the authentication service to handle login
+      console.log('Login component: Starting authentication process');
+      const authResult = await authenticateUser(data.email, data.password);
+      
+      if (!authResult.success) {
+        throw new Error(authResult.message || 'Authentication failed');
       }
-
-      // Use fallback data if user profile not found, to prevent login failures
-      if (!rawUserData) {
-        console.warn("User profile not found in Firestore. Using minimal fallback profile with role from token.");
-        
-        // Get the role from token claims if available
-        const tokenResult = await userCredential.user.getIdTokenResult();
-        const tokenRole = (tokenResult.claims.role as string) || "consumer";
-        
-        console.log(`Using role from token claims for fallback profile: "${tokenRole}"`);
-        
-        rawUserData = {
-          name: userCredential.user.displayName || "User",
-          email: userCredential.user.email || "",
-          role: tokenRole, // Use authenticated role from token instead of hardcoding "consumer"
-          userId: userCredential.user.uid,
-          phone: "",
-          points: 0,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          emailVerified: userCredential.user.emailVerified
-        };
-      }
-
-      // Ensure consistent user schema by applying standardizeUser function
-      const userData = standardizeUser({
-        ...rawUserData, 
-        id: userCredential.user.uid, 
-        userId: userCredential.user.uid
-      }) as UserType;
-
-      // Log the standardized user data for debugging
-      console.log("Successfully retrieved and standardized user profile:", userData);
-
+      
+      console.log(`Login component: Authentication successful for user with role ${authResult.role}`);
+      
+      // Show success toast to user
       toast({
         title: "Logged in successfully",
         duration: 2000,
       });
-
-      // Import the enhanced role verification utilities
-      const { getDashboardUrlForRole, verifyUserRole } = await import('@/lib/role-verification');
       
-      // Make sure role is lowercase for consistent lookup
-      const userRole = (userData.role || "consumer").toLowerCase() as UserRoleType;
-      
-      // Verify the user's role against their expected role from Firestore
-      console.log(`Verifying role before redirection: ${userRole}`);
-      const roleVerification = await verifyUserRole(userRole);
-      
-      if (roleVerification.hasRole) {
-        // Always use the verified role from the verification result for redirection
-        // This is crucial - it ensures we use the authoritative role from the token
-        const redirectRole = roleVerification.actualRole || userRole;
-        
-        // Check if there was a role mismatch
-        if (roleVerification.actualRole && roleVerification.actualRole !== userRole) {
-          console.log(`Role mismatch detected: Token has "${roleVerification.actualRole}" but profile had "${userRole}"`);
-          console.log(`Using verified role from token: "${redirectRole}" for redirection`);
-          
-          // Notify user of the role change
-          toast({
-            title: "Role Updated",
-            description: `Your role has been updated to ${redirectRole}`,
-            duration: 3000,
-          });
-        } else {
-          console.log(`Role verified (${redirectRole}), redirecting to appropriate dashboard`);
-        }
-        
-        // Always redirect to the dashboard for the verified role
-        setLocation(getDashboardUrlForRole(redirectRole));
-      } else if (roleVerification.actualRole) {
-        // If verification failed but we have an actual role, use that instead
-        console.log(`Role verification failed, but found actual role: ${roleVerification.actualRole}`);
-        console.log(`Redirecting to ${getDashboardUrlForRole(roleVerification.actualRole)} instead`);
+      // If role changed, notify user
+      if (authResult.user?.role && authResult.role && authResult.user.role !== authResult.role) {
+        console.log(`Login component: Role was updated from ${authResult.user.role} to ${authResult.role}`);
         
         toast({
-          title: "Role Mismatch",
-          description: `Your role has been updated to ${roleVerification.actualRole}`,
+          title: "Role Updated",
+          description: `Your role has been updated to ${authResult.role}`,
           duration: 3000,
         });
-        
-        setLocation(getDashboardUrlForRole(roleVerification.actualRole));
-      } else {
-        // Fallback to consumer dashboard if no role could be verified
-        console.warn("Could not verify any role, defaulting to consumer dashboard");
-        setLocation(getDashboardUrlForRole("consumer"));
       }
+      
+      // Use the verified role for redirection
+      console.log(`Login component: Redirecting to dashboard for role ${authResult.role}`);
+      
+      // Handle redirection - wait a short delay to ensure toasts are visible
+      setTimeout(async () => {
+        try {
+          if (authResult.role) {
+            // Use the redirect service for consistent behavior
+            await redirectUserBasedOnRole(authResult.role);
+          } else {
+            // Fallback to consumer if no role available
+            console.warn('Login component: No role available, defaulting to consumer');
+            await redirectUserBasedOnRole('consumer');
+          }
+        } catch (redirectError) {
+          console.error('Login component: Redirect error', redirectError);
+          
+          // Show error toast but don't stop the login flow
+          toast({
+            title: "Navigation issue",
+            description: "We had trouble redirecting you to your dashboard. Please try again.",
+            variant: "destructive",
+            duration: 4000,
+          });
+        }
+      }, 500);
     } catch (error: any) {
       setError(error.message);
       toast({
