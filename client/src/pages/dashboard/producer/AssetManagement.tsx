@@ -137,7 +137,8 @@ function RoleDebugSection({ user, authHeader }: { user: any, authHeader: string 
   const [tokenData, setTokenData] = useState<any>(null);
   const [syncingRole, setSyncingRole] = useState(false);
   const { toast } = useToast();
-  const { harmonizedUser } = useAuth();
+  const { profileData } = useAuthService();
+  const { harmonizedUser } = profileData;
   
   const decodeJwt = (token: string) => {
     try {
@@ -292,7 +293,7 @@ export default function AssetManagement() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { user: authUser } = useAuth(); // Get user from auth context
+  const { user: authUser } = useAuthService(); // Get user from auth service
   const [activeTab, setActiveTab] = useState("yachts");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
