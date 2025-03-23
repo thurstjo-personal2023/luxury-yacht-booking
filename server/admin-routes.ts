@@ -10,6 +10,16 @@ import validateImageUrls from '../scripts/validate-images';
 // Import will be loaded dynamically to avoid initialization issues
 // import { validateMediaUrls, saveMediaValidationResults } from '../scripts/validate-media';
 
+// Global state to track media validation/repair progress
+const mediaValidationState = {
+  isValidating: false,
+  isRepairing: false,
+  validationProgress: { total: 0, processed: 0 },
+  repairProgress: { total: 0, processed: 0 },
+  lastValidationId: null,
+  lastRepairId: null
+};
+
 // Middleware to verify admin role
 export const verifyAdminAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
