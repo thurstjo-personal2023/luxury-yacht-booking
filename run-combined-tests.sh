@@ -25,7 +25,7 @@ run_test_group() {
   echo -e "\n${BLUE}===== Running ${name} Tests =====${NC}"
   
   # Run tests with the specified configuration
-  npx jest --config $config --detectOpenHandles
+  npx jest --config $config --detectOpenHandles --forceExit
   
   if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ ${name} tests passed!${NC}"
