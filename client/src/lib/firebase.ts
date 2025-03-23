@@ -80,92 +80,22 @@ export const rtdb = getDatabase(app);
 
 // Persistence will be set inside auth-context.tsx useEffect to prevent duplicate calls
 
-// Initialize auth state listener to manage tokens
-console.log('Setting up auth state listener for Firebase...');
+// LEGACY AUTH STATE LISTENER - DISABLED
+// Now using centralized AuthService from client/src/services/auth/auth-service.ts
+console.log('Legacy Firebase auth state listener disabled, using centralized AuthService instead');
 
-auth.onAuthStateChanged(async (user) => {
-  console.log('Firebase Auth state changed:', user ? `User ${user.uid} signed in` : 'User signed out');
-  
-  if (user) {
-    try {
-      console.log('Auth state change: User authenticated', {
-        uid: user.uid,
-        email: user.email,
-        emailVerified: user.emailVerified,
-        provider: user.providerId
-      });
-      
-      // Get fresh token when auth state changes
-      console.log('Requesting fresh token on auth state change...');
-      const token = await user.getIdToken(true);
-      
-      if (token) {
-        localStorage.setItem('authToken', token);
-        const tokenPreview = token.length > 10 ? 
-          `${token.substring(0, 10)}...${token.substring(token.length - 5)}` : 
-          '[invalid token]';
-        console.log(`Auth token refreshed and stored in localStorage: ${tokenPreview}`);
-        
-        // Force a reload of the user in auth state to ensure all claims are loaded
-        try {
-          console.log('Refreshing user claims...');
-          await user.getIdTokenResult(true);
-          console.log('User claims refreshed successfully');
-        } catch (claimsError) {
-          console.error('Error refreshing user claims:', claimsError);
-        }
-        
-        // Set up a token refresh interval (every 10 minutes)
-        // Shorter interval for testing purposes
-        const TOKEN_REFRESH_INTERVAL = 10 * 60 * 1000; // 10 minutes in milliseconds
-        console.log(`Setting up token refresh interval: ${TOKEN_REFRESH_INTERVAL/1000/60} minutes`);
-        
-        const tokenRefreshInterval = setInterval(async () => {
-          try {
-            if (auth.currentUser) {
-              console.log('Performing scheduled token refresh...');
-              const refreshedToken = await auth.currentUser.getIdToken(true);
-              localStorage.setItem('authToken', refreshedToken);
-              console.log('Auth token refreshed on schedule');
-            } else {
-              // Clear interval if user is no longer signed in
-              console.log('User no longer authenticated, clearing token refresh interval');
-              clearInterval(tokenRefreshInterval);
-            }
-          } catch (refreshError) {
-            console.error('Error during periodic token refresh:', refreshError);
-          }
-        }, TOKEN_REFRESH_INTERVAL);
-        
-        // Store the interval ID so it can be cleared on logout
-        // @ts-ignore - Adding custom property to window
-        window.__tokenRefreshInterval = tokenRefreshInterval;
-        console.log('Token refresh interval set up and stored');
-      } else {
-        console.error('Failed to obtain token after auth state change');
-      }
-    } catch (error) {
-      console.error('Error refreshing auth token on auth state change:', error);
-    }
-  } else {
-    // User is signed out
-    console.log('Auth state change: User signed out');
-    
-    // Clear token when user signs out
-    localStorage.removeItem('authToken');
-    console.log('Auth token removed from localStorage');
-    
-    // Clear token refresh interval if it exists
-    // @ts-ignore - Accessing custom property from window
-    if (window.__tokenRefreshInterval) {
-      // @ts-ignore - Accessing custom property from window
-      clearInterval(window.__tokenRefreshInterval);
-      // @ts-ignore - Cleaning up custom property
-      window.__tokenRefreshInterval = null;
-      console.log('Token refresh interval cleared');
-    }
-  }
-});
+/*
+ * DISABLED AUTH LISTENER: This listener is now disabled as part of authentication refactoring.
+ * 
+ * The auth state listener and token management has been centralized in AuthService
+ * to prevent duplicate listeners and token management issues.
+ * 
+ * Reference implementation:
+ * 
+ * auth.onAuthStateChanged(async (user) => {
+ *   // Token management logic
+ * });
+ */
 
 // Set up a global error collection for error detection
 // This will be used by the ConnectionStatus component to detect Firebase errors
