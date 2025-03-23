@@ -175,8 +175,8 @@ class MediaTypeDetector {
         const mediaTypePath = fieldPath.replace(/\.url$/, '') + '.mediaType';
         
         this._setNestedValue(processedDoc, mediaTypePath, mediaType);
-      } else if (Array.isArray(value) && fieldPath === 'media') {
-        // For media arrays, process each item
+      } else if (Array.isArray(value)) {
+        // For any array fields (not just 'media'), process each item
         const updatedArray = value.map(item => {
           if (typeof item === 'string') {
             return {
@@ -184,14 +184,16 @@ class MediaTypeDetector {
               mediaType: this.detectMediaType({ url: item })
             };
           } else if (item && typeof item === 'object' && item.url) {
+            // Create a copy to avoid modifying the original
+            const itemCopy = { ...item };
             // Only add mediaType if it doesn't already exist
-            if (!item.mediaType) {
-              item.mediaType = this.detectMediaType({ 
-                url: item.url, 
-                mimeType: item.contentType || item.mimeType 
+            if (!itemCopy.mediaType) {
+              itemCopy.mediaType = this.detectMediaType({ 
+                url: itemCopy.url, 
+                mimeType: itemCopy.contentType || itemCopy.mimeType 
               });
             }
-            return item;
+            return itemCopy;
           }
           return item;
         });
