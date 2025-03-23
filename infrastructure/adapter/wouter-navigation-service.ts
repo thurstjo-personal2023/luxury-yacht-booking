@@ -1,62 +1,96 @@
 /**
  * Wouter Navigation Service
  * 
- * This module implements the navigation service interface using Wouter.
+ * This module implements the navigation service interface using wouter.
+ * It handles programmatic navigation between routes in the application.
  */
 
-import { INavigationService } from '../../core/application/navigation/navigation-service.interface';
+import { INavigationService } from '../../core/application/services/navigation-service.interface';
 
 /**
- * Navigation service implementation using Wouter
+ * Wouter implementation of the navigation service
+ * This uses window.location but could be adapted to use wouter's programmatic navigation
  */
 export class WouterNavigationService implements INavigationService {
+  private navigateCallback: (path: string) => void = () => {};
+  
   /**
    * Constructor
-   * 
-   * @param navigate Wouter's navigate function
-   * @param location Current location from Wouter
+   * @param navigate Optional navigation callback (from wouter's useLocation)
    */
-  constructor(
-    private navigate: (path: string, options?: { replace?: boolean }) => void,
-    private location: string
-  ) {}
-  
-  /**
-   * Navigate to a specific path
-   */
-  navigateTo(path: string): void {
-    this.navigate(path);
+  constructor(navigate?: (path: string) => void) {
+    if (navigate) {
+      this.navigateCallback = navigate;
+    }
   }
   
   /**
-   * Replace the current location with a new path
+   * Set the navigation callback
+   * This should be called from the app's main component with the navigate function from useLocation
    */
-  replaceWith(path: string): void {
-    this.navigate(path, { replace: true });
+  setNavigateCallback(navigate: (path: string) => void): void {
+    this.navigateCallback = navigate;
   }
   
   /**
-   * Go back to the previous location
+   * Navigate to a specific route
    */
-  goBack(): void {
-    window.history.back();
+  navigateTo(route: string): void {
+    console.log('Navigation service: Navigating to', route);
+    try {
+      this.navigateCallback(route);
+    } catch (error) {
+      console.error('Navigation service: Error during navigation, falling back to window.location', error);
+      window.location.href = route;
+    }
   }
   
   /**
-   * Get the current path
+   * Navigate to the home page
    */
-  getCurrentPath(): string {
-    return this.location;
+  navigateToHome(): void {
+    this.navigateTo('/');
   }
   
   /**
-   * Factory method to create the service from React hooks
-   * This needs to be used within a React component since it uses hooks
+   * Navigate to the login page
    */
-  static fromHooks(
-    navigate: (path: string, options?: { replace?: boolean }) => void,
-    location: string
-  ): WouterNavigationService {
-    return new WouterNavigationService(navigate, location);
+  navigateToLogin(): void {
+    this.navigateTo('/login');
+  }
+  
+  /**
+   * Navigate to the dashboard
+   */
+  navigateToDashboard(): void {
+    this.navigateTo('/dashboard');
+  }
+  
+  /**
+   * Navigate to the admin login page
+   */
+  navigateToAdminLogin(): void {
+    this.navigateTo('/admin/login');
+  }
+  
+  /**
+   * Navigate to the admin dashboard
+   */
+  navigateToAdminDashboard(): void {
+    this.navigateTo('/admin/dashboard');
+  }
+  
+  /**
+   * Navigate to the media validation page
+   */
+  navigateToMediaValidation(): void {
+    this.navigateTo('/admin/media-validation');
+  }
+  
+  /**
+   * Navigate to a specific error page
+   */
+  navigateToError(errorCode: string): void {
+    this.navigateTo(`/error/${errorCode}`);
   }
 }
