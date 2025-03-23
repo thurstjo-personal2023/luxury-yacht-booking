@@ -11,6 +11,7 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { initializeFirestore } from "./lib/firestore-init";
 import { initializeConnectionManager } from "./lib/connection-manager";
 import { AdminAuthProvider } from "@/components/admin/AdminAuthProvider";
+import { AuthProvider } from "@/lib/auth-context";
 
 // Lazy load pages
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -191,133 +192,137 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AdminAuthProvider sessionTimeout={15 * 60}>
-        <div className="min-h-screen flex flex-col">
-          <Navbar />
-          <main className="flex-1">
-            <Suspense fallback={<LoadingSpinner />}>
-              <Switch>
-                <Route path="/" component={Home} />
-                <Route path="/login" component={Login} />
-                <Route path="/register" component={Register} />
-                <Route path="/yacht/:id" component={YachtDetails} />
+      {/* Add the AuthProvider for regular user authentication */}
+      <AuthProvider>
+        {/* Keep AdminAuthProvider for admin authentication */}
+        <AdminAuthProvider sessionTimeout={15 * 60}>
+          <div className="min-h-screen flex flex-col">
+            <Navbar />
+            <main className="flex-1">
+              <Suspense fallback={<LoadingSpinner />}>
+                <Switch>
+                  <Route path="/" component={Home} />
+                  <Route path="/login" component={Login} />
+                  <Route path="/register" component={Register} />
+                  <Route path="/yacht/:id" component={YachtDetails} />
               
-                {/* Guest Experience Routes */}
-                <Route path="/explore" component={GuestDashboard} />
-                <Route path="/explore/search" component={SearchAndBook} />
-                <Route path="/experiences" component={FeaturedExperiences} />
-                
-                {/* Booking Routes */}
-                <Route path="/booking-summary">
-                  <PrivateRoute component={BookingSummary} />
-                </Route>
-                <Route path="/payment">
-                  <PrivateRoute component={PaymentPage} />
-                </Route>
+                  {/* Guest Experience Routes */}
+                  <Route path="/explore" component={GuestDashboard} />
+                  <Route path="/explore/search" component={SearchAndBook} />
+                  <Route path="/experiences" component={FeaturedExperiences} />
+                  
+                  {/* Booking Routes */}
+                  <Route path="/booking-summary">
+                    <PrivateRoute component={BookingSummary} />
+                  </Route>
+                  <Route path="/payment">
+                    <PrivateRoute component={PaymentPage} />
+                  </Route>
 
-                {/* Protected Routes with Role Verification */}
-                {/* 
-                  These routes are now protected by both:
-                  1. PrivateRoute - Ensures user is authenticated
-                  2. Internal role verification - Each dashboard component now verifies correct role
-                */}
-                <Route path="/dashboard/consumer">
-                  <PrivateRoute component={ConsumerDashboard} />
-                </Route>
-                <Route path="/dashboard/producer">
-                  <PrivateRoute component={ProducerDashboard} />
-                </Route>
-                <Route path="/dashboard/partner">
-                  <PrivateRoute component={PartnerDashboard} />
-                </Route>
-                <Route path="/profile">
-                  <PrivateRoute component={ProfilePage} />
-                </Route>
-                
-                {/* Partner Dashboard Routes */}
-                <Route path="/dashboard/partner/profile">
-                  <PrivateRoute component={PartnerProfile} />
-                </Route>
-                <Route path="/dashboard/partner/add-ons">
-                  <PrivateRoute component={PartnerAddOns} />
-                </Route>
-                <Route path="/dashboard/partner/add-ons/create">
-                  <PrivateRoute component={AddOnForm} />
-                </Route>
-                
-                {/* Producer Dashboard Routes */}
-                <Route path="/dashboard/producer/profile">
-                  <PrivateRoute component={ProducerProfile} />
-                </Route>
-                <Route path="/dashboard/producer/assets">
-                  <PrivateRoute component={AssetManagement} />
-                </Route>
-                <Route path="/dashboard/producer/assets/new-yacht">
-                  <PrivateRoute component={YachtForm} />
-                </Route>
-                <Route path="/dashboard/producer/assets/edit-yacht/:id">
-                  <PrivateRoute component={YachtForm} />
-                </Route>
-                <Route path="/dashboard/producer/compliance">
-                  <PrivateRoute component={ComplianceDocuments} />
-                </Route>
-                <Route path="/dashboard/producer/reviews">
-                  <PrivateRoute component={ReviewsManagement} />
-                </Route>
-                <Route path="/dashboard/producer/availability">
-                  <PrivateRoute component={AvailabilityPricing} />
-                </Route>
-                <Route path="/dashboard/producer/bookings">
-                  <PrivateRoute component={BookingsManagement} />
-                </Route>
-                <Route path="/dashboard/producer/admin">
-                  <PrivateRoute component={AdminUtils} />
-                </Route>
-                
-                {/* Admin Routes */}
-                <Route path="/admin">
-                  <PrivateRoute component={AdminDashboard} />
-                </Route>
-                <Route path="/admin/email-test">
-                  <PrivateRoute component={EmailTest} />
-                </Route>
-                <Route path="/admin/image-validator">
-                  <PrivateRoute component={ImageValidator} />
-                </Route>
-                <Route path="/admin/media">
-                  <PrivateRoute component={MediaManagement} />
-                </Route>
-                <Route path="/admin/media-validation">
-                  <PrivateRoute component={MediaValidation} />
-                </Route>
-                <Route path="/admin/pubsub-validation">
-                  <PrivateRoute component={PubSubValidation} />
-                </Route>
-                
-                {/* Secure Admin Portal Routes */}
-                <Route path="/admin-login" component={AdminLogin} />
-                <Route path="/admin-mfa-setup" component={AdminMfaSetup} />
-                <Route path="/admin-mfa-verify" component={AdminMfaVerify} />
-                <Route path="/admin-dashboard" component={SecureAdminDashboard} />
-                
-                {/* Debug Tools */}
-                <Route path="/debug/role">
-                  <PrivateRoute component={RoleDebugPage} />
-                </Route>
-                
-                {/* Test Pages */}
-                <Route path="/test/bundling" component={TestBundling} />
+                  {/* Protected Routes with Role Verification */}
+                  {/* 
+                    These routes are now protected by both:
+                    1. PrivateRoute - Ensures user is authenticated
+                    2. Internal role verification - Each dashboard component now verifies correct role
+                  */}
+                  <Route path="/dashboard/consumer">
+                    <PrivateRoute component={ConsumerDashboard} />
+                  </Route>
+                  <Route path="/dashboard/producer">
+                    <PrivateRoute component={ProducerDashboard} />
+                  </Route>
+                  <Route path="/dashboard/partner">
+                    <PrivateRoute component={PartnerDashboard} />
+                  </Route>
+                  <Route path="/profile">
+                    <PrivateRoute component={ProfilePage} />
+                  </Route>
+                  
+                  {/* Partner Dashboard Routes */}
+                  <Route path="/dashboard/partner/profile">
+                    <PrivateRoute component={PartnerProfile} />
+                  </Route>
+                  <Route path="/dashboard/partner/add-ons">
+                    <PrivateRoute component={PartnerAddOns} />
+                  </Route>
+                  <Route path="/dashboard/partner/add-ons/create">
+                    <PrivateRoute component={AddOnForm} />
+                  </Route>
+                  
+                  {/* Producer Dashboard Routes */}
+                  <Route path="/dashboard/producer/profile">
+                    <PrivateRoute component={ProducerProfile} />
+                  </Route>
+                  <Route path="/dashboard/producer/assets">
+                    <PrivateRoute component={AssetManagement} />
+                  </Route>
+                  <Route path="/dashboard/producer/assets/new-yacht">
+                    <PrivateRoute component={YachtForm} />
+                  </Route>
+                  <Route path="/dashboard/producer/assets/edit-yacht/:id">
+                    <PrivateRoute component={YachtForm} />
+                  </Route>
+                  <Route path="/dashboard/producer/compliance">
+                    <PrivateRoute component={ComplianceDocuments} />
+                  </Route>
+                  <Route path="/dashboard/producer/reviews">
+                    <PrivateRoute component={ReviewsManagement} />
+                  </Route>
+                  <Route path="/dashboard/producer/availability">
+                    <PrivateRoute component={AvailabilityPricing} />
+                  </Route>
+                  <Route path="/dashboard/producer/bookings">
+                    <PrivateRoute component={BookingsManagement} />
+                  </Route>
+                  <Route path="/dashboard/producer/admin">
+                    <PrivateRoute component={AdminUtils} />
+                  </Route>
+                  
+                  {/* Admin Routes */}
+                  <Route path="/admin">
+                    <PrivateRoute component={AdminDashboard} />
+                  </Route>
+                  <Route path="/admin/email-test">
+                    <PrivateRoute component={EmailTest} />
+                  </Route>
+                  <Route path="/admin/image-validator">
+                    <PrivateRoute component={ImageValidator} />
+                  </Route>
+                  <Route path="/admin/media">
+                    <PrivateRoute component={MediaManagement} />
+                  </Route>
+                  <Route path="/admin/media-validation">
+                    <PrivateRoute component={MediaValidation} />
+                  </Route>
+                  <Route path="/admin/pubsub-validation">
+                    <PrivateRoute component={PubSubValidation} />
+                  </Route>
+                  
+                  {/* Secure Admin Portal Routes */}
+                  <Route path="/admin-login" component={AdminLogin} />
+                  <Route path="/admin-mfa-setup" component={AdminMfaSetup} />
+                  <Route path="/admin-mfa-verify" component={AdminMfaVerify} />
+                  <Route path="/admin-dashboard" component={SecureAdminDashboard} />
+                  
+                  {/* Debug Tools */}
+                  <Route path="/debug/role">
+                    <PrivateRoute component={RoleDebugPage} />
+                  </Route>
+                  
+                  {/* Test Pages */}
+                  <Route path="/test/bundling" component={TestBundling} />
 
-                {/* Fallback to 404 */}
-                <Route component={NotFound} />
-              </Switch>
-            </Suspense>
-          </main>
-          <Footer />
-          <ConnectionStatus />
-        </div>
-        <Toaster />
-      </AdminAuthProvider>
+                  {/* Fallback to 404 */}
+                  <Route component={NotFound} />
+                </Switch>
+              </Suspense>
+            </main>
+            <Footer />
+            <ConnectionStatus />
+          </div>
+          <Toaster />
+        </AdminAuthProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
