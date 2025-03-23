@@ -241,7 +241,8 @@ export async function redirectAfterRegistration(role: UserRoleType): Promise<boo
   try {
     console.log(`Registration service: Redirecting new user based on role ${role}`);
     
-    // Use the navigation service for redirection
+    // Use the updated navigation service that uses wouter's navigate
+    // instead of window.location to prevent full page reloads
     const redirectResult = await redirectToDashboard(role);
     
     return redirectResult.success;
