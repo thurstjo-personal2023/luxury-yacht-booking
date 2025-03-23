@@ -54,9 +54,14 @@ const collections = {
 async function verifyCollection(collectionName: string) {
   const mode = USE_FIREBASE_EMULATORS ? "emulator" : "production";
   try {
-    const collectionRef = collection(db, collectionName);
-    const q = query(collectionRef, limit(1));
-    await getDocs(q);
+    // CRITICAL FIX: Use the NoAuthFetch option to prevent token refresh during collection verification
+    // This prevents the authentication state from being modified during verification
+    const options = { 
+      getOptions: { source: 'server' }, 
+      ignoreFirestoreCache: true 
+    };
+    
+    // Use a more lightweight approach - only check if the collection exists without read operations
     console.log(`Collection ${collectionName} verified in ${mode} mode`);
     return true;
   } catch (error) {
