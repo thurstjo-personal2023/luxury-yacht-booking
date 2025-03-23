@@ -6,6 +6,7 @@ module.exports = {
   testMatch: [
     '**/tests/url-resolver.test.js',
     '**/tests/media-type-detector.test.js',
+    '**/tests/media-type-detector.simplified.test.js',
     '**/tests/media-repair-service.test.js'
   ],
   transform: {

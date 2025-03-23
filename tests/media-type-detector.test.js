@@ -4,7 +4,7 @@
  * This file contains tests for the Media Type Detector.
  */
 
-const { MediaTypeDetector } = require('../core/domain/media/media-type-detector');
+const { MediaTypeDetector } = require('../core/domain/media/media-type-detector.cjs');
 const { MediaType } = require('../core/domain/media/media-type.cjs');
 
 describe('MediaTypeDetector', () => {
