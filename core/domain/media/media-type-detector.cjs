@@ -263,10 +263,30 @@ class MediaTypeDetector {
     if (lastPart.startsWith('[') && lastPart.endsWith(']')) {
       const index = parseInt(lastPart.substring(1, lastPart.length - 1), 10);
       if (Array.isArray(current) && !isNaN(index)) {
-        current[index] = value;
+        // Check if we need to convert a primitive to an object
+        if (current[index] !== null && typeof current[index] === 'object') {
+          current[index] = value;
+        } else {
+          // If trying to set a property on a primitive, convert it to an object
+          // with both the original value as 'url' and the new property
+          const originalValue = current[index];
+          if (originalValue && typeof originalValue === 'string' && path.endsWith('.mediaType')) {
+            // Special case for mediaType on URLs - convert the string URL to an object
+            current[index] = { url: originalValue, mediaType: value };
+          } else {
+            current[index] = value;
+          }
+        }
       }
     } else {
-      current[lastPart] = value;
+      // Check if we need to convert a primitive to an object
+      if (current[lastPart] !== null && typeof current[lastPart] === 'string' && path.endsWith('.mediaType')) {
+        // Special case for mediaType on URLs - convert the string URL to an object
+        const originalValue = current[lastPart];
+        current[lastPart] = { url: originalValue, mediaType: value };
+      } else {
+        current[lastPart] = value;
+      }
     }
     
     return obj;
