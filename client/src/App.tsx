@@ -5,13 +5,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { ConnectionStatus } from "@/components/ui/connection-status";
-import { auth } from "@/lib/firebase";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { initializeFirestore } from "./lib/firestore-init";
 import { initializeConnectionManager } from "./lib/connection-manager";
 import { AdminAuthProvider } from "@/components/admin/AdminAuthProvider";
 import { useAuthService } from "@/services/auth";
-import { useAuthState } from "react-firebase-hooks/auth";
 
 // Lazy load pages
 const NotFound = lazy(() => import("@/pages/not-found"));
