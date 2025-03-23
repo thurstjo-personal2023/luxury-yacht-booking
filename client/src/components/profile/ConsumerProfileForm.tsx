@@ -22,7 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/auth-context";
+import { useAuthService } from "@/services/auth";
 import { doc, setDoc, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, Plus, X } from "lucide-react";
@@ -39,7 +39,8 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function ConsumerProfileForm() {
   const { toast } = useToast();
-  const { user, harmonizedUser, touristProfile, refreshUserData } = useAuth();
+  const { user, profileData, refreshUserData } = useAuthService();
+  const { harmonizedUser, touristProfile } = profileData;
   const [isLoading, setIsLoading] = useState(false);
   const [newPreference, setNewPreference] = useState("");
 

@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import { useAuth } from "@/lib/auth-context"; // Import enhanced auth system
+import { useAuthService } from "@/services/auth"; // Import our new auth service
 
 /**
  * User role enum for registration
@@ -65,7 +65,8 @@ export default function Register() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { register: authRegister, user, harmonizedUser } = useAuth(); // Use enhanced auth context
+  const { register: authRegister, user, profileData } = useAuthService();
+  const { harmonizedUser } = profileData;
   
   // Check if user is already logged in and redirect to appropriate dashboard
   useEffect(() => {
