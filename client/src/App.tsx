@@ -115,10 +115,14 @@ function App() {
                   
                 {/* Booking Routes */}
                 <Route path="/booking-summary">
-                  <PrivateRoute component={BookingSummary} />
+                  <PrivateRoute>
+                    <BookingSummary />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/payment">
-                  <PrivateRoute component={PaymentPage} />
+                  <PrivateRoute>
+                    <PaymentPage />
+                  </PrivateRoute>
                 </Route>
 
                 {/* Protected Routes with Role Verification */}
@@ -128,76 +132,120 @@ function App() {
                   2. Internal role verification - Each dashboard component now verifies correct role
                 */}
                 <Route path="/dashboard/consumer">
-                  <PrivateRoute component={ConsumerDashboard} />
+                  <PrivateRoute routeType="consumer">
+                    <ConsumerDashboard />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/dashboard/producer">
-                  <PrivateRoute component={ProducerDashboard} />
+                  <PrivateRoute routeType="producer">
+                    <ProducerDashboard />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/dashboard/partner">
-                  <PrivateRoute component={PartnerDashboard} />
+                  <PrivateRoute routeType="partner">
+                    <PartnerDashboard />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/profile">
-                  <PrivateRoute component={ProfilePage} />
+                  <PrivateRoute>
+                    <ProfilePage />
+                  </PrivateRoute>
                 </Route>
                   
                 {/* Partner Dashboard Routes */}
                 <Route path="/dashboard/partner/profile">
-                  <PrivateRoute component={PartnerProfile} />
+                  <PrivateRoute routeType="partner">
+                    <PartnerProfile />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/dashboard/partner/add-ons">
-                  <PrivateRoute component={PartnerAddOns} />
+                  <PrivateRoute routeType="partner">
+                    <PartnerAddOns />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/dashboard/partner/add-ons/create">
-                  <PrivateRoute component={AddOnForm} />
+                  <PrivateRoute routeType="partner">
+                    <AddOnForm />
+                  </PrivateRoute>
                 </Route>
                   
                 {/* Producer Dashboard Routes */}
                 <Route path="/dashboard/producer/profile">
-                  <PrivateRoute component={ProducerProfile} />
+                  <PrivateRoute routeType="producer">
+                    <ProducerProfile />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/dashboard/producer/assets">
-                  <PrivateRoute component={AssetManagement} />
+                  <PrivateRoute routeType="producer">
+                    <AssetManagement />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/dashboard/producer/assets/new-yacht">
-                  <PrivateRoute component={YachtForm} />
+                  <PrivateRoute routeType="producer">
+                    <YachtForm />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/dashboard/producer/assets/edit-yacht/:id">
-                  <PrivateRoute component={YachtForm} />
+                  <PrivateRoute routeType="producer">
+                    <YachtForm />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/dashboard/producer/compliance">
-                  <PrivateRoute component={ComplianceDocuments} />
+                  <PrivateRoute routeType="producer">
+                    <ComplianceDocuments />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/dashboard/producer/reviews">
-                  <PrivateRoute component={ReviewsManagement} />
+                  <PrivateRoute routeType="producer">
+                    <ReviewsManagement />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/dashboard/producer/availability">
-                  <PrivateRoute component={AvailabilityPricing} />
+                  <PrivateRoute routeType="producer">
+                    <AvailabilityPricing />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/dashboard/producer/bookings">
-                  <PrivateRoute component={BookingsManagement} />
+                  <PrivateRoute routeType="producer">
+                    <BookingsManagement />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/dashboard/producer/admin">
-                  <PrivateRoute component={AdminUtils} />
+                  <PrivateRoute routeType="producer">
+                    <AdminUtils />
+                  </PrivateRoute>
                 </Route>
                   
                 {/* Admin Routes */}
                 <Route path="/admin">
-                  <PrivateRoute component={AdminDashboard} />
+                  <PrivateRoute routeType="admin">
+                    <AdminDashboard />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/admin/email-test">
-                  <PrivateRoute component={EmailTest} />
+                  <PrivateRoute routeType="admin">
+                    <EmailTest />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/admin/image-validator">
-                  <PrivateRoute component={ImageValidator} />
+                  <PrivateRoute routeType="admin">
+                    <ImageValidator />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/admin/media">
-                  <PrivateRoute component={MediaManagement} />
+                  <PrivateRoute routeType="admin">
+                    <MediaManagement />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/admin/media-validation">
-                  <PrivateRoute component={MediaValidation} />
+                  <PrivateRoute routeType="admin">
+                    <MediaValidation />
+                  </PrivateRoute>
                 </Route>
                 <Route path="/admin/pubsub-validation">
-                  <PrivateRoute component={PubSubValidation} />
+                  <PrivateRoute routeType="admin">
+                    <PubSubValidation />
+                  </PrivateRoute>
                 </Route>
                   
                 {/* Secure Admin Portal Routes */}
@@ -208,7 +256,9 @@ function App() {
                   
                 {/* Debug Tools */}
                 <Route path="/debug/role">
-                  <PrivateRoute component={RoleDebugPage} />
+                  <PrivateRoute>
+                    <RoleDebugPage />
+                  </PrivateRoute>
                 </Route>
                   
                 {/* Test Pages */}
