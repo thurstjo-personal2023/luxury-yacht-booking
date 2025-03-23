@@ -1,274 +1,154 @@
 /**
  * Media Validation Scheduler
  * 
- * This module handles scheduling and coordination of media validation tasks.
- * It interfaces with the Pub/Sub system to schedule validation jobs and track progress.
+ * This module provides functionality for scheduling media validation tasks
+ * using Google Cloud Pub/Sub. It handles:
+ * - Scheduled validation tasks (daily/weekly)
+ * - On-demand validation triggered by API
+ * - Task distribution across multiple workers
  */
-const admin = require("../src/utils/firebaseAdmin");
-const { logger } = require("../src/utils/logging");
-const { PubSub } = require("@google-cloud/pubsub");
+const {PubSub} = require('@google-cloud/pubsub');
+const admin = require('firebase-admin');
+const {v4: uuidv4} = require('uuid');
 
-// Default configuration for the scheduler
+// Default scheduler configuration
 const DEFAULT_CONFIG = {
-  // Default collections to validate
-  collections: [
+  topicName: 'media-validation-tasks',
+  cronSchedule: '0 2 * * *', // 2 AM every day (UTC)
+  timezone: 'UTC',
+  batchSize: 50,
+  collectionsToValidate: [
     'unified_yacht_experiences',
     'yacht_profiles',
     'products_add_ons',
     'articles_and_guides',
     'event_announcements'
   ],
-  
-  // Scheduler configuration
-  scheduleName: 'media-validation-daily',
-  topicName: 'media-validation-tasks',
-  cronSchedule: '0 2 * * *', // 2 AM every day
-  timezone: 'UTC',
-  
-  // Task settings
-  batchSize: 50,
-  
-  // Worker configuration
   workerConfig: {
     autoFix: true,
     fixRelativeUrls: true,
-    fixMediaTypes: true,
-    saveValidationResults: true,
-    resultsCollection: 'media_validation_reports',
-    tasksCollection: 'media_validation_tasks',
-    placeholderImage: 'https://storage.googleapis.com/etoile-yachts.firebasestorage.app/yacht-placeholder.jpg'
+    fixMediaTypes: true
   }
 };
 
 /**
  * Media Validation Scheduler
+ * 
+ * Manages scheduling and distribution of media validation tasks
  */
 class MediaValidationScheduler {
   /**
-   * Create a new scheduler
-   * 
-   * @param {Object} config - Configuration options
+   * Constructor
+   * @param {Object} config Configuration options for the scheduler
    */
   constructor(config = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
-    this.pubsub = new PubSub();
+    // Merge user config with defaults
+    this.config = {...DEFAULT_CONFIG, ...config};
+    
+    // Initialize Pub/Sub client
+    this.pubSubClient = new PubSub();
+    
+    // Generate a unique ID for this scheduler instance
+    this.instanceId = `scheduler-${uuidv4()}`;
+    
+    // Get Firestore instance if not provided
     this.db = admin.firestore();
-    this.topic = this.pubsub.topic(this.config.topicName);
   }
   
   /**
    * Initialize the scheduler
-   * Ensures the Pub/Sub topic exists and any other required setup
+   * Creates Pub/Sub topic if it doesn't exist
    */
   async initialize() {
-    // Check if topic exists, create if not
     try {
-      const [topicExists] = await this.topic.exists();
+      console.log(`Initializing media validation scheduler (${this.instanceId})...`);
+      
+      // Create Pub/Sub topic if it doesn't exist
+      const [topicExists] = await this.pubSubClient.topic(this.config.topicName).exists();
+      
       if (!topicExists) {
-        logger.info(`Creating Pub/Sub topic: ${this.config.topicName}`);
-        await this.topic.create();
+        console.log(`Creating Pub/Sub topic: ${this.config.topicName}`);
+        await this.pubSubClient.createTopic(this.config.topicName);
       }
-      logger.info('Media validation scheduler initialized successfully');
+      
+      // Create tasks collection if it doesn't exist
+      const tasksRef = this.db.collection('media_validation_tasks');
+      const tasksDoc = await tasksRef.doc('__config__').get();
+      
+      if (!tasksDoc.exists) {
+        await tasksRef.doc('__config__').set({
+          initialized: true,
+          schedulerConfig: this.config,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+      
+      console.log(`Media validation scheduler initialized successfully`);
       return true;
     } catch (error) {
-      logger.error('Error initializing media validation scheduler:', error);
+      console.error('Error initializing media validation scheduler:', error);
       throw error;
     }
   }
   
   /**
-   * Trigger validation for a set of collections
-   * 
-   * @param {Object} metadata - Additional metadata for the validation run
-   * @returns {Promise<string>} - The message ID from Pub/Sub
+   * Trigger media validation
+   * @param {Object} metadata Additional metadata for the validation task
+   * @returns {Promise<string>} Message ID of the published message
    */
   async triggerValidation(metadata = {}) {
     try {
-      // Create a unique ID for this validation run
-      const validationId = this.db.collection(this.config.workerConfig.resultsCollection).doc().id;
+      // Create a unique task ID
+      const taskId = `task-${Date.now()}-${uuidv4().substring(0, 8)}`;
       
-      // Default metadata
-      const defaultMetadata = {
-        validationId,
+      // Get collections to validate (use defaults if not provided)
+      const collections = metadata.collections || this.config.collectionsToValidate;
+      
+      // Create task data
+      const taskData = {
+        taskId,
+        collections,
         timestamp: Date.now(),
-        requestedAt: new Date().toISOString(),
-        requestedBy: 'scheduler',
-        collections: this.config.collections
-      };
-      
-      // Combine with user metadata
-      const messageData = {
-        ...defaultMetadata,
+        schedulerInstance: this.instanceId,
+        batchSize: this.config.batchSize,
+        workerConfig: this.config.workerConfig,
         ...metadata
       };
       
-      // Create initial validation record in Firestore
-      await this.db.collection(this.config.workerConfig.resultsCollection)
-        .doc(validationId)
-        .set({
-          started: admin.firestore.FieldValue.serverTimestamp(),
-          status: 'running',
-          collections: messageData.collections.reduce((acc, collection) => {
-            acc[collection] = { processed: 0, fixed: 0, errors: 0, invalidUrls: 0 };
-            return acc;
-          }, {}),
-          metadata: messageData,
-          totalCollections: messageData.collections.length,
-          completedCollections: 0
-        });
+      // Save task to Firestore
+      await this.db.collection('media_validation_tasks').doc(taskId).set({
+        ...taskData,
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
       
-      // Publish message to Pub/Sub topic
-      const dataBuffer = Buffer.from(JSON.stringify(messageData));
-      const messageId = await this.topic.publish(dataBuffer);
+      // Publish message to Pub/Sub
+      const dataBuffer = Buffer.from(JSON.stringify(taskData));
+      const messageId = await this.pubSubClient.topic(this.config.topicName).publish(dataBuffer);
       
-      logger.info(`Triggered media validation with ID: ${validationId}`);
+      console.log(`Published validation task ${taskId} with message ID: ${messageId}`);
       
       return messageId;
     } catch (error) {
-      logger.error('Error triggering media validation:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Process a validation task from Pub/Sub
-   * 
-   * @param {Object} message - The Pub/Sub message
-   * @returns {Promise<Object>} - Result of processing
-   */
-  async handleValidationTask(message) {
-    try {
-      // Parse the message data
-      const messageData = message.data 
-        ? JSON.parse(Buffer.from(message.data, 'base64').toString())
-        : {};
-      
-      logger.info(`Handling media validation task: ${JSON.stringify({
-        validationId: messageData.validationId,
-        collections: messageData.collections ? messageData.collections.length : 0
-      })}`);
-      
-      // If this is just a trigger message, schedule batch tasks for each collection
-      if (messageData.collections && !messageData.batch) {
-        await this.scheduleBatchTasks(messageData);
-        return { success: true, message: 'Batch tasks scheduled' };
-      }
-      
-      // Otherwise, this is a batch task - dispatch to worker
-      return { success: true, message: 'Batch processed' };
-    } catch (error) {
-      logger.error('Error handling validation task:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Schedule batch tasks for collections
-   * Breaks validation into smaller batch tasks for processing
-   * 
-   * @param {Object} validationData - Data for the validation run
-   */
-  async scheduleBatchTasks(validationData) {
-    const { validationId, collections } = validationData;
-    
-    try {
-      // For each collection, schedule batch tasks
-      for (const collection of collections) {
-        // Get collection size
-        const snapshot = await this.db.collection(collection).count().get();
-        const documentCount = snapshot.data().count;
-        
-        // Calculate number of batches needed
-        const batchSize = this.config.batchSize;
-        const batchCount = Math.ceil(documentCount / batchSize);
-        
-        logger.info(`Scheduling ${batchCount} batches for collection ${collection}`);
-        
-        // Create a task for each batch
-        for (let i = 0; i < batchCount; i++) {
-          const batchTask = {
-            validationId,
-            collection,
-            batchIndex: i,
-            totalBatches: batchCount,
-            startIndex: i * batchSize,
-            batchSize,
-            timestamp: Date.now()
-          };
-          
-          // Publish batch task to Pub/Sub
-          const dataBuffer = Buffer.from(JSON.stringify(batchTask));
-          await this.topic.publish(dataBuffer);
-          
-          // Record the task in Firestore
-          await this.db.collection(this.config.workerConfig.tasksCollection).add({
-            ...batchTask,
-            status: 'scheduled',
-            scheduledAt: admin.firestore.FieldValue.serverTimestamp()
-          });
-        }
-      }
-      
-      return true;
-    } catch (error) {
-      logger.error(`Error scheduling batch tasks for validation ${validationId}:`, error);
-      
-      // Update validation status in Firestore
-      await this.db.collection(this.config.workerConfig.resultsCollection)
-        .doc(validationId)
-        .update({
-          status: 'error',
-          error: error.message,
-          lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-        });
-      
-      throw error;
-    }
-  }
-  
-  /**
-   * Get validation tasks
-   * 
-   * @param {number} limit - Maximum number of tasks to return
-   * @returns {Promise<Array>} - List of validation tasks
-   */
-  async getValidationTasks(limit = 10) {
-    try {
-      const tasksSnapshot = await this.db
-        .collection(this.config.workerConfig.tasksCollection)
-        .orderBy('timestamp', 'desc')
-        .limit(limit)
-        .get();
-      
-      const tasks = [];
-      tasksSnapshot.forEach(doc => {
-        tasks.push({
-          id: doc.id,
-          ...doc.data()
-        });
-      });
-      
-      return tasks;
-    } catch (error) {
-      logger.error('Error getting validation tasks:', error);
+      console.error('Error triggering media validation:', error);
       throw error;
     }
   }
   
   /**
    * Get validation reports
-   * 
-   * @param {number} limit - Maximum number of reports to return
-   * @returns {Promise<Array>} - List of validation reports
+   * @param {number} limit Maximum number of reports to return
+   * @returns {Promise<Array>} Array of validation reports
    */
   async getValidationReports(limit = 10) {
     try {
-      const reportsSnapshot = await this.db
-        .collection(this.config.workerConfig.resultsCollection)
+      // Get reports from Firestore, sorted by timestamp
+      const reportsSnapshot = await this.db.collection('media_validation_reports')
         .orderBy('started', 'desc')
         .limit(limit)
         .get();
       
+      // Map to array of reports
       const reports = [];
       reportsSnapshot.forEach(doc => {
         reports.push({
@@ -279,7 +159,7 @@ class MediaValidationScheduler {
       
       return reports;
     } catch (error) {
-      logger.error('Error getting validation reports:', error);
+      console.error('Error getting validation reports:', error);
       throw error;
     }
   }
@@ -287,28 +167,37 @@ class MediaValidationScheduler {
 
 /**
  * Schedule media validation
- * This is used by the scheduled Cloud Function
+ * 
+ * This function is called by the onSchedule trigger
+ * It publishes a message to the Pub/Sub topic to trigger validation
  */
-async function scheduleMediaValidation(context) {
+async function scheduleMediaValidation(event) {
   try {
+    // Create scheduler instance with default config
     const scheduler = new MediaValidationScheduler();
+    
+    // Initialize if needed
     await scheduler.initialize();
     
+    // Trigger validation with scheduled metadata
     const messageId = await scheduler.triggerValidation({
-      requestedBy: 'cron',
+      requestedBy: 'scheduler',
       requestedAt: new Date().toISOString(),
-      description: 'Scheduled media validation run'
+      scheduled: true,
+      description: 'Scheduled media validation task'
     });
     
-    logger.info(`Scheduled media validation successfully with message ID: ${messageId}`);
-    return messageId;
+    console.log(`Scheduled media validation triggered successfully with message ID: ${messageId}`);
+    return { success: true, messageId };
   } catch (error) {
-    logger.error('Error scheduling media validation:', error);
+    console.error('Error scheduling media validation:', error);
     throw error;
   }
 }
 
+// Export the scheduler class and the schedule function
 module.exports = {
   MediaValidationScheduler,
-  scheduleMediaValidation
+  scheduleMediaValidation,
+  DEFAULT_CONFIG
 };
