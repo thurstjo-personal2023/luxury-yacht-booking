@@ -6,12 +6,11 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { ConnectionStatus } from "@/components/ui/connection-status";
 import { auth } from "@/lib/firebase";
-import { useAuthState } from "react-firebase-hooks/auth";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { initializeFirestore } from "./lib/firestore-init";
 import { initializeConnectionManager } from "./lib/connection-manager";
 import { AdminAuthProvider } from "@/components/admin/AdminAuthProvider";
-import { AuthProvider } from "@/lib/auth-context";
+import { useAuthService } from "@/services/auth";
 
 // Lazy load pages
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -76,9 +75,10 @@ const LoadingSpinner = () => (
  * 2. Performs token validation before rendering protected components
  * 3. Implements a caching mechanism to avoid unnecessary token checks
  * 4. Preserves React state and prevents full page reloads
+ * 5. Uses our new auth service implementation
  */
 function PrivateRoute({ component: Component, ...rest }: any) {
-  const [user, loading] = useAuthState(auth);
+  const { isAuthenticated, isLoading, user, refreshUserData } = useAuthService();
   const [, setLocation] = useLocation();
   const [isTokenValid, setIsTokenValid] = useState<boolean>(false);
   const [checkingToken, setCheckingToken] = useState<boolean>(true);
@@ -86,53 +86,15 @@ function PrivateRoute({ component: Component, ...rest }: any) {
   // Verify token freshness when user is authenticated
   useEffect(() => {
     const validateToken = async () => {
-      if (!user) {
+      if (!isAuthenticated || !user) {
         setIsTokenValid(false);
         setCheckingToken(false);
         return;
       }
       
       try {
-        // Check if token exists and is valid
-        const token = localStorage.getItem('authToken');
-        
-        if (!token) {
-          // No token found, request a fresh one
-          console.log('PrivateRoute: No auth token found, requesting fresh token');
-          await user.getIdToken(true).then(newToken => {
-            localStorage.setItem('authToken', newToken);
-            console.log('PrivateRoute: New token generated and stored');
-          });
-        } else {
-          // Token exists, verify it's not expired
-          try {
-            // Decode token parts (header.payload.signature)
-            const payload = token.split('.')[1];
-            if (payload) {
-              const decodedPayload = JSON.parse(atob(payload));
-              const expTime = decodedPayload.exp * 1000; // Convert to milliseconds
-              const now = Date.now();
-              
-              // If token is expired or close to expiring (within 5 minutes), refresh it
-              if (now > (expTime - 5 * 60 * 1000)) {
-                console.log('PrivateRoute: Token is expired or expiring soon, refreshing');
-                await user.getIdToken(true).then(newToken => {
-                  localStorage.setItem('authToken', newToken);
-                  console.log('PrivateRoute: Refreshed token and stored');
-                });
-              } else {
-                console.log('PrivateRoute: Token is valid and not close to expiration');
-              }
-            }
-          } catch (tokenError) {
-            console.error('PrivateRoute: Error checking token expiration:', tokenError);
-            // If we can't decode the token, refresh it to be safe
-            await user.getIdToken(true).then(newToken => {
-              localStorage.setItem('authToken', newToken);
-              console.log('PrivateRoute: Refreshed token after decode error');
-            });
-          }
-        }
+        // Using our auth service's API to refresh the token
+        await refreshUserData();
         
         // Update state to indicate token is valid
         setIsTokenValid(true);
@@ -145,16 +107,16 @@ function PrivateRoute({ component: Component, ...rest }: any) {
     };
     
     validateToken();
-  }, [user]);
+  }, [isAuthenticated, user, refreshUserData]);
   
   // Show loading state while we check authentication or token
-  if (loading || checkingToken) {
+  if (isLoading || checkingToken) {
     return <LoadingSpinner />;
   }
   
   // Handle unauthenticated or invalid token states
-  if (!user || !isTokenValid) {
-    console.log('PrivateRoute: Access denied - User authenticated:', !!user, 'Token valid:', isTokenValid);
+  if (!isAuthenticated || !user || !isTokenValid) {
+    console.log('PrivateRoute: Access denied - User authenticated:', isAuthenticated, 'Token valid:', isTokenValid);
     
     // Use React Router's navigation to preserve state
     setTimeout(() => {
@@ -169,7 +131,7 @@ function PrivateRoute({ component: Component, ...rest }: any) {
 }
 
 function App() {
-  const [user] = useAuthState(auth);
+  const { user } = useAuthService();
 
   useEffect(() => {
     // Initialize connection manager
@@ -192,15 +154,13 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Add the AuthProvider for regular user authentication */}
-      <AuthProvider>
-        {/* Keep AdminAuthProvider for admin authentication */}
-        <AdminAuthProvider sessionTimeout={15 * 60}>
-          <div className="min-h-screen flex flex-col">
-            <Navbar />
-            <main className="flex-1">
-              <Suspense fallback={<LoadingSpinner />}>
-                <Switch>
+      {/* Keep AdminAuthProvider for admin authentication */}
+      <AdminAuthProvider sessionTimeout={15 * 60}>
+        <div className="min-h-screen flex flex-col">
+          <Navbar />
+          <main className="flex-1">
+            <Suspense fallback={<LoadingSpinner />}>
+              <Switch>
                   <Route path="/" component={Home} />
                   <Route path="/login" component={Login} />
                   <Route path="/register" component={Register} />
