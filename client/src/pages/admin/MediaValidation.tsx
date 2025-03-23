@@ -4,8 +4,11 @@
  * This page provides an interface for administrators to validate and fix media URLs.
  */
 import React from 'react';
+import { Link } from 'wouter';
 import MediaValidationPanel from '@/components/admin/MediaValidationPanel';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { CloudIcon, ArrowRight } from 'lucide-react';
 import { Helmet } from 'react-helmet';
 // Import directly using relative path to fix TypeScript module resolution
 import AdminLayout from '../../components/layouts/AdminLayout';
@@ -36,6 +39,18 @@ export default function MediaValidation() {
               The system can detect broken links, incorrect media types, and relative URLs that need fixing.
             </p>
           </CardContent>
+          <CardFooter className="bg-gray-50 border-t">
+            <div className="flex justify-between items-center w-full">
+              <span className="text-sm text-gray-500">Try our new background processing system</span>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/admin/pubsub-validation">
+                  <CloudIcon className="mr-2 h-4 w-4" />
+                  PubSub Validation
+                  <ArrowRightIcon className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </CardFooter>
         </Card>
         
         <MediaValidationPanel />
