@@ -4,6 +4,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   connectAuthEmulator,
+  setPersistence,
+  browserLocalPersistence,
 } from "firebase/auth";
 import {
   getFirestore, 
@@ -30,6 +32,16 @@ export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
 export const rtdb = getDatabase(app);
+
+// Set persistence to LOCAL to ensure the session is maintained across page reloads
+(async () => {
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+    console.log("Firebase auth persistence set to LOCAL");
+  } catch (persistenceError) {
+    console.error("Failed to set Firebase auth persistence to LOCAL:", persistenceError);
+  }
+})();
 
 // Initialize auth state listener to manage tokens
 console.log('Setting up auth state listener for Firebase...');

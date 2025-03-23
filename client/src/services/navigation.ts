@@ -6,6 +6,7 @@
  */
 
 import { UserRoleType } from '@shared/user-schema';
+import { navigate } from 'wouter/use-browser-location';
 
 // Navigation result interface
 export interface NavigationResult {
@@ -30,9 +31,9 @@ export async function redirectToDashboard(role: UserRoleType | null | undefined)
     const dashboardUrl = getDashboardUrlForRole(role);
     console.log(`Navigation service: Redirecting to ${dashboardUrl} for role ${role}`);
     
-    // Use window.location for critical redirects after authentication
-    // This ensures a fresh page load and consistent state
-    window.location.href = dashboardUrl;
+    // Use navigate for preserving React state and preventing full page reloads
+    // which can cause Firebase auth persistence issues
+    navigate(dashboardUrl);
     
     return {
       success: true,
@@ -59,8 +60,9 @@ export function navigateToLogin(reason?: string): NavigationResult {
     const url = reason ? `/login?reason=${encodeURIComponent(reason)}` : '/login';
     console.log(`Navigation service: Redirecting to login${reason ? ' with reason: ' + reason : ''}`);
     
-    // Use window.location for consistent behavior
-    window.location.href = url;
+    // Use navigate for preserving React state and preventing full page reloads
+    // which can cause Firebase auth persistence issues
+    navigate(url);
     
     return {
       success: true,

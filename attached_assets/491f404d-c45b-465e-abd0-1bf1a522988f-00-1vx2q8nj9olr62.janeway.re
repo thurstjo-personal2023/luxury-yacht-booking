@@ -1,12 +1,12 @@
  injection-tss TSS: hosted page injected
  injection-tss MBTSS: Nonce:  nonce
- Removing unpermitted intrinsics
+lockdown-install.js:1 Removing unpermitted intrinsics
  CONTENT_SHELL: Page allowed. Skipping shell injection blocks
  TSS: excluded result:  true
- Browsing Topics API removed
  DFP: Breach notification feature flag is enabled. true
- [vite] connecting...
- [vite] connected.
+ Browsing Topics API removed
+client:495 [vite] connecting...
+client:614 [vite] connected.
 firebase.ts:23 Firebase initialized in PRODUCTION mode
 firebase.ts:35 Setting up auth state listener for Firebase...
 firebase.ts:132 Using PRODUCTION Firebase services - skipping emulator connection
@@ -30,7 +30,7 @@ use-auth.ts:371 Auth context: No role available from user object
  CONTENT_SHELL: Page allowed. Skipping shell injection blocks
  DFP: Breach notification feature flag is enabled. true
  TSS: excluded result:  true
- DFP: Breach notification feature flag is enabled. true
  Browsing Topics API removed
+ DFP: Breach notification feature flag is enabled. true
  Browsing Topics API removed
 login:1 [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) <input type=​"password" class=​"flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:​border-0 file:​bg-transparent file:​text-sm file:​font-medium file:​text-foreground placeholder:​text-muted-foreground focus-visible:​outline-none focus-visible:​ring-2 focus-visible:​ring-ring focus-visible:​ring-offset-2 disabled:​cursor-not-allowed disabled:​opacity-50" placeholder=​"Enter your password" name=​"password" id=​":​r9:​-form-item" aria-describedby=​":​r9:​-form-item-description" aria-invalid=​"false" value>​flex
