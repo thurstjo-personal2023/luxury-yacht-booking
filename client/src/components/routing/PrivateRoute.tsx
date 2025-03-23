@@ -1,16 +1,18 @@
 /**
  * PrivateRoute Component
  * 
- * This component wraps routes that require authentication.
+ * Enhanced PrivateRoute with improved auth context integration
+ * This component wraps routes that require authentication and specific roles.
  * It redirects to the login page if the user is not authenticated.
  */
 
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect } from 'react';
 import { Redirect } from 'wouter';
-import { useAuth } from '../../providers/auth-provider';
+import { useAuth } from '@/lib/auth-context';
+import { Loader2 } from 'lucide-react';
 
 // Different types of protected routes
-export type RouteType = 'user' | 'admin' | 'producer' | 'partner';
+export type RouteType = 'user' | 'admin' | 'producer' | 'partner' | 'consumer';
 
 interface PrivateRouteProps {
   children: ReactNode;
@@ -20,45 +22,78 @@ interface PrivateRouteProps {
 /**
  * PrivateRoute Component
  * Restricts access to routes based on authentication state and user role
+ * Uses enhanced auth context with improved token handling
  */
 export const PrivateRoute: React.FC<PrivateRouteProps> = ({ 
   children, 
   routeType = 'user' 
 }) => {
-  const { isLoading, isAuthenticated, isAdminAuthenticated, user } = useAuth();
+  const { loading, user, harmonizedUser } = useAuth();
   
-  // Show loading state
-  if (isLoading) {
-    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
-  }
-  
-  // Admin routes check
-  if (routeType === 'admin') {
-    if (!isAdminAuthenticated) {
-      console.log('PrivateRoute: Redirecting to admin login - not an authenticated admin');
-      return <Redirect to="/admin/login" />;
+  // Effect to refresh user data when component mounts
+  useEffect(() => {
+    if (user && !harmonizedUser) {
+      console.log('PrivateRoute: User authenticated but profile not loaded, refreshing data...');
+      // The auth context will automatically load profile data when user changes
     }
-    return <>{children}</>;
+  }, [user, harmonizedUser]);
+  
+  // Show loading state with improved UI
+  if (loading) {
+    return (
+      <div className="flex flex-col justify-center items-center min-h-screen bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+        <p className="text-lg text-muted-foreground">Loading your profile...</p>
+      </div>
+    );
   }
   
-  // Regular user routes check
-  if (!isAuthenticated) {
+  // Check if user is authenticated at all
+  if (!user) {
     console.log('PrivateRoute: Redirecting to login - not authenticated');
     return <Redirect to="/login" />;
   }
   
-  // Role-specific routes
-  if (routeType === 'producer' && user?.role !== 'producer') {
-    console.log('PrivateRoute: Redirecting to dashboard - not a producer');
-    return <Redirect to="/dashboard" />;
+  // Admin routes check - we'd need to implement admin checks in the future
+  // For now this is just a placeholder
+  if (routeType === 'admin') {
+    // Check for admin role in token claims
+    const isAdmin = user.getIdTokenResult()
+      .then(token => token.claims.role === 'admin')
+      .catch(() => false);
+      
+    if (!isAdmin) {
+      console.log('PrivateRoute: Redirecting to admin login - not an authenticated admin');
+      return <Redirect to="/admin/login" />;
+    }
   }
   
-  if (routeType === 'partner' && user?.role !== 'partner') {
-    console.log('PrivateRoute: Redirecting to dashboard - not a partner');
-    return <Redirect to="/dashboard" />;
+  // Role-specific routes for regular users
+  // Only check these if we actually have the harmonized user data
+  if (harmonizedUser) {
+    const userRole = harmonizedUser.role?.toLowerCase();
+    
+    // Producer route check
+    if (routeType === 'producer' && userRole !== 'producer') {
+      console.log(`PrivateRoute: User role ${userRole} doesn't match required role producer`);
+      return <Redirect to="/dashboard/consumer" />;
+    }
+    
+    // Partner route check
+    if (routeType === 'partner' && userRole !== 'partner') {
+      console.log(`PrivateRoute: User role ${userRole} doesn't match required role partner`);
+      return <Redirect to="/dashboard/consumer" />;
+    }
+    
+    // Consumer route check
+    if (routeType === 'consumer' && userRole !== 'consumer') {
+      console.log(`PrivateRoute: User role ${userRole} doesn't match required role consumer`);
+      // Redirect to the appropriate dashboard
+      return <Redirect to={`/dashboard/${userRole}`} />;
+    }
   }
   
-  // If all checks pass, render the children
+  // If all checks pass or we're still loading harmonized data, render the children
   return <>{children}</>;
 };
 
