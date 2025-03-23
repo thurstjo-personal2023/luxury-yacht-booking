@@ -37,6 +37,31 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const { login, user, harmonizedUser } = useAuth(); // Use enhanced auth context
+
+  // Check if user is already logged in and redirect to appropriate dashboard
+  useEffect(() => {
+    if (user && harmonizedUser) {
+      console.log("User already authenticated, redirecting to dashboard");
+      const role = harmonizedUser.role?.toLowerCase() || 'consumer';
+      let dashboardUrl = '/dashboard/consumer'; // Default
+      
+      switch (role) {
+        case 'producer':
+          dashboardUrl = '/dashboard/producer';
+          break;
+        case 'partner':
+          dashboardUrl = '/dashboard/partner';
+          break;
+        case 'consumer':
+        default:
+          dashboardUrl = '/dashboard/consumer';
+          break;
+      }
+      
+      setLocation(dashboardUrl);
+    }
+  }, [user, harmonizedUser, setLocation]);
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -53,18 +78,10 @@ export default function Login() {
 
       console.log(`Login component: Attempting login for email: ${data.email}`);
       
-      // Use the Firebase helper directly for consistent behavior
-      const { loginWithEmail } = await import('@/lib/firebase');
+      // Use our enhanced auth context login method
+      const user = await login(data.email, data.password);
       
-      // Perform login
-      const userCredential = await loginWithEmail(data.email, data.password);
-      
-      // Verify we have a user
-      if (!userCredential || !userCredential.user) {
-        throw new Error('Login returned invalid user data');
-      }
-      
-      console.log(`Login component: Successfully logged in user: ${userCredential.user.uid}`);
+      console.log(`Login component: Successfully logged in user: ${user.uid}`);
       
       // Show success toast to user
       toast({
@@ -73,10 +90,11 @@ export default function Login() {
         duration: 2000,
       });
       
-      // Get user profile to determine the correct role and dashboard
+      // Get user role from Firestore - we use this approach for safety
+      // even though harmonizedUser might have the role, this ensures we have fresh data
       try {
         // Get user profile from Firestore to determine the role
-        const userDocRef = doc(db, 'users', userCredential.user.uid);
+        const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
         const userData = userDoc.data();
         
@@ -84,14 +102,14 @@ export default function Login() {
         console.log(`Login component: User profile data:`, {
           exists: userDoc.exists(),
           role: userData?.role || 'No role found in profile',
-          userId: userCredential.user.uid,
+          userId: user.uid,
         });
         
         // Normalize the role to lowercase to handle legacy data
         const userRole = userData?.role?.toLowerCase() || 'consumer';
         
         // Also check auth claims for comparison
-        const tokenResult = await userCredential.user.getIdTokenResult(true);
+        const tokenResult = await user.getIdTokenResult(true);
         const claimRole = tokenResult.claims.role as string | undefined;
         
         console.log(`Login component: Role in token claims: "${claimRole}", Role in profile: "${userRole}"`);
@@ -102,11 +120,14 @@ export default function Login() {
           
           // Call sync API endpoint to update claims
           try {
+            const token = await user.getIdToken(true);
+            localStorage.setItem('authToken', token); // Ensure fresh token is stored
+            
             const syncResponse = await fetch('/api/user/sync-auth-claims', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${await userCredential.user.getIdToken()}`
+                'Authorization': `Bearer ${token}`
               }
             });
             
@@ -114,7 +135,8 @@ export default function Login() {
               console.log('Login component: Successfully synchronized user roles');
               
               // Force token refresh to get updated claims
-              await userCredential.user.getIdToken(true);
+              const newToken = await user.getIdToken(true);
+              localStorage.setItem('authToken', newToken);
             } else {
               console.warn('Login component: Failed to synchronize roles');
             }
@@ -162,7 +184,7 @@ export default function Login() {
       setError(error.message);
       toast({
         title: "Login failed",
-        description: error.message,
+        description: error.message || "Failed to log in. Please check your credentials and try again.",
         variant: "destructive",
         duration: 4000,
       });

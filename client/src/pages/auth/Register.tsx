@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-// Removed direct Firebase imports in favor of service-based approach
+import { useAuth } from "@/lib/auth-context"; // Import enhanced auth system
 
 /**
  * User role enum for registration
@@ -65,6 +65,31 @@ export default function Register() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { register: authRegister, user, harmonizedUser } = useAuth(); // Use enhanced auth context
+  
+  // Check if user is already logged in and redirect to appropriate dashboard
+  useEffect(() => {
+    if (user && harmonizedUser) {
+      console.log("User already authenticated, redirecting to dashboard");
+      const role = harmonizedUser.role?.toLowerCase() || 'consumer';
+      let dashboardUrl = '/dashboard/consumer'; // Default
+      
+      switch (role) {
+        case 'producer':
+          dashboardUrl = '/dashboard/producer';
+          break;
+        case 'partner':
+          dashboardUrl = '/dashboard/partner';
+          break;
+        case 'consumer':
+        default:
+          dashboardUrl = '/dashboard/consumer';
+          break;
+      }
+      
+      setLocation(dashboardUrl);
+    }
+  }, [user, harmonizedUser, setLocation]);
 
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -78,17 +103,11 @@ export default function Register() {
     },
   });
 
-  // Profile detail updates are now handled by the registration service in a clean architecture approach
-
   const onSubmit = async (data: RegisterForm) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Import the registration service
-      const { registerUser, updateRoleSpecificProfile, redirectAfterRegistration } = await import('@/services/registration-service');
-      const { sendWelcomeEmail } = await import('@/services/email-service');
-      
       console.log("Register component: Starting registration process...");
       
       // Convert role enum to UserRoleType string
@@ -96,66 +115,64 @@ export default function Register() {
                         data.role === UserRole.PRODUCER ? 'producer' : 
                         'partner';
       
-      // Call the registration service to handle the core registration
-      const registrationResult = await registerUser({
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        password: data.password,
-        phone: data.phone,
-        role: roleValue as 'consumer' | 'producer' | 'partner',
-        businessName: data.role !== UserRole.CONSUMER ? `${data.firstName} ${data.lastName}'s Business` : undefined
-      });
+      // Full name for user profile
+      const fullName = `${data.firstName} ${data.lastName}`;
       
-      if (!registrationResult.success) {
-        throw new Error(registrationResult.message || 'Registration failed');
-      }
+      // Use our enhanced auth context's register method
+      console.log(`Register component: Registering user with email ${data.email} and role ${roleValue}`);
       
-      console.log('Register component: Base registration successful');
-      
-      if (!registrationResult.user?.token) {
-        throw new Error('Authentication token not available after registration');
-      }
-      
-      // Update role-specific profile details
-      const profileUpdateResult = await updateRoleSpecificProfile(
-        registrationResult.user.token,
-        {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          password: data.password,
-          phone: data.phone,
-          role: roleValue as 'consumer' | 'producer' | 'partner',
-          businessName: data.role !== UserRole.CONSUMER ? `${data.firstName} ${data.lastName}'s Business` : undefined
-        }
+      // Call auth context register method
+      const user = await authRegister(
+        data.email, 
+        data.password, 
+        fullName, 
+        roleValue
       );
       
-      if (!profileUpdateResult.success) {
-        console.warn("Register component: Failed to update role-specific profile details, but user account was created");
+      console.log('Register component: Base registration successful, user created:', user.uid);
+      
+      // Show success toast
+      toast({
+        title: "Registration successful!",
+        description: "Welcome to Etoile Yachts. Your account has been created.",
+        duration: 3000,
+      });
+      
+      // Import service to update additional profile details
+      try {
+        const { updateUserProfile } = await import('@/services/user-profile-service');
         
-        toast({
-          title: "Registration successful!",
-          description: "Your account was created, but we couldn't update all profile details. You can update them later.",
-          duration: 5000,
+        // Update additional profile details
+        await updateUserProfile({
+          userId: user.uid,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phone: data.phone,
+          role: roleValue,
+          businessName: data.role !== UserRole.CONSUMER ? `${data.firstName} ${data.lastName}'s Business` : undefined
         });
-      } else {
-        console.log("Register component: Successfully updated role-specific profile details");
         
-        toast({
-          title: "Registration successful!",
-          description: "Welcome to Etoile Yachts. Your profile has been saved to our secure database.",
-          duration: 5000,
-        });
+        console.log("Register component: Successfully updated additional profile details");
+      } catch (profileError) {
+        console.warn("Register component: Failed to update additional profile details, but user account was created", profileError);
       }
       
       // Send welcome email
       try {
+        const { sendWelcomeEmail } = await import('@/services/email-service');
         console.log('Register component: Sending welcome email...');
-        const businessName = data.role === UserRole.CONSUMER ? undefined : 
-                            `${data.firstName} ${data.lastName}'s Business`;
+        
+        const businessName = data.role !== UserRole.CONSUMER ? 
+                             `${data.firstName} ${data.lastName}'s Business` : 
+                             undefined;
                             
-        await sendWelcomeEmail(data.email, `${data.firstName} ${data.lastName}`, roleValue as 'consumer' | 'producer' | 'partner', businessName);
+        await sendWelcomeEmail(
+          data.email, 
+          fullName, 
+          roleValue as 'consumer' | 'producer' | 'partner', 
+          businessName
+        );
+        
         console.log('Register component: Welcome email sent successfully');
       } catch (emailError) {
         console.warn('Register component: Could not send welcome email, but registration was successful:', emailError);
@@ -163,20 +180,21 @@ export default function Register() {
 
       // Redirect user to the appropriate dashboard based on role
       console.log(`Register component: Redirecting to dashboard for role ${roleValue}`);
-      const redirectSuccess = await redirectAfterRegistration(roleValue as 'consumer' | 'producer' | 'partner');
       
-      if (!redirectSuccess) {
-        console.warn(`Register component: Could not redirect automatically, falling back to manual redirect`);
-        
-        // Manual fallback redirection if the service fails
-        const dashboardRoutes = {
-          [UserRole.CONSUMER]: "/dashboard/consumer",
-          [UserRole.PRODUCER]: "/dashboard/producer",
-          [UserRole.PARTNER]: "/dashboard/partner",
-        };
+      // Determine dashboard URL
+      const dashboardRoutes = {
+        [UserRole.CONSUMER]: "/dashboard/consumer",
+        [UserRole.PRODUCER]: "/dashboard/producer",
+        [UserRole.PARTNER]: "/dashboard/partner",
+      };
+      
+      // Delay redirect slightly to ensure token propagation and auth state update
+      setTimeout(() => {
         setLocation(dashboardRoutes[data.role]);
-      }
+      }, 1500);
+      
     } catch (error: any) {
+      console.error("Register component: Registration error:", error);
       setError(error.message);
       toast({
         title: "Registration failed",
