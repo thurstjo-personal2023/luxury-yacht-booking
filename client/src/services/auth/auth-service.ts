@@ -26,6 +26,7 @@ import {
   onIdTokenChanged,
   onAuthStateChanged
 } from 'firebase/auth';
+import { toast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase';
 import { getUserProfileById, syncAuthClaims } from '@/lib/user-profile-utils';
 import { HarmonizedUser, ServiceProviderProfile, TouristProfile } from '@shared/harmonized-user-schema';
@@ -102,6 +103,7 @@ export class AuthService {
   private authStateListeners: Set<(user: FirebaseUser | null) => void>;
   private tokenChangeListeners: Set<(user: FirebaseUser | null) => void>;
   private cleanupFunctions: (() => void)[] = [];
+  private tokenRefreshTimer: number | null = null;
 
   /**
    * Create a new AuthService
@@ -299,6 +301,73 @@ export class AuthService {
     } catch (error) {
       console.error('AuthService: Error signing out:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Set up automatic token refresh
+   * @param user Firebase user
+   */
+  setupTokenRefresh(user: FirebaseUser): void {
+    // Clear any existing timer first
+    this.clearTokenRefreshTimer();
+    
+    if (!user) {
+      console.warn('AuthService: Cannot setup token refresh - no user provided');
+      return;
+    }
+    
+    // Get the token and set up scheduled refresh
+    user.getIdTokenResult()
+      .then(tokenResult => {
+        const expirationTime = new Date(tokenResult.expirationTime).getTime();
+        const currentTime = Date.now();
+        
+        // Calculate time until expiration (in milliseconds)
+        // Refresh 5 minutes before expiration to be safe
+        const timeUntilRefresh = Math.max(0, expirationTime - currentTime - (5 * 60 * 1000));
+        
+        console.log(`AuthService: Token will expire in ${Math.round(timeUntilRefresh / 60000)} minutes. Setting up refresh.`);
+        
+        // Set up the refresh timer
+        this.tokenRefreshTimer = window.setTimeout(() => {
+          console.log('AuthService: Token refresh timer triggered');
+          
+          // Only attempt refresh if the same user is still signed in
+          const currentUser = this.getCurrentUser();
+          if (currentUser && currentUser.uid === user.uid) {
+            this.refreshToken()
+              .then(() => {
+                // Set up the next refresh cycle
+                this.setupTokenRefresh(currentUser);
+              })
+              .catch(error => {
+                console.error('AuthService: Failed to refresh token on schedule:', error);
+                
+                // Notify user of authentication issues
+                toast({
+                  title: 'Authentication update failed',
+                  description: 'Your session token could not be refreshed. You may need to sign in again.',
+                  variant: 'destructive',
+                  duration: 5000,
+                });
+              });
+          }
+        }, timeUntilRefresh);
+      })
+      .catch(error => {
+        console.error('AuthService: Error setting up token refresh:', error);
+      });
+  }
+  
+  /**
+   * Clear token refresh timer
+   */
+  clearTokenRefreshTimer(): void {
+    if (this.tokenRefreshTimer !== null) {
+      window.clearTimeout(this.tokenRefreshTimer);
+      this.tokenRefreshTimer = null;
+      console.log('AuthService: Token refresh timer cleared');
     }
   }
 
