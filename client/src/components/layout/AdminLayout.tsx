@@ -13,7 +13,7 @@ import {
   Menu,
   X
 } from 'lucide-react';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuthService } from '@/services/auth';
 import {
   Sheet,
   SheetContent,
@@ -31,7 +31,7 @@ interface NavItem {
 }
 
 export function AdminLayout({ children }: AdminLayoutProps) {
-  const { user, signOut } = useAuth();
+  const { user, signOut } = useAuthService();
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
 

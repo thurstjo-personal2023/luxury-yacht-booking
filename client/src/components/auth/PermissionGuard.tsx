@@ -1,5 +1,5 @@
-import { ReactNode } from 'react';
-import { useAuth } from '@/hooks/use-auth';
+import { ReactNode, useEffect, useState } from 'react';
+import { useAuthService } from '@/services/auth';
 import { checkPermission, checkMultiplePermissions, checkAnyPermission } from '@/lib/role-verification';
 
 interface PermissionGuardProps {
@@ -14,6 +14,7 @@ interface PermissionGuardProps {
  * Permission-based component guard
  * Only renders children if user has required permission(s)
  * Does not redirect; simply shows or hides content based on permissions
+ * Uses central AuthService for improved role management
  */
 export const PermissionGuard = ({
   children,
@@ -22,7 +23,17 @@ export const PermissionGuard = ({
   requireAll = true, // Whether to require all permissions or just one
   fallback = null // What to render if permission check fails
 }: PermissionGuardProps) => {
-  const { userRole } = useAuth();
+  const { isAuthenticated, profileData } = useAuthService();
+  const [userRole, setUserRole] = useState<string | undefined>(undefined);
+  
+  // Extract user role from profile data
+  useEffect(() => {
+    if (isAuthenticated && profileData) {
+      setUserRole(profileData.role?.toLowerCase());
+    } else {
+      setUserRole(undefined);
+    }
+  }, [isAuthenticated, profileData]);
   
   // Single permission check
   if (permission) {
