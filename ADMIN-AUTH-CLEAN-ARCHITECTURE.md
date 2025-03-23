@@ -1,127 +1,175 @@
-# Admin Authentication Clean Architecture
+# Clean Architecture Authentication System
 
-This document describes the implementation of the admin authentication system using clean architecture principles.
+This document provides an overview of the Clean Architecture Authentication System implemented for the Etoile Yachts platform.
 
 ## Architecture Overview
 
-The system is organized into the following layers:
+The authentication system follows Clean Architecture principles to achieve:
 
-1. **Domain Layer** - Contains business entities, value objects, and domain services
-2. **Application Layer** - Contains use cases and interfaces for repositories
-3. **Adapter Layer** - Contains implementations of interfaces defined in the application layer
-4. **Infrastructure Layer** - Contains framework-specific code (Express routes, controllers)
+1. Separation of concerns
+2. Independence of frameworks and UI
+3. Testability and maintainability
+4. Role-specific authentication flows
 
-## Domain Layer
+## Directory Structure
 
-### Entities
+```
+├── core/
+│   ├── domain/
+│   │   └── auth/
+│   │       ├── user.ts               # User and Administrator entities
+│   │       ├── auth-token.ts         # Token value object
+│   │       └── auth-exceptions.ts    # Domain-specific exceptions
+│   └── application/
+│       ├── auth/
+│       │   ├── auth-service.interface.ts   # Auth service interfaces
+│       │   ├── auth-use-cases.ts           # Regular user auth use cases
+│       │   └── admin-auth-use-cases.ts     # Admin-specific auth use cases
+│       ├── repositories/
+│       │   ├── user-repository.interface.ts    # User repository interface
+│       │   └── admin-repository.interface.ts   # Admin repository interface
+│       └── services/
+│           └── navigation-service.interface.ts  # Navigation service interface
+├── infrastructure/
+│   └── adapter/
+│       ├── firebase-auth-service.ts        # Firebase auth implementation
+│       ├── firebase-admin-auth-service.ts  # Firebase admin auth implementation
+│       ├── firestore-user-repository.ts    # Firestore user repository
+│       ├── firestore-admin-repository.ts   # Firestore admin repository
+│       └── wouter-navigation-service.ts    # Navigation service implementation
+└── client/
+    ├── src/
+    │   ├── providers/
+    │   │   └── auth-provider.tsx     # Context provider for auth state
+    │   ├── components/
+    │   │   └── routing/
+    │   │       └── PrivateRoute.tsx  # Route protection component
+    │   ├── hooks/
+    │   │   └── use-auth.ts           # Hook for accessing auth in components
+    │   └── App.refactored.tsx        # Example refactored app component
+```
 
-- `AdminUser` - Represents an administrator user with identity, credentials, and permissions
-- `AdminCredentials` - Represents authentication credentials for an admin user
-- `AdminInvitation` - Represents an invitation to create a new admin account
+## Layers Explanation
 
-### Value Objects
+### Domain Layer (core/domain)
 
-- `AdminRole` - Enumerates the possible roles for an admin user (SUPER_ADMIN, ADMIN, MODERATOR)
-- `Permission` - Represents a specific permission that can be granted to an admin
-- `MfaStatus` - Represents the status of Multi-Factor Authentication for an admin
+Contains the business entities and rules of the authentication system:
 
-### Domain Services
+- `User` and `Administrator` entities define the core data structures
+- `AuthToken` value object represents authentication tokens
+- Domain-specific exceptions for error handling
 
-- `AdminAuthenticationService` - Contains core authentication logic
-- `AdminAuthorizationService` - Contains logic for permission checking
-- `AdminInvitationService` - Contains logic for creating and verifying invitations
+### Application Layer (core/application)
 
-## Application Layer
+Contains the application-specific business rules:
 
-### Interfaces
+- Interface definitions for services and repositories
+- Use cases that orchestrate the domain entities
+- Separate interfaces for regular users and administrators
 
-- `IAdminRepository` - Interface for admin user persistence
-- `IAdminCredentialsRepository` - Interface for admin credentials persistence
-- `IAdminInvitationRepository` - Interface for admin invitation persistence
-- `IAuthProvider` - Interface for authentication provider
+### Interface Adapters (infrastructure/adapter)
 
-### Use Cases
+Adapts the interfaces defined in the application layer to external frameworks:
 
-- `AuthenticateAdminUseCase` - Authenticates an admin user with email and password
-- `VerifyAdminMfaUseCase` - Verifies an admin's Multi-Factor Authentication code
-- `CreateAdminInvitationUseCase` - Creates an invitation for a new admin
-- `VerifyAdminInvitationUseCase` - Verifies an invitation code
-- `RegisterAdminUseCase` - Registers a new admin using an invitation
+- Firebase implementations of authentication services
+- Firestore implementations of repositories
+- Navigation service implementation using wouter
 
-## Adapter Layer
+### Infrastructure Layer (client/src)
 
-### Repositories
+Contains the frameworks and UI components:
 
-- `FirebaseAdminRepository` - Implements `IAdminRepository` using Firebase Firestore
-- `FirebaseAdminCredentialsRepository` - Implements `IAdminCredentialsRepository` using Firebase Firestore
-- `FirebaseAdminInvitationRepository` - Implements `IAdminInvitationRepository` using Firebase Firestore
+- React components for auth providers and routes
+- Hooks for accessing authentication state
+- Route protection mechanism
 
-### Auth Provider
+## Authentication Flows
 
-- `FirebaseAuthProvider` - Implements `IAuthProvider` using Firebase Authentication
+### Regular User Authentication:
 
-## Infrastructure Layer
+1. User enters credentials in Login/Register component
+2. Component calls `signIn`/`signUp` methods from auth hook
+3. Auth hook delegates to authentication provider
+4. Provider uses the Firebase auth service implementation
+5. Service handles authentication and stores the result
+6. UI updates based on authentication state
 
-### Controllers
+### Administrator Authentication:
 
-- `AdminAuthController` - Handles HTTP requests and responses for admin authentication
-- `AdminAuthControllerFactory` - Creates and configures the admin auth controller
+1. Admin enters credentials in Admin Login component
+2. Component calls `adminSignIn` method from auth hook
+3. Auth hook delegates to authentication provider
+4. Provider uses the Firebase admin auth service implementation
+5. Service verifies the user is an admin and handles MFA if required
+6. UI updates based on admin authentication state
 
-### Routes
+## Benefits of This Architecture
 
-Routes are registered by the controller factory to handle:
-- Admin login
-- MFA verification
-- Invitation creation
-- Invitation verification
-- Admin registration
+1. **Separation of Concerns**: Authentication logic is separate from UI components
+2. **Testability**: Each layer can be tested independently
+3. **Maintainability**: Changes to one layer don't affect others
+4. **Role Separation**: Clear separation between regular users and administrators
+5. **Dependency Inversion**: High-level modules don't depend on low-level modules
+6. **Domain-Driven Design**: Focus on business rules and use cases
 
-## Dependency Injection
+## Implementation Notes
 
-The system uses the factory pattern for dependency injection:
+### Authentication Service
 
-- `AdminAuthFactory` - Creates and configures all components of the admin auth system
-- `AdminAuthControllerFactory` - Sets up the controller and registers routes
+- Handles authentication operations for users or administrators
+- Manages login state, tokens, and sessions
+- Communicates with Firebase Auth
 
-## Usage Examples
+### Repository Classes
 
-See the examples directory for usage demonstrations:
+- Handle data persistence for user profiles and admin accounts
+- Manage the transition between different role collections
+- Implement MFA-related functionality for admins
 
-- `examples/admin-auth/admin-auth-usage.ts` - Basic usage of use cases
-- `examples/admin-auth/admin-routes-integration.ts` - Integration with Express app
+### Component Structure
 
-## Testing
+- `AuthProvider`: Context provider that manages auth state
+- `PrivateRoute`: Route wrapper that enforces authentication and role checks
+- `useAuth`: Hook that provides an interface for components to access auth state
 
-Unit tests are implemented for each layer:
+## Usage Example
 
-- Domain layer tests focus on business logic
-- Application layer tests mock repositories and providers
-- Adapter layer tests use Firebase emulator
-- Infrastructure layer tests use supertest
+```tsx
+// In a component that needs authentication
+import { useAuth } from '../hooks/use-auth';
 
-## Benefits of Clean Architecture
+function LoginPage() {
+  const { signIn, isAuthenticated, user } = useAuth();
+  
+  const handleLogin = async (email, password) => {
+    try {
+      await signIn(email, password);
+      // Success, user will be redirected
+    } catch (error) {
+      // Handle error
+    }
+  };
+  
+  return (
+    // Login form UI
+  );
+}
+```
 
-1. **Separation of Concerns**: Each layer has a specific responsibility
-2. **Testability**: Components can be tested in isolation with mocks
-3. **Flexibility**: Implementations can be swapped (e.g., replacing Firebase with another database)
-4. **Maintainability**: Changes in one layer don't affect others
-5. **Independence from Frameworks**: Core business logic is not tied to Express or Firebase
+## Middleware and Route Protection
 
-## Implementation Details
+```tsx
+// In App.tsx or routing configuration
+<Route path="/dashboard/producer">
+  <PrivateRoute routeType="producer">
+    <ProducerDashboard />
+  </PrivateRoute>
+</Route>
+```
 
-### Authentication Flow
+The `PrivateRoute` component ensures that:
 
-1. User submits login credentials
-2. System validates credentials and returns a token
-3. If MFA is enabled, user is prompted for MFA code
-4. User submits MFA code for verification
-5. System validates MFA code and grants access
-
-### Invitation Flow
-
-1. Existing admin creates an invitation for a new admin
-2. System generates an invitation code
-3. Invitation is sent to the new admin's email
-4. New admin verifies invitation code
-5. New admin completes registration
-6. New admin account may require approval depending on settings
+1. User is authenticated
+2. User has the appropriate role
+3. Redirects to login if not authenticated
+4. Redirects to dashboard if authenticated but wrong role

@@ -7,6 +7,12 @@
 
 export interface INavigationService {
   /**
+   * Set the navigation callback
+   * This should be called from the app's main component with the navigate function from useLocation
+   */
+  setNavigateCallback(navigate: (path: string) => void): void;
+  
+  /**
    * Navigate to a specific route
    */
   navigateTo(route: string): void;

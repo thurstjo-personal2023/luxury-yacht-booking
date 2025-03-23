@@ -10,7 +10,7 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { Suspense, lazy, useEffect } from "react";
 import { initializeFirestore } from "./lib/firestore-init";
 import { initializeConnectionManager } from "./lib/connection-manager";
-import { AuthProvider } from "@/hooks/use-auth";
+import { AuthProvider } from "@/lib/auth-context";
 import { AdminAuthProvider } from "@/components/admin/AdminAuthProvider";
 
 // Lazy load pages

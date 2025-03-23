@@ -16,7 +16,8 @@ import {
   getDocs, 
   getFirestore, 
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  deleteDoc
 } from 'firebase/firestore';
 import { IUserRepository } from '../../core/application/repositories/user-repository.interface';
 import { User, UserRole } from '../../core/domain/auth/user';
@@ -156,8 +157,10 @@ export class FirestoreUserRepository implements IUserRepository {
           });
           
           // Delete from old collection
-          const oldCollection = this.getCollectionForRole(currentUser.role);
-          await this.deleteUserProfile(userId, oldCollection);
+          if (currentUser.role) { // Check if role exists to satisfy TypeScript
+            const oldCollection = this.getCollectionForRole(currentUser.role);
+            await this.deleteUserProfile(userId, oldCollection);
+          }
           
           console.log('Firestore user repository: User profile moved to new collection');
           return;
