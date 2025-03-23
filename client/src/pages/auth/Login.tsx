@@ -50,63 +50,114 @@ export default function Login() {
       setIsLoading(true);
       setError(null);
 
-      // Import authentication service for clean login flow
-      const { authenticateUser, redirectUserBasedOnRole } = await import('@/services/auth-service');
+      console.log(`Login component: Attempting login for email: ${data.email}`);
       
-      // Use the authentication service to handle login
-      console.log('Login component: Starting authentication process');
-      const authResult = await authenticateUser(data.email, data.password);
+      // Use the Firebase helper directly for consistent behavior
+      const { loginWithEmail } = await import('@/lib/firebase');
       
-      if (!authResult.success) {
-        throw new Error(authResult.message || 'Authentication failed');
+      // Perform login
+      const userCredential = await loginWithEmail(data.email, data.password);
+      
+      // Verify we have a user
+      if (!userCredential || !userCredential.user) {
+        throw new Error('Login returned invalid user data');
       }
       
-      console.log(`Login component: Authentication successful for user with role ${authResult.role}`);
+      console.log(`Login component: Successfully logged in user: ${userCredential.user.uid}`);
       
       // Show success toast to user
       toast({
         title: "Logged in successfully",
+        description: "Redirecting to your dashboard...",
         duration: 2000,
       });
       
-      // If role changed, notify user
-      if (authResult.user?.role && authResult.role && authResult.user.role !== authResult.role) {
-        console.log(`Login component: Role was updated from ${authResult.user.role} to ${authResult.role}`);
+      // Get user profile to determine the correct role and dashboard
+      try {
+        // Get user profile from Firestore to determine the role
+        const userDocRef = doc(db, 'users', userCredential.user.uid);
+        const userDoc = await getDoc(userDocRef);
+        const userData = userDoc.data();
         
-        toast({
-          title: "Role Updated",
-          description: `Your role has been updated to ${authResult.role}`,
-          duration: 3000,
+        // Log detailed info for debugging the login flow
+        console.log(`Login component: User profile data:`, {
+          exists: userDoc.exists(),
+          role: userData?.role || 'No role found in profile',
+          userId: userCredential.user.uid,
         });
-      }
-      
-      // Use the verified role for redirection
-      console.log(`Login component: Redirecting to dashboard for role ${authResult.role}`);
-      
-      // Handle redirection - wait a short delay to ensure toasts are visible
-      setTimeout(async () => {
-        try {
-          if (authResult.role) {
-            // Use the redirect service for consistent behavior
-            await redirectUserBasedOnRole(authResult.role);
-          } else {
-            // Fallback to consumer if no role available
-            console.warn('Login component: No role available, defaulting to consumer');
-            await redirectUserBasedOnRole('consumer');
-          }
-        } catch (redirectError) {
-          console.error('Login component: Redirect error', redirectError);
+        
+        // Normalize the role to lowercase to handle legacy data
+        const userRole = userData?.role?.toLowerCase() || 'consumer';
+        
+        // Also check auth claims for comparison
+        const tokenResult = await userCredential.user.getIdTokenResult(true);
+        const claimRole = tokenResult.claims.role as string | undefined;
+        
+        console.log(`Login component: Role in token claims: "${claimRole}", Role in profile: "${userRole}"`);
+        
+        // If roles don't match, sync them
+        if (claimRole !== userRole) {
+          console.log(`Login component: Role mismatch detected between claims and profile`);
           
-          // Show error toast but don't stop the login flow
-          toast({
-            title: "Navigation issue",
-            description: "We had trouble redirecting you to your dashboard. Please try again.",
-            variant: "destructive",
-            duration: 4000,
-          });
+          // Call sync API endpoint to update claims
+          try {
+            const syncResponse = await fetch('/api/user/sync-auth-claims', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${await userCredential.user.getIdToken()}`
+              }
+            });
+            
+            if (syncResponse.ok) {
+              console.log('Login component: Successfully synchronized user roles');
+              
+              // Force token refresh to get updated claims
+              await userCredential.user.getIdToken(true);
+            } else {
+              console.warn('Login component: Failed to synchronize roles');
+            }
+          } catch (syncError) {
+            console.error('Login component: Error synchronizing roles:', syncError);
+          }
         }
-      }, 500);
+        
+        // Determine the dashboard URL based on role
+        let dashboardUrl = '/dashboard/consumer'; // Default
+        
+        switch (userRole) {
+          case 'producer':
+            dashboardUrl = '/dashboard/producer';
+            break;
+          case 'partner':
+            dashboardUrl = '/dashboard/partner';
+            break;
+          case 'consumer':
+          default:
+            dashboardUrl = '/dashboard/consumer';
+            break;
+        }
+        
+        console.log(`Login component: Redirecting user to dashboard: ${dashboardUrl}`);
+        
+        // Use a timeout to ensure the toast is visible before redirecting
+        setTimeout(() => {
+          setLocation(dashboardUrl);
+        }, 1000);
+        
+      } catch (profileError) {
+        console.error('Login component: Error loading user profile:', profileError);
+        
+        // Default to consumer dashboard if we can't determine the role
+        console.log('Login component: Defaulting to consumer dashboard due to profile error');
+        
+        // Use a timeout to ensure the toast is visible before redirecting
+        setTimeout(() => {
+          setLocation('/dashboard/consumer');
+        }, 1000);
+      }
     } catch (error: any) {
+      console.error('Login component: Login error:', error);
       setError(error.message);
       toast({
         title: "Login failed",
