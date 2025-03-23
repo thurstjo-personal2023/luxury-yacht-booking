@@ -163,22 +163,22 @@ const MediaValidationPanel = () => {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-green-50 p-3 rounded-md">
                     <p className="text-sm text-gray-500">Valid</p>
-                    <p className="text-2xl font-semibold text-green-700">{latestReport.validUrls}</p>
+                    <p className="text-2xl font-semibold text-green-700">{latestReport.validUrls || 0}</p>
                   </div>
                   <div className="bg-red-50 p-3 rounded-md">
                     <p className="text-sm text-gray-500">Invalid</p>
-                    <p className="text-2xl font-semibold text-red-700">{latestReport.invalidUrls}</p>
+                    <p className="text-2xl font-semibold text-red-700">{latestReport.invalidUrls || 0}</p>
                   </div>
                   <div className="bg-amber-50 p-3 rounded-md">
                     <p className="text-sm text-gray-500">Missing</p>
-                    <p className="text-2xl font-semibold text-amber-700">{latestReport.missingUrls}</p>
+                    <p className="text-2xl font-semibold text-amber-700">{latestReport.missingUrls || 0}</p>
                   </div>
                 </div>
                 
                 <div className="text-sm text-gray-500">
-                  <p>Last scan: {formatTimestamp(latestReport.endTime)}</p>
-                  <p>Duration: {formatDuration(latestReport.duration)}</p>
-                  <p>Documents scanned: {latestReport.totalDocuments}</p>
+                  <p>Last scan: {latestReport.endTime ? formatTimestamp(latestReport.endTime) : 'N/A'}</p>
+                  <p>Duration: {latestReport.duration ? formatDuration(latestReport.duration) : 'N/A'}</p>
+                  <p>Documents scanned: {latestReport.totalDocuments || 0}</p>
                 </div>
               </div>
             )}
@@ -253,15 +253,15 @@ const MediaValidationPanel = () => {
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <div className="p-2">
                   <p className="text-xs text-gray-500">Valid</p>
-                  <p className="text-xl font-semibold text-green-700">{report.validUrls}</p>
+                  <p className="text-xl font-semibold text-green-700">{report.validUrls || 0}</p>
                 </div>
                 <div className="p-2">
                   <p className="text-xs text-gray-500">Invalid</p>
-                  <p className="text-xl font-semibold text-red-700">{report.invalidUrls}</p>
+                  <p className="text-xl font-semibold text-red-700">{report.invalidUrls || 0}</p>
                 </div>
                 <div className="p-2">
                   <p className="text-xs text-gray-500">Missing</p>
-                  <p className="text-xl font-semibold text-amber-700">{report.missingUrls}</p>
+                  <p className="text-xl font-semibold text-amber-700">{report.missingUrls || 0}</p>
                 </div>
               </div>
               
@@ -328,22 +328,22 @@ const MediaValidationPanel = () => {
               <div className="grid grid-cols-3 gap-2 text-center mb-2">
                 <div>
                   <p className="text-xs text-gray-500">Total</p>
-                  <p className="font-medium">{summary.totalUrls}</p>
+                  <p className="font-medium">{summary.totalUrls || 0}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Valid</p>
-                  <p className="font-medium text-green-700">{summary.validUrls}</p>
+                  <p className="font-medium text-green-700">{summary.validUrls || 0}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Invalid</p>
-                  <p className="font-medium text-red-700">{summary.invalidUrls}</p>
+                  <p className="font-medium text-red-700">{summary.invalidUrls || 0}</p>
                 </div>
               </div>
               
               <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-green-500 rounded-full" 
-                  style={{ width: `${summary.validPercent}%` }}
+                  style={{ width: `${summary.validPercent || 0}%` }}
                 ></div>
               </div>
             </CardContent>
