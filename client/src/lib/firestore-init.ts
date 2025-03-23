@@ -1,4 +1,4 @@
-import { db } from "./firebase";
+import { db, auth } from "./firebase";
 import { collection, getDocs, query, limit, connectFirestoreEmulator } from "firebase/firestore";
 import type {
   YachtExperience,
@@ -76,13 +76,62 @@ export async function initializeFirestore(skipVerification = false) {
       return;
     }
     
-    // Verify all collections exist
-    const verificationPromises = Object.values(collections).map(verifyCollection);
-    await Promise.all(verificationPromises);
+    console.log("[DEBUG-AUTH] firestore-init.ts: Starting collection verification");
+    
+    // Log authentication state before verification begins
+    const authStateBefore = {
+      hasCurrentUser: !!auth.currentUser,
+      uid: auth.currentUser?.uid || 'none'
+    };
+    console.log("[DEBUG-AUTH] firestore-init.ts: Auth state BEFORE verification:", authStateBefore);
+    
+    // Verify all collections exist - do this one by one for better debugging
+    console.log("[DEBUG-AUTH] firestore-init.ts: Verifying collections sequentially for debugging");
+    
+    for (const collectionName of Object.values(collections)) {
+      console.log(`[DEBUG-AUTH] firestore-init.ts: Starting verification of collection: ${collectionName}`);
+      
+      // Check auth state before each collection verification
+      const currentUser = auth.currentUser;
+      console.log(`[DEBUG-AUTH] firestore-init.ts: Auth state before verifying ${collectionName}:`, 
+        currentUser ? { uid: currentUser.uid } : 'Not authenticated');
+      
+      await verifyCollection(collectionName);
+      
+      // Check auth state after each collection verification
+      const userAfter = auth.currentUser;
+      console.log(`[DEBUG-AUTH] firestore-init.ts: Auth state after verifying ${collectionName}:`, 
+        userAfter ? { uid: userAfter.uid } : 'Not authenticated');
+      
+      // Detect if sign-out occurred during this collection verification
+      if (currentUser && !userAfter) {
+        console.error(`[DEBUG-AUTH] CRITICAL: User was signed out during verification of collection: ${collectionName}`);
+      }
+    }
+    
+    // Log authentication state after all verifications
+    const authStateAfter = {
+      hasCurrentUser: !!auth.currentUser,
+      uid: auth.currentUser?.uid || 'none'
+    };
+    console.log("[DEBUG-AUTH] firestore-init.ts: Auth state AFTER all verifications:", authStateAfter);
+    
+    // Detect if sign-out occurred during the verification process
+    if (authStateBefore.hasCurrentUser && !authStateAfter.hasCurrentUser) {
+      console.error("[DEBUG-AUTH] CRITICAL: User was signed out during collection verification process");
+    }
 
     console.log(`All Firestore collections initialized successfully in ${mode} mode`);
   } catch (error) {
-    console.error(`Error initializing Firestore collections in ${mode} mode:`, error);
+    console.error(`[DEBUG-AUTH] Error initializing Firestore collections in ${mode} mode:`, error);
+    
+    // Log authentication state after error
+    const authStateAfterError = {
+      hasCurrentUser: !!auth.currentUser,
+      uid: auth.currentUser?.uid || 'none'
+    };
+    console.log("[DEBUG-AUTH] firestore-init.ts: Auth state AFTER error:", authStateAfterError);
+    
     // Don't throw the error, just log it to prevent app crashes
     // throw error;
   }

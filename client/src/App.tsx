@@ -11,6 +11,7 @@ import { initializeConnectionManager } from "./lib/connection-manager";
 import { AdminAuthProvider } from "@/components/admin/AdminAuthProvider";
 import { useAuthService } from "@/services/auth";
 import { PrivateRoute } from '@/components/routing/PrivateRoute';
+import { auth } from "@/lib/firebase";
 
 // Lazy load pages
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -89,8 +90,48 @@ function App() {
   useEffect(() => {
     if (user) {
       // Now that we have authentication, verify collections
-      console.log("User authenticated, verifying Firestore collections");
-      initializeFirestore(false).catch(console.error);
+      console.log("[DEBUG-AUTH] App.tsx useEffect: User authenticated, starting Firestore collections verification", 
+        { userId: user.uid, email: user.email });
+      
+      // Store authentication state before verification
+      const authStateBefore = { 
+        isAuthenticated: !!user, 
+        authTime: new Date().toISOString(),
+        userId: user.uid
+      };
+      console.log("[DEBUG-AUTH] App.tsx: Auth state BEFORE collection verification:", authStateBefore);
+      
+      // Wrap the initialization with a try-catch for better error logging
+      try {
+        initializeFirestore(false)
+          .then(() => {
+            // Check auth state after verification completes
+            const currentUser = auth.currentUser;
+            const authStateAfter = { 
+              isAuthenticated: !!currentUser, 
+              authTime: new Date().toISOString(),
+              userId: currentUser?.uid || 'none'
+            };
+            console.log("[DEBUG-AUTH] App.tsx: Auth state AFTER collection verification:", authStateAfter);
+            
+            // Log if a sign-out occurred during verification
+            if (authStateBefore.isAuthenticated && !authStateAfter.isAuthenticated) {
+              console.error("[DEBUG-AUTH] App.tsx: CRITICAL - User was signed out during Firestore collection verification!");
+            }
+          })
+          .catch(error => {
+            console.error("[DEBUG-AUTH] App.tsx: Error during Firestore initialization:", error);
+            
+            // Check auth state after error
+            const currentUser = auth.currentUser;
+            console.log("[DEBUG-AUTH] App.tsx: Auth state after error:", { 
+              isAuthenticated: !!currentUser,
+              userId: currentUser?.uid || 'none'
+            });
+          });
+      } catch (error) {
+        console.error("[DEBUG-AUTH] App.tsx: Exception during Firestore initialization setup:", error);
+      }
     }
   }, [user]);
 

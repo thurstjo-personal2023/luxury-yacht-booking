@@ -1,0 +1,17 @@
+Solution: Ensure you only have one onAuthStateChanged listener active at a time. If you're setting it up in multiple components, make sure they're not interfering with each other. Consider centralizing your onAuthStateChanged logic in your AuthService or a top-level component.
+
+Debounce/Throttle: As a temporary workaround (for testing only), you could try debouncing or throttling the onAuthStateChanged listener to prevent it from firing too rapidly. However, this is a band-aid and you should still find the underlying cause.
+
+2. Firestore Collection Verification Interference:
+
+Possible Cause: The logs indicate that the sign-out occurs during the "verifying Firestore collections" process. This suggests that your Firestore verification logic might be triggering the sign-out, or that it's interacting with the authentication state in a way that causes it to be cleared.
+
+Troubleshooting Steps:
+
+Examine Firestore Verification Logic: Carefully review the code that verifies your Firestore collections. Is it accidentally modifying the authentication state, calling signOut() , or triggering any actions that could lead to a sign-out?
+
+Check Security Rules: It's unlikely that security rules are directly causing the sign-out, but double-check that your security rules aren't inadvertently denying access to the Firestore collections in a way that triggers an error that your code then interprets as a sign-out condition.
+
+Permissions Issues: The Firestore verification might be failing due to a lack of permissions. If the user doesn't have the necessary permissions to access the collections, it could lead to an error that your code is misinterpreting. Ensure your security rules and user roles are correctly configured.
+
+Separate Concerns: Ideally, your Firestore verification logic should be completely independent of your authentication logic. Make sure they're not coupled in any way. If the verification fails, it should result in an error message or a redirect to an error page, but not a sign-out.

@@ -9,16 +9,13 @@
  [vite] connected.
  Creating new Firebase app instance
  Firebase initialized in PRODUCTION mode
- Setting up auth state listener for Firebase...
+ Legacy Firebase auth state listener disabled, using centralized AuthService instead
  Using PRODUCTION Firebase services - skipping emulator connection
  Using production Firebase services - emulator connection disabled
  Using production Firebase services - emulator connection disabled
  useAuthService: Setting up auth state listener
  Initializing Firestore collections in production mode...
  Skipping collection verification during initialization (will verify after authentication)
- Firebase Auth state changed: User signed out
- Auth state change: User signed out
- Auth token removed from localStorage
  AuthService: Auth state changed: User signed out
  useAuthService: Auth state changed: User signed out
  AuthService: ID token changed: No token
@@ -44,79 +41,38 @@ overrideMethod @ installHook.js:1
 login:1 [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) 
  Login component: Attempting login for email: thurstjo@icloud.com
  AuthService: ID token changed: Token updated
- Firebase Auth state changed: User HEUJCCukkCbNP2jsETBLt6Ngmuy1 signed in
- Auth state change: User authenticated Object
- Requesting fresh token on auth state change...
  AuthService: Auth state changed: User signed in
  useAuthService: Auth state changed: User signed in
  useAuthService: Auth state changed: User signed in
- useAuthService: Setting up auth state listener
- useAuthService: Setting up auth state listener
  User authenticated, verifying Firestore collections
  Initializing Firestore collections in production mode...
- AuthService: Auth state changed: User signed in
- useAuthService: Auth state changed: User signed in
- useAuthService: Auth state changed: User signed in
- AuthService: ID token changed: Token updated
  AuthService: ID token changed: Token updated
  AuthService: Stored fresh auth token in localStorage after login
  Login component: Successfully logged in user: HEUJCCukkCbNP2jsETBLt6Ngmuy1
- Auth token refreshed and stored in localStorage: eyJhbGciOi...0VLkA
- Refreshing user claims...
  AuthService: Roles are in sync: consumer
- AuthService: ID token changed: Token updated
- User claims refreshed successfully
- Setting up token refresh interval: 10 minutes
- Token refresh interval set up and stored
  AuthService: Roles are in sync: consumer
  Login component: User already authenticated, redirecting to dashboard
- AuthService: Roles are in sync: consumer
- Login component: User already authenticated, redirecting to dashboard
- TSS: Counted history being pushed
- TSS: Caught history
- TSS: Checking if repeated 500 times for interval 1000 against data:  Object
- useAuthService: Setting up auth state listener
  AuthService: ID token changed: No token
- Firebase Auth state changed: User signed out
- Auth state change: User signed out
- Auth token removed from localStorage
- Token refresh interval cleared
  AuthService: Auth state changed: User signed out
  useAuthService: Auth state changed: User signed out
  useAuthService: Auth state changed: User signed out
  Collection harmonized_users verified in production mode
  Collection unified_yacht_experiences verified in production mode
- Collection user_profiles_tourist verified in production mode
- Collection articles_and_guides verified in production mode
- Collection event_announcements verified in production mode
- Collection notifications verified in production mode
- Collection products_add_ons verified in production mode
- Collection promotions_and_offers verified in production mode
- Collection reviews_and_feedback verified in production mode
- Collection support_content verified in production mode
- Collection user_profiles_service_provider verified in production mode
- All Firestore collections initialized successfully in production mode
- useAuthService: Setting up auth state listener
- useAuthService: Setting up auth state listener
- AuthService: Auth state changed: User signed out
-use-auth-service.ts:76 useAuthService: Auth state changed: User signed out
-use-auth-service.ts:76 useAuthService: Auth state changed: User signed out
-auth-service.ts:467 AuthService: ID token changed: No token
-App.tsx:118 PrivateRoute: Access denied - User authenticated: false Token valid: false
-App.tsx:118 PrivateRoute: Access denied - User authenticated: false Token valid: false
+firestore-init.ts:60 Collection user_profiles_tourist verified in production mode
+firestore-init.ts:60 Collection articles_and_guides verified in production mode
+firestore-init.ts:60 Collection event_announcements verified in production mode
+firestore-init.ts:60 Collection notifications verified in production mode
+firestore-init.ts:60 Collection products_add_ons verified in production mode
+firestore-init.ts:60 Collection promotions_and_offers verified in production mode
+firestore-init.ts:60 Collection reviews_and_feedback verified in production mode
+firestore-init.ts:60 Collection support_content verified in production mode
+firestore-init.ts:60 Collection user_profiles_service_provider verified in production mode
+firestore-init.ts:83 All Firestore collections initialized successfully in production mode
 injection-tss-mv3.js:1 TSS: Counted history being pushed
 injection-tss-mv3.js:1 TSS: Caught history
 injection-tss-mv3.js:1 TSS: Checking if repeated 500 times for interval 1000 against data:  Object
 use-auth-service.ts:52 useAuthService: Setting up auth state listener
-injection-tss-mv3.js:1 TSS: Counted history being pushed
-injection-tss-mv3.js:1 TSS: Caught history
-injection-tss-mv3.js:1 TSS: Checking if repeated 500 times for interval 1000 against data:  Object
-login:1 [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) null
-injection-tss-mv3.js:1 TSS: Counted history being pushed
-injection-tss-mv3.js:1 TSS: Caught history
-injection-tss-mv3.js:1 TSS: Checking if repeated 500 times for interval 1000 against data:  Object
-use-auth-service.ts:52 useAuthService: Setting up auth state listener
-App.tsx:118 PrivateRoute: Access denied - User authenticated: false Token valid: false
+PrivateRoute.tsx:81 PrivateRoute: Redirecting to login - not authenticated
 injection-tss-mv3.js:1 TSS: Counted history being pushed
 injection-tss-mv3.js:1 TSS: Caught history
 injection-tss-mv3.js:1 TSS: Checking if repeated 500 times for interval 1000 against data:  Object

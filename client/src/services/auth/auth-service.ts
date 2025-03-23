@@ -287,19 +287,25 @@ export class AuthService {
    */
   async signOut(): Promise<void> {
     try {
-      console.log('AuthService: Beginning sign out process...');
+      console.log('[DEBUG-AUTH] AuthService.signOut: Beginning sign out process...');
+      console.log('[DEBUG-AUTH] AuthService.signOut: Call stack:', new Error().stack);
+      
+      // Get current user before sign out
+      const currentUser = this.getCurrentUser();
+      console.log('[DEBUG-AUTH] AuthService.signOut: Current user before signOut:', 
+        currentUser ? { uid: currentUser.uid, email: currentUser.email } : 'No user');
       
       // Clear all auth tokens from storage
       localStorage.removeItem('authToken');
       sessionStorage.removeItem('authToken');
       localStorage.removeItem('lastAuthState');
-      console.log('AuthService: Removed auth tokens from storage during sign out');
+      console.log('[DEBUG-AUTH] AuthService.signOut: Removed auth tokens from storage during sign out');
       
       // Sign out from Firebase Auth
       await firebaseSignOut(this.auth);
-      console.log('AuthService: Successfully signed out from Firebase Auth');
+      console.log('[DEBUG-AUTH] AuthService.signOut: Successfully signed out from Firebase Auth');
     } catch (error) {
-      console.error('AuthService: Error signing out:', error);
+      console.error('[DEBUG-AUTH] AuthService.signOut: Error signing out:', error);
       throw error;
     }
   }
@@ -501,7 +507,21 @@ export class AuthService {
     // Set up the Firebase listener if this is the first listener
     if (this.authStateListeners.size === 1) {
       const unsubscribe = onAuthStateChanged(this.auth, (user) => {
-        console.log('AuthService: Auth state changed:', user ? 'User signed in' : 'User signed out');
+        const eventType = user ? 'User signed in' : 'User signed out';
+        console.log('[DEBUG-AUTH] AuthService.onAuthStateChanged:', eventType);
+        
+        // Log detailed debugging information
+        if (!user) {
+          // Log a stack trace to see where the sign-out is coming from
+          console.log('[DEBUG-AUTH] Auth state changed to signed-out, stack trace:', new Error().stack);
+        } else {
+          console.log('[DEBUG-AUTH] User signed in details:', { 
+            uid: user.uid,
+            email: user.email,
+            isAnonymous: user.isAnonymous,
+            emailVerified: user.emailVerified
+          });
+        }
         
         // IMPORTANT: Do not manipulate token storage here to avoid race conditions
         // Token storage is handled in the ID token change listener
@@ -511,7 +531,7 @@ export class AuthService {
           try {
             listener(user);
           } catch (error) {
-            console.error('AuthService: Error in auth state listener:', error);
+            console.error('[DEBUG-AUTH] Error in auth state listener:', error);
           }
         });
       });
@@ -545,24 +565,41 @@ export class AuthService {
     // Set up the Firebase listener if this is the first listener
     if (this.tokenChangeListeners.size === 1) {
       const unsubscribe = onIdTokenChanged(this.auth, (user) => {
-        console.log('AuthService: ID token changed:', user ? 'Token updated' : 'No token');
+        console.log('[DEBUG-AUTH] AuthService.onIdTokenChanged:', user ? 'Token updated' : 'No token');
         
+        // Log additional details for debugging
+        if (!user) {
+          console.log('[DEBUG-AUTH] ID token changed to null, stack trace:', new Error().stack);
+          console.log('[DEBUG-AUTH] Local storage state at token removal:', {
+            hasAuthToken: !!localStorage.getItem('authToken'),
+            authHeaderLength: localStorage.getItem('authToken')?.length || 0
+          });
+        } else {
+          console.log('[DEBUG-AUTH] ID token updated for user:', { 
+            uid: user.uid,
+            email: user.email
+          });
+        }
+
         // Notify all listeners
         this.tokenChangeListeners.forEach(listener => {
           try {
             listener(user);
           } catch (error) {
-            console.error('AuthService: Error in token change listener:', error);
+            console.error('[DEBUG-AUTH] Error in token change listener:', error);
           }
         });
         
         // Update storage with new token
         if (user) {
           user.getIdToken().then(token => {
+            console.log('[DEBUG-AUTH] Storing new auth token in localStorage, tokenLength:', token.length);
             localStorage.setItem('authToken', token);
           }).catch(error => {
-            console.error('AuthService: Error getting token during token change:', error);
+            console.error('[DEBUG-AUTH] Error getting token during token change:', error);
           });
+        } else {
+          console.log('[DEBUG-AUTH] Removing auth token from localStorage due to null user');
         }
       });
       
