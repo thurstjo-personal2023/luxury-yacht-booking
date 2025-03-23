@@ -16,8 +16,8 @@ const mediaValidationState = {
   isRepairing: false,
   validationProgress: { total: 0, processed: 0 },
   repairProgress: { total: 0, processed: 0 },
-  lastValidationId: null,
-  lastRepairId: null
+  lastValidationId: '',  // Use empty string instead of null
+  lastRepairId: ''       // Use empty string instead of null
 };
 
 // Middleware to verify admin role
@@ -129,33 +129,81 @@ export function registerAdminRoutes(app: Express) {
    * Run media validation across all collections
    * This endpoint validates both images and videos
    */
-  app.get('/api/admin/validate-media', verifyAdminAuth, async (req: Request, res: Response) => {
+  app.post('/api/admin/validate-media', verifyAdminAuth, async (req: Request, res: Response) => {
     try {
       console.log('Starting media validation via admin API...');
+      
+      // Update validation state to indicate validation is in progress
+      mediaValidationState.isValidating = true;
+      mediaValidationState.validationProgress = { total: 100, processed: 0 }; // Initial estimate
       
       // Import the validation function dynamically
       const { validateMediaUrls, saveMediaValidationResults } = await import('../scripts/validate-media');
       
-      // Run validation
-      const results = await validateMediaUrls();
-      
-      // Save results to Firestore
-      const reportId = await saveMediaValidationResults(results);
-      
-      // Return summary results
+      // Start validation in background to prevent timeout
       res.json({
         success: true,
-        reportId,
-        timestamp: results.timestamp,
-        stats: results.stats,
-        sampleIssues: {
-          invalid: results.invalid.slice(0, 5),
-          missing: results.missing.slice(0, 5)
-        }
+        message: 'Media validation started',
+        inProgress: true
       });
+      
+      // Get the validation function dynamically
+      let resultPromise;
+      try {
+        // Execute validation (we'll need to modify the validateMediaUrls function later to accept a callback)
+        resultPromise = validateMediaUrls();
+        
+        // Start progress tracking in background
+        let processedCount = 0;
+        const interval = setInterval(() => {
+          processedCount += 5; // Simulate progress
+          if (processedCount > 95) processedCount = 95; // Cap at 95% until complete
+          mediaValidationState.validationProgress = { total: 100, processed: processedCount };
+        }, 1000);
+        
+        // Wait for validation to complete
+        const results = await resultPromise;
+        clearInterval(interval);
+        
+        // Mark as 100% complete
+        mediaValidationState.validationProgress = { total: 100, processed: 100 };
+        
+        // Save results to Firestore
+        const reportId = await saveMediaValidationResults(results);
+        
+        // Update validation state
+        mediaValidationState.isValidating = false;
+        mediaValidationState.lastValidationId = reportId;
+      } catch (error) {
+        // Handle errors during validation
+        mediaValidationState.isValidating = false;
+        throw error;
+      }
+      
+      console.log(`Media validation completed with report ID: ${mediaValidationState.lastValidationId}`);
     } catch (error) {
       console.error('Error running media validation:', error);
-      res.status(500).json({ error: 'Failed to run media validation' });
+      // Reset validation state on error
+      mediaValidationState.isValidating = false;
+      mediaValidationState.validationProgress = { total: 0, processed: 0 };
+    }
+  });
+  
+  /**
+   * Get the validation status for backward compatibility
+   */
+  app.get('/api/admin/validate-media', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      // Return the current validation state
+      res.json({
+        success: true,
+        isValidating: mediaValidationState.isValidating,
+        progress: mediaValidationState.validationProgress,
+        lastValidationId: mediaValidationState.lastValidationId
+      });
+    } catch (error) {
+      console.error('Error getting media validation status:', error);
+      res.status(500).json({ error: 'Failed to get validation status' });
     }
   });
 
@@ -491,6 +539,53 @@ export function registerAdminRoutes(app: Express) {
   });
   
   /**
+   * Get current media validation status
+   * Returns whether validation or repair is currently in progress
+   */
+  app.get('/api/admin/media-validation-status', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      // Return the current validation state
+      res.json({
+        isValidating: mediaValidationState.isValidating,
+        isRepairing: mediaValidationState.isRepairing,
+        lastValidationId: mediaValidationState.lastValidationId,
+        lastRepairId: mediaValidationState.lastRepairId
+      });
+    } catch (error) {
+      console.error('Error getting media validation status:', error);
+      res.status(500).json({ error: 'Failed to get validation status' });
+    }
+  });
+
+  /**
+   * Get current validation progress
+   * Returns the progress of an ongoing validation
+   */
+  app.get('/api/admin/validation-progress', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      // Return the current validation progress
+      res.json(mediaValidationState.validationProgress);
+    } catch (error) {
+      console.error('Error getting validation progress:', error);
+      res.status(500).json({ error: 'Failed to get validation progress' });
+    }
+  });
+
+  /**
+   * Get current repair progress
+   * Returns the progress of an ongoing repair operation
+   */
+  app.get('/api/admin/repair-progress', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      // Return the current repair progress
+      res.json(mediaValidationState.repairProgress);
+    } catch (error) {
+      console.error('Error getting repair progress:', error);
+      res.status(500).json({ error: 'Failed to get repair progress' });
+    }
+  });
+
+  /**
    * Fix all media issues (relative URLs and media type mismatches)
    * This is a comprehensive fix that addresses problems with both images and videos
    */
@@ -498,34 +593,62 @@ export function registerAdminRoutes(app: Express) {
     try {
       console.log(`[${new Date().toISOString()}] Starting media issues repair via admin API...`);
       
+      // Update repair state to indicate repair is in progress
+      mediaValidationState.isRepairing = true;
+      mediaValidationState.repairProgress = { total: 100, processed: 0 }; // Initial estimate
+      
       // Dynamic import to avoid initialization issues
       const { fixMediaIssues, saveRepairResults } = await import('../scripts/fix-media-issues');
       
-      // Run the repair
-      const results = await fixMediaIssues();
-      
-      // Save results to Firestore
-      const reportId = await saveRepairResults(results);
-      
-      // Return summary results
+      // Start repair in background to prevent timeout
       res.json({
         success: true,
-        reportId,
-        timestamp: results.timestamp,
-        stats: {
-          documentsProcessed: results.stats.documentsProcessed,
-          relativeUrlsFixed: results.stats.relativeUrlsFixed,
-          mediaTypesFixed: results.stats.mediaTypesFixed,
-        },
-        message: `Fixed ${results.stats.relativeUrlsFixed} relative URLs and ${results.stats.mediaTypesFixed} media type mismatches`,
-        sampleFixes: {
-          relativeUrls: results.relativeUrlsFixed.slice(0, 5),
-          mediaTypes: results.mediaTypesFixed.slice(0, 5)
-        }
+        message: 'Media repair started',
+        inProgress: true
       });
+      
+      // Get the repair function dynamically
+      let resultPromise;
+      try {
+        // Execute repair (we'll need to modify the fixMediaIssues function later to accept a callback)
+        resultPromise = fixMediaIssues();
+        
+        // Start progress tracking in background
+        let processedCount = 0;
+        const interval = setInterval(() => {
+          processedCount += 5; // Simulate progress
+          if (processedCount > 95) processedCount = 95; // Cap at 95% until complete
+          mediaValidationState.repairProgress = { total: 100, processed: processedCount };
+        }, 1000);
+        
+        // Wait for repair to complete
+        const results = await resultPromise;
+        clearInterval(interval);
+        
+        // Mark as 100% complete
+        mediaValidationState.repairProgress = { total: 100, processed: 100 };
+        
+        // Save results to Firestore
+        const reportId = await saveRepairResults(results);
+        
+        // Update repair state as complete
+        mediaValidationState.isRepairing = false;
+        // Set the ID as an actual string value, not null
+        if (reportId) {
+          mediaValidationState.lastRepairId = reportId;
+        }
+      } catch (error) {
+        // Handle errors during repair
+        mediaValidationState.isRepairing = false;
+        throw error;
+      }
+      
+      console.log(`Media repair completed with report ID: ${mediaValidationState.lastRepairId}`);
     } catch (error) {
       console.error('Error fixing media issues:', error);
-      res.status(500).json({ error: 'Failed to fix media issues' });
+      // Reset repair state on error
+      mediaValidationState.isRepairing = false;
+      mediaValidationState.repairProgress = { total: 0, processed: 0 };
     }
   });
   
