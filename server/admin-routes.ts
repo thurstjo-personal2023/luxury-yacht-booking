@@ -7,6 +7,7 @@
 import { Request, Response, Express, NextFunction } from 'express';
 import { verifyAuth, adminDb } from './firebase-admin';
 import validateImageUrls from '../scripts/validate-images';
+import { PubSub } from '@google-cloud/pubsub';
 // Import will be loaded dynamically to avoid initialization issues
 // import { validateMediaUrls, saveMediaValidationResults } from '../scripts/validate-media';
 
@@ -693,6 +694,183 @@ export function registerAdminRoutes(app: Express) {
     } catch (error) {
       console.error('Error fetching media repair reports:', error);
       res.status(500).json({ error: 'Failed to fetch media repair reports' });
+    }
+  });
+
+  /**
+   * Trigger media validation using Pub/Sub
+   * This endpoint publishes a message to the Pub/Sub topic to trigger background validation
+   */
+  app.post('/api/admin/trigger-pubsub-validation', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      console.log(`[${new Date().toISOString()}] Triggering media validation via Pub/Sub...`);
+      
+      // Initialize the PubSub client
+      const pubsub = new PubSub();
+      const topicName = 'media-validation-tasks';
+      
+      // Create a message with collections to validate
+      // Use collections from request body or default to standard collections
+      const collections = req.body?.collections || [
+        'unified_yacht_experiences',
+        'yacht_profiles',
+        'products_add_ons',
+        'articles_and_guides',
+        'event_announcements'
+      ];
+      
+      // Create the message data with unique task ID
+      const messageData = {
+        taskId: `manual-${Date.now()}`,
+        collections,
+        timestamp: Date.now(),
+        requestedBy: 'admin-api',
+        requestedAt: new Date().toISOString(),
+        validateSingle: false
+      };
+      
+      // Publish the message to the Pub/Sub topic
+      const dataBuffer = Buffer.from(JSON.stringify(messageData));
+      const messageId = await pubsub.topic(topicName).publish(dataBuffer);
+      
+      console.log(`[${new Date().toISOString()}] Published validation message with ID: ${messageId}`);
+      
+      // Return a success response
+      res.json({
+        success: true,
+        message: 'Media validation triggered via Pub/Sub',
+        messageId,
+        taskId: messageData.taskId
+      });
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[${new Date().toISOString()}] Error triggering Pub/Sub validation:`, errorMessage);
+      res.status(500).json({
+        error: 'Failed to trigger media validation',
+        details: errorMessage
+      });
+    }
+  });
+  
+  /**
+   * Get media validation tasks from the Pub/Sub system
+   */
+  app.get('/api/admin/pubsub-validation-tasks', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      // Get tasks from Firestore
+      const tasksSnapshot = await adminDb.collection('media_validation_tasks')
+        .orderBy('timestamp', 'desc')
+        .limit(req.query.limit ? parseInt(req.query.limit as string) : 10)
+        .get();
+      
+      // Map to array of tasks
+      const tasks = tasksSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Return tasks
+      res.json({
+        success: true,
+        tasks
+      });
+    } catch (error: any) {
+      console.error('Error fetching media validation tasks:', error);
+      res.status(500).json({
+        error: 'Failed to fetch validation tasks',
+        details: error.message
+      });
+    }
+  });
+  
+  /**
+   * Get Pub/Sub validation reports
+   */
+  app.get('/api/admin/pubsub-validation-reports', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      // Get reports from Firestore
+      const reportsSnapshot = await adminDb.collection('media_validation_reports')
+        .orderBy('started', 'desc')
+        .limit(req.query.limit ? parseInt(req.query.limit as string) : 10)
+        .get();
+      
+      // Map to array of reports
+      const reports = reportsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          // Ensure these fields exist for the frontend
+          status: data.status || 'unknown',
+          collections: data.collections || {},
+          completedCollections: data.completedCollections || 0,
+          totalCollections: data.totalCollections || 0,
+          started: data.started,
+          completed: data.completed,
+          // Add progress percentage
+          progress: data.completedCollections && data.totalCollections 
+            ? Math.round((data.completedCollections / data.totalCollections) * 100) 
+            : 0
+        };
+      });
+      
+      // Return reports
+      res.json({
+        success: true,
+        reports
+      });
+    } catch (error: any) {
+      console.error('Error fetching Pub/Sub validation reports:', error);
+      res.status(500).json({
+        error: 'Failed to fetch validation reports',
+        details: error.message
+      });
+    }
+  });
+  
+  /**
+   * Get detailed Pub/Sub validation report
+   */
+  app.get('/api/admin/pubsub-validation-reports/:reportId', verifyAdminAuth, async (req: Request, res: Response) => {
+    try {
+      const { reportId } = req.params;
+      
+      // Get the report from Firestore
+      const reportDoc = await adminDb.collection('media_validation_reports').doc(reportId).get();
+      
+      if (!reportDoc.exists) {
+        return res.status(404).json({ error: 'Report not found' });
+      }
+      
+      // Get invalid URLs for the report
+      const invalidUrlsSnapshot = await adminDb
+        .collection('media_validation_reports')
+        .doc(reportId)
+        .collection('invalid_urls')
+        .orderBy('timestamp', 'desc')
+        .limit(100)
+        .get();
+      
+      const invalidUrls = invalidUrlsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Return the report data with invalid URLs
+      res.json({
+        success: true,
+        report: {
+          id: reportId,
+          ...reportDoc.data(),
+          invalidUrls
+        }
+      });
+    } catch (error: any) {
+      console.error('Error fetching detailed validation report:', error);
+      res.status(500).json({
+        error: 'Failed to fetch validation report',
+        details: error.message
+      });
     }
   });
 }

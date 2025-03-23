@@ -1,345 +1,274 @@
 /**
  * Media Validation Worker
  * 
- * This module implements the background worker functionality that processes
- * media validation tasks from a Pub/Sub queue. It:
- * 
- * 1. Listens for validation job messages 
- * 2. Processes batches of documents from specific collections
- * 3. Validates and repairs media URLs
- * 4. Records validation results for reporting
+ * This module processes media validation tasks from Pub/Sub.
+ * It validates and repairs media URLs in Firestore documents.
  */
-
-const admin = require('firebase-admin');
-const { validateAndRepairMedia, validateImageUrl } = require('./validation');
+const admin = require("../src/utils/firebaseAdmin");
+const { logger } = require("../src/utils/logging");
+const { validateAndRepairMedia } = require("./validation");
 
 // Constants for worker operation
-const BATCH_SIZE = 50; // Number of documents to process in a single batch
-const COLLECTIONS_WITH_MEDIA = [
+const DEFAULT_BATCH_SIZE = 50;
+const DEFAULT_COLLECTIONS = [
   'unified_yacht_experiences',
   'yacht_profiles',
   'products_add_ons',
   'articles_and_guides',
   'event_announcements'
 ];
-const VALID_MEDIA_TYPES = ['image', 'video'];
+
+/**
+ * Process a validation task from Pub/Sub
+ * 
+ * @param {Object} message - The Pub/Sub message
+ * @param {Object} context - The event context
+ * @returns {Promise<Object>} - Processing result
+ */
+async function mediaValidationWorker(message, context) {
+  try {
+    // Parse the message data
+    const task = JSON.parse(Buffer.from(message.data, "base64").toString());
+
+    // If this is a batch task, process it directly
+    if (task.batchIndex !== undefined && task.collection) {
+      logger.info(
+          `Processing media validation task for ${task.collection}, ` +
+          `batch ${task.batchIndex + 1}/${task.totalBatches}`
+      );
+
+      // Process the batch
+      return await processBatch(task);
+    } 
+    
+    // Otherwise, this was just a trigger message which should have already been handled by the scheduler
+    logger.info('Received trigger message; batch tasks should be scheduled by scheduler');
+    return { success: true, message: 'Trigger message received' };
+  } catch (error) {
+    logger.error("Error processing media validation task:", error);
+    throw error; // Re-throw to trigger Pub/Sub retry
+  }
+}
 
 /**
  * Process a batch of documents from a collection
  * 
- * @param {string} collectionName - The Firestore collection to process
- * @param {string} reportId - ID of the validation report document
- * @param {number} batchSize - Number of documents to process
- * @param {number} offset - Starting point for batch
- * @returns {Promise<Object>} - Result of batch processing
+ * @param {Object} task - The batch task to process
+ * @returns {Promise<Object>} - Batch processing result
  */
-async function processBatch(collectionName, reportId, batchSize = BATCH_SIZE, offset = 0) {
-  const db = admin.firestore();
-  const results = {
-    processed: 0,
-    fixed: 0,
-    errors: [],
-    invalidUrls: []
-  };
-  
+async function processBatch(task) {
+  const { 
+    collection, 
+    batchSize = DEFAULT_BATCH_SIZE, 
+    startIndex = 0,
+    validationId
+  } = task;
+
   try {
     // Get a batch of documents from the collection
-    const snapshot = await db.collection(collectionName)
-      .orderBy('__name__') // Order by document ID
-      .limit(batchSize)
-      .offset(offset)
-      .get();
-    
-    if (snapshot.empty) {
-      return { ...results, done: true };
+    const query = admin
+        .firestore()
+        .collection(collection)
+        .orderBy("__name__") // Order by document ID for consistent pagination
+        .limit(batchSize);
+
+    // If we have a start index, add a startAfter clause
+    let snapshot;
+    if (startIndex > 0) {
+      // Get the document ID at the previous batch's last position
+      const previousBatchQuery = admin
+          .firestore()
+          .collection(collection)
+          .orderBy("__name__")
+          .limit(1)
+          .offset(startIndex - 1);
+
+      const previousBatchSnapshot = await previousBatchQuery.get();
+
+      if (!previousBatchSnapshot.empty) {
+        const lastDoc = previousBatchSnapshot.docs[0];
+        snapshot = await query.startAfter(lastDoc).get();
+      } else {
+        snapshot = await query.get();
+      }
+    } else {
+      snapshot = await query.get();
     }
-    
+
     // Process each document in the batch
-    const processPromises = snapshot.docs.map(async (doc) => {
-      const docData = doc.data();
-      results.processed++;
-      
+    const results = {
+      processed: 0,
+      fixed: 0,
+      errors: 0,
+      invalidUrls: [],
+    };
+
+    for (const doc of snapshot.docs) {
       try {
-        // Validate and repair media URLs
-        const repairResult = await validateAndRepairMedia(
-          collectionName, 
-          doc.id, 
-          docData
-        );
-        
-        if (repairResult.fixed) {
-          results.fixed++;
-        }
-        
-        // Perform deep validation of media URLs if they exist
-        if (docData.media && Array.isArray(docData.media)) {
-          for (let i = 0; i < docData.media.length; i++) {
-            const mediaItem = docData.media[i];
-            
-            // Skip items without URLs or invalid types
-            if (!mediaItem || !mediaItem.url || !VALID_MEDIA_TYPES.includes(mediaItem.type)) {
-              continue;
-            }
-            
-            // Validate image URLs
-            if (mediaItem.type === 'image') {
-              const validationResult = await validateImageUrl(mediaItem.url);
-              
-              if (!validationResult.valid) {
-                results.invalidUrls.push({
-                  documentId: doc.id,
-                  fieldPath: `media.[${i}].url`,
-                  url: mediaItem.url,
-                  reason: validationResult.error ? 'Request failed' : 'Invalid content type',
-                  status: validationResult.status,
-                  error: validationResult.error
-                });
-                
-                // Record the invalid URL in the report
-                await db.collection('media_validation_reports')
-                  .doc(reportId)
-                  .collection('invalid_urls')
-                  .add({
-                    collection: collectionName,
-                    documentId: doc.id,
-                    fieldPath: `media.[${i}].url`,
-                    url: mediaItem.url,
-                    reason: validationResult.reason || 'Invalid URL',
-                    status: validationResult.status,
-                    error: validationResult.error,
-                    contentType: validationResult.contentType,
-                    timestamp: admin.firestore.FieldValue.serverTimestamp()
-                  });
-              }
-            }
+        const data = doc.data();
+        results.processed++;
+
+        // Only process documents with media fields
+        if (hasMediaFields(data)) {
+          const { fixed } = await validateAndRepairMedia(
+              collection,
+              doc.id,
+              data,
+          );
+          if (fixed) {
+            results.fixed++;
           }
         }
       } catch (error) {
-        results.errors.push({
-          documentId: doc.id,
-          error: error.message
+        logger.error(
+            `Error processing document ${doc.id} in ${collection}:`,
+            error,
+        );
+        results.errors++;
+      }
+    }
+
+    // Log results
+    logger.info(
+        `Completed batch ${task.batchIndex + 1}/${task.totalBatches} ` +
+        `for ${collection}:`,
+    );
+    logger.info(`- Documents processed: ${results.processed}`);
+    logger.info(`- Media items fixed: ${results.fixed}`);
+    logger.info(`- Errors: ${results.errors}`);
+
+    // Save the results to Firestore for reporting
+    await saveWorkerResults(collection, task, results, validationId);
+    
+    // Update task status
+    await admin.firestore().collection('media_validation_tasks')
+      .doc(task.taskId || `${collection}-${task.batchIndex}`)
+      .set({
+        ...task,
+        status: 'completed',
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        results
+      }, { merge: true });
+    
+    // Return the results
+    return {
+      success: true,
+      collection,
+      batchIndex: task.batchIndex,
+      totalBatches: task.totalBatches,
+      results
+    };
+  } catch (error) {
+    logger.error(`Error processing batch for ${collection}:`, error);
+    
+    // Update task status
+    if (task.taskId) {
+      await admin.firestore().collection('media_validation_tasks')
+        .doc(task.taskId)
+        .set({
+          status: 'error',
+          error: error.message,
+          errorAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Check if a document has media fields that need validation.
+ *
+ * @param {object} data - The document data to check for media fields.
+ * @return {boolean} - Returns true if the document has media fields,
+ * otherwise false.
+ */
+function hasMediaFields(data) {
+  // Check for common media field patterns
+  if (data.media && Array.isArray(data.media)) {
+    return true;
+  }
+
+  if (data.imageUrl || data.coverImageUrl || data.thumbnailUrl) {
+    return true;
+  }
+
+  // Check for nested media fields like virtualTour.scenes[].imageUrl
+  if (
+    data.virtualTour &&
+    data.virtualTour.scenes &&
+    Array.isArray(data.virtualTour.scenes)
+  ) {
+    return data.virtualTour.scenes.some(
+        (scene) => scene.imageUrl || scene.thumbnailUrl,
+    );
+  }
+
+  return false;
+}
+
+/**
+ * Save worker results to Firestore for reporting
+ *
+ * @param {string} collection - The name of the Firestore collection.
+ * @param {object} task - The task object containing batch details.
+ * @param {object} results - The results of the worker's processing.
+ * @param {string} validationId - The ID of the validation run.
+ */
+async function saveWorkerResults(collection, task, results, validationId) {
+  const timestamp = admin.firestore.Timestamp.now();
+
+  // Save to the log collection
+  await admin.firestore().collection("media_validation_worker_logs").add({
+    collection,
+    batch: task.batchIndex + 1,
+    totalBatches: task.totalBatches,
+    results,
+    timestamp,
+    taskId: task.timestamp || Date.now(),
+    validationId
+  });
+  
+  // If we have a validation ID, update the validation report
+  if (validationId) {
+    const docRef = admin.firestore().collection('media_validation_reports').doc(validationId);
+    
+    // Update the collection stats in the validation report
+    await docRef.update({
+      [`collections.${collection}.processed`]: admin.firestore.FieldValue.increment(results.processed),
+      [`collections.${collection}.fixed`]: admin.firestore.FieldValue.increment(results.fixed),
+      [`collections.${collection}.errors`]: admin.firestore.FieldValue.increment(results.errors),
+      lastUpdated: timestamp
+    });
+    
+    // Check if this is the last batch for this collection
+    if (task.batchIndex === task.totalBatches - 1) {
+      // Mark this collection as completed
+      await docRef.update({
+        [`collections.${collection}.completed`]: true,
+        [`collections.${collection}.completedAt`]: timestamp,
+        completedCollections: admin.firestore.FieldValue.increment(1)
+      });
+      
+      // Check if all collections are completed
+      const doc = await docRef.get();
+      const data = doc.data();
+      
+      if (data.completedCollections >= data.totalCollections) {
+        // Mark the entire validation as completed
+        await docRef.update({
+          status: 'completed',
+          completed: timestamp
         });
         
-        console.error(`Error processing document ${collectionName}/${doc.id}:`, error);
+        logger.info(`Media validation ${validationId} completed`);
       }
-    });
-    
-    // Wait for all documents to be processed
-    await Promise.all(processPromises);
-    
-    // Update the report with batch results
-    await db.collection('media_validation_reports')
-      .doc(reportId)
-      .update({
-        [`collections.${collectionName}.processed`]: admin.firestore.FieldValue.increment(results.processed),
-        [`collections.${collectionName}.fixed`]: admin.firestore.FieldValue.increment(results.fixed),
-        [`collections.${collectionName}.errors`]: admin.firestore.FieldValue.increment(results.errors.length),
-        [`collections.${collectionName}.invalidUrls`]: admin.firestore.FieldValue.increment(results.invalidUrls.length),
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-      });
-    
-    return { ...results, done: snapshot.size < batchSize };
-  } catch (error) {
-    console.error(`Error processing batch for ${collectionName}:`, error);
-    
-    // Update the report with batch error
-    await db.collection('media_validation_reports')
-      .doc(reportId)
-      .update({
-        [`collections.${collectionName}.batchErrors`]: admin.firestore.FieldValue.increment(1),
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-      });
-    
-    return { 
-      ...results, 
-      error: error.message,
-      done: true  // Stop processing this collection if we hit an error
-    };
+    }
   }
 }
 
-/**
- * Process validation for a single collection
- * 
- * @param {string} collectionName - The collection to validate
- * @param {string} reportId - ID of the validation report document
- * @returns {Promise<Object>} - Result of collection processing
- */
-async function processCollection(collectionName, reportId) {
-  const db = admin.firestore();
-  let offset = 0;
-  let done = false;
-  const collectionResults = {
-    collection: collectionName,
-    totalProcessed: 0,
-    totalFixed: 0,
-    totalErrors: 0,
-    totalInvalidUrls: 0,
-    batches: 0
-  };
-  
-  // Initialize collection results in the report
-  await db.collection('media_validation_reports')
-    .doc(reportId)
-    .update({
-      [`collections.${collectionName}`]: {
-        processed: 0,
-        fixed: 0,
-        errors: 0,
-        invalidUrls: 0,
-        batchErrors: 0,
-        started: admin.firestore.FieldValue.serverTimestamp()
-      }
-    });
-  
-  // Process batches until done
-  while (!done) {
-    collectionResults.batches++;
-    
-    const batchResult = await processBatch(
-      collectionName, 
-      reportId, 
-      BATCH_SIZE, 
-      offset
-    );
-    
-    // Accumulate results
-    collectionResults.totalProcessed += batchResult.processed;
-    collectionResults.totalFixed += batchResult.fixed;
-    collectionResults.totalErrors += batchResult.errors.length;
-    collectionResults.totalInvalidUrls += batchResult.invalidUrls.length;
-    
-    // Move to next batch or finish
-    done = batchResult.done;
-    offset += BATCH_SIZE;
-  }
-  
-  // Mark collection as completed in the report
-  await db.collection('media_validation_reports')
-    .doc(reportId)
-    .update({
-      [`collections.${collectionName}.completed`]: admin.firestore.FieldValue.serverTimestamp(),
-      [`collections.${collectionName}.batches`]: collectionResults.batches
-    });
-  
-  return collectionResults;
-}
-
-/**
- * Process a validation job from Pub/Sub
- * 
- * @param {Object} message - The Pub/Sub message
- * @returns {Promise<Object>} - Result of job processing
- */
-async function processValidationJob(message) {
-  const db = admin.firestore();
-  
-  // Parse the message data
-  const messageData = message.json || {};
-  const { 
-    collections = COLLECTIONS_WITH_MEDIA,
-    reportId = null,
-    validateSingle = false,
-    documentId = null,
-    collectionName = null
-  } = messageData;
-  
-  try {
-    // Create a new report if not provided
-    const actualReportId = reportId || db.collection('media_validation_reports').doc().id;
-    
-    // Initialize the report
-    if (!reportId) {
-      await db.collection('media_validation_reports').doc(actualReportId).set({
-        started: admin.firestore.FieldValue.serverTimestamp(),
-        status: 'running',
-        collections: {},
-        validateSingle: validateSingle,
-        singleCollection: collectionName,
-        singleDocumentId: documentId,
-        totalCollections: validateSingle ? 1 : collections.length,
-        completedCollections: 0,
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-      });
-    }
-    
-    // Process a single document if requested
-    if (validateSingle && documentId && collectionName) {
-      const docRef = db.collection(collectionName).doc(documentId);
-      const doc = await docRef.get();
-      
-      if (!doc.exists) {
-        throw new Error(`Document ${collectionName}/${documentId} not found`);
-      }
-      
-      const docData = doc.data();
-      const result = await validateAndRepairMedia(collectionName, documentId, docData);
-      
-      // Update the report
-      await db.collection('media_validation_reports').doc(actualReportId).update({
-        result,
-        status: 'completed',
-        completed: admin.firestore.FieldValue.serverTimestamp(),
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-      });
-      
-      return { 
-        success: true, 
-        reportId: actualReportId,
-        validateSingle: true,
-        result 
-      };
-    }
-    
-    // Process all collections
-    const collectionsToProcess = validateSingle ? [collectionName] : collections;
-    const results = [];
-    
-    for (const collection of collectionsToProcess) {
-      const collectionResult = await processCollection(collection, actualReportId);
-      results.push(collectionResult);
-      
-      // Update completed collections count
-      await db.collection('media_validation_reports').doc(actualReportId).update({
-        completedCollections: admin.firestore.FieldValue.increment(1),
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-      });
-    }
-    
-    // Mark the report as completed
-    await db.collection('media_validation_reports').doc(actualReportId).update({
-      status: 'completed',
-      completed: admin.firestore.FieldValue.serverTimestamp(),
-      lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-    });
-    
-    return { 
-      success: true, 
-      reportId: actualReportId,
-      results 
-    };
-  } catch (error) {
-    console.error("Error processing validation job:", error);
-    
-    // Update the report with error
-    if (reportId) {
-      await db.collection('media_validation_reports').doc(reportId).update({
-        status: 'error',
-        error: error.message,
-        completed: admin.firestore.FieldValue.serverTimestamp(),
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-      });
-    }
-    
-    return { 
-      success: false, 
-      error: error.message 
-    };
-  }
-}
-
-module.exports = {
-  processValidationJob,
-  processCollection,
-  processBatch
+module.exports = { 
+  mediaValidationWorker,
+  processBatch,
+  hasMediaFields
 };
