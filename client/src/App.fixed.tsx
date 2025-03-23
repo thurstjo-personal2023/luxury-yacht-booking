@@ -11,7 +11,6 @@ import { initializeFirestore } from "./lib/firestore-init";
 import { initializeConnectionManager } from "./lib/connection-manager";
 import { AdminAuthProvider } from "@/components/admin/AdminAuthProvider";
 import { useAuthService } from "@/services/auth";
-import { useAuthState } from "react-firebase-hooks/auth";
 
 // Lazy load pages
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -155,7 +154,6 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Keep AdminAuthProvider for admin authentication */}
       <AdminAuthProvider sessionTimeout={15 * 60}>
         <div className="min-h-screen flex flex-col">
           <Navbar />
@@ -181,11 +179,6 @@ function App() {
                 </Route>
 
                 {/* Protected Routes with Role Verification */}
-                {/* 
-                  These routes are now protected by both:
-                  1. PrivateRoute - Ensures user is authenticated
-                  2. Internal role verification - Each dashboard component now verifies correct role
-                */}
                 <Route path="/dashboard/consumer">
                   <PrivateRoute component={ConsumerDashboard} />
                 </Route>
