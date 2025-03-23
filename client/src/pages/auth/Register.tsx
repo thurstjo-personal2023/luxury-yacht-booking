@@ -20,9 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import { auth } from "@/lib/firebase";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { sendWelcomeEmail } from "@/services/email-service";
+// Removed direct Firebase imports in favor of service-based approach
 
 /**
  * User role enum for registration
@@ -80,115 +78,61 @@ export default function Register() {
     },
   });
 
-  // Function to update profile data once user is created
-  const updateProfileDetails = async (token: string, data: RegisterForm, roleValue: string) => {
-    try {
-      const updateEndpoint = data.role === UserRole.CONSUMER
-        ? '/api/user/update-tourist-profile'
-        : '/api/user/update-provider-profile';
-      
-      const phoneNumber = data.phone;
-      
-      const updateData = data.role === UserRole.CONSUMER
-        ? {
-            preferences: [],
-            loyaltyTier: 'Bronze',
-            phoneNumber: phoneNumber
-          }
-        : {
-            businessName: `${data.firstName} ${data.lastName}'s Business`,
-            servicesOffered: [],
-            contactInformation: {
-              address: '',
-              phone: phoneNumber
-            }
-          };
-      
-      const updateResponse = await fetch(updateEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(updateData)
-      });
-      
-      if (!updateResponse.ok) {
-        console.warn(`Profile update warning: ${updateResponse.status} ${updateResponse.statusText}`);
-        return false;
-      }
-      
-      return true;
-    } catch (error) {
-      console.error('Error updating profile details:', error);
-      return false;
-    }
-  };
+  // Profile detail updates are now handled by the registration service in a clean architecture approach
 
   const onSubmit = async (data: RegisterForm) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      console.log("Registering user with Firebase Auth and creating profile in Production Firestore...");
+      // Import the registration service
+      const { registerUser, updateRoleSpecificProfile, redirectAfterRegistration } = await import('@/services/registration-service');
+      const { sendWelcomeEmail } = await import('@/services/email-service');
       
-      // Convert role enum to string value to match what the server expects
+      console.log("Register component: Starting registration process...");
+      
+      // Convert role enum to UserRoleType string
       const roleValue = data.role === UserRole.CONSUMER ? 'consumer' :
                         data.role === UserRole.PRODUCER ? 'producer' : 
                         'partner';
       
-      const fullName = `${data.firstName} ${data.lastName}`;
-                    
-      // Register the user with Firebase Auth directly (no context dependency)
-      console.log('Registering user with Firebase Auth directly');
-      
-      // Step 1: Create the user in Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        data.email, 
-        data.password
-      );
-      
-      const user = userCredential.user;
-      console.log('User created successfully in Firebase Auth');
-      
-      // Step 2: Update the user's display name
-      await updateProfile(user, { displayName: fullName });
-      console.log('User profile display name updated');
-      
-      // Step 3: Get a fresh auth token for API requests
-      const token = await user.getIdToken(true);
-      localStorage.setItem('authToken', token);
-      console.log('Fresh auth token obtained and stored');
-      
-      // Step 4: Create the user profile in Firestore via the API
-      console.log('Creating user profile in Firestore via API');
-      
-      const createProfileResponse = await fetch('/api/user/create-profile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          name: fullName,
-          email: data.email,
-          role: roleValue,
-          phone: data.phone
-        })
+      // Call the registration service to handle the core registration
+      const registrationResult = await registerUser({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        password: data.password,
+        phone: data.phone,
+        role: roleValue as 'consumer' | 'producer' | 'partner',
+        businessName: data.role !== UserRole.CONSUMER ? `${data.firstName} ${data.lastName}'s Business` : undefined
       });
       
-      if (!createProfileResponse.ok) {
-        throw new Error(`Failed to create user profile: ${createProfileResponse.status} ${createProfileResponse.statusText}`);
+      if (!registrationResult.success) {
+        throw new Error(registrationResult.message || 'Registration failed');
       }
       
-      console.log('User profile created successfully in Firestore');
+      console.log('Register component: Base registration successful');
       
-      // Update additional profile details
-      const profileUpdateSuccess = await updateProfileDetails(token, data, roleValue);
+      if (!registrationResult.user?.token) {
+        throw new Error('Authentication token not available after registration');
+      }
       
-      if (!profileUpdateSuccess) {
-        console.warn("Failed to update additional profile details, but user account was created");
+      // Update role-specific profile details
+      const profileUpdateResult = await updateRoleSpecificProfile(
+        registrationResult.user.token,
+        {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          password: data.password,
+          phone: data.phone,
+          role: roleValue as 'consumer' | 'producer' | 'partner',
+          businessName: data.role !== UserRole.CONSUMER ? `${data.firstName} ${data.lastName}'s Business` : undefined
+        }
+      );
+      
+      if (!profileUpdateResult.success) {
+        console.warn("Register component: Failed to update role-specific profile details, but user account was created");
         
         toast({
           title: "Registration successful!",
@@ -196,7 +140,7 @@ export default function Register() {
           duration: 5000,
         });
       } else {
-        console.log("Successfully updated profile details");
+        console.log("Register component: Successfully updated role-specific profile details");
         
         toast({
           title: "Registration successful!",
@@ -207,23 +151,31 @@ export default function Register() {
       
       // Send welcome email
       try {
-        console.log('Sending welcome email...');
+        console.log('Register component: Sending welcome email...');
         const businessName = data.role === UserRole.CONSUMER ? undefined : 
                             `${data.firstName} ${data.lastName}'s Business`;
                             
         await sendWelcomeEmail(data.email, `${data.firstName} ${data.lastName}`, roleValue as 'consumer' | 'producer' | 'partner', businessName);
-        console.log('Welcome email sent successfully');
+        console.log('Register component: Welcome email sent successfully');
       } catch (emailError) {
-        console.warn('Could not send welcome email, but registration was successful:', emailError);
+        console.warn('Register component: Could not send welcome email, but registration was successful:', emailError);
       }
 
-      // Role-based redirection
-      const dashboardRoutes = {
-        [UserRole.CONSUMER]: "/dashboard/consumer",
-        [UserRole.PRODUCER]: "/dashboard/producer",
-        [UserRole.PARTNER]: "/dashboard/partner",
-      };
-      setLocation(dashboardRoutes[data.role]);
+      // Redirect user to the appropriate dashboard based on role
+      console.log(`Register component: Redirecting to dashboard for role ${roleValue}`);
+      const redirectSuccess = await redirectAfterRegistration(roleValue as 'consumer' | 'producer' | 'partner');
+      
+      if (!redirectSuccess) {
+        console.warn(`Register component: Could not redirect automatically, falling back to manual redirect`);
+        
+        // Manual fallback redirection if the service fails
+        const dashboardRoutes = {
+          [UserRole.CONSUMER]: "/dashboard/consumer",
+          [UserRole.PRODUCER]: "/dashboard/producer",
+          [UserRole.PARTNER]: "/dashboard/partner",
+        };
+        setLocation(dashboardRoutes[data.role]);
+      }
     } catch (error: any) {
       setError(error.message);
       toast({
