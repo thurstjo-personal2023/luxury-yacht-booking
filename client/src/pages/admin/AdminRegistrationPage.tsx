@@ -220,7 +220,7 @@ const AdminRegistrationPage: React.FC = () => {
       });
       
       // Redirect to email verification page
-      navigate('/admin/verify-email');
+      navigate(`/admin-email-verification/${userCredential.user.uid}`);
       
     } catch (error: any) {
       console.error('Registration error:', error);
@@ -283,7 +283,7 @@ const AdminRegistrationPage: React.FC = () => {
             </p>
           </CardContent>
           <CardFooter>
-            <Button variant="outline" className="w-full" onClick={() => navigate('/admin/login')}>
+            <Button variant="outline" className="w-full" onClick={() => navigate('/admin-login')}>
               Go to Admin Login
             </Button>
           </CardFooter>
@@ -475,11 +475,11 @@ const AdminRegistrationPage: React.FC = () => {
           <p className="text-sm text-muted-foreground">
             Already have an account?{' '}
             <a 
-              href="/admin/login" 
+              href="/admin-login" 
               className="text-primary font-medium hover:underline"
               onClick={(e) => {
                 e.preventDefault();
-                navigate('/admin/login');
+                navigate('/admin-login');
               }}
             >
               Sign In

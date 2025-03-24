@@ -32,6 +32,12 @@ const RoleDebugPage = lazy(() => import("@/pages/debug/RoleDebugPage"));
 const TestBundling = lazy(() => import("@/pages/test-bundling"));
 const AuthTestPage = lazy(() => import("@/pages/AuthTestPage"));
 
+// Admin Registration Pages
+const AdminRegistrationPage = lazy(() => import("@/pages/admin/AdminRegistrationPage"));
+const EmailVerificationPage = lazy(() => import("@/pages/admin/EmailVerificationPage"));
+const PhoneVerificationPage = lazy(() => import("@/pages/admin/PhoneVerificationPage"));
+const PendingApprovalPage = lazy(() => import("@/pages/admin/PendingApprovalPage"));
+
 // Partner Dashboard Pages
 const PartnerProfile = lazy(() => import("@/pages/dashboard/partner/PartnerProfile"));
 const PartnerAddOns = lazy(() => import("@/pages/dashboard/partner/AddOns"));
@@ -244,6 +250,12 @@ function App() {
                   <Route path="/admin-mfa-setup" component={AdminMfaSetup} />
                   <Route path="/admin-mfa-verify" component={AdminMfaVerify} />
                   <Route path="/admin-dashboard" component={SecureAdminDashboard} />
+                    
+                  {/* Admin Registration Flow Routes */}
+                  <Route path="/admin-registration/:inviteCode" component={AdminRegistrationPage} />
+                  <Route path="/admin-email-verification/:userId" component={EmailVerificationPage} />
+                  <Route path="/admin-phone-verification/:userId" component={PhoneVerificationPage} />
+                  <Route path="/admin-pending-approval/:userId" component={PendingApprovalPage} />
                     
                   {/* Debug Tools */}
                   <Route path="/debug/role">

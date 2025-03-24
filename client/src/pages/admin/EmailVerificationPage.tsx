@@ -34,7 +34,7 @@ const EmailVerificationPage: React.FC = () => {
       
       if (!currentUser) {
         // No user is signed in, redirect to login
-        navigate('/admin/login');
+        navigate('/admin-login');
         return;
       }
       
