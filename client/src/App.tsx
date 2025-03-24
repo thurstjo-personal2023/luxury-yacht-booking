@@ -39,6 +39,10 @@ const PhoneVerificationPage = lazy(() => import("@/pages/admin/PhoneVerification
 const PendingApprovalPage = lazy(() => import("@/pages/admin/PendingApprovalPage"));
 const AdminApprovalPage = lazy(() => import("@/pages/admin/AdminApprovalPage"));
 
+// Admin MFA Pages
+const MfaSetupPage = lazy(() => import("@/pages/admin/MfaSetupPage"));
+const MfaOptionsPage = lazy(() => import("@/pages/admin/MfaOptionsPage"));
+
 // Partner Dashboard Pages
 const PartnerProfile = lazy(() => import("@/pages/dashboard/partner/PartnerProfile"));
 const PartnerAddOns = lazy(() => import("@/pages/dashboard/partner/AddOns"));
@@ -65,7 +69,7 @@ const PubSubValidation = lazy(() => import("@/pages/admin/PubSubValidation"));
 // Secure Admin Portal
 const SecureAdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard"));
 const AdminLogin = lazy(() => import("@/pages/admin/AdminLogin"));
-const AdminMfaSetup = lazy(() => import("@/pages/admin/MfaSetup"));
+const AdminMfaSetupPage = lazy(() => import("@/pages/admin/MfaSetup"));
 const AdminMfaVerify = lazy(() => import("@/pages/admin/MfaVerify"));
 
 // Loading component
@@ -248,7 +252,8 @@ function App() {
                     
                   {/* Secure Admin Portal Routes */}
                   <Route path="/admin-login" component={AdminLogin} />
-                  <Route path="/admin-mfa-setup/:uid" component={AdminMfaSetup} />
+                  <Route path="/admin-mfa-setup/:uid" component={AdminMfaSetupPage} />
+                  <Route path="/admin-mfa-options/:uid" component={MfaOptionsPage} />
                   <Route path="/admin-mfa-verify" component={AdminMfaVerify} />
                   <Route path="/admin-dashboard" component={SecureAdminDashboard} />
                     

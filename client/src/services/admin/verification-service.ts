@@ -20,6 +20,9 @@ export interface VerificationStatus {
   approvedBy?: string;
   isMfaEnabled: boolean;
   mfaEnabledAt?: string;
+  mfaType?: 'phone' | 'totp';
+  totpMfaEnabled?: boolean;
+  phoneMfaEnabled?: boolean;
   registrationComplete: boolean;
 }
 
@@ -36,6 +39,9 @@ export async function getVerificationStatus(uid: string): Promise<VerificationSt
       isPhoneVerified: false,
       isApproved: false,
       isMfaEnabled: false,
+      totpMfaEnabled: false,
+      phoneMfaEnabled: false,
+      mfaType: undefined,
       registrationComplete: false
     };
   } catch (error) {
@@ -138,6 +144,74 @@ export async function updateMfaStatus(uid: string, enabled: boolean): Promise<vo
 }
 
 /**
+ * Generate TOTP secret for authenticator app
+ * @param userId User ID
+ * @returns Secret, QR code URL, and backup codes
+ */
+export async function generateTotpSecret(userId: string): Promise<{
+  success: boolean;
+  secret: string;
+  qrCodeUrl: string;
+  backupCodes: string[];
+}> {
+  try {
+    const response = await axios.post('/api/admin/generate-totp-secret', {
+      userId,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error generating TOTP secret:', error);
+    throw error;
+  }
+}
+
+/**
+ * Verify TOTP code
+ * @param userId User ID
+ * @param otp OTP code from authenticator app
+ * @param secret Secret (optional, will use stored secret if not provided)
+ * @returns Success status
+ */
+export async function verifyTotpCode(userId: string, otp: string, secret?: string): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  try {
+    const response = await axios.post('/api/admin/verify-totp', {
+      userId,
+      otp,
+      secret,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error verifying TOTP code:', error);
+    throw error;
+  }
+}
+
+/**
+ * Verify backup code
+ * @param userId User ID
+ * @param backupCode Backup code
+ * @returns Success status
+ */
+export async function verifyBackupCode(userId: string, backupCode: string): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  try {
+    const response = await axios.post('/api/admin/verify-backup-code', {
+      userId,
+      backupCode,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error verifying backup code:', error);
+    throw error;
+  }
+}
+
+/**
  * Get next step in verification process
  * @param status Verification status
  * @returns Next step route
@@ -156,7 +230,8 @@ export function getNextVerificationStep(status: VerificationStatus, uid: string)
   }
   
   if (!status.isMfaEnabled) {
-    return `/admin-mfa-setup/${uid}`;
+    // Use the new MFA options page instead of the basic MFA setup
+    return `/admin-mfa-options/${uid}`;
   }
   
   return `/admin-dashboard`;

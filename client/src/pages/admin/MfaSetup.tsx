@@ -31,7 +31,12 @@ const otpSchema = z.object({
 type PhoneFormValues = z.infer<typeof phoneSchema>;
 type OtpFormValues = z.infer<typeof otpSchema>;
 
-export default function MfaSetup() {
+export interface MfaSetupPageProps {
+  uid?: string;
+  onComplete?: (success: boolean) => void;
+}
+
+export default function MfaSetupPage({ uid: propUid, onComplete }: MfaSetupPageProps) {
   const [stage, setStage] = useState<'phone' | 'verification'>('phone');
   const [verificationId, setVerificationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,7 +45,7 @@ export default function MfaSetup() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const params = useParams<{ uid: string }>();
-  const uid = params?.uid;
+  const uid = propUid || params?.uid;
   
   // Get returnUrl from query parameters
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
@@ -170,8 +175,13 @@ export default function MfaSetup() {
           description: 'Two-factor authentication has been enabled for your account.',
         });
         
-        // Redirect to returnUrl or dashboard
-        setLocation(returnUrl);
+        // Call onComplete callback if provided
+        if (onComplete) {
+          onComplete(true);
+        } else {
+          // Otherwise redirect to returnUrl or dashboard
+          setLocation(returnUrl);
+        }
       } else {
         toast({
           title: 'Verification Failed',
@@ -317,6 +327,19 @@ export default function MfaSetup() {
     </Form>
   );
 
+  // Check if the component is being used by MfaOptionsPage
+  const isEmbedded = Boolean(onComplete);
+  
+  // Embedded mode (inside MfaOptionsPage)
+  if (isEmbedded) {
+    return (
+      <div>
+        {stage === 'phone' ? renderPhoneStage() : renderVerificationStage()}
+      </div>
+    );
+  }
+  
+  // Standalone mode
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
       <Card className="w-full max-w-md shadow-lg">
