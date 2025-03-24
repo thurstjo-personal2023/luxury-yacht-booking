@@ -343,10 +343,48 @@ router.post('/api/admin/update-mfa-status', async (req: Request, res: Response) 
     // Update admin profile
     await adminProfileRef.update(updateData);
     
+    // If registration is now complete, update harmonized user record
+    if (updateData.registrationComplete) {
+      // Get harmonized user record
+      const harmonizedUserRef = adminDb.collection('harmonized_users').doc(uid);
+      const harmonizedUserDoc = await harmonizedUserRef.get();
+      
+      if (harmonizedUserDoc.exists) {
+        // Update harmonized user record
+        await harmonizedUserRef.update({
+          adminStatus: 'active',
+          mfaEnabled: true,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Create harmonized user record if it doesn't exist
+        // This is a fallback and shouldn't normally happen at this stage
+        await harmonizedUserRef.set({
+          id: uid,
+          userId: uid,
+          name: `${adminProfile?.firstName || ''} ${adminProfile?.lastName || ''}`.trim(),
+          email: adminProfile?.email || '',
+          phone: adminProfile?.phoneNumber || '',
+          role: 'admin',
+          isAdmin: true,
+          adminRole: adminProfile?.role?.toUpperCase() || 'ADMIN',
+          adminStatus: 'active',
+          adminDepartment: adminProfile?.department || '',
+          adminPosition: adminProfile?.position || '',
+          mfaEnabled: true,
+          emailVerified: true,
+          points: 0,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+    }
+    
     return res.json({
       success: true,
       message: 'MFA status updated successfully',
       mfaEnabled: isMfaEnabled === true,
+      registrationComplete: !!updateData.registrationComplete,
     });
   } catch (error: any) {
     console.error('Error updating MFA status:', error);

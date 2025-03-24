@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'wouter';
+import { useLocation, useParams } from 'wouter';
 import { Shield, Smartphone, ArrowLeft } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminAuth } from '@/hooks/use-admin-auth';
+import { getVerificationStatus, updateMfaStatus, getNextVerificationStep } from '@/services/admin/verification-service';
 
 // Setup verification schema
 const phoneSchema = z.object({
@@ -34,13 +35,16 @@ export default function MfaSetup() {
   const [stage, setStage] = useState<'phone' | 'verification'>('phone');
   const [verificationId, setVerificationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<any>(null);
   const { adminUser, setupMfa, confirmMfaSetup, error } = useAdminAuth();
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
+  const params = useParams<{ uid: string }>();
+  const uid = params?.uid;
   
   // Get returnUrl from query parameters
-  const params = new URLSearchParams(location.split('?')[1] || '');
-  const returnUrl = params.get('returnUrl') || '/admin-dashboard';
+  const urlParams = new URLSearchParams(location.split('?')[1] || '');
+  const returnUrl = urlParams.get('returnUrl') || '/admin-dashboard';
   
   // Initialize phone form with React Hook Form
   const phoneForm = useForm<PhoneFormValues>({
@@ -58,13 +62,56 @@ export default function MfaSetup() {
     },
   });
 
-  // Check if user is authenticated
+  // Check verification status
   useEffect(() => {
-    if (!adminUser && !localStorage.getItem('adminSessionActive')) {
-      // No admin user, redirect to login
-      setLocation('/admin-login');
+    async function checkStatus() {
+      try {
+        setIsLoading(true);
+        
+        if (uid) {
+          // Get verification status to check if we should be on this page
+          const verificationStatus = await getVerificationStatus(uid);
+          setStatus(verificationStatus);
+          
+          // Check if the user is approved and ready for MFA setup
+          if (!verificationStatus.isApproved) {
+            // Redirect to the correct verification step
+            const nextStep = getNextVerificationStep(verificationStatus, uid);
+            setLocation(nextStep);
+            return;
+          }
+          
+          // Check if MFA is already enabled
+          if (verificationStatus.isMfaEnabled) {
+            toast({
+              title: 'MFA Already Enabled',
+              description: 'Multi-Factor Authentication is already set up for your account.',
+            });
+            
+            // Redirect to dashboard after a delay
+            setTimeout(() => {
+              setLocation('/admin-dashboard');
+            }, 2000);
+            return;
+          }
+        } else if (!adminUser && !localStorage.getItem('adminSessionActive')) {
+          // No user ID and not logged in, redirect to login
+          setLocation('/admin-login');
+        }
+      } catch (error) {
+        console.error('Error checking verification status:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to check verification status',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
     }
-  }, [adminUser]);
+    
+    checkStatus();
+  }, [uid, adminUser]);
   
   // Handle phone form submission
   const onPhoneSubmit = async (values: PhoneFormValues) => {
@@ -106,6 +153,18 @@ export default function MfaSetup() {
       const success = await confirmMfaSetup(values.otp);
       
       if (success) {
+        // Update MFA status in backend for admin registration flow
+        if (uid) {
+          try {
+            await updateMfaStatus(uid, true);
+            console.log('MFA status updated in backend for user:', uid);
+          } catch (error) {
+            console.error('Error updating MFA status in backend:', error);
+            // Continue with successful flow even if backend update fails
+            // The user can still log in, but may need to set up MFA again later
+          }
+        }
+        
         toast({
           title: 'MFA Setup Complete',
           description: 'Two-factor authentication has been enabled for your account.',

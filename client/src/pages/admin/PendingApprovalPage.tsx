@@ -5,8 +5,9 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, AlertTriangle, Bell } from 'lucide-react';
 import { getApprovalStatus, getVerificationStatus } from '@/services/admin/verification-service';
+import { createApprovalRequestedNotification } from '@/services/notifications/admin-notification-service';
 
 interface ApprovalStatus {
   status: 'pending' | 'approved' | 'rejected';
@@ -88,6 +89,20 @@ const PendingApprovalPage: React.FC = () => {
       const response = await getApprovalStatus(uid);
       
       setApprovalStatus(response);
+      
+      // If status is pending and it's a fresh check (no previous status),
+      // send a notification to super admins
+      if (response.status === 'pending' && !approvalStatus) {
+        try {
+          await createApprovalRequestedNotification(
+            uid, 
+            user?.displayName || 'New Administrator'
+          );
+        } catch (error) {
+          console.error('Failed to create approval notification:', error);
+          // Continue execution; this is not critical
+        }
+      }
       
       // If approved, redirect to MFA setup
       if (response.status === 'approved') {

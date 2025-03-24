@@ -248,7 +248,7 @@ function App() {
                     
                   {/* Secure Admin Portal Routes */}
                   <Route path="/admin-login" component={AdminLogin} />
-                  <Route path="/admin-mfa-setup" component={AdminMfaSetup} />
+                  <Route path="/admin-mfa-setup/:uid" component={AdminMfaSetup} />
                   <Route path="/admin-mfa-verify" component={AdminMfaVerify} />
                   <Route path="/admin-dashboard" component={SecureAdminDashboard} />
                     
