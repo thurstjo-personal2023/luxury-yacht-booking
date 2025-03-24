@@ -146,6 +146,135 @@ export const checkIpWhitelist = async (req: Request, res: Response, next: NextFu
  */
 export function registerAdminAuthRoutes(app: Express) {
   /**
+   * Special Route: Initialize Super Admin Account
+   * WARNING: This route is only for development and testing purposes.
+   * It should be removed or protected in production.
+   */
+  app.post('/api/init-super-admin', async (req: Request, res: Response) => {
+    try {
+      // Only allow in development to prevent accidental use in production
+      if (process.env.NODE_ENV === 'production') {
+        console.warn("Attempt to call init-super-admin endpoint in production");
+        return res.status(403).json({ 
+          error: 'Forbidden',
+          message: 'This endpoint is only available in development mode'
+        });
+      }
+
+      const { email, firstName, lastName, password } = req.body;
+
+      if (!email || !firstName || !lastName || !password) {
+        return res.status(400).json({ 
+          error: 'Bad Request',
+          message: 'Missing required fields'
+        });
+      }
+
+      console.log(`Creating initial Super Admin account for ${email}...`);
+      
+      // Import Auth from firebase-admin
+      const { getAuth } = await import('firebase-admin/auth');
+      const adminAuth = getAuth();
+      
+      // Check if user already exists in Auth
+      let userRecord;
+      try {
+        userRecord = await adminAuth.getUserByEmail(email);
+        console.log(`User ${email} already exists with UID: ${userRecord.uid}`);
+      } catch (error) {
+        // User doesn't exist, create new user
+        userRecord = await adminAuth.createUser({
+          email,
+          password,
+          displayName: `${firstName} ${lastName}`,
+          emailVerified: true // Auto-verify for Super Admin
+        });
+        console.log(`Created new user ${email} with UID: ${userRecord.uid}`);
+      }
+      
+      // Set custom claims for SUPER_ADMIN role
+      await adminAuth.setCustomUserClaims(userRecord.uid, {
+        role: 'admin',
+        adminRole: 'SUPER_ADMIN',
+        isAdmin: true
+      });
+      console.log(`Set custom claims for user ${email}`);
+      
+      // Create or update admin profile
+      const adminProfileRef = adminDb.collection('admin_profiles').doc(userRecord.uid);
+      const adminProfileDoc = await adminProfileRef.get();
+      
+      const now = Timestamp.now();
+      
+      if (adminProfileDoc.exists) {
+        // Update existing profile
+        await adminProfileRef.update({
+          firstName,
+          lastName,
+          email,
+          role: 'SUPER_ADMIN',
+          department: 'Executive',
+          position: 'CEO',
+          status: 'active',
+          updatedAt: now
+        });
+        console.log(`Updated existing admin profile for ${email}`);
+      } else {
+        // Create new admin profile
+        await adminProfileRef.set({
+          firstName,
+          lastName,
+          email,
+          role: 'SUPER_ADMIN',
+          department: 'Executive',
+          position: 'CEO',
+          status: 'active',
+          approved: true,
+          approvedBy: 'system',
+          approvedAt: now,
+          createdAt: now,
+          updatedAt: now,
+          mfaRequired: true,
+          mfaSetup: false
+        });
+        console.log(`Created new admin profile for ${email}`);
+      }
+      
+      // Create verification document
+      const verificationRef = adminDb.collection('admin_verifications').doc(userRecord.uid);
+      const verificationDoc = await verificationRef.get();
+      
+      if (!verificationDoc.exists) {
+        await verificationRef.set({
+          userId: userRecord.uid,
+          emailVerified: true,
+          phoneVerified: false,
+          createdAt: now,
+          updatedAt: now
+        });
+        console.log(`Created verification document for ${email}`);
+      }
+      
+      // Return success with user info
+      return res.json({
+        success: true,
+        message: 'Super Admin account created successfully',
+        user: {
+          uid: userRecord.uid,
+          email: userRecord.email,
+          role: 'SUPER_ADMIN'
+        }
+      });
+      
+    } catch (error: any) {
+      console.error('Error creating Super Admin account:', error);
+      return res.status(500).json({
+        error: 'Internal Server Error',
+        message: error.message || 'Failed to create Super Admin account'
+      });
+    }
+  });
+  /**
    * Admin login audit endpoint
    * Records successful login attempts and updates last login timestamp
    */
