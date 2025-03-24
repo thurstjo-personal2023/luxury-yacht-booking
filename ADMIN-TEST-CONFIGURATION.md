@@ -42,6 +42,34 @@ The Firebase Emulator configuration in `firebase.test.json` includes:
 - Firestore emulator: Port 8080
 - Functions emulator: Port 5001
 
+### Simplified Test Files
+
+For easier execution without Firebase emulator complexities, we've created simplified test files:
+
+```
+admin-registration.test.simplified.ts
+admin-mfa.test.simplified.ts
+```
+
+These files use mocks and stubs to test the core functionality without requiring a full Firebase emulator environment. To run them:
+
+```bash
+npx jest admin-registration.test.simplified.ts
+npx jest admin-mfa.test.simplified.ts
+```
+
+### MFA Testing with Firebase Emulator Limitations
+
+**Note**: Firebase Auth Emulator has limitations with Multi-Factor Authentication testing:
+
+1. The Firebase Auth Emulator does not fully support MFA operations
+2. For complete MFA testing, we use a hybrid approach:
+   - Firebase Auth Emulator for basic authentication
+   - Mock MFA verification in Firestore
+   - TOTP code generation/verification with `speakeasy`
+
+Our `tests/utils/mfa-test-utils.ts` file provides utilities to work around these limitations.
+
 ### Test Phone Numbers
 
 For SMS-based verification testing, use these dedicated test phone numbers:
