@@ -17,13 +17,13 @@ interface AdminRouteProps {
 }
 
 export function AdminRoute({ children, requiresMfa = true }: AdminRouteProps) {
-  const [isLoading, setIsLoading] = useState(true);
-  const { adminUser, loading } = useAdminAuth();
+  const [routeLoading, setRouteLoading] = useState(true);
+  const { adminUser, isLoading } = useAdminAuth();
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
     // Wait for admin auth to initialize
-    if (loading) {
+    if (isLoading) {
       return;
     }
     
@@ -42,11 +42,11 @@ export function AdminRoute({ children, requiresMfa = true }: AdminRouteProps) {
     }
     
     // Authentication and MFA checks passed
-    setIsLoading(false);
-  }, [adminUser, loading, setLocation, location, requiresMfa]);
+    setRouteLoading(false);
+  }, [adminUser, isLoading, setLocation, location, requiresMfa]);
 
   // Show loading spinner while checking authentication
-  if (loading || isLoading) {
+  if (isLoading || routeLoading) {
     return <AdminLoadingSpinner />;
   }
 

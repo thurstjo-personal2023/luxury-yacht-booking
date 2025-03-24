@@ -35,7 +35,7 @@ import { ServiceProviderProfile, YachtExperience, Review, ProducerBooking } from
 export default function ProducerDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { user, profileData, isLoading: loading } = useAuthService();
+  const { user, profileData, isLoading } = useAuthService();
   const userRole = profileData?.harmonizedUser?.role || 'producer';
   const [activeTab, setActiveTab] = useState("overview");
   const [profileCompletion, setProfileCompletion] = useState(0);
@@ -58,7 +58,7 @@ export default function ProducerDashboard() {
   useEffect(() => {
     const checkProducerAccessAndFetchProfile = async () => {
       // If still loading auth state, wait
-      if (loading) {
+      if (isLoading) {
         return;
       }
       
