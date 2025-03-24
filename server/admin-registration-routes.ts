@@ -296,6 +296,67 @@ router.post('/api/admin/update-verification-status', async (req: Request, res: R
   }
 });
 
+// Update MFA status
+router.post('/api/admin/update-mfa-status', async (req: Request, res: Response) => {
+  try {
+    const { uid, isMfaEnabled } = req.body;
+    
+    if (!uid) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required',
+      });
+    }
+    
+    // Get admin profile
+    const adminProfileRef = adminDb.collection('admin_profiles').doc(uid);
+    const adminProfileDoc = await adminProfileRef.get();
+    
+    if (!adminProfileDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin profile not found',
+      });
+    }
+    
+    const adminProfile = adminProfileDoc.data();
+    
+    // Update MFA status
+    const updateData: Record<string, any> = {
+      mfaEnabled: isMfaEnabled === true,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    
+    // If MFA is now enabled, add timestamp and check if the registration is now complete
+    if (isMfaEnabled === true) {
+      updateData.mfaEnabledAt = FieldValue.serverTimestamp();
+      
+      // Check if the admin has been approved and has verified email and phone
+      if (adminProfile?.approvalStatus === 'approved' && 
+          adminProfile?.isEmailVerified === true && 
+          adminProfile?.isPhoneVerified === true) {
+        updateData.status = 'active';
+        updateData.registrationComplete = true;
+      }
+    }
+    
+    // Update admin profile
+    await adminProfileRef.update(updateData);
+    
+    return res.json({
+      success: true,
+      message: 'MFA status updated successfully',
+      mfaEnabled: isMfaEnabled === true,
+    });
+  } catch (error: any) {
+    console.error('Error updating MFA status:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update MFA status',
+    });
+  }
+});
+
 // Get admin profile
 router.get('/api/admin/profile/:uid', async (req: Request, res: Response) => {
   try {
