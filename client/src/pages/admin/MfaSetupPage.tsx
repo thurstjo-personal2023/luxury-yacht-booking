@@ -121,7 +121,7 @@ const MfaSetupPage: React.FC = () => {
         }
         
         // Check if the user already has multifactor auth enabled
-        if (currentUser.multiFactor?.enrolledFactors?.length > 0) {
+        if ((currentUser as any).multiFactor?.enrolledFactors?.length > 0) {
           // Update the status in backend to reflect MFA is set up
           await updateMfaStatus(currentUser.uid, true);
           
@@ -177,7 +177,7 @@ const MfaSetupPage: React.FC = () => {
     
     try {
       // Start enrolling a new second factor with a phone number
-      const session = await user.multiFactor.getSession();
+      const session = await (user as any).multiFactor.getSession();
       
       // Specify the phone number and pass the verification ID
       const phoneInfoOptions = {
@@ -245,7 +245,7 @@ const MfaSetupPage: React.FC = () => {
       
       // Complete enrollment of the second factor with the verification credential
       const multiFactorAssertion = PhoneMultiFactorGenerator.assertion(cred);
-      await user.multiFactor.enroll(multiFactorAssertion, "Mobile Phone");
+      await (user as any).multiFactor.enroll(multiFactorAssertion, "Mobile Phone");
       
       // Update MFA status in the backend
       await updateMfaStatus(user.uid, true);
