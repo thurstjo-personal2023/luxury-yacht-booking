@@ -135,7 +135,7 @@ export default function ProducerDashboard() {
     };
     
     checkProducerAccessAndFetchProfile();
-  }, [user, userRole, loading, setLocation, toast]);
+  }, [user, userRole, isLoading, setLocation, toast]);
   
   // Calculate dashboard statistics
   const totalBookings = bookings?.length || 0;
