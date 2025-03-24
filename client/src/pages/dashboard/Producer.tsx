@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuthService } from "@/services/auth/use-auth-service";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,8 @@ import { ServiceProviderProfile, YachtExperience, Review, ProducerBooking } from
 export default function ProducerDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { user, userRole, loading } = useAuth();
+  const { user, profileData, isLoading: loading } = useAuthService();
+  const userRole = profileData?.harmonizedUser?.role || 'producer';
   const [activeTab, setActiveTab] = useState("overview");
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [producerProfile, setProducerProfile] = useState<ServiceProviderProfile | null>(null);

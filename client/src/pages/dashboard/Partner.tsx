@@ -32,13 +32,14 @@ import {
   usePartnerAddons,
   useServiceAnalytics
 } from "@/hooks/partner/usePartnerQueries";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuthService } from "@/services/auth/use-auth-service";
 import { PartnerAnalytics } from "@/components/partner/PartnerAnalytics";
 import { useToast } from "@/hooks/use-toast";
 
 export default function PartnerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
-  const { user, userRole } = useAuth();
+  const { user, profileData } = useAuthService();
+  const userRole = profileData?.harmonizedUser?.role || 'partner';
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   

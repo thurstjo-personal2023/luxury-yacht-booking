@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { YachtExperience } from "@shared/firestore-schema";
 import { getDocs, query, where, limit, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuthService } from "@/services/auth/use-auth-service";
 import { DateRange } from "react-day-picker";
 import { Progress } from "@/components/ui/progress";
 import { PlacesAutocomplete } from "@/components/ui/places-autocomplete";
@@ -78,7 +78,8 @@ const durations = [
 
 export default function ConsumerDashboard() {
   const { toast } = useToast();
-  const { user, userRole } = useAuth();
+  const { user, profileData } = useAuthService();
+  const userRole = profileData?.harmonizedUser?.role || 'consumer';
   
   // Role verification - ensure user has consumer role
   useEffect(() => {
