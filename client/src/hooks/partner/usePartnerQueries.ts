@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuthService } from '@/services/auth/use-auth-service';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ServiceProviderProfile, 
@@ -27,7 +27,7 @@ interface EarningsResponse {
  * Hook for fetching partner profile data
  */
 export function usePartnerProfile() {
-  const { user } = useAuth();
+  const { user, profileData } = useAuthService();
   
   return useQuery({
     queryKey: ['/api/partner/profile'],
@@ -45,7 +45,7 @@ export function usePartnerProfile() {
       
       return await response.json() as PartnerProfileResponse;
     },
-    enabled: !!user && user?.role === 'partner',
+    enabled: !!user && profileData?.harmonizedUser?.role === 'partner',
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
@@ -105,7 +105,7 @@ export function useUpdatePartnerProfile() {
  * Hook for fetching partner's add-ons
  */
 export function usePartnerAddons() {
-  const { user } = useAuth();
+  const { user, profileData } = useAuthService();
   
   return useQuery({
     queryKey: ['/api/partner/addons'],
@@ -192,7 +192,7 @@ export function useCreateAddon() {
  * Hook for fetching partner bookings
  */
 export function usePartnerBookings() {
-  const { user } = useAuth();
+  const { user, profileData } = useAuthService();
   
   return useQuery({
     queryKey: ['/api/partner/bookings'],
@@ -219,7 +219,7 @@ export function usePartnerBookings() {
  * Hook for fetching partner earnings data
  */
 export function usePartnerEarnings() {
-  const { user } = useAuth();
+  const { user, profileData } = useAuthService();
   
   return useQuery({
     queryKey: ['/api/partner/earnings'],
@@ -257,7 +257,7 @@ export function useServiceAnalytics(options?: {
   endDate?: Date;
   aggregateBy?: 'day' | 'week' | 'month';
 }) {
-  const { user } = useAuth();
+  const { user, profileData } = useAuthService();
   
   // Create query parameters
   const queryParams = new URLSearchParams();
