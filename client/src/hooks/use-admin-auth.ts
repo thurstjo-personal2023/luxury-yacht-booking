@@ -14,11 +14,11 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   User as FirebaseUser,
-  onAuthStateChanged,
   setPersistence,
   browserLocalPersistence
 } from 'firebase/auth';
 import { doc, getDoc, getFirestore, updateDoc } from 'firebase/firestore';
+import { authService } from '@/services/auth/auth-service';
 
 // Admin user type with additional fields
 interface AdminUser {
@@ -83,9 +83,14 @@ export function AdminAuthProvider({
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  // Listen for Firebase auth state changes
+  // Listen for auth state changes using the centralized authService
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    console.log('AdminAuthProvider: Setting up auth state listener via authService');
+    
+    // Use the centralized authService for auth state changes
+    const unsubscribe = authService.onAuthStateChanged(async (user) => {
+      console.log('AdminAuthProvider: Auth state changed:', user ? 'User signed in' : 'User signed out');
+      
       if (user) {
         try {
           // Check if user is an admin
@@ -93,6 +98,7 @@ export function AdminAuthProvider({
           
           if (userDoc.exists()) {
             const userData = userDoc.data();
+            console.log('AdminAuthProvider: User is an admin, setting up admin session');
             
             // Set session flag in localStorage
             localStorage.setItem('adminSessionActive', 'true');
@@ -111,17 +117,19 @@ export function AdminAuthProvider({
               lastActivityAt: userData.lastActivityAt
             });
           } else {
-            // User is not an admin, sign them out
-            await signOut(auth);
+            console.log('AdminAuthProvider: User is not an admin');
+            // User is not an admin, but don't sign them out automatically
+            // This allows regular users to stay signed in even if they're not admins
             localStorage.removeItem('adminSessionActive');
             setAdminUser(null);
           }
         } catch (err) {
-          console.error('Error fetching admin user data:', err);
+          console.error('AdminAuthProvider: Error fetching admin user data:', err);
           setError('Failed to verify admin credentials');
         }
       } else {
         // User is signed out
+        console.log('AdminAuthProvider: User is signed out, clearing admin session');
         localStorage.removeItem('adminSessionActive');
         setAdminUser(null);
       }
@@ -130,7 +138,7 @@ export function AdminAuthProvider({
     });
     
     return () => unsubscribe();
-  }, [auth, db]);
+  }, [db]);
 
   // Sign in as admin
   const adminSignIn = async (email: string, password: string): Promise<FirebaseUser> => {
