@@ -104,6 +104,9 @@ export class AuthService {
   private tokenChangeListeners: Set<(user: FirebaseUser | null) => void>;
   private cleanupFunctions: (() => void)[] = [];
   private tokenRefreshTimer: number | null = null;
+  
+  // Add a flag to prevent automatic token refreshes during sensitive operations
+  private sensitiveOperationInProgress = false;
 
   /**
    * Create a new AuthService
@@ -490,6 +493,23 @@ export class AuthService {
   }
 
   /**
+   * Method to safely perform operations that shouldn't trigger auth changes
+   * @param operation The operation to perform
+   * @returns Promise resolving when the operation completes
+   */
+  async performSensitiveOperation(operation: () => Promise<void>): Promise<void> {
+    this.sensitiveOperationInProgress = true;
+    try {
+      console.log('[DEBUG-AUTH] AuthService: Starting sensitive operation (token changes suppressed)');
+      await operation();
+      console.log('[DEBUG-AUTH] AuthService: Completed sensitive operation');
+    } finally {
+      this.sensitiveOperationInProgress = false;
+      console.log('[DEBUG-AUTH] AuthService: Sensitive operation mode disabled');
+    }
+  }
+  
+  /**
    * Synchronize auth claims
    */
   async syncAuthClaims(): Promise<any> {
@@ -509,6 +529,12 @@ export class AuthService {
       const unsubscribe = onAuthStateChanged(this.auth, (user) => {
         const eventType = user ? 'User signed in' : 'User signed out';
         console.log('[DEBUG-AUTH] AuthService.onAuthStateChanged:', eventType);
+        
+        // Check if we're in a sensitive operation that should suppress auth state changes
+        if (this.sensitiveOperationInProgress) {
+          console.log('[DEBUG-AUTH] Ignoring auth state change during sensitive operation');
+          return; // Skip processing during sensitive operations
+        }
         
         // Log detailed debugging information
         if (!user) {
@@ -566,6 +592,12 @@ export class AuthService {
     if (this.tokenChangeListeners.size === 1) {
       const unsubscribe = onIdTokenChanged(this.auth, (user) => {
         console.log('[DEBUG-AUTH] AuthService.onIdTokenChanged:', user ? 'Token updated' : 'No token');
+        
+        // Check if we're in a sensitive operation that should suppress token changes
+        if (this.sensitiveOperationInProgress) {
+          console.log('[DEBUG-AUTH] Ignoring token change during sensitive operation');
+          return; // Skip token processing during sensitive operations
+        }
         
         // Log additional details for debugging
         if (!user) {
