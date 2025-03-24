@@ -124,7 +124,7 @@ export function usePartnerAddons() {
       const typedResponse = await response.json() as AddonsResponse;
       return typedResponse.addons || [];
     },
-    enabled: !!user && user?.role === 'partner',
+    enabled: !!user && profileData?.harmonizedUser?.role === 'partner',
   });
 }
 
@@ -211,7 +211,7 @@ export function usePartnerBookings() {
       const typedResponse = await response.json() as BookingsResponse;
       return typedResponse.bookings || [];
     },
-    enabled: !!user && user?.role === 'partner',
+    enabled: !!user && profileData?.harmonizedUser?.role === 'partner',
   });
 }
 
@@ -244,7 +244,7 @@ export function usePartnerEarnings() {
         commissionRate: 0.8,
       };
     },
-    enabled: !!user && user?.role === 'partner',
+    enabled: !!user && profileData?.harmonizedUser?.role === 'partner',
   });
 }
 
@@ -291,6 +291,6 @@ export function useServiceAnalytics(options?: {
       const data = await response.json() as ServiceAnalyticsResponse;
       return data.analytics;
     },
-    enabled: !!user && user?.role === 'partner',
+    enabled: !!user && profileData?.harmonizedUser?.role === 'partner',
   });
 }
