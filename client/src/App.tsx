@@ -30,6 +30,7 @@ const ProfilePage = lazy(() => import("@/pages/profile/ProfilePage"));
 const FeaturedExperiences = lazy(() => import("@/pages/experiences/FeaturedExperiences"));
 const RoleDebugPage = lazy(() => import("@/pages/debug/RoleDebugPage"));
 const TestBundling = lazy(() => import("@/pages/test-bundling"));
+const AuthTestPage = lazy(() => import("@/pages/AuthTestPage"));
 
 // Partner Dashboard Pages
 const PartnerProfile = lazy(() => import("@/pages/dashboard/partner/PartnerProfile"));
@@ -253,6 +254,7 @@ function App() {
                     
                   {/* Test Pages */}
                   <Route path="/test/bundling" component={TestBundling} />
+                  <Route path="/test/auth" component={AuthTestPage} />
 
                   {/* Fallback to 404 */}
                   <Route component={NotFound} />

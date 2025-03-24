@@ -5,12 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authService } from '../../services/auth/auth-service';
 import { useToast } from '@/hooks/use-toast';
+import { User as FirebaseUser } from 'firebase/auth';
 
 export function AuthTest() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
   const { toast } = useToast();
   
   // Check current auth state on component mount
@@ -19,7 +20,7 @@ export function AuthTest() {
     setUser(currentUser);
     
     // Set up auth state listener
-    const unsubscribe = authService.onAuthStateChanged((user) => {
+    const unsubscribe = authService.onAuthStateChanged((user: FirebaseUser | null) => {
       console.log('AuthTest: Auth state changed:', user ? `User: ${user.email}` : 'No user');
       setUser(user);
     });
