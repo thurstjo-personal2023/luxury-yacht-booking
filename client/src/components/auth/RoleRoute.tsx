@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuthService } from '@/services/auth/use-auth-service';
 import { UserRoleType } from '@shared/user-schema';
 import { verifyUserRole, getDashboardUrlForRole, isValidUserRole } from '@/lib/role-verification';
 import { useToast } from '@/hooks/use-toast';
@@ -32,7 +32,8 @@ export const RoleRoute = ({
   roles, 
   fallbackPath = '/login' 
 }: RoleRouteProps) => {
-  const { user, loading, userRole } = useAuth();
+  const { user, loading, profileData } = useAuthService();
+  const userRole = profileData?.harmonizedUser?.role;
   const [, setLocation] = useLocation();
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
