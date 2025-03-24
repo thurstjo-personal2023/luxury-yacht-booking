@@ -43,6 +43,9 @@ const AdminApprovalPage = lazy(() => import("@/pages/admin/AdminApprovalPage"));
 const MfaSetupPage = lazy(() => import("@/pages/admin/MfaSetupPage"));
 const MfaOptionsPage = lazy(() => import("@/pages/admin/MfaOptionsPage"));
 
+// Admin Portal - Coordinates the entire registration flow
+const AdminPortal = lazy(() => import("@/pages/admin/AdminPortal"));
+
 // Partner Dashboard Pages
 const PartnerProfile = lazy(() => import("@/pages/dashboard/partner/PartnerProfile"));
 const PartnerAddOns = lazy(() => import("@/pages/dashboard/partner/AddOns"));
@@ -267,6 +270,9 @@ function App() {
                   <Route path="/admin-phone-verification/:userId" component={PhoneVerificationPage} />
                   <Route path="/admin-pending-approval/:userId" component={PendingApprovalPage} />
                   <Route path="/admin-approve" component={AdminApprovalPage} />
+                  <Route path="/admin-registration-portal/:userId?">
+                    {(params) => <AdminPortal />}
+                  </Route>
                     
                   {/* Debug Tools */}
                   <Route path="/debug/role">
