@@ -36,17 +36,18 @@ const otpSchema = z.object({
 type PhoneFormValues = z.infer<typeof phoneSchema>;
 type OtpFormValues = z.infer<typeof otpSchema>;
 
+interface MfaSetupPageProps {
+  uid: string;
+  onComplete?: (success: boolean) => void;
+}
+
 /**
  * MFA Setup Page Component
  * 
  * This component handles the Multi-Factor Authentication setup process for new administrators
  * It uses Firebase MFA with phone authentication
  */
-const MfaSetupPage: React.FC = () => {
-  // Get UID from URL params
-  const params = useParams<{ uid: string }>();
-  const uid = params?.uid;
-  
+const MfaSetupPage: React.FC<MfaSetupPageProps> = ({ uid, onComplete }) => {
   // State
   const [, navigate] = useLocation();
   const [loading, setLoading] = useState(true);
@@ -256,8 +257,14 @@ const MfaSetupPage: React.FC = () => {
         title: 'MFA Setup Complete',
         description: 'Multi-Factor Authentication has been successfully set up',
       });
+
+      // Call the onComplete callback if provided
+      if (onComplete) {
+        onComplete(true);
+        return; // Don't navigate if we're in the options page
+      }
       
-      // Redirect to dashboard after a delay
+      // Redirect to dashboard after a delay if no callback provided
       setTimeout(() => {
         navigate('/admin-dashboard');
       }, 2000);

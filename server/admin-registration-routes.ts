@@ -10,7 +10,8 @@ import {
   generateTotpSecret, 
   generateBackupCodes, 
   verifyTotpToken, 
-  hashBackupCode 
+  hashBackupCode,
+  verifyBackupCode
 } from './utils/totp-utils';
 
 // Admin registration router
@@ -300,6 +301,203 @@ router.post('/api/admin/update-verification-status', async (req: Request, res: R
     return res.status(500).json({
       success: false,
       message: error.message || 'Failed to update verification status',
+    });
+  }
+});
+
+// Generate TOTP secret for authenticator app
+router.post('/api/admin/generate-totp-secret', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required',
+      });
+    }
+    
+    // Get admin profile to verify it exists and get email
+    const adminProfileRef = adminDb.collection('admin_profiles').doc(userId);
+    const adminProfileDoc = await adminProfileRef.get();
+    
+    if (!adminProfileDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin profile not found',
+      });
+    }
+    
+    const adminProfile = adminProfileDoc.data();
+    const email = adminProfile?.email || 'admin';
+    
+    // Generate TOTP secret
+    const secret = generateTotpSecret('Etoile Yachts', email);
+    
+    // Generate backup codes
+    const backupCodes = generateBackupCodes(10);
+    const hashedBackupCodes = backupCodes.map(code => hashBackupCode(code));
+    
+    // Store the secret and hashed backup codes in Firestore
+    // We'll use a separate collection for TOTP secrets for better security
+    const totpSecretsRef = adminDb.collection('admin_totp_secrets').doc(userId);
+    await totpSecretsRef.set({
+      userId,
+      base32Secret: secret.base32,
+      backupCodes: hashedBackupCodes,
+      verified: false,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    
+    // Return the secret and backup codes to the client
+    return res.json({
+      success: true,
+      secret: secret.base32,
+      qrCodeUrl: secret.otpauth_url,
+      backupCodes: backupCodes,
+    });
+  } catch (error: any) {
+    console.error('Error generating TOTP secret:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate TOTP secret',
+    });
+  }
+});
+
+// Verify TOTP token
+router.post('/api/admin/verify-totp', async (req: Request, res: Response) => {
+  try {
+    const { userId, otp, secret } = req.body;
+    
+    if (!userId || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID and OTP are required',
+      });
+    }
+    
+    // Get stored secret
+    const totpSecretsRef = adminDb.collection('admin_totp_secrets').doc(userId);
+    const totpSecretsDoc = await totpSecretsRef.get();
+    
+    if (!totpSecretsDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'TOTP secret not found',
+      });
+    }
+    
+    const totpSecrets = totpSecretsDoc.data();
+    const storedSecret = totpSecrets?.base32Secret;
+    
+    // Verify the OTP
+    const isValid = verifyTotpToken(otp, storedSecret);
+    
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification code',
+      });
+    }
+    
+    // Mark the TOTP setup as verified
+    await totpSecretsRef.update({
+      verified: true,
+      verifiedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    
+    // Update the admin profile to indicate MFA is enabled
+    const adminProfileRef = adminDb.collection('admin_profiles').doc(userId);
+    await adminProfileRef.update({
+      totpMfaEnabled: true,
+      mfaEnabled: true,
+      mfaType: 'totp',
+      mfaEnabledAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    
+    // Also update the harmonized user record
+    const harmonizedUserRef = adminDb.collection('harmonized_users').doc(userId);
+    const harmonizedUserDoc = await harmonizedUserRef.get();
+    
+    if (harmonizedUserDoc.exists) {
+      await harmonizedUserRef.update({
+        mfaEnabled: true,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    
+    return res.json({
+      success: true,
+      message: 'TOTP verification successful',
+    });
+  } catch (error: any) {
+    console.error('Error verifying TOTP:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to verify TOTP',
+    });
+  }
+});
+
+// Verify backup code
+router.post('/api/admin/verify-backup-code', async (req: Request, res: Response) => {
+  try {
+    const { userId, backupCode } = req.body;
+    
+    if (!userId || !backupCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID and backup code are required',
+      });
+    }
+    
+    // Get stored backup codes
+    const totpSecretsRef = adminDb.collection('admin_totp_secrets').doc(userId);
+    const totpSecretsDoc = await totpSecretsRef.get();
+    
+    if (!totpSecretsDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'TOTP secrets not found',
+      });
+    }
+    
+    const totpSecrets = totpSecretsDoc.data();
+    const hashedBackupCodes = totpSecrets?.backupCodes || [];
+    
+    // Verify the backup code
+    const verificationResult = verifyBackupCode(backupCode, hashedBackupCodes);
+    
+    if (!verificationResult.valid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid backup code',
+      });
+    }
+    
+    // Remove the used backup code
+    const updatedBackupCodes = [...hashedBackupCodes];
+    updatedBackupCodes.splice(verificationResult.index, 1);
+    
+    // Update the stored backup codes
+    await totpSecretsRef.update({
+      backupCodes: updatedBackupCodes,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    
+    return res.json({
+      success: true,
+      message: 'Backup code verification successful',
+    });
+  } catch (error: any) {
+    console.error('Error verifying backup code:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to verify backup code',
     });
   }
 });
