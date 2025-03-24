@@ -4,6 +4,7 @@ import axios from 'axios';
  * Verification Service
  * 
  * This service handles admin verification status tracking and updates
+ * It centralizes all verification-related API calls for consistency
  */
 
 /**
@@ -117,6 +118,23 @@ export function isRegistrationComplete(status: VerificationStatus): boolean {
          status.isPhoneVerified && 
          status.isApproved && 
          status.isMfaEnabled;
+}
+
+/**
+ * Update MFA status
+ * @param uid User ID
+ * @param enabled MFA enabled status
+ */
+export async function updateMfaStatus(uid: string, enabled: boolean): Promise<void> {
+  try {
+    await axios.post('/api/admin/update-mfa-status', {
+      uid,
+      isMfaEnabled: enabled,
+    });
+  } catch (error) {
+    console.error('Error updating MFA status:', error);
+    throw error;
+  }
 }
 
 /**
