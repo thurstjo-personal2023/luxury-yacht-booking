@@ -82,8 +82,8 @@ export const PrivateRoute: React.FC<PrivateRouteProps> = ({
     return <Redirect to="/login" />;
   }
   
-  // Get user role from profile data
-  const userRole = profileData?.role?.toLowerCase();
+  // Get user role from harmonized profile data
+  const userRole = profileData?.harmonizedUser?.role?.toLowerCase();
   
   // Handle route type checks
   if (routeType !== 'user') {

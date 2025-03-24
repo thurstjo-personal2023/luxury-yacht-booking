@@ -32,7 +32,7 @@ export const RoleRoute = ({
   roles, 
   fallbackPath = '/login' 
 }: RoleRouteProps) => {
-  const { user, loading, profileData } = useAuthService();
+  const { user, isLoading, profileData } = useAuthService();
   const userRole = profileData?.harmonizedUser?.role;
   const [, setLocation] = useLocation();
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
@@ -48,15 +48,15 @@ export const RoleRoute = ({
       
       // Enhanced debugging to trace the authorization flow
       console.log('🔍 RoleRoute evaluating access with:', { 
-        loading, 
+        isLoading, 
         userExists: !!user, 
         userRole,
         allowedRoles: roles
       });
 
       // If still loading, don't make any decisions yet
-      if (loading) {
-        console.log('⏳ RoleRoute: Still loading, skipping authorization check');
+      if (isLoading) {
+        console.log('⏳ RoleRoute: Still loading, skipping authorization check (isLoading: true)');
         if (isMounted) setIsVerifying(false);
         return;
       }
@@ -172,10 +172,10 @@ export const RoleRoute = ({
     return () => {
       isMounted = false;
     };
-  }, [user, loading, userRole, roles, fallbackPath, setLocation, toast]);
+  }, [user, isLoading, userRole, roles, fallbackPath, setLocation, toast]);
 
   // Show loading state while we check authorization
-  if (loading || isVerifying || isAuthorized === null) {
+  if (isLoading || isVerifying || isAuthorized === null) {
     return <AuthLoadingSpinner />;
   }
 
