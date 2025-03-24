@@ -125,7 +125,14 @@ export const AdminVerificationProvider: React.FC<AdminVerificationProviderProps>
     
     try {
       const status = await getVerificationStatus(userId);
-      setVerificationState(status);
+      // Map verification status to state and add required fields
+      setVerificationState({
+        ...status,
+        registrationComplete: status.isEmailVerified && 
+                             status.isPhoneVerified && 
+                             status.isApproved && 
+                             status.isMfaEnabled
+      });
     } catch (err: any) {
       console.error('Error fetching verification status:', err);
       setError(err.message || 'Failed to load verification status');

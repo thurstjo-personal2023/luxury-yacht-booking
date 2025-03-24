@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -7,7 +7,8 @@ import {
   Phone, 
   ClipboardCheck, 
   Shield, 
-  Loader2
+  Loader2,
+  CheckCircle
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,35 @@ const pageVariants = {
       ease: 'easeIn',
     },
   },
+};
+
+// Step item animations
+const stepItemVariants = {
+  initial: { opacity: 0, y: 20 },
+  animate: (custom: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      delay: custom * 0.1,
+      duration: 0.4,
+      ease: [0.43, 0.13, 0.23, 0.96]
+    }
+  }),
+  exit: { opacity: 0, y: -10, transition: { duration: 0.2 } }
+};
+
+// Success animation
+const successVariants = {
+  initial: { scale: 0.8, opacity: 0 },
+  animate: { 
+    scale: 1, 
+    opacity: 1,
+    transition: {
+      type: 'spring',
+      stiffness: 300,
+      damping: 15
+    }
+  }
 };
 
 /**
@@ -181,28 +211,97 @@ const AdminPortalInner: React.FC = () => {
     );
   }
   
-  // Portal content
+  // Portal content with registration complete
+  const registrationComplete = verificationState?.registrationComplete;
+  
   return (
     <AnimatePresence mode="wait">
-      <motion.div
-        key="admin-portal"
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        variants={pageVariants}
-        className="flex flex-col items-center justify-center min-h-screen p-4 bg-slate-50 dark:bg-slate-900"
-      >
-        <Card className="w-full max-w-md shadow-lg">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold">Admin Registration Portal</CardTitle>
-            <CardDescription>
-              Complete the following steps to access the admin dashboard
-            </CardDescription>
-            <div className="pt-4">
-              <Progress value={progressPercentage} className="w-full h-2" />
-              <p className="text-xs text-right mt-1 text-muted-foreground">{progressPercentage}% Complete</p>
-            </div>
-          </CardHeader>
+      {registrationComplete ? (
+        <motion.div
+          key="admin-complete"
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          variants={pageVariants}
+          className="flex flex-col items-center justify-center min-h-screen p-4 bg-slate-50 dark:bg-slate-900"
+        >
+          <Card className="w-full max-w-md shadow-lg">
+            <CardHeader className="space-y-1 text-center">
+              <motion.div 
+                className="flex justify-center mb-4"
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ 
+                  scale: 1, 
+                  opacity: 1,
+                  transition: {
+                    type: 'spring',
+                    stiffness: 300,
+                    damping: 15,
+                    delay: 0.2
+                  }
+                }}
+              >
+                <div className="h-24 w-24 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                  <CheckCircle className="h-14 w-14 text-green-600 dark:text-green-400" />
+                </div>
+              </motion.div>
+              <CardTitle className="text-2xl font-bold">Registration Complete!</CardTitle>
+              <CardDescription>
+                Your administrator account is now fully set up and ready to use.
+              </CardDescription>
+              <div className="pt-4">
+                <Progress value={100} className="w-full h-2" />
+                <p className="text-xs text-right mt-1 text-muted-foreground">100% Complete</p>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <motion.div 
+                className="p-4 bg-green-50 dark:bg-green-950/20 rounded-md border border-green-200 dark:border-green-900 text-center"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ 
+                  y: 0, 
+                  opacity: 1,
+                  transition: {
+                    delay: 0.5
+                  }
+                }}
+              >
+                <p className="text-green-700 dark:text-green-400 font-medium">All verification steps completed successfully</p>
+                <p className="text-sm text-green-600/80 dark:text-green-500/80 mt-1">
+                  You can now access the administrator dashboard
+                </p>
+              </motion.div>
+            </CardContent>
+            <CardFooter className="flex justify-center">
+              <Button 
+                onClick={() => navigate('/admin-dashboard')}
+                className="px-8"
+              >
+                Go to Dashboard
+              </Button>
+            </CardFooter>
+          </Card>
+        </motion.div>
+      ) : (
+        <motion.div
+          key="admin-portal"
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          variants={pageVariants}
+          className="flex flex-col items-center justify-center min-h-screen p-4 bg-slate-50 dark:bg-slate-900"
+        >
+          <Card className="w-full max-w-md shadow-lg">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-2xl font-bold">Admin Registration Portal</CardTitle>
+              <CardDescription>
+                Complete the following steps to access the admin dashboard
+              </CardDescription>
+              <div className="pt-4">
+                <Progress value={progressPercentage} className="w-full h-2" />
+                <p className="text-xs text-right mt-1 text-muted-foreground">{progressPercentage}% Complete</p>
+              </div>
+            </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               {steps.map((step, index) => {
@@ -213,7 +312,7 @@ const AdminPortalInner: React.FC = () => {
                 const isCompleted = index + 1 < currentStepIndex;
                 
                 return (
-                  <div 
+                  <motion.div 
                     key={`step-${index}`}
                     className={`flex items-center p-3 rounded-md transition-colors ${
                       isActive 
@@ -222,6 +321,11 @@ const AdminPortalInner: React.FC = () => {
                         ? 'bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900'
                         : 'bg-muted border border-transparent'
                     }`}
+                    variants={stepItemVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    custom={index}
                   >
                     <div className={`rounded-full p-2 mr-3 ${
                       isActive 
@@ -247,13 +351,16 @@ const AdminPortalInner: React.FC = () => {
                       </p>
                     </div>
                     {isCompleted && (
-                      <div className="h-5 w-5 bg-green-500 rounded-full flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                          <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                      </div>
+                      <motion.div 
+                        className="h-5 w-5 bg-green-500 rounded-full flex items-center justify-center"
+                        variants={successVariants}
+                        initial="initial"
+                        animate="animate"
+                      >
+                        <CheckCircle className="h-3 w-3 text-white" />
+                      </motion.div>
                     )}
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>
