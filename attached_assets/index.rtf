@@ -23,6 +23,12 @@ const \{defineSecret\} = require("firebase-functions/params");\
 const \{getAuth\} = require("firebase-admin/auth");\
 const \{scheduleMediaValidation\} = require("./media-validation/scheduler");\
 const \{mediaValidationWorker\} = require("./media-validation/worker");\
+const crypto = require("crypto");\
+\
+// Constants\
+const INVITATION_COLLECTION = "admin_invitations";\
+const INVITATION_EXPIRY_DAYS = 7;\
+\
 \
 // Define the secret\
 const googleMapsApiKey = defineSecret("GOOGLE_MAPS_API_KEY");\
@@ -204,5 +210,463 @@ exports.processMediaValidation = onMessagePublished(\
       memory: "1GiB",\
     \},\
     mediaValidationWorker,\
+);\
+\
+\
+/**\
+ * Generate a secure random token for invitation links\
+ * @return \{string\} A cryptographically secure random token\
+ */\
+function generateSecureToken() \{\
+  return crypto.randomBytes(32).toString("hex");\
+\}\
+\
+/**\
+ * Generate an invitation for a new administrator\
+ * @param \{string\} email - Email address for the invited admin\
+ * @param \{string\} role - Administrator role (default: 'admin')\
+ * @param \{number\} expiryDays - Days until the invitation expires\
+ * @return \{Promise<object>\} The invitation details\
+ */\
+async function generateAdminInvitation(\
+    email,\
+    role = "admin",\
+    expiryDays = INVITATION_EXPIRY_DAYS,\
+) \{\
+  // Validate email format\
+  if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) \{\
+    throw new Error("Valid email address is required");\
+  \}\
+\
+  // Check if an active invitation already exists for this email\
+  const existingInvitations = await db.collection(INVITATION_COLLECTION)\
+      .where("email", "==", email)\
+      .where("used", "==", false)\
+      .where("expiresAt", ">", admin.firestore.Timestamp.now())\
+      .get();\
+\
+  // If an active invitation exists, return it instead of creating a new one\
+  if (!existingInvitations.empty) \{\
+    const invitation = existingInvitations.docs[0].data();\
+    return \{\
+      invitationId: existingInvitations.docs[0].id,\
+      ...invitation,\
+    \};\
+  \}\
+\
+  // Generate expiration date (now + expiryDays)\
+  const now = admin.firestore.Timestamp.now();\
+  const expiresAt = admin.firestore.Timestamp.fromDate(\
+      new Date(now.toDate().getTime() + (expiryDays * 24 * 60 * 60 * 1000)),\
+  );\
+\
+  // Create the invitation document\
+  const token = generateSecureToken();\
+  const invitationData = \{\
+    token,\
+    email,\
+    role,\
+    createdAt: now,\
+    expiresAt,\
+    used: false,\
+    createdBy: null, // Will be populated with auth.uid in the Cloud Function\
+  \};\
+\
+  // Save to Firestore\
+  const invitationRef = await db.collection(INVITATION_COLLECTION)\
+      .add(invitationData);\
+\
+  return \{\
+    invitationId: invitationRef.id,\
+    ...invitationData,\
+  \};\
+\}\
+\
+/**\
+ * Validate an admin invitation token\
+ * @param \{string\} token - The invitation token to validate\
+ * @return \{Promise<object|null>\} The invitation details if valid,\
+ *     null otherwise\
+ */\
+async function validateAdminInvitation(token) \{\
+  if (!token) return null;\
+\
+  const invitations = await db.collection(INVITATION_COLLECTION)\
+      .where("token", "==", token)\
+      .where("used", "==", false)\
+      .where("expiresAt", ">", admin.firestore.Timestamp.now())\
+      .limit(1)\
+      .get();\
+\
+  if (invitations.empty) \{\
+    return null;\
+  \}\
+\
+  const invitation = invitations.docs[0];\
+  return \{\
+    id: invitation.id,\
+    ...invitation.data(),\
+  \};\
+\}\
+\
+/**\
+ * Mark an invitation as used.\
+ * This function updates the invitation document in Firestore to indicate\
+ * that it has been used, along with the user ID of the person who used it.\
+ *\
+ * @param \{string\} token - The invitation token that was used.\
+ * @param \{string\} userId - The user ID that used the invitation.\
+ * @return \{Promise<boolean>\} true if marked as used, false if not found.\
+ */\
+async function markInvitationUsed(token, userId) \{\
+  const invitations = await db.collection(INVITATION_COLLECTION)\
+      .where("token", "==", token)\
+      .limit(1)\
+      .get();\
+\
+  if (invitations.empty) \{\
+    return false;\
+  \}\
+\
+  const invitation = invitations.docs[0];\
+  await invitation.ref.update(\{\
+    used: true,\
+    usedAt: admin.firestore.Timestamp.now(),\
+    usedBy: userId,\
+  \});\
+\
+  return true;\
+\}\
+\
+// Cloud Functions for Admin Invitations\
+\
+/**\
+ * Verify if the user has Super Admin privileges\
+ * @param \{object\} context - The callable context\
+ * @return \{Promise<boolean>\} true if the user is a super admin\
+ */\
+async function verifySuperAdmin(context) \{\
+  if (!context.auth) \{\
+    return false;\
+  \}\
+\
+  try \{\
+    const user = await getAuth().getUser(context.auth.uid);\
+    const customClaims = user.customClaims || \{\};\
+\
+    // Check if the user has the superAdmin claim\
+    return customClaims.role === "superAdmin";\
+  \} catch (error) \{\
+    console.error("Error verifying super admin:", error);\
+    return false;\
+  \}\
+\}\
+\
+// Function to generate an admin invitation\
+exports.generateInvitation = onCall(\
+    \{region\},\
+    async (data, context) => \{\
+    // Check if the user is a Super Admin\
+      const isSuperAdmin = await verifySuperAdmin(context);\
+      if (!isSuperAdmin) \{\
+        throw new functions.https.HttpsError(\
+            "permission-denied",\
+            "Only Super Administrators can generate invitations",\
+        );\
+      \}\
+\
+      try \{\
+        const \{email, role, expiryDays\} = data;\
+\
+        if (!email) \{\
+          throw new functions.https.HttpsError(\
+              "invalid-argument",\
+              "Email is required",\
+          );\
+        \}\
+\
+        // Generate the invitation\
+        const invitation = await generateAdminInvitation(\
+            email,\
+            role || "admin",\
+            expiryDays || 7,\
+        );\
+\
+        // Update the createdBy field\
+        if (context.auth) \{\
+          await db.collection("admin_invitations")\
+              .doc(invitation.invitationId)\
+              .update(\{\
+                createdBy: context.auth.uid,\
+              \});\
+        \}\
+\
+        // Return successful response with invitation details\
+        return \{\
+          success: true,\
+          invitation: \{\
+            id: invitation.invitationId,\
+            token: invitation.token,\
+            email: invitation.email,\
+            role: invitation.role,\
+            createdAt: invitation.createdAt,\
+            expiresAt: invitation.expiresAt,\
+          \},\
+        \};\
+      \} catch (error) \{\
+        console.error("Error generating invitation:", error);\
+\
+        throw new functions.https.HttpsError(\
+            "internal",\
+            error.message || "Failed to generate invitation",\
+        );\
+      \}\
+    \},\
+);\
+\
+// Function to validate an admin invitation\
+exports.validateInvitation = onCall(\
+    \{region\},\
+    async (data, context) => \{\
+      try \{\
+        const \{token\} = data;\
+\
+        if (!token) \{\
+          throw new functions.https.HttpsError(\
+              "invalid-argument",\
+              "Invitation token is required",\
+          );\
+        \}\
+\
+        // Validate the invitation\
+        const invitation = await validateAdminInvitation(token);\
+\
+        if (!invitation) \{\
+          return \{\
+            valid: false,\
+            message: "Invitation is invalid, expired, or has already been used",\
+          \};\
+        \}\
+\
+        // Return successful response with minimal invitation details\
+        return \{\
+          valid: true,\
+          invitation: \{\
+            email: invitation.email,\
+            role: invitation.role,\
+            expiresAt: invitation.expiresAt,\
+          \},\
+        \};\
+      \} catch (error) \{\
+        console.error("Error validating invitation:", error);\
+\
+        throw new functions.https.HttpsError(\
+            "internal",\
+            error.message || "Failed to validate invitation",\
+        );\
+      \}\
+    \},\
+);\
+\
+// Function to list all active admin invitations\
+exports.listInvitations = onCall(\
+    \{region\},\
+    async (data, context) => \{\
+    // Check if the user is a Super Admin\
+      const isSuperAdmin = await verifySuperAdmin(context);\
+      if (!isSuperAdmin) \{\
+        throw new functions.https.HttpsError(\
+            "permission-denied",\
+            "Only Super Administrators can list invitations",\
+        );\
+      \}\
+\
+      try \{\
+        const \{status\} = data || \{\};\
+        let query = db.collection("admin_invitations");\
+\
+        // Filter by status if provided\
+        if (status === "active") \{\
+          query = query\
+              .where("used", "==", false)\
+              .where("expiresAt", ">", admin.firestore.Timestamp.now());\
+        \} else if (status === "used") \{\
+          query = query.where("used", "==", true);\
+        \} else if (status === "expired") \{\
+          query = query\
+              .where("used", "==", false)\
+              .where("expiresAt", "<", admin.firestore.Timestamp.now());\
+        \}\
+\
+        // Execute the query\
+        const snapshot = await query.get();\
+\
+        // Map the results\
+        const invitations = snapshot.docs.map((doc) => (\{\
+          id: doc.id,\
+          ...doc.data(),\
+        \}));\
+\
+        // Return successful response\
+        return \{\
+          success: true,\
+          invitations,\
+        \};\
+      \} catch (error) \{\
+        console.error("Error listing invitations:", error);\
+\
+        throw new functions.https.HttpsError(\
+            "internal",\
+            error.message || "Failed to list invitations",\
+        );\
+      \}\
+    \},\
+);\
+\
+\
+// Development-only HTTP function to generate an admin invitation\
+exports.devGenerateInvitation = onRequest(\
+    \{region\},\
+    async (req, res) => \{\
+    // Check if we're in a development environment\
+      const isDevelopment = process.env.NODE_ENV === "development" ||\
+                          process.env.FUNCTIONS_EMULATOR === "true";\
+\
+      if (!isDevelopment) \{\
+        res.status(403).json(\{\
+          error: "This endpoint is only available in development environments",\
+        \});\
+        return;\
+      \}\
+\
+      try \{\
+        const \{email, role\} = req.query;\
+\
+        if (!email || typeof email !== "string") \{\
+          res.status(400).json(\{\
+            error: "Email parameter is required",\
+          \});\
+          return;\
+        \}\
+\
+        // Generate the invitation\
+        const invitation = await generateAdminInvitation(\
+            email,\
+        typeof role === "string" ? role : "admin",\
+        );\
+\
+        // Construct the invitation URL for the frontend\
+        const inviteUrl = `$\{req.protocol\}://$\{req.get("host")\}/admin/register?token=$\{invitation.token\}`;\
+\
+        // Return successful response with invitation details and URL\
+        res.json(\{\
+          success: true,\
+          invitation: \{\
+            id: invitation.invitationId,\
+            token: invitation.token,\
+            email: invitation.email,\
+            role: invitation.role,\
+            createdAt: invitation.createdAt,\
+            expiresAt: invitation.expiresAt,\
+          \},\
+          inviteUrl,\
+        \});\
+      \} catch (error) \{\
+        console.error("Error generating development invitation:", error);\
+\
+        res.status(500).json(\{\
+          error: error.message || "Failed to generate invitation",\
+        \});\
+      \}\
+    \},\
+);\
+\
+// Scheduled function to clean up expired invitations (runs daily)\
+exports.cleanupExpiredInvitations = onSchedule(\
+    \{\
+      schedule: "0 0 * * *", // Run at midnight every day\
+      region,\
+    \},\
+    async (context) => \{\
+      try \{\
+        const now = admin.firestore.Timestamp.now();\
+\
+        // Find all expired, unused invitations\
+        const expiredSnapshot = await db.collection("admin_invitations")\
+            .where("used", "==", false)\
+            .where("expiresAt", "<", now)\
+            .get();\
+\
+        if (expiredSnapshot.empty) \{\
+          console.log("No expired invitations to clean up");\
+          return null;\
+        \}\
+\
+        // Delete expired invitations in batches\
+        const batch = db.batch();\
+        let count = 0;\
+\
+        expiredSnapshot.docs.forEach((doc) => \{\
+          batch.delete(doc.ref);\
+          count++;\
+        \});\
+\
+        await batch.commit();\
+        console.log(`Cleaned up $\{count\} expired invitations`);\
+\
+        return null;\
+      \} catch (error) \{\
+        console.error("Error cleaning up expired invitations:", error);\
+        return null;\
+      \}\
+    \},\
+);\
+\
+// Function to mark an invitation as used after successful registration\
+exports.completeInvitationRegistration = onCall(\
+    \{region\},\
+    async (data, context) => \{\
+    // Must be authenticated to complete registration\
+      if (!context.auth) \{\
+        throw new functions.https.HttpsError(\
+            "unauthenticated",\
+            "Authentication required",\
+        );\
+      \}\
+\
+      try \{\
+        const \{token\} = data;\
+\
+        if (!token) \{\
+          throw new functions.https.HttpsError(\
+              "invalid-argument",\
+              "Invitation token is required",\
+          );\
+        \}\
+\
+        // Mark the invitation as used with the current user's ID\
+        const marked = await markInvitationUsed(token, context.auth.uid);\
+\
+        if (!marked) \{\
+          throw new functions.https.HttpsError(\
+              "not-found",\
+              "Invitation not found or already used",\
+          );\
+        \}\
+\
+        // Return success\
+        return \{\
+          success: true,\
+          message: "Invitation marked as used",\
+        \};\
+      \} catch (error) \{\
+        console.error("Error completing invitation registration:", error);\
+\
+        throw new functions.https.HttpsError(\
+            "internal",\
+            error.message || "Failed to complete invitation registration",\
+        );\
+      \}\
+    \},\
 );\
 }
