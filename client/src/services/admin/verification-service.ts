@@ -106,6 +106,29 @@ export async function getApprovalStatus(uid: string): Promise<any> {
 }
 
 /**
+ * Update approval status for an admin user
+ * @param uid User ID
+ * @param approved Approval status
+ * @param approverUid User ID of the approver (optional)
+ */
+export async function updateApprovalStatus(
+  uid: string, 
+  approved: boolean,
+  approverUid?: string
+): Promise<void> {
+  try {
+    await axios.post('/api/admin/update-verification-status', {
+      uid,
+      isApproved: approved,
+      approverUid
+    });
+  } catch (error) {
+    console.error('Error updating approval status:', error);
+    throw error;
+  }
+}
+
+/**
  * Check if verification process is complete
  * @param status Verification status
  * @returns Whether verification is complete

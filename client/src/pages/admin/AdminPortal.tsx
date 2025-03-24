@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -9,13 +9,13 @@ import {
   Shield, 
   Loader2
 } from 'lucide-react';
-import { getVerificationStatus, isVerificationComplete, isRegistrationComplete } from '@/services/admin/verification-service';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/auth-provider';
+import { useAdminVerification, AdminVerificationProvider } from '@/providers/admin-verification-provider';
 
 // Animation variants
 const pageVariants = {
@@ -42,24 +42,26 @@ const pageVariants = {
 };
 
 /**
- * Admin Portal Component
+ * Admin Portal Inner Component
  * 
- * This component serves as the central hub for the admin registration flow,
- * showing the current progress and guiding users through each step.
+ * This component handles the actual portal rendering using the verification context
  */
-const AdminPortal: React.FC = () => {
-  const params = useParams<{ userId?: string }>();
-  const userId = params?.userId;
+const AdminPortalInner: React.FC = () => {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
-  const { user } = useAuthState();
+  const { user } = useAuth();
   
-  // State
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [verificationStatus, setVerificationStatus] = useState<any>(null);
-  const [currentStep, setCurrentStep] = useState<number>(1);
-  const [progress, setProgress] = useState<number>(0);
+  // Get verification state from context
+  const { 
+    userId, 
+    verificationState, 
+    loading, 
+    error, 
+    refreshStatus, 
+    currentStepIndex,
+    progressPercentage,
+    resetError
+  } = useAdminVerification();
   
   // Map steps to routes and descriptions
   const steps = [
@@ -82,89 +84,52 @@ const AdminPortal: React.FC = () => {
       icon: <Phone className="w-5 h-5" />,
       description: 'Verify your phone number',
       route: userId ? `/admin-phone-verification/${userId}` : '',
-      condition: () => verificationStatus?.isEmailVerified === true,
+      condition: () => verificationState?.isEmailVerified === true,
     },
     { 
       name: 'Approval', 
       icon: <ClipboardCheck className="w-5 h-5" />,
       description: 'Wait for approval from a super admin',
       route: userId ? `/admin-pending-approval/${userId}` : '',
-      condition: () => verificationStatus?.isEmailVerified === true && verificationStatus?.isPhoneVerified === true,
+      condition: () => verificationState?.isEmailVerified === true && verificationState?.isPhoneVerified === true,
     },
     { 
       name: 'MFA Setup', 
       icon: <Shield className="w-5 h-5" />,
       description: 'Set up multi-factor authentication',
       route: userId ? `/admin-mfa-options/${userId}` : '',
-      condition: () => verificationStatus?.isEmailVerified === true && 
-                        verificationStatus?.isPhoneVerified === true && 
-                        verificationStatus?.isApproved === true,
+      condition: () => verificationState?.isEmailVerified === true && 
+                        verificationState?.isPhoneVerified === true && 
+                        verificationState?.isApproved === true,
     },
     { 
       name: 'Dashboard', 
       icon: <Shield className="w-5 h-5" />,
       description: 'Access the admin dashboard',
       route: '/admin-dashboard',
-      condition: () => verificationStatus?.isEmailVerified === true && 
-                        verificationStatus?.isPhoneVerified === true && 
-                        verificationStatus?.isApproved === true && 
-                        verificationStatus?.isMfaEnabled === true,
+      condition: () => verificationState?.isEmailVerified === true && 
+                        verificationState?.isPhoneVerified === true && 
+                        verificationState?.isApproved === true && 
+                        verificationState?.isMfaEnabled === true,
     },
   ];
-
-  // Fetch verification status on mount and when userId changes
-  useEffect(() => {
-    async function fetchStatus() {
-      if (!userId) {
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        setLoading(true);
-        const status = await getVerificationStatus(userId);
-        setVerificationStatus(status);
-        
-        // Calculate current step
-        let step = 1; // Default to first step
-        
-        if (status.isEmailVerified) step = 2;
-        if (status.isEmailVerified && status.isPhoneVerified) step = 3;
-        if (status.isEmailVerified && status.isPhoneVerified && status.isApproved) step = 4;
-        if (status.isEmailVerified && status.isPhoneVerified && status.isApproved && status.isMfaEnabled) step = 5;
-        
-        setCurrentStep(step);
-        
-        // Calculate progress percentage
-        const progressPercentage = Math.min(100, Math.floor((step / (steps.length - 1)) * 100));
-        setProgress(progressPercentage);
-      } catch (error: any) {
-        console.error('Error fetching verification status:', error);
-        setError(error.message || 'Failed to load verification status');
-        
-        toast({
-          title: 'Error',
-          description: 'Failed to load verification status',
-          variant: 'destructive',
-        });
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    fetchStatus();
-  }, [userId]);
   
   // Navigate to current step
   const goToCurrentStep = () => {
     // Find the current active step
     const activeStep = steps.find((step, index) => 
-      index + 1 === currentStep && step.condition()
+      index + 1 === currentStepIndex && step.condition()
     );
     
     if (activeStep && activeStep.route) {
       navigate(activeStep.route);
     }
+  };
+  
+  // Handle refresh
+  const handleRefresh = () => {
+    resetError();
+    refreshStatus();
   };
   
   // Loading state
@@ -206,7 +171,7 @@ const AdminPortal: React.FC = () => {
             </Alert>
             <Button 
               className="w-full" 
-              onClick={() => window.location.reload()}
+              onClick={handleRefresh}
             >
               Try Again
             </Button>
@@ -234,8 +199,8 @@ const AdminPortal: React.FC = () => {
               Complete the following steps to access the admin dashboard
             </CardDescription>
             <div className="pt-4">
-              <Progress value={progress} className="w-full h-2" />
-              <p className="text-xs text-right mt-1 text-muted-foreground">{progress}% Complete</p>
+              <Progress value={progressPercentage} className="w-full h-2" />
+              <p className="text-xs text-right mt-1 text-muted-foreground">{progressPercentage}% Complete</p>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -244,8 +209,8 @@ const AdminPortal: React.FC = () => {
                 // Only show steps that meet their conditions
                 if (!step.condition()) return null;
                 
-                const isActive = index + 1 === currentStep;
-                const isCompleted = index + 1 < currentStep;
+                const isActive = index + 1 === currentStepIndex;
+                const isCompleted = index + 1 < currentStepIndex;
                 
                 return (
                   <div 
@@ -302,14 +267,31 @@ const AdminPortal: React.FC = () => {
             </Button>
             <Button 
               onClick={goToCurrentStep}
-              disabled={!steps[currentStep - 1]?.route}
+              disabled={!steps[currentStepIndex - 1]?.route}
             >
-              {currentStep === steps.length ? 'Go to Dashboard' : 'Continue Registration'}
+              {currentStepIndex === steps.length ? 'Go to Dashboard' : 'Continue Registration'}
             </Button>
           </CardFooter>
         </Card>
       </motion.div>
     </AnimatePresence>
+  );
+};
+
+/**
+ * Admin Portal Component
+ * 
+ * This component serves as the central hub for the admin registration flow,
+ * showing the current progress and guiding users through each step.
+ */
+const AdminPortal: React.FC = () => {
+  const params = useParams<{ userId?: string }>();
+  const userId = params?.userId;
+  
+  return (
+    <AdminVerificationProvider initialUserId={userId}>
+      <AdminPortalInner />
+    </AdminVerificationProvider>
   );
 };
 
