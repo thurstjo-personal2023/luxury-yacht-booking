@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'wouter';
+import { useLocation, useParams } from 'wouter';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
-import axios from 'axios';
+import { getApprovalStatus, getVerificationStatus } from '@/services/admin/verification-service';
 
 interface ApprovalStatus {
   status: 'pending' | 'approved' | 'rejected';
@@ -23,6 +23,10 @@ interface ApprovalStatus {
  * It handles the waiting period between verification and approval
  */
 const PendingApprovalPage: React.FC = () => {
+  // Get UID from URL params
+  const params = useParams<{ uid: string }>();
+  const uid = params?.uid;
+  
   // State
   const [, navigate] = useLocation();
   const [loading, setLoading] = useState(true);
@@ -59,7 +63,7 @@ const PendingApprovalPage: React.FC = () => {
     
     // Cleanup function
     return () => unsubscribe();
-  }, [auth, navigate]);
+  }, [auth, navigate, uid]);
   
   // Check approval status at intervals
   useEffect(() => {
@@ -81,12 +85,12 @@ const PendingApprovalPage: React.FC = () => {
   const checkApprovalStatus = async (uid: string) => {
     setChecking(true);
     try {
-      const response = await axios.get(`/api/admin/approval-status/${uid}`);
+      const response = await getApprovalStatus(uid);
       
-      setApprovalStatus(response.data);
+      setApprovalStatus(response);
       
       // If approved, redirect to MFA setup
-      if (response.data.status === 'approved') {
+      if (response.status === 'approved') {
         // Delay a bit so user can see the approved message
         setTimeout(() => {
           navigate(`/admin-mfa-setup/${user.uid}`);
