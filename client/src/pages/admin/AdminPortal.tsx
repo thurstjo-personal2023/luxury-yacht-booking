@@ -223,9 +223,9 @@ const AdminPortalInner: React.FC = () => {
           animate="animate"
           exit="exit"
           variants={pageVariants}
-          className="flex flex-col items-center justify-center min-h-screen p-4 bg-slate-50 dark:bg-slate-900"
+          className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 md:p-8 bg-slate-50 dark:bg-slate-900"
         >
-          <Card className="w-full max-w-md shadow-lg">
+          <Card className="w-full max-w-md shadow-lg transform transition-all hover:shadow-xl motion-safe:hover:scale-[1.01]">
             <CardHeader className="space-y-1 text-center">
               <motion.div 
                 className="flex justify-center mb-4"
@@ -289,9 +289,9 @@ const AdminPortalInner: React.FC = () => {
           animate="animate"
           exit="exit"
           variants={pageVariants}
-          className="flex flex-col items-center justify-center min-h-screen p-4 bg-slate-50 dark:bg-slate-900"
+          className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 md:p-8 bg-slate-50 dark:bg-slate-900"
         >
-          <Card className="w-full max-w-md shadow-lg">
+          <Card className="w-full max-w-md shadow-lg transform transition-all hover:shadow-xl">
             <CardHeader className="space-y-1">
               <CardTitle className="text-2xl font-bold">Admin Registration Portal</CardTitle>
               <CardDescription>
@@ -302,8 +302,8 @@ const AdminPortalInner: React.FC = () => {
                 <p className="text-xs text-right mt-1 text-muted-foreground">{progressPercentage}% Complete</p>
               </div>
             </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
               {steps.map((step, index) => {
                 // Only show steps that meet their conditions
                 if (!step.condition()) return null;
