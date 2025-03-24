@@ -1,89 +1,75 @@
-# Admin Authentication Tests
+# Administrator Registration & MFA Tests
 
-This directory contains tests for the admin authentication system, including login, MFA setup/verification, and session management.
+This document describes the test suite for Administrator Registration and Multi-Factor Authentication functionality.
 
-## Test Suite Overview
+## Overview
 
-The test suite is divided into several categories:
+The test suite covers the following areas:
 
-1. **Unit Tests for Authentication Logic**: Tests for the `useAdminAuth` hook and its functionality.
-2. **Integration Tests for Login Flow**: Tests for the complete login → MFA verification → dashboard flow.
-3. **Security Tests for Session Management**: Tests for session timeout and refreshing functionality.
-4. **MFA Setup and Verification Tests**: Tests for MFA enrollment and verification processes.
+1. **Administrator Registration & Validation** - Tests for user registration, email/phone verification, and approval processes
+2. **Multi-Factor Authentication (MFA)** - Tests for MFA setup, verification, and enforcement
 
-## Running the Tests
+## Test Files
 
-You can run all admin tests with the following command:
+The test suite includes both unit tests and end-to-end tests:
+
+### Unit Tests
+- `tests/unit/admin-registration-validation.test.ts` - Tests for admin registration and validation functions
+- `tests/unit/admin-mfa.test.ts` - Tests for MFA functionality using Firebase Auth
+
+### End-to-End Tests
+- `cypress/e2e/admin-registration.cy.ts` - Tests admin registration workflow through the UI
+
+## Running Tests
+
+### Prerequisites
+- Firebase emulators must be running (`firebase emulators:start`)
+- For E2E tests, Cypress must be installed
+
+### Running Admin Tests
+
+To run the admin tests, use the provided script:
 
 ```bash
 ./run-admin-tests.sh
 ```
 
-Or run specific test categories:
+This script performs the following:
+1. Checks if Firebase emulators are running
+2. Runs the unit tests for admin registration and MFA
+3. If Cypress is installed, runs the E2E tests for admin registration
 
-```bash
-npx jest --config=jest.config.js -i tests/use-admin-auth.test.tsx
-npx jest --config=jest.config.js -i tests/admin-login-flow.test.tsx
-npx jest --config=jest.config.js -i tests/admin-session.test.tsx
-npx jest --config=jest.config.js -i tests/admin-mfa.test.tsx
-```
+## Test Cases
 
-## Test Files
+The test cases are based on the requirements in "Test Suite - Epics for the Administration Role" document. The key test scenarios include:
 
-- **use-admin-auth.test.tsx**: Unit tests for the authentication hook, covering login, logout, MFA setup/verification, and session refresh.
-- **admin-login-flow.test.tsx**: Integration tests for the complete login flow, testing navigation between components.
-- **admin-session.test.tsx**: Tests for session management, including timeout and refresh functionality.
-- **admin-mfa.test.tsx**: Tests for MFA setup and verification components.
-- **admin-registration.test.ts**: Tests for the administrator registration and approval process.
+### Registration & Validation Tests
+- ARV-001: Super Admin can send an invite to an email address
+- ARV-002: Admin cannot register without an invite link
+- ARV-003: Admin registration requires email & phone OTP verification
+- ARV-004: Admin remains inactive until manually approved
+- ARV-005: Super Admin can approve new Admins
+- ARV-006: Expired invite token is rejected
+- ARV-007: Incorrect OTP blocks after 3 failed attempts
+- ARV-008: Password too weak is rejected
+- ARV-009: MFA setup is required before accessing admin features
+- ARV-010: Invitations can only be used once
 
-## Test Coverage
+### MFA Tests
+- Admin can enroll in TOTP-based MFA
+- Admin with MFA must verify second factor during login
+- Admin cannot bypass MFA requirement
 
-These tests cover the following aspects of the admin authentication system:
+## Firebase Configuration
 
-### Authentication Logic
-- Admin sign in validation
-- Non-admin user detection and rejection
-- Sign out functionality
-- Auth state management
+The tests use the Firebase emulators with the following configuration:
+- Auth emulator: Port 9099
+- Firestore emulator: Port 8080
 
-### MFA Functionality
-- Phone number validation and verification
-- OTP (one-time password) verification
-- MFA setup and enrollment process
-- MFA requirement enforcement
+## Troubleshooting
 
-### Session Management
-- Session timeout after inactivity
-- Session refreshing on user activity
-- Secure session termination
+If you encounter issues:
 
-### Login Flow
-- Login form submission and validation
-- Navigation between auth components
-- Protected route enforcement
-- Error handling and user feedback
-
-## Firebase Emulator Requirements
-
-The tests utilize Firebase emulators for auth and Firestore functionality. Make sure the emulators are running before executing the tests:
-
-```bash
-firebase emulators:start
-```
-
-## Adding New Tests
-
-When adding new tests, follow these guidelines:
-
-1. Use the appropriate testing utilities from `hook-test-utils.tsx` or `react-test-utils.tsx`
-2. Mock external dependencies (Firebase, APIs, etc.)
-3. Use `act()` for asynchronous operations
-4. Add the new test file to `jest.config.js`
-
-## Configuration
-
-The test configuration is defined in `jest.config.js`, with separate projects for different test categories. Each project has its own environment (node or jsdom) and setup files.
-
-## LSP Warning
-
-Note that you may see some LSP errors in the test files related to imports. These are expected and can be ignored, as the test runtime correctly resolves these imports through the Jest configuration.
+1. **Firebase emulator connection errors**: Ensure Firebase emulators are running on the expected ports
+2. **Authentication issues**: The tests create temporary users. If you see auth errors, try resetting the Auth emulator
+3. **Test data issues**: Check Firestore emulator data for consistency

@@ -1,182 +1,291 @@
-# Administrator Registration Test Suite
+# Administrator Registration Test Suite Documentation
 
-## Overview
-This document outlines the test cases for the Administrator Registration and Validation functionality for the Etoile Yachts platform. The Administrator Registration process includes invitation handling, multi-step verification, and approval workflows.
+This document describes the detailed test cases for the Administrator Registration and Validation functionality in the Etoile Yachts platform.
 
-## Test IDs and Descriptions
+## Test Case Specifications
 
-### ARV-001: Admin Invitation Generation
-**Objective**: Verify that Super Administrators can generate invitation links for new administrators.
+### ARV-001: Super Admin can send an invite to an email address
 
-**Test Steps**:
-1. Login as a Super Administrator
-2. Generate an invitation for a new administrator with a specific email address
-3. Verify the invitation is stored correctly in Firestore
-4. Verify the invitation has a valid token and expiration date
+**Description:**  
+Tests that a Super Admin can generate an invitation for a new admin user.
 
-**Expected Results**:
+**Preconditions:**
+- Super Admin user is authenticated
+- Super Admin authorization is verified
+
+**Test Steps:**
+1. Super Admin generates an invitation with:
+   - Target email address
+   - Admin role assignment
+   - Department and position information
+2. System generates a unique invitation token
+3. System stores invitation record in Firestore
+4. System sends invitation email with token link
+
+**Expected Results:**
 - Invitation record is created in Firestore
-- Email address is correctly associated with the invitation
-- Token is generated and valid
-- Expiration date is set for 7 days in the future
-- Used status is set to false
+- Invitation has a valid expiration date
+- Invitation token is valid and unique
+- Response indicates successful invitation creation
 
-### ARV-002: Registration Access Control
-**Objective**: Verify that administrator registration requires a valid invitation token.
+**Assertions:**
+- Verify invitation document exists in Firestore
+- Verify invitation fields are correctly set
+- Verify invitation token is valid
+- Verify HTTP response status is successful
 
-**Test Steps**:
-1. Attempt to access the registration form without a token
-2. Attempt to register with an invalid token
-3. Attempt to register with an expired token
-4. Attempt to register with a valid token
+---
 
-**Expected Results**:
-- Registration is rejected for no token, invalid tokens, and expired tokens
-- Registration proceeds only with a valid token
+### ARV-002: Admin cannot register without an invite link
 
-### ARV-003: Registration Verification Requirements
-**Objective**: Verify that administrator registration requires proper verification steps.
+**Description:**  
+Tests that non-invited users cannot register as administrators.
 
-**Test Steps**:
-1. Access registration form with a valid token
-2. Submit registration without email verification
-3. Submit registration without phone verification
-4. Submit registration with weak password
-5. Submit complete registration with all verifications
+**Preconditions:**
+- No valid invitation exists for test email
 
-**Expected Results**:
-- Registration is rejected without email verification
-- Registration is rejected without phone verification
-- Registration is rejected with weak password
-- Registration proceeds with all verifications
-- Admin account is created in pending_approval state
+**Test Steps:**
+1. Attempt to register a user as admin without invitation token
+2. Attempt to register with an invalid/expired invitation token
+3. Attempt to register with a fabricated token
 
-### ARV-004: Admin Account Status Control
-**Objective**: Verify that admin accounts remain inactive until approved.
+**Expected Results:**
+- All registration attempts are rejected
+- Appropriate error messages are returned
+- No admin user is created in the system
 
-**Test Steps**:
-1. Create a pending admin account
-2. Attempt to access admin features with the pending account
-3. Verify middleware blocks access
+**Assertions:**
+- Verify HTTP response status code indicates failure
+- Verify error message indicates invitation requirement
+- Verify no admin user record is created
 
-**Expected Results**:
-- Admin account is created in pending_approval state
-- Access to admin features is blocked until approval
-- Appropriate error messages are shown
+---
 
-### ARV-005: Admin Approval Process
-**Objective**: Verify that Super Administrators can approve pending admin accounts.
+### ARV-003: Admin registration requires email & phone OTP verification
 
-**Test Steps**:
-1. Create a pending admin account
-2. Login as a Super Administrator
-3. View and approve the pending admin account
-4. Verify account status change
+**Description:**  
+Tests that admin registration requires both email and phone verification.
 
-**Expected Results**:
-- Super Admin can view pending accounts
-- Super Admin can approve or reject accounts
-- Account status changes to 'active' when approved
-- Approved accounts gain access to admin features
+**Preconditions:**
+- Valid admin invitation exists
+- User has started registration process
 
-### ARV-006: Expired Invitation Handling
-**Objective**: Verify that expired invitations are properly handled.
+**Test Steps:**
+1. Complete initial registration form
+2. System sends email verification code
+3. User provides valid email verification code
+4. System sends phone verification code
+5. User provides valid phone verification code
 
-**Test Steps**:
-1. Create an expired invitation (expiration date in the past)
-2. Attempt to use the expired invitation
-3. Verify rejection with appropriate error message
+**Expected Results:**
+- User cannot proceed without email verification
+- User cannot proceed without phone verification
+- Verification status is tracked correctly
+- Full registration completes after both verifications
 
-**Expected Results**:
-- Expired invitations are recognized as invalid
-- Appropriate error message about expiration is displayed
-- Registration does not proceed
+**Assertions:**
+- Verify verification status updates correctly
+- Verify system requires both verification steps
+- Verify registration completion after verifications
 
-### ARV-007: OTP Verification Attempts
-**Objective**: Verify that OTP verification has appropriate attempt limits.
+---
 
-**Test Steps**:
-1. Access registration with valid token
-2. Submit incorrect OTP multiple times
-3. Verify lockout after 3 failed attempts
+### ARV-004: Admin remains inactive until manually approved
 
-**Expected Results**:
-- OTP failures are tracked
-- After 3 failed attempts, account is temporarily locked
-- Appropriate error messages are shown
+**Description:**  
+Tests that new admin accounts remain inactive until approved by a Super Admin.
 
-### ARV-008: Password Strength Requirements
-**Objective**: Verify that administrator passwords must meet strong requirements.
+**Preconditions:**
+- Admin user has completed registration
+- Admin verification is complete
 
-**Test Steps**:
-1. Attempt registration with short password
-2. Attempt registration with password without uppercase
-3. Attempt registration with password without lowercase
-4. Attempt registration with password without numbers
-5. Attempt registration with password without special characters
-6. Attempt registration with strong password
+**Test Steps:**
+1. Check admin account status after registration
+2. Attempt to access admin features with new account
+3. Verify account status shows as "pending approval"
 
-**Expected Results**:
-- All weak passwords are rejected with specific error messages
-- Strong password is accepted
+**Expected Results:**
+- Admin account is created but marked as "pending"
+- Admin cannot access restricted features
+- System shows appropriate "waiting for approval" messages
 
-### ARV-009: MFA Requirement Enforcement
-**Objective**: Verify that administrators must set up MFA before accessing admin features.
+**Assertions:**
+- Verify account status is "pending_approval"
+- Verify admin access is restricted
+- Verify proper notification to the user
 
-**Test Steps**:
-1. Complete registration and approval process
-2. Attempt to access admin features without MFA setup
-3. Set up MFA
-4. Access admin features after MFA setup
+---
 
-**Expected Results**:
-- Admin cannot access admin features until MFA is set up
-- MFA setup workflow is enforced
+### ARV-005: Super Admin can approve new Admins
+
+**Description:**  
+Tests that Super Admins can review and approve new administrator accounts.
+
+**Preconditions:**
+- Super Admin is authenticated
+- New admin account is in "pending_approval" state
+
+**Test Steps:**
+1. Super Admin views list of pending admins
+2. Super Admin reviews admin details
+3. Super Admin approves the admin account
+4. System updates admin status to "active"
+
+**Expected Results:**
+- Admin status changes to "active"
+- Admin receives notification of approval
+- Admin can now access appropriate features
+
+**Assertions:**
+- Verify admin status is updated correctly
+- Verify approval timestamp is recorded
+- Verify approving admin's ID is recorded
+
+---
+
+### ARV-006: Expired invite token is rejected
+
+**Description:**  
+Tests that expired invitation tokens are rejected during admin registration.
+
+**Preconditions:**
+- An invitation with an expired timestamp exists
+
+**Test Steps:**
+1. Attempt to register using expired invitation token
+2. System validates token expiration timestamp
+3. System rejects registration attempt
+
+**Expected Results:**
+- Registration is rejected
+- Clear error message about expired invitation
+- No admin account is created
+
+**Assertions:**
+- Verify HTTP response indicates failure
+- Verify error message specifically mentions expiration
+- Verify no admin account is created
+
+---
+
+### ARV-007: Incorrect OTP blocks after 3 failed attempts
+
+**Description:**  
+Tests that the system blocks further verification attempts after multiple failures.
+
+**Preconditions:**
+- Admin registration is in progress
+- Verification process has started
+
+**Test Steps:**
+1. Submit incorrect OTP code first time
+2. Submit incorrect OTP code second time
+3. Submit incorrect OTP code third time
+4. Attempt to submit a fourth incorrect code
+
+**Expected Results:**
+- First three attempts show error but allow retry
+- Fourth attempt blocks verification for a time period
+- User is notified of temporary blocking
+
+**Assertions:**
+- Verify failed attempt count is tracked
+- Verify blocking occurs after three failures
+- Verify error message indicates blocking duration
+
+---
+
+### ARV-008: Password too weak is rejected
+
+**Description:**  
+Tests that weak passwords are rejected during admin registration.
+
+**Preconditions:**
+- Valid invitation token exists
+- Registration form is being completed
+
+**Test Steps:**
+1. Attempt to register with password "password"
+2. Attempt to register with password "12345678"
+3. Attempt to register with password without special characters
+4. Attempt to register with password under minimum length
+
+**Expected Results:**
+- All weak password attempts are rejected
+- Specific error messages indicate password requirements
+- Registration doesn't proceed until password meets criteria
+
+**Assertions:**
+- Verify rejection of common passwords
+- Verify rejection of short passwords
+- Verify requirement for complexity (special chars, numbers, etc.)
+
+---
+
+### ARV-009: MFA setup is required before accessing admin features
+
+**Description:**  
+Tests that admins must complete MFA setup before accessing admin features.
+
+**Preconditions:**
+- Admin account is approved and activated
+- Admin has not completed MFA setup
+
+**Test Steps:**
+1. Admin attempts to access admin dashboard
+2. System checks MFA enrollment status
+3. System redirects to MFA setup
+4. Admin completes MFA setup
+5. Admin attempts access again
+
+**Expected Results:**
+- Initial access attempt redirects to MFA setup
+- MFA setup must be completed
 - Access is granted after MFA setup
 
-### ARV-010: Invite Usage Restriction
-**Objective**: Verify that invitations can only be used once.
+**Assertions:**
+- Verify redirection to MFA setup
+- Verify MFA enrollment status tracking
+- Verify access after MFA enrollment
 
-**Test Steps**:
-1. Use a valid invitation to register
-2. Attempt to use the same invitation again
+---
 
-**Expected Results**:
-- First registration succeeds
-- Second attempt is rejected
-- Invitation is marked as used after first registration
+### ARV-010: Invitations can only be used once
 
-## Implementation Details
+**Description:**  
+Tests that admin invitations cannot be reused after successful registration.
 
-### Test Environment
-- Tests run against Firebase Emulators (Auth, Firestore, Functions)
-- Express app for API testing
-- Mock implementations for external services
+**Preconditions:**
+- Valid invitation has been used for registration
+- Registration process is complete
 
-### Test Data
-- Test admin users with various roles and statuses
-- Test invitations with various states (valid, expired, used)
-- Mock authentication tokens for API requests
+**Test Steps:**
+1. Attempt to register another account with same invitation
+2. System checks if invitation has been used
+3. System rejects the registration attempt
 
-### Test Helpers
-- `createTestAdminUser()`: Creates admin users for testing
-- `createTestInvitation()`: Creates invitations for testing
-- Mock middleware for auth and admin role verification
-- Mock cloud functions for invitation validation
+**Expected Results:**
+- Registration is rejected
+- Clear error message about already-used invitation
+- No additional admin account is created
 
-## Technical Considerations
+**Assertions:**
+- Verify HTTP response indicates failure
+- Verify error message mentions already-used invitation
+- Verify no additional admin account is created
 
-### Firebase Emulators
-- Tests require Firebase Emulators running for Auth, Firestore, and Functions
-- Test environment automatically checks if emulators are running
-- Local data is reset between test runs
+## Test Implementation
 
-### Jest Configuration
-- Tests run in Node.js environment
-- TypeScript support via ts-jest
-- Setup files handle emulator initialization
+Each test case is implemented in:
 
-### Test Isolation
-- Each test starts with a clean state
-- Admin users and invitations are created per test
-- Auth state is cleared between tests
+1. **Unit Tests**: `tests/unit/admin-registration-validation.test.ts`
+   - Tests the core business logic
+   - Uses mocked repositories
+
+2. **Integration Tests**: `tests/integration/admin-registration.test.ts`
+   - Tests the HTTP API endpoints
+   - Uses Firebase emulator
+
+3. **E2E Tests**: `cypress/e2e/admin-registration.cy.ts`
+   - Tests the complete user interface flow
+   - Uses Cypress for browser automation

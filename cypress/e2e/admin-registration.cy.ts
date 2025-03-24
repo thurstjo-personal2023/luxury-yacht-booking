@@ -5,6 +5,18 @@
  * Tests cover the scenarios specified in the Test Suite - Epics for the Administration Role.
  */
 
+/// <reference types="cypress" />
+
+// Import Firebase Auth types for intellisense
+import type { 
+  MultiFactorSession,
+  MultiFactorResolver,
+  MultiFactorInfo,
+  PhoneAuthCredential,
+  PhoneMultiFactorInfo,
+  MultiFactorUser 
+} from 'firebase/auth';
+
 describe('1. Administrator Registration & Validation', () => {
   // Test data
   const testSuperAdminEmail = Cypress.env('SUPER_ADMIN_EMAIL') || 'super.admin@etoileyachts.com';
@@ -292,5 +304,112 @@ describe('1. Administrator Registration & Validation', () => {
     
     // We should no longer see the password error
     cy.get('[data-cy=password-error-message]').should('not.exist');
+  });
+
+  /**
+   * ARV-009: MFA Requirement Enforcement
+   * 
+   * This test verifies that administrators must set up MFA before accessing admin features,
+   * as per the Firebase Multi-factor Authentication requirements.
+   */
+  it('ARV-009: MFA setup is required before accessing admin features', () => {
+    // Assuming the admin user is registered and approved
+    // at this point, but hasn't set up MFA yet
+    
+    // Log in with approved admin account
+    cy.visit('/admin-login');
+    cy.get('[data-cy=email-input]').type(testAdminEmail);
+    cy.get('[data-cy=password-input]').type(testAdminPassword);
+    cy.get('[data-cy=login-button]').click();
+    
+    // We should be redirected to MFA setup page
+    cy.url().should('include', '/admin-mfa-setup');
+    cy.get('[data-cy=mfa-setup-title]')
+      .should('be.visible')
+      .and('contain', 'Multi-Factor Authentication Setup');
+    
+    // Verify that we can't bypass this page
+    cy.visit('/admin-dashboard');
+    cy.url().should('include', '/admin-mfa-setup'); // Should redirect back
+    
+    // Choose authentication method (TOTP/Authenticator app)
+    cy.get('[data-cy=setup-authenticator-option]').click();
+    
+    // Verify QR code is displayed
+    cy.get('[data-cy=authenticator-qr-code]').should('be.visible');
+    cy.get('[data-cy=authenticator-manual-code]').should('be.visible');
+    
+    // Enter verification code (in real test, this would come from a test TOTP generator)
+    cy.get('[data-cy=totp-verification-code]').type('123456');
+    cy.get('[data-cy=verify-totp-button]').click();
+    
+    // Save backup codes
+    cy.get('[data-cy=backup-codes-container]').should('be.visible');
+    cy.get('[data-cy=confirm-backup-codes]').click();
+    
+    // MFA setup should be complete, we should be redirected to admin dashboard
+    cy.url().should('include', '/admin-dashboard');
+    
+    // Verify that on subsequent logins, MFA is required
+    cy.get('[data-cy=logout-button]').click();
+    
+    // Log in again
+    cy.visit('/admin-login');
+    cy.get('[data-cy=email-input]').type(testAdminEmail);
+    cy.get('[data-cy=password-input]').type(testAdminPassword);
+    cy.get('[data-cy=login-button]').click();
+    
+    // We should now be prompted for MFA code
+    cy.get('[data-cy=mfa-verification-title]')
+      .should('be.visible')
+      .and('contain', 'Two-Factor Authentication');
+    
+    // Enter MFA code
+    cy.get('[data-cy=mfa-code-input]').type('123456');
+    cy.get('[data-cy=verify-mfa-button]').click();
+    
+    // We should be logged in and redirected to admin dashboard
+    cy.url().should('include', '/admin-dashboard');
+  });
+
+  /**
+   * ARV-010: Invite Usage Restriction
+   * 
+   * This test verifies that admin invitations can only be used once.
+   */
+  it('ARV-010: Invitations can only be used once', () => {
+    // For this test, we need:
+    // 1. An active invitation
+    // 2. To use it once successfully
+    // 3. Try to use it again
+    
+    // Simulate a valid invite token
+    const validToken = 'one-time-token-123456';
+    
+    // First use - should succeed
+    cy.visit(`/admin-register?token=${validToken}`);
+    
+    // Complete registration (simplified)
+    cy.get('[data-cy=admin-registration-form]').within(() => {
+      cy.get('[data-cy=admin-name-input]').type(`${testAdminName} 2`);
+      cy.get('[data-cy=admin-phone-input]').type(testAdminPhone);
+      cy.get('[data-cy=admin-password-input]').type(testAdminPassword);
+      cy.get('[data-cy=admin-confirm-password-input]').type(testAdminPassword);
+      cy.get('[data-cy=submit-registration-button]').click();
+    });
+    
+    // Verify we proceed to verification steps (success)
+    cy.get('[data-cy=email-verification-title]').should('be.visible');
+    
+    // Now try to use the same token again
+    cy.visit(`/admin-register?token=${validToken}`);
+    
+    // Verify error message about token already used
+    cy.get('[data-cy=error-message]')
+      .should('be.visible')
+      .and('contain', 'This invitation has already been used');
+    
+    // Verify registration form is not available
+    cy.get('[data-cy=admin-registration-form]').should('not.exist');
   });
 });
