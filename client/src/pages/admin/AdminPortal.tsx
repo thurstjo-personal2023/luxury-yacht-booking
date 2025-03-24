@@ -337,30 +337,30 @@ const AdminPortalInner: React.FC = () => {
                         {step.icon}
                       </div>
                       <div className="flex-1">
-                      <h3 className={`font-medium ${
-                        isActive 
-                          ? 'text-foreground' 
-                          : isCompleted
-                          ? 'text-green-700 dark:text-green-400'
-                          : 'text-muted-foreground'
-                      }`}>
-                        {step.name}
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        {step.description}
-                      </p>
-                    </div>
-                    {isCompleted && (
-                      <motion.div 
-                        className="h-5 w-5 bg-green-500 rounded-full flex items-center justify-center"
-                        variants={successVariants}
-                        initial="initial"
-                        animate="animate"
-                      >
-                        <CheckCircle className="h-3 w-3 text-white" />
-                      </motion.div>
-                    )}
-                  </motion.div>
+                        <h3 className={`font-medium ${
+                          isActive 
+                            ? 'text-foreground' 
+                            : isCompleted
+                            ? 'text-green-700 dark:text-green-400'
+                            : 'text-muted-foreground'
+                        }`}>
+                          {step.name}
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          {step.description}
+                        </p>
+                      </div>
+                      {isCompleted && (
+                        <motion.div 
+                          className="h-5 w-5 bg-green-500 rounded-full flex items-center justify-center"
+                          variants={successVariants}
+                          initial="initial"
+                          animate="animate"
+                        >
+                          <CheckCircle className="h-3 w-3 text-white" />
+                        </motion.div>
+                      )}
+                    </motion.div>
                 );
               })}
             </div>
