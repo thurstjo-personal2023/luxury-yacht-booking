@@ -60,9 +60,10 @@ router.post('/api/admin/validate-invitation', async (req: Request, res: Response
     // Return validation result
     return res.json({
       valid: true,
-      data: {
+      invitation: {
         email: invitation.email,
         role: invitation.role || 'admin',
+        expiresAt: expiresAt ? expiresAt.toISOString() : null,
         department: invitation.department || '',
         invitedBy: invitation.createdBy || '',
       }
