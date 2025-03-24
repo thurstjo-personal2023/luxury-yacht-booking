@@ -665,5 +665,10 @@ export class AuthService {
   }
 }
 
-// Create and export a singleton instance
-export const authService = new AuthService(auth);
+// Add a mechanism to prevent multiple initializations
+const GLOBAL_AUTH_INITIALIZED = '__GLOBAL_AUTH_SERVICE_INITIALIZED__';
+
+// Create and export a singleton instance, but only if it hasn't been created before
+// This helps prevent duplicate listeners when the module is imported multiple times
+export const authService = (window as any)[GLOBAL_AUTH_INITIALIZED] || 
+                          ((window as any)[GLOBAL_AUTH_INITIALIZED] = new AuthService(auth));

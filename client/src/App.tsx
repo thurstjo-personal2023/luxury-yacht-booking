@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -9,9 +9,8 @@ import { Suspense, lazy, useEffect } from "react";
 import { initializeFirestore } from "./lib/firestore-init";
 import { initializeConnectionManager } from "./lib/connection-manager";
 import { AdminAuthProvider } from "@/components/admin/AdminAuthProvider";
-import { useAuthService } from "@/services/auth";
+import { AuthProvider } from '@/providers/auth-provider';
 import { PrivateRoute } from '@/components/routing/PrivateRoute';
-import { auth } from "@/lib/firebase";
 
 // Lazy load pages
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -74,262 +73,198 @@ const LoadingSpinner = () => (
  */
 
 function App() {
-  const { user } = useAuthService();
-
+  // Initialize connection and base Firestore setup only once at startup
   useEffect(() => {
     // Initialize connection manager
     const cleanup = initializeConnectionManager();
 
-    // Initialize Firestore collections - skip verification until user is authenticated
+    // Initialize Firestore with skipVerification=true
+    // Verification will be done later when a user is authenticated
     initializeFirestore(true).catch(console.error);
 
+    console.log("[DEBUG-AUTH] App.tsx: Initial setup complete, using consolidated auth providers");
+    
     return cleanup;
   }, []);
-  
-  // Once a user is authenticated, validate Firestore collections with a delay
-  useEffect(() => {
-    if (user) {
-      console.log("[DEBUG-AUTH] App.tsx useEffect: User authenticated, delaying Firestore collections verification", 
-        { userId: user.uid, email: user.email });
-      
-      // CRITICAL FIX: Delay verification to ensure auth state is stable
-      const verificationTimer = setTimeout(() => {
-        // Now start verification
-        console.log("[DEBUG-AUTH] Starting delayed collection verification");
-        
-        // Store authentication state before verification
-        const authStateBefore = { 
-          isAuthenticated: !!user, 
-          authTime: new Date().toISOString(),
-          userId: user.uid
-        };
-        console.log("[DEBUG-AUTH] App.tsx: Auth state BEFORE collection verification:", authStateBefore);
-        
-        // Wrap the initialization with a try-catch for better error logging
-        try {
-          // Import the authService for sensitive operations
-          import('@/services/auth/auth-service').then(({ authService }) => {
-            // Use performSensitiveOperation to prevent auth state changes during verification
-            authService.performSensitiveOperation(async () => {
-              console.log("[DEBUG-AUTH] App.tsx: Performing actual verification with sensitive operation mode enabled");
-              // Now it's safe to verify collections without authentication state changes
-              await initializeFirestore(false);
-              
-              // Check auth state after verification completes
-              const currentUser = auth.currentUser;
-              const authStateAfter = { 
-                isAuthenticated: !!currentUser, 
-                authTime: new Date().toISOString(),
-                userId: currentUser?.uid || 'none'
-              };
-              console.log("[DEBUG-AUTH] App.tsx: Auth state AFTER protected verification:", authStateAfter);
-              
-              // Log if a sign-out occurred (should be prevented by sensitiveOperationInProgress)
-              if (authStateBefore.isAuthenticated && !authStateAfter.isAuthenticated) {
-                console.error("[DEBUG-AUTH] App.tsx: CRITICAL - User was signed out during protected verification!");
-              }
-            }).catch(error => {
-              console.error("[DEBUG-AUTH] App.tsx: Error during protected verification:", error);
-            });
-          });
-        } catch (error) {
-          console.error("[DEBUG-AUTH] App.tsx: Exception during Firestore initialization setup:", error);
-          
-          // Check auth state after error
-          const currentUser = auth.currentUser;
-          console.log("[DEBUG-AUTH] App.tsx: Auth state after error:", { 
-            isAuthenticated: !!currentUser,
-            userId: currentUser?.uid || 'none'
-          });
-        }
-      }, 3000); // 3-second delay to ensure auth state is stable
-      
-      return () => {
-        clearTimeout(verificationTimer); // Clean up timer if component unmounts
-      };
-    }
-  }, [user]);
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Keep AdminAuthProvider for admin authentication */}
-      <AdminAuthProvider sessionTimeout={15 * 60}>
-        <div className="min-h-screen flex flex-col">
-          <Navbar />
-          <main className="flex-1">
-            <Suspense fallback={<LoadingSpinner />}>
-              <Switch>
-                <Route path="/" component={Home} />
-                <Route path="/login" component={Login} />
-                <Route path="/register" component={Register} />
-                <Route path="/yacht/:id" component={YachtDetails} />
-              
-                {/* Guest Experience Routes */}
-                <Route path="/explore" component={GuestDashboard} />
-                <Route path="/explore/search" component={SearchAndBook} />
-                <Route path="/experiences" component={FeaturedExperiences} />
-                  
-                {/* Booking Routes */}
-                <Route path="/booking-summary">
-                  <PrivateRoute>
-                    <BookingSummary />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/payment">
-                  <PrivateRoute>
-                    <PaymentPage />
-                  </PrivateRoute>
-                </Route>
+      {/* AuthProvider should wrap the AdminAuthProvider */}
+      <AuthProvider>
+        {/* AdminAuthProvider for admin-specific authentication */}
+        <AdminAuthProvider sessionTimeout={15 * 60}>
+          <div className="min-h-screen flex flex-col">
+            <Navbar />
+            <main className="flex-1">
+              <Suspense fallback={<LoadingSpinner />}>
+                <Switch>
+                  <Route path="/" component={Home} />
+                  <Route path="/login" component={Login} />
+                  <Route path="/register" component={Register} />
+                  <Route path="/yacht/:id" component={YachtDetails} />
+                
+                  {/* Guest Experience Routes */}
+                  <Route path="/explore" component={GuestDashboard} />
+                  <Route path="/explore/search" component={SearchAndBook} />
+                  <Route path="/experiences" component={FeaturedExperiences} />
+                    
+                  {/* Booking Routes */}
+                  <Route path="/booking-summary">
+                    <PrivateRoute>
+                      <BookingSummary />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/payment">
+                    <PrivateRoute>
+                      <PaymentPage />
+                    </PrivateRoute>
+                  </Route>
 
-                {/* Protected Routes with Role Verification */}
-                {/* 
-                  These routes are now protected by both:
-                  1. PrivateRoute - Ensures user is authenticated
-                  2. Internal role verification - Each dashboard component now verifies correct role
-                */}
-                <Route path="/dashboard/consumer">
-                  <PrivateRoute routeType="consumer">
-                    <ConsumerDashboard />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/dashboard/producer">
-                  <PrivateRoute routeType="producer">
-                    <ProducerDashboard />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/dashboard/partner">
-                  <PrivateRoute routeType="partner">
-                    <PartnerDashboard />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/profile">
-                  <PrivateRoute>
-                    <ProfilePage />
-                  </PrivateRoute>
-                </Route>
-                  
-                {/* Partner Dashboard Routes */}
-                <Route path="/dashboard/partner/profile">
-                  <PrivateRoute routeType="partner">
-                    <PartnerProfile />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/dashboard/partner/add-ons">
-                  <PrivateRoute routeType="partner">
-                    <PartnerAddOns />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/dashboard/partner/add-ons/create">
-                  <PrivateRoute routeType="partner">
-                    <AddOnForm />
-                  </PrivateRoute>
-                </Route>
-                  
-                {/* Producer Dashboard Routes */}
-                <Route path="/dashboard/producer/profile">
-                  <PrivateRoute routeType="producer">
-                    <ProducerProfile />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/dashboard/producer/assets">
-                  <PrivateRoute routeType="producer">
-                    <AssetManagement />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/dashboard/producer/assets/new-yacht">
-                  <PrivateRoute routeType="producer">
-                    <YachtForm />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/dashboard/producer/assets/edit-yacht/:id">
-                  <PrivateRoute routeType="producer">
-                    <YachtForm />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/dashboard/producer/compliance">
-                  <PrivateRoute routeType="producer">
-                    <ComplianceDocuments />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/dashboard/producer/reviews">
-                  <PrivateRoute routeType="producer">
-                    <ReviewsManagement />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/dashboard/producer/availability">
-                  <PrivateRoute routeType="producer">
-                    <AvailabilityPricing />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/dashboard/producer/bookings">
-                  <PrivateRoute routeType="producer">
-                    <BookingsManagement />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/dashboard/producer/admin">
-                  <PrivateRoute routeType="producer">
-                    <AdminUtils />
-                  </PrivateRoute>
-                </Route>
-                  
-                {/* Admin Routes */}
-                <Route path="/admin">
-                  <PrivateRoute routeType="admin">
-                    <AdminDashboard />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/admin/email-test">
-                  <PrivateRoute routeType="admin">
-                    <EmailTest />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/admin/image-validator">
-                  <PrivateRoute routeType="admin">
-                    <ImageValidator />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/admin/media">
-                  <PrivateRoute routeType="admin">
-                    <MediaManagement />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/admin/media-validation">
-                  <PrivateRoute routeType="admin">
-                    <MediaValidation />
-                  </PrivateRoute>
-                </Route>
-                <Route path="/admin/pubsub-validation">
-                  <PrivateRoute routeType="admin">
-                    <PubSubValidation />
-                  </PrivateRoute>
-                </Route>
-                  
-                {/* Secure Admin Portal Routes */}
-                <Route path="/admin-login" component={AdminLogin} />
-                <Route path="/admin-mfa-setup" component={AdminMfaSetup} />
-                <Route path="/admin-mfa-verify" component={AdminMfaVerify} />
-                <Route path="/admin-dashboard" component={SecureAdminDashboard} />
-                  
-                {/* Debug Tools */}
-                <Route path="/debug/role">
-                  <PrivateRoute>
-                    <RoleDebugPage />
-                  </PrivateRoute>
-                </Route>
-                  
-                {/* Test Pages */}
-                <Route path="/test/bundling" component={TestBundling} />
+                  {/* Protected Routes with Role Verification */}
+                  <Route path="/dashboard/consumer">
+                    <PrivateRoute routeType="consumer">
+                      <ConsumerDashboard />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/dashboard/producer">
+                    <PrivateRoute routeType="producer">
+                      <ProducerDashboard />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/dashboard/partner">
+                    <PrivateRoute routeType="partner">
+                      <PartnerDashboard />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/profile">
+                    <PrivateRoute>
+                      <ProfilePage />
+                    </PrivateRoute>
+                  </Route>
+                    
+                  {/* Partner Dashboard Routes */}
+                  <Route path="/dashboard/partner/profile">
+                    <PrivateRoute routeType="partner">
+                      <PartnerProfile />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/dashboard/partner/add-ons">
+                    <PrivateRoute routeType="partner">
+                      <PartnerAddOns />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/dashboard/partner/add-ons/create">
+                    <PrivateRoute routeType="partner">
+                      <AddOnForm />
+                    </PrivateRoute>
+                  </Route>
+                    
+                  {/* Producer Dashboard Routes */}
+                  <Route path="/dashboard/producer/profile">
+                    <PrivateRoute routeType="producer">
+                      <ProducerProfile />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/dashboard/producer/assets">
+                    <PrivateRoute routeType="producer">
+                      <AssetManagement />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/dashboard/producer/assets/new-yacht">
+                    <PrivateRoute routeType="producer">
+                      <YachtForm />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/dashboard/producer/assets/edit-yacht/:id">
+                    <PrivateRoute routeType="producer">
+                      <YachtForm />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/dashboard/producer/compliance">
+                    <PrivateRoute routeType="producer">
+                      <ComplianceDocuments />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/dashboard/producer/reviews">
+                    <PrivateRoute routeType="producer">
+                      <ReviewsManagement />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/dashboard/producer/availability">
+                    <PrivateRoute routeType="producer">
+                      <AvailabilityPricing />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/dashboard/producer/bookings">
+                    <PrivateRoute routeType="producer">
+                      <BookingsManagement />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/dashboard/producer/admin">
+                    <PrivateRoute routeType="producer">
+                      <AdminUtils />
+                    </PrivateRoute>
+                  </Route>
+                    
+                  {/* Admin Routes */}
+                  <Route path="/admin">
+                    <PrivateRoute routeType="admin">
+                      <AdminDashboard />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/admin/email-test">
+                    <PrivateRoute routeType="admin">
+                      <EmailTest />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/admin/image-validator">
+                    <PrivateRoute routeType="admin">
+                      <ImageValidator />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/admin/media">
+                    <PrivateRoute routeType="admin">
+                      <MediaManagement />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/admin/media-validation">
+                    <PrivateRoute routeType="admin">
+                      <MediaValidation />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/admin/pubsub-validation">
+                    <PrivateRoute routeType="admin">
+                      <PubSubValidation />
+                    </PrivateRoute>
+                  </Route>
+                    
+                  {/* Secure Admin Portal Routes */}
+                  <Route path="/admin-login" component={AdminLogin} />
+                  <Route path="/admin-mfa-setup" component={AdminMfaSetup} />
+                  <Route path="/admin-mfa-verify" component={AdminMfaVerify} />
+                  <Route path="/admin-dashboard" component={SecureAdminDashboard} />
+                    
+                  {/* Debug Tools */}
+                  <Route path="/debug/role">
+                    <PrivateRoute>
+                      <RoleDebugPage />
+                    </PrivateRoute>
+                  </Route>
+                    
+                  {/* Test Pages */}
+                  <Route path="/test/bundling" component={TestBundling} />
 
-                {/* Fallback to 404 */}
-                <Route component={NotFound} />
-              </Switch>
-            </Suspense>
-          </main>
-          <Footer />
-          <ConnectionStatus />
-        </div>
-        <Toaster />
-      </AdminAuthProvider>
+                  {/* Fallback to 404 */}
+                  <Route component={NotFound} />
+                </Switch>
+              </Suspense>
+            </main>
+            <Footer />
+            <ConnectionStatus />
+          </div>
+          <Toaster />
+        </AdminAuthProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
