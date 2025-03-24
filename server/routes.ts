@@ -3444,9 +3444,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register Admin Registration routes
   try {
-    const { registerAdminRegistrationRoutes } = require('./admin-registration-routes');
-    registerAdminRegistrationRoutes(app);
-    console.log('Admin registration routes successfully registered');
+    // Import using dynamic import for ESM compatibility
+    import('./admin-registration-routes.js').then(module => {
+      module.registerAdminRegistrationRoutes(app);
+      console.log('Admin registration routes successfully registered');
+    }).catch(error => {
+      console.error('Failed to import admin registration routes:', error);
+    });
   } catch (error) {
     console.error('Failed to register admin registration routes:', error);
   }

@@ -89,7 +89,11 @@ const AdminApprovalPage: React.FC = () => {
   const { toast } = useToast();
   
   // Get auth from service
-  const { user, isAdmin, isSuperAdmin } = useAuthService();
+  const { user, profileData } = useAuthService();
+  
+  // Determine admin status from profile data
+  const isAdmin = profileData?.harmonizedUser?.adminRole === 'ADMIN' || profileData?.harmonizedUser?.adminRole === 'SUPER_ADMIN';
+  const isSuperAdmin = profileData?.harmonizedUser?.adminRole === 'SUPER_ADMIN';
   
   // Fetch approval requests on mount
   useEffect(() => {
