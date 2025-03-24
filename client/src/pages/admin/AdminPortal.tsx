@@ -361,26 +361,27 @@ const AdminPortalInner: React.FC = () => {
                         </motion.div>
                       )}
                     </motion.div>
-                );
-              })}
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button 
-              variant="outline" 
-              onClick={() => navigate('/')}
-            >
-              Back to Home
-            </Button>
-            <Button 
-              onClick={goToCurrentStep}
-              disabled={!steps[currentStepIndex - 1]?.route}
-            >
-              {currentStepIndex === steps.length ? 'Go to Dashboard' : 'Continue Registration'}
-            </Button>
-          </CardFooter>
-        </Card>
-      </motion.div>
+                  );
+                })}
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/')}
+              >
+                Back to Home
+              </Button>
+              <Button 
+                onClick={goToCurrentStep}
+                disabled={!steps[currentStepIndex - 1]?.route}
+              >
+                {currentStepIndex === steps.length ? 'Go to Dashboard' : 'Continue Registration'}
+              </Button>
+            </CardFooter>
+          </Card>
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 };
