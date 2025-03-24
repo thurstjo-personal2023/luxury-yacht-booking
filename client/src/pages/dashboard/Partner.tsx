@@ -35,6 +35,7 @@ import {
 import { useAuthService } from "@/services/auth/use-auth-service";
 import { PartnerAnalytics } from "@/components/partner/PartnerAnalytics";
 import { useToast } from "@/hooks/use-toast";
+import { PartnerBooking, BookingAddOn } from "@/types/partner";
 
 export default function PartnerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -355,7 +356,7 @@ export default function PartnerDashboard() {
                           <div className="space-y-4">
                             {bookings?.slice(0, 3).map((booking) => (
                               <div
-                                key={booking.id}
+                                key={booking.bookingId}
                                 className="p-4 border rounded-lg flex justify-between items-center"
                               >
                                 <div>
@@ -370,7 +371,7 @@ export default function PartnerDashboard() {
                                       <AlertCircle className="h-4 w-4 text-red-500 mr-1" />
                                     )}
                                     <p className="font-medium">
-                                      Booking #{booking.id.slice(0, 6)}
+                                      Booking #{booking.bookingId.slice(0, 6)}
                                     </p>
                                   </div>
                                   <p className="text-sm text-muted-foreground mt-1">
