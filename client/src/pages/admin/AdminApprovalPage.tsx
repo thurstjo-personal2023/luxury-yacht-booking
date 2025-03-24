@@ -43,10 +43,12 @@ import {
   UserCheck,
   UserX,
   Info,
-  Calendar
+  Calendar,
+  Bell
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthService } from '@/services/auth/use-auth-service';
+import { createApprovalStatusNotification } from '@/services/notifications/admin-notification-service';
 
 /**
  * Approval Request Interface
@@ -167,10 +169,22 @@ const AdminApprovalPage: React.FC = () => {
     setProcessingRequest(true);
     
     try {
+      // First, process the approval
       await axios.post('/api/admin/process-approval', {
         approvalId: selectedRequest.id,
         decision: 'approved',
       });
+      
+      // Create a notification for the administrator
+      try {
+        await createApprovalStatusNotification(
+          selectedRequest.adminId, 
+          true // approved = true
+        );
+      } catch (notifError) {
+        console.error('Error creating approval notification:', notifError);
+        // Continue execution; notification failure is not critical
+      }
       
       toast({
         title: 'Administrator Approved',
@@ -210,11 +224,23 @@ const AdminApprovalPage: React.FC = () => {
     setProcessingRequest(true);
     
     try {
+      // First, process the rejection
       await axios.post('/api/admin/process-approval', {
         approvalId: selectedRequest.id,
         decision: 'rejected',
         notes: rejectionReason,
       });
+      
+      // Create a notification for the administrator
+      try {
+        await createApprovalStatusNotification(
+          selectedRequest.adminId, 
+          false // approved = false
+        );
+      } catch (notifError) {
+        console.error('Error creating rejection notification:', notifError);
+        // Continue execution; notification failure is not critical
+      }
       
       toast({
         title: 'Administrator Rejected',
