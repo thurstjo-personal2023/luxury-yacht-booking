@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, Express } from 'express';
 import { z } from 'zod';
 import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -7,6 +7,17 @@ import { db, auth, functions } from './firebase';
 
 // Admin registration router
 const router = Router();
+
+/**
+ * Register admin registration routes
+ * @param app Express application
+ */
+export function registerAdminRegistrationRoutes(app: Express): void {
+  // Register all routes
+  app.use(router);
+  
+  console.log('Admin registration routes registered');
+}
 
 // Validate invitation token
 router.post('/api/admin/validate-invitation', async (req: Request, res: Response) => {
@@ -332,4 +343,3 @@ router.get('/api/admin/approval-status/:uid', async (req: Request, res: Response
   }
 });
 
-export default router;
