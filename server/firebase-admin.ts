@@ -182,6 +182,130 @@ setTimeout(async () => {
   }
 }, 3000);
 
+// Admin role verification middleware
+export const verifyAdminRole = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Verify base authentication first
+    if (!req.user || !req.user.uid) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Authentication required',
+      });
+    }
+    
+    const { uid, role } = req.user;
+    
+    // If user has admin role in auth claims, verify against admin_profiles
+    if (role === 'admin' || role === 'super_admin' || role === 'moderator') {
+      // Verify user exists in admin_profiles collection
+      const adminProfileRef = adminDb.collection('admin_profiles').doc(uid);
+      const adminProfileDoc = await adminProfileRef.get();
+      
+      if (!adminProfileDoc.exists) {
+        console.warn(`verifyAdminRole - User ${uid} has admin role in auth but no admin profile`);
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Admin profile not found',
+        });
+      }
+      
+      const adminProfile = adminProfileDoc.data();
+      
+      // Check if admin is approved
+      if (adminProfile?.approvalStatus !== 'approved') {
+        console.warn(`verifyAdminRole - Admin ${uid} is not approved (status: ${adminProfile?.approvalStatus})`);
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Admin account not approved',
+          status: adminProfile?.approvalStatus,
+        });
+      }
+      
+      // Check MFA requirement
+      if (!adminProfile?.mfaEnabled && !req.path.includes('/api/admin/setup-mfa')) {
+        console.warn(`verifyAdminRole - Admin ${uid} has not enabled MFA`);
+        return res.status(403).json({
+          error: 'MFA Required',
+          message: 'Multi-factor authentication must be enabled',
+          redirect: '/admin/setup-mfa',
+        });
+      }
+      
+      // Set additional admin info on request
+      req.user.adminRole = adminProfile.role;
+      req.user.adminDepartment = adminProfile.department;
+      req.user.adminPosition = adminProfile.position;
+      req.user.firstName = adminProfile.firstName;
+      req.user.lastName = adminProfile.lastName;
+      
+      // Admin verification successful
+      console.log(`verifyAdminRole - Admin verification successful for ${uid} (${adminProfile.role})`);
+      return next();
+    } else {
+      // User does not have admin role
+      console.warn(`verifyAdminRole - User ${uid} with role ${role} attempted to access admin route`);
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Admin access required',
+      });
+    }
+  } catch (error: any) {
+    console.error('Error verifying admin role:', error);
+    return res.status(500).json({
+      error: 'Server Error',
+      message: 'Failed to verify admin role',
+    });
+  }
+};
+
+// Super admin verification middleware
+export const verifySuperAdminRole = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Verify admin role first
+    if (!req.user || !req.user.uid) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Authentication required',
+      });
+    }
+    
+    const { uid } = req.user;
+    
+    // Check admin profile for super_admin role
+    const adminProfileRef = adminDb.collection('admin_profiles').doc(uid);
+    const adminProfileDoc = await adminProfileRef.get();
+    
+    if (!adminProfileDoc.exists) {
+      console.warn(`verifySuperAdminRole - User ${uid} has no admin profile`);
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Admin profile not found',
+      });
+    }
+    
+    const adminProfile = adminProfileDoc.data();
+    
+    // Check for super_admin role
+    if (adminProfile?.role !== 'super_admin') {
+      console.warn(`verifySuperAdminRole - Admin ${uid} is not a super admin (role: ${adminProfile?.role})`);
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Super Administrator access required',
+      });
+    }
+    
+    // Super admin verification successful
+    console.log(`verifySuperAdminRole - Super admin verification successful for ${uid}`);
+    return next();
+  } catch (error: any) {
+    console.error('Error verifying super admin role:', error);
+    return res.status(500).json({
+      error: 'Server Error',
+      message: 'Failed to verify super admin role',
+    });
+  }
+};
+
 // Export the initialized services
 export { adminAuth, adminDb, adminStorage };
 

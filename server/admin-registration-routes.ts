@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 
 // Import Firebase Admin SDK resources
-import { adminDb, adminAuth } from './firebase-admin';
+import { adminDb, adminAuth, verifyAuth, verifyAdminRole, verifySuperAdminRole } from './firebase-admin';
 
 // Admin registration router
 const router = Router();
@@ -388,6 +388,423 @@ router.get('/api/admin/approval-status/:uid', async (req: Request, res: Response
     return res.status(500).json({
       success: false,
       message: error.message || 'Failed to get approval status',
+    });
+  }
+});
+
+// Create admin invitation (requires super admin)
+router.post('/api/admin/create-invitation', verifyAuth, verifySuperAdminRole, async (req: Request, res: Response) => {
+  try {
+    const { email, role, department, expirationDays = 7 } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required',
+      });
+    }
+    
+    // Validate schema
+    const invitationSchema = z.object({
+      email: z.string().email(),
+      role: z.enum(['admin', 'super_admin', 'moderator']).default('admin'),
+      department: z.string().optional(),
+      expirationDays: z.number().min(1).max(30).default(7),
+    });
+    
+    try {
+      invitationSchema.parse(req.body);
+    } catch (validationError: any) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid invitation data',
+        errors: validationError.errors,
+      });
+    }
+    
+    // Check if email already has an active invitation
+    const invitationsRef = adminDb.collection('admin_invitations');
+    const existingInvitationQuery = invitationsRef
+      .where('email', '==', email)
+      .where('used', '==', false);
+    
+    const existingInvitationSnapshot = await existingInvitationQuery.get();
+    
+    if (!existingInvitationSnapshot.empty) {
+      return res.status(400).json({
+        success: false,
+        message: 'An active invitation already exists for this email',
+      });
+    }
+    
+    // Check if email already registered as an admin
+    const adminProfilesRef = adminDb.collection('admin_profiles');
+    const existingProfileQuery = adminProfilesRef.where('email', '==', email);
+    const existingProfileSnapshot = await existingProfileQuery.get();
+    
+    if (!existingProfileSnapshot.empty) {
+      return res.status(400).json({
+        success: false,
+        message: 'This email is already registered as an administrator',
+      });
+    }
+    
+    // Generate a secure invitation token
+    const token = Buffer.from(Math.random().toString(36) + Date.now().toString(36)).toString('base64');
+    
+    // Calculate expiration date
+    const now = new Date();
+    const expiresAt = new Date(now);
+    expiresAt.setDate(now.getDate() + expirationDays);
+    
+    // Create invitation
+    const invitationRef = invitationsRef.doc();
+    await invitationRef.set({
+      email,
+      role: role || 'admin',
+      department: department || '',
+      token,
+      used: false,
+      expiresAt: Timestamp.fromDate(expiresAt),
+      createdBy: req.user?.uid,
+      createdByName: `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim() || req.user?.email || 'Unknown',
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    
+    return res.json({
+      success: true,
+      message: 'Invitation created successfully',
+      data: {
+        id: invitationRef.id,
+        email,
+        token,
+        expiresAt: expiresAt.toISOString(),
+        invitationUrl: `${req.protocol}://${req.get('host')}/admin/register?token=${token}`,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error creating invitation:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to create invitation',
+    });
+  }
+});
+
+// List pending admin approvals (requires super admin)
+router.get('/api/admin/pending-approvals', verifyAuth, verifySuperAdminRole, async (req: Request, res: Response) => {
+  try {
+    // Get all pending approval requests
+    const approvalsRef = adminDb.collection('admin_approval_requests');
+    const approvalQuery = approvalsRef.where('status', '==', 'pending');
+    const approvalSnapshot = await approvalQuery.get();
+    
+    const pendingApprovals: any[] = [];
+    
+    approvalSnapshot.forEach(doc => {
+      const approval = doc.data();
+      
+      // Format dates
+      const formattedApproval: Record<string, any> = {
+        id: doc.id,
+        ...approval,
+      };
+      
+      // Convert Timestamps to ISO strings
+      for (const [key, value] of Object.entries(formattedApproval)) {
+        if (value instanceof Timestamp) {
+          formattedApproval[key] = value.toDate().toISOString();
+        }
+      }
+      
+      pendingApprovals.push(formattedApproval);
+    });
+    
+    return res.json(pendingApprovals);
+  } catch (error: any) {
+    console.error('Error getting pending approvals:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to get pending approvals',
+    });
+  }
+});
+
+// Set up MFA for admin account
+router.post('/api/admin/setup-mfa', verifyAuth, async (req: Request, res: Response) => {
+  try {
+    const { uid, mfaVerified } = req.body;
+    
+    // Verify that the user calling this is the same as in the request
+    if (req.user?.uid !== uid) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only set up MFA for your own account',
+      });
+    }
+    
+    // Get admin profile
+    const adminProfileRef = adminDb.collection('admin_profiles').doc(uid);
+    const adminProfileDoc = await adminProfileRef.get();
+    
+    if (!adminProfileDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin profile not found',
+      });
+    }
+    
+    const adminProfile = adminProfileDoc.data();
+    
+    // Check if admin has been approved
+    if (adminProfile?.approvalStatus !== 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin account must be approved before setting up MFA',
+        status: adminProfile?.approvalStatus,
+      });
+    }
+    
+    // Update MFA status
+    await adminProfileRef.update({
+      mfaEnabled: mfaVerified === true,
+      status: mfaVerified === true ? 'active' : adminProfile?.status,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    
+    return res.json({
+      success: true,
+      message: 'MFA status updated successfully',
+      mfaEnabled: mfaVerified === true,
+    });
+  } catch (error: any) {
+    console.error('Error setting up MFA:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to set up MFA',
+    });
+  }
+});
+
+// Get admin stats (requires admin)
+router.get('/api/admin/stats', verifyAuth, verifyAdminRole, async (req: Request, res: Response) => {
+  try {
+    // Get admin profile counts by status
+    const adminProfilesRef = adminDb.collection('admin_profiles');
+    
+    // Get count of total admins
+    const totalAdminsSnapshot = await adminProfilesRef.get();
+    const totalAdmins = totalAdminsSnapshot.size;
+    
+    // Get count of active admins
+    const activeAdminsQuery = adminProfilesRef.where('status', '==', 'active');
+    const activeAdminsSnapshot = await activeAdminsQuery.get();
+    const activeAdmins = activeAdminsSnapshot.size;
+    
+    // Get count of pending verification
+    const pendingVerificationQuery = adminProfilesRef.where('status', '==', 'pending_verification');
+    const pendingVerificationSnapshot = await pendingVerificationQuery.get();
+    const pendingVerification = pendingVerificationSnapshot.size;
+    
+    // Get count of pending approval
+    const pendingApprovalQuery = adminProfilesRef.where('status', '==', 'pending_approval');
+    const pendingApprovalSnapshot = await pendingApprovalQuery.get();
+    const pendingApproval = pendingApprovalSnapshot.size;
+    
+    // Get count of MFA required
+    const mfaRequiredQuery = adminProfilesRef.where('status', '==', 'mfa_required');
+    const mfaRequiredSnapshot = await mfaRequiredQuery.get();
+    const mfaRequired = mfaRequiredSnapshot.size;
+    
+    // Get count of rejected
+    const rejectedQuery = adminProfilesRef.where('status', '==', 'rejected');
+    const rejectedSnapshot = await rejectedQuery.get();
+    const rejected = rejectedSnapshot.size;
+    
+    // Get count by role
+    const superAdminQuery = adminProfilesRef.where('role', '==', 'super_admin');
+    const superAdminSnapshot = await superAdminQuery.get();
+    const superAdmin = superAdminSnapshot.size;
+    
+    const adminQuery = adminProfilesRef.where('role', '==', 'admin');
+    const adminSnapshot = await adminQuery.get();
+    const admin = adminSnapshot.size;
+    
+    const moderatorQuery = adminProfilesRef.where('role', '==', 'moderator');
+    const moderatorSnapshot = await moderatorQuery.get();
+    const moderator = moderatorSnapshot.size;
+    
+    // Get invitations stats
+    const invitationsRef = adminDb.collection('admin_invitations');
+    
+    // Get active invitations
+    const activeInvitationsQuery = invitationsRef.where('used', '==', false);
+    const activeInvitationsSnapshot = await activeInvitationsQuery.get();
+    const activeInvitations = activeInvitationsSnapshot.size;
+    
+    // Get used invitations
+    const usedInvitationsQuery = invitationsRef.where('used', '==', true);
+    const usedInvitationsSnapshot = await usedInvitationsQuery.get();
+    const usedInvitations = usedInvitationsSnapshot.size;
+    
+    return res.json({
+      totalAdmins,
+      activeAdmins,
+      pendingVerification,
+      pendingApproval,
+      mfaRequired,
+      rejected,
+      byRole: {
+        superAdmin,
+        admin,
+        moderator,
+      },
+      invitations: {
+        active: activeInvitations,
+        used: usedInvitations,
+        total: activeInvitations + usedInvitations,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error getting admin stats:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to get admin stats',
+    });
+  }
+});
+
+// List all administrators (requires admin)
+router.get('/api/admin/list', verifyAuth, verifyAdminRole, async (req: Request, res: Response) => {
+  try {
+    // Get all admin profiles
+    const adminProfilesRef = adminDb.collection('admin_profiles');
+    const adminProfilesSnapshot = await adminProfilesRef.get();
+    
+    const adminProfiles: any[] = [];
+    
+    adminProfilesSnapshot.forEach(doc => {
+      const profile = doc.data();
+      
+      // Format dates
+      const formattedProfile: Record<string, any> = {
+        id: doc.id,
+        ...profile,
+      };
+      
+      // Convert Timestamps to ISO strings
+      for (const [key, value] of Object.entries(formattedProfile)) {
+        if (value instanceof Timestamp) {
+          formattedProfile[key] = value.toDate().toISOString();
+        }
+      }
+      
+      adminProfiles.push(formattedProfile);
+    });
+    
+    return res.json(adminProfiles);
+  } catch (error: any) {
+    console.error('Error listing administrators:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to list administrators',
+    });
+  }
+});
+
+// Process admin approval (requires super admin)
+router.post('/api/admin/process-approval', verifyAuth, verifySuperAdminRole, async (req: Request, res: Response) => {
+  try {
+    const { approvalId, decision, notes } = req.body;
+    
+    if (!approvalId || !decision) {
+      return res.status(400).json({
+        success: false,
+        message: 'Approval ID and decision are required',
+      });
+    }
+    
+    // Validate schema
+    const approvalSchema = z.object({
+      approvalId: z.string(),
+      decision: z.enum(['approve', 'reject']),
+      notes: z.string().optional(),
+    });
+    
+    try {
+      approvalSchema.parse(req.body);
+    } catch (validationError: any) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid approval data',
+        errors: validationError.errors,
+      });
+    }
+    
+    // Get approval request
+    const approvalRef = adminDb.collection('admin_approval_requests').doc(approvalId);
+    const approvalDoc = await approvalRef.get();
+    
+    if (!approvalDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Approval request not found',
+      });
+    }
+    
+    const approval = approvalDoc.data();
+    
+    // Check if already processed
+    if (approval?.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: `Approval request already ${approval?.status}`,
+      });
+    }
+    
+    // Process the approval
+    const isApproved = decision === 'approve';
+    const newStatus = isApproved ? 'approved' : 'rejected';
+    
+    // Update approval request
+    await approvalRef.update({
+      status: newStatus,
+      reviewedBy: req.user?.uid,
+      reviewedByName: `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim() || req.user?.email || 'Unknown',
+      reviewNotes: notes || '',
+      reviewedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    
+    // Update admin profile
+    const adminProfileRef = adminDb.collection('admin_profiles').doc(approval.adminId);
+    await adminProfileRef.update({
+      approvalStatus: newStatus,
+      status: isApproved ? 'mfa_required' : 'rejected',
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    
+    // If approved, update Firebase Auth custom claims
+    if (isApproved) {
+      const adminProfileDoc = await adminProfileRef.get();
+      const adminProfile = adminProfileDoc.data();
+      
+      // Set custom claims with role
+      await adminAuth.setCustomUserClaims(approval.adminId, {
+        role: adminProfile?.role || 'admin',
+      });
+    }
+    
+    return res.json({
+      success: true,
+      message: `Administrator ${isApproved ? 'approved' : 'rejected'} successfully`,
+    });
+  } catch (error: any) {
+    console.error('Error processing approval:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to process approval',
     });
   }
 });
