@@ -56,7 +56,7 @@ const EmailVerificationPage: React.FC = () => {
           });
           
           // Continue to phone verification
-          navigate('/admin/verify-phone');
+          navigate(`/admin-phone-verification/${currentUser.uid}`);
         } catch (error) {
           console.error('Error updating verification status:', error);
           setErrorMessage('Failed to update verification status. Please try again.');
@@ -102,7 +102,7 @@ const EmailVerificationPage: React.FC = () => {
           });
           
           // Continue to phone verification
-          navigate('/admin/verify-phone');
+          navigate(`/admin-phone-verification/${auth.currentUser.uid}`);
         }
       } catch (error) {
         console.error('Error checking verification status:', error);
@@ -152,7 +152,7 @@ const EmailVerificationPage: React.FC = () => {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      navigate('/admin/login');
+      navigate('/admin-login');
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -182,7 +182,7 @@ const EmailVerificationPage: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button className="w-full" onClick={() => navigate('/admin/login')}>
+            <Button className="w-full" onClick={() => navigate('/admin-login')}>
               Go to Login
             </Button>
           </CardContent>

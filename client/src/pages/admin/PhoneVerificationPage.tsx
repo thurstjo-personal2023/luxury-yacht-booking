@@ -80,13 +80,13 @@ const PhoneVerificationPage: React.FC = () => {
       
       if (!currentUser) {
         // No user is signed in, redirect to login
-        navigate('/admin/login');
+        navigate('/admin-login');
         return;
       }
       
       // If email is not verified, go back to email verification
       if (!currentUser.emailVerified) {
-        navigate('/admin/verify-email');
+        navigate(`/admin-email-verification/${currentUser.uid}`);
         return;
       }
       
@@ -100,7 +100,7 @@ const PhoneVerificationPage: React.FC = () => {
           setVerificationComplete(true);
           // Redirect to pending approval page after a delay
           setTimeout(() => {
-            navigate('/admin/pending-approval');
+            navigate(`/admin-pending-approval/${currentUser.uid}`);
           }, 2000);
         }
       } catch (error) {
