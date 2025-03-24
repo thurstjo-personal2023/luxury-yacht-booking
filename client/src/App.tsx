@@ -37,6 +37,7 @@ const AdminRegistrationPage = lazy(() => import("@/pages/admin/AdminRegistration
 const EmailVerificationPage = lazy(() => import("@/pages/admin/EmailVerificationPage"));
 const PhoneVerificationPage = lazy(() => import("@/pages/admin/PhoneVerificationPage"));
 const PendingApprovalPage = lazy(() => import("@/pages/admin/PendingApprovalPage"));
+const AdminApprovalPage = lazy(() => import("@/pages/admin/AdminApprovalPage"));
 
 // Partner Dashboard Pages
 const PartnerProfile = lazy(() => import("@/pages/dashboard/partner/PartnerProfile"));
@@ -256,6 +257,7 @@ function App() {
                   <Route path="/admin-email-verification/:userId" component={EmailVerificationPage} />
                   <Route path="/admin-phone-verification/:userId" component={PhoneVerificationPage} />
                   <Route path="/admin-pending-approval/:userId" component={PendingApprovalPage} />
+                  <Route path="/admin-approve" component={AdminApprovalPage} />
                     
                   {/* Debug Tools */}
                   <Route path="/debug/role">

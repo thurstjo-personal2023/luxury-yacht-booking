@@ -592,6 +592,48 @@ router.get('/api/admin/pending-approvals', verifyAuth, verifySuperAdminRole, asy
   }
 });
 
+// List processed admin approvals (requires super admin)
+router.get('/api/admin/processed-approvals', verifyAuth, verifySuperAdminRole, async (req: Request, res: Response) => {
+  try {
+    // Get all processed approval requests (approved or rejected)
+    const approvalsRef = adminDb.collection('admin_approval_requests');
+    const approvalQuery = approvalsRef.where('status', 'in', ['approved', 'rejected'])
+      .orderBy('updatedAt', 'desc')
+      .limit(50); // Limit to the most recent 50 processed approvals
+      
+    const approvalSnapshot = await approvalQuery.get();
+    
+    const processedApprovals: any[] = [];
+    
+    approvalSnapshot.forEach(doc => {
+      const approval = doc.data();
+      
+      // Format the response
+      const formattedApproval: Record<string, any> = {
+        id: doc.id,
+        ...approval,
+      };
+      
+      // Convert timestamps to ISO strings
+      for (const [key, value] of Object.entries(formattedApproval)) {
+        if (value instanceof Timestamp) {
+          formattedApproval[key] = value.toDate().toISOString();
+        }
+      }
+      
+      processedApprovals.push(formattedApproval);
+    });
+    
+    return res.json(processedApprovals);
+  } catch (error: any) {
+    console.error('Error getting processed approvals:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to get processed approvals',
+    });
+  }
+});
+
 // Set up MFA for admin account
 router.post('/api/admin/setup-mfa', verifyAuth, async (req: Request, res: Response) => {
   try {
