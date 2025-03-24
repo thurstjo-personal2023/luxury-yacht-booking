@@ -304,39 +304,39 @@ const AdminPortalInner: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-              {steps.map((step, index) => {
-                // Only show steps that meet their conditions
-                if (!step.condition()) return null;
-                
-                const isActive = index + 1 === currentStepIndex;
-                const isCompleted = index + 1 < currentStepIndex;
-                
-                return (
-                  <motion.div 
-                    key={`step-${index}`}
-                    className={`flex items-center p-3 rounded-md transition-colors ${
-                      isActive 
-                        ? 'bg-primary/10 border border-primary/30' 
-                        : isCompleted
-                        ? 'bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900'
-                        : 'bg-muted border border-transparent'
-                    }`}
-                    variants={stepItemVariants}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    custom={index}
-                  >
-                    <div className={`rounded-full p-2 mr-3 ${
-                      isActive 
-                        ? 'bg-primary text-primary-foreground' 
-                        : isCompleted
-                        ? 'bg-green-500 text-white'
-                        : 'bg-muted-foreground/20 text-muted-foreground'
-                    }`}>
-                      {step.icon}
-                    </div>
-                    <div className="flex-1">
+                {steps.map((step, index) => {
+                  // Only show steps that meet their conditions
+                  if (!step.condition()) return null;
+                  
+                  const isActive = index + 1 === currentStepIndex;
+                  const isCompleted = index + 1 < currentStepIndex;
+                  
+                  return (
+                    <motion.div 
+                      key={`step-${index}`}
+                      className={`flex items-center p-3 rounded-md transition-colors ${
+                        isActive 
+                          ? 'bg-primary/10 border border-primary/30' 
+                          : isCompleted
+                          ? 'bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900'
+                          : 'bg-muted border border-transparent'
+                      }`}
+                      variants={stepItemVariants}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                      custom={index}
+                    >
+                      <div className={`rounded-full p-2 mr-3 ${
+                        isActive 
+                          ? 'bg-primary text-primary-foreground' 
+                          : isCompleted
+                          ? 'bg-green-500 text-white'
+                          : 'bg-muted-foreground/20 text-muted-foreground'
+                      }`}>
+                        {step.icon}
+                      </div>
+                      <div className="flex-1">
                       <h3 className={`font-medium ${
                         isActive 
                           ? 'text-foreground' 
