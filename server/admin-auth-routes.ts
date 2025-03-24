@@ -255,6 +255,51 @@ export function registerAdminAuthRoutes(app: Express) {
         console.log(`Created verification document for ${email}`);
       }
       
+      // Add user to harmonized_users collection for compatibility with auth system
+      const harmonizedUserRef = adminDb.collection('harmonized_users').doc(userRecord.uid);
+      const harmonizedUserDoc = await harmonizedUserRef.get();
+      
+      if (!harmonizedUserDoc.exists) {
+        await harmonizedUserRef.set({
+          id: userRecord.uid,
+          email: email,
+          firstName: firstName,
+          lastName: lastName,
+          displayName: `${firstName} ${lastName}`,
+          role: 'admin',
+          adminRole: 'SUPER_ADMIN',
+          isVerified: true,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now
+        });
+        console.log(`Added user to harmonized_users collection for ${email}`);
+      }
+      
+      // Create or update admin_users entry for authentication
+      const adminUserRef = adminDb.collection('admin_users').doc(userRecord.uid);
+      const adminUserDoc = await adminUserRef.get();
+      
+      if (!adminUserDoc.exists) {
+        await adminUserRef.set({
+          uid: userRecord.uid,
+          email: email,
+          displayName: `${firstName} ${lastName}`,
+          firstName: firstName,
+          lastName: lastName,
+          role: 'SUPER_ADMIN',
+          permissions: ['manage_security', 'manage_users', 'manage_content', 'manage_media', 'manage_system'],
+          isActive: true,
+          mfaEnabled: false, // Will be set up on first login
+          mfaVerified: false,
+          lastLoginAt: null,
+          lastActivityAt: now,
+          createdAt: now,
+          updatedAt: now
+        });
+        console.log(`Created admin_users entry for ${email}`);
+      }
+      
       // Return success with user info
       return res.json({
         success: true,
