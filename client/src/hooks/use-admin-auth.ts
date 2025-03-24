@@ -88,7 +88,7 @@ export function AdminAuthProvider({
     console.log('AdminAuthProvider: Setting up auth state listener via authService');
     
     // Use the centralized authService for auth state changes
-    const unsubscribe = authService.onAuthStateChanged(async (user) => {
+    const unsubscribe = authService.onAuthStateChanged(async (user: FirebaseUser | null) => {
       console.log('AdminAuthProvider: Auth state changed:', user ? 'User signed in' : 'User signed out');
       
       if (user) {
@@ -145,22 +145,25 @@ export function AdminAuthProvider({
     try {
       setLoading(true);
       setError(null);
+      console.log('AdminAuthProvider: Attempting to sign in admin user');
       
-      // Set persistence to LOCAL
-      await setPersistence(auth, browserLocalPersistence);
-      
-      // Sign in with email and password
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // Use the centralized authService for sign-in
+      // This will trigger our auth state change listener with the new user
+      const authResult = await authService.signIn(email, password);
+      console.log('AdminAuthProvider: User signed in, checking admin status');
       
       // Check if user is an admin
-      const userDoc = await getDoc(doc(db, 'admin_users', userCredential.user.uid));
+      const userDoc = await getDoc(doc(db, 'admin_users', authResult.user.uid));
       
       if (!userDoc.exists()) {
+        console.log('AdminAuthProvider: User is not an admin, signing out');
         // User is not an admin, sign them out
-        await signOut(auth);
+        await authService.signOut();
         localStorage.removeItem('adminSessionActive');
         throw new Error('Invalid admin credentials');
       }
+      
+      console.log('AdminAuthProvider: Admin sign-in successful');
       
       // Call login audit API
       try {
@@ -168,7 +171,7 @@ export function AdminAuthProvider({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${await userCredential.user.getIdToken()}`
+            'Authorization': `Bearer ${await authResult.user.getIdToken()}`
           }
         });
         
@@ -179,7 +182,7 @@ export function AdminAuthProvider({
         console.warn('Error recording login audit:', auditError);
       }
       
-      return userCredential.user;
+      return authResult.user;
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to sign in';
       console.error('Admin sign in error:', err);
@@ -193,10 +196,13 @@ export function AdminAuthProvider({
   // Sign out admin user
   const adminSignOut = async (): Promise<void> => {
     try {
-      await signOut(auth);
+      console.log('AdminAuthProvider: Signing out admin user');
+      // Use centralized authService for sign-out
+      await authService.signOut();
       localStorage.removeItem('adminSessionActive');
       setAdminUser(null);
       setLocation('/admin-login');
+      console.log('AdminAuthProvider: Admin user signed out successfully');
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to sign out';
       console.error('Admin sign out error:', err);
@@ -208,15 +214,20 @@ export function AdminAuthProvider({
   // Verify MFA code
   const verifyMfa = async (otp: string): Promise<boolean> => {
     try {
-      if (!auth.currentUser) {
+      // Use the current user from the centralized auth service
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser) {
+        console.error('AdminAuthProvider: Cannot verify MFA - no authenticated user');
         throw new Error('No authenticated user');
       }
+      
+      console.log('AdminAuthProvider: Verifying MFA code');
       
       // In a real implementation, this would verify OTP against Firebase Auth
       // For now, we'll simulate the verification with a simple check
       if (otp === '123456') {
         // Update user doc to mark MFA as verified for this session
-        await updateDoc(doc(db, 'admin_users', auth.currentUser.uid), {
+        await updateDoc(doc(db, 'admin_users', currentUser.uid), {
           mfaVerified: true,
           lastActivityAt: new Date()
         });
@@ -224,13 +235,15 @@ export function AdminAuthProvider({
         // Update local state
         setAdminUser(prev => prev ? { ...prev, mfaVerified: true } : null);
         
+        console.log('AdminAuthProvider: MFA code verified successfully');
         return true;
       }
       
+      console.error('AdminAuthProvider: Invalid MFA verification code');
       throw new Error('Invalid verification code');
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to verify MFA';
-      console.error('MFA verification error:', err);
+      console.error('AdminAuthProvider: MFA verification error:', err);
       setError(errorMessage);
       throw err;
     }
@@ -239,13 +252,18 @@ export function AdminAuthProvider({
   // Set up MFA for user
   const setupMfa = async (phoneNumber: string): Promise<string> => {
     try {
-      if (!auth.currentUser) {
+      // Use the current user from the centralized auth service
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser) {
+        console.error('AdminAuthProvider: Cannot setup MFA - no authenticated user');
         throw new Error('No authenticated user');
       }
       
+      console.log('AdminAuthProvider: Setting up MFA with phone number');
+      
       // In a real implementation, this would send OTP to the phone via Firebase Auth
       // For now, we'll simulate the setup process
-      await updateDoc(doc(db, 'admin_users', auth.currentUser.uid), {
+      await updateDoc(doc(db, 'admin_users', currentUser.uid), {
         phone: phoneNumber,
         mfaEnabled: false, // Will be set to true after verification
         lastActivityAt: new Date()
@@ -254,11 +272,13 @@ export function AdminAuthProvider({
       // Update local state
       setAdminUser(prev => prev ? { ...prev, phoneNumber } : null);
       
+      console.log('AdminAuthProvider: MFA setup successful, waiting for verification');
+      
       // Return verification ID (would come from Firebase in real implementation)
       return 'verification-id-123456';
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to set up MFA';
-      console.error('MFA setup error:', err);
+      console.error('AdminAuthProvider: MFA setup error:', err);
       setError(errorMessage);
       throw err;
     }
@@ -267,15 +287,20 @@ export function AdminAuthProvider({
   // Confirm MFA setup with verification code
   const confirmMfaSetup = async (otp: string): Promise<boolean> => {
     try {
-      if (!auth.currentUser) {
+      // Use the current user from the centralized auth service
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser) {
+        console.error('AdminAuthProvider: Cannot confirm MFA setup - no authenticated user');
         throw new Error('No authenticated user');
       }
+      
+      console.log('AdminAuthProvider: Confirming MFA setup with verification code');
       
       // In a real implementation, this would confirm OTP via Firebase Auth
       // For now, we'll simulate the confirmation
       if (otp === '123456') {
         // Update user doc to mark MFA as enabled and verified
-        await updateDoc(doc(db, 'admin_users', auth.currentUser.uid), {
+        await updateDoc(doc(db, 'admin_users', currentUser.uid), {
           mfaEnabled: true,
           mfaVerified: true,
           lastActivityAt: new Date()
@@ -288,13 +313,15 @@ export function AdminAuthProvider({
           mfaVerified: true  
         } : null);
         
+        console.log('AdminAuthProvider: MFA setup confirmed successfully');
         return true;
       }
       
+      console.error('AdminAuthProvider: Invalid MFA confirmation code');
       throw new Error('Invalid verification code');
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to confirm MFA setup';
-      console.error('MFA confirmation error:', err);
+      console.error('AdminAuthProvider: MFA confirmation error:', err);
       setError(errorMessage);
       throw err;
     }
@@ -303,17 +330,22 @@ export function AdminAuthProvider({
   // Refresh the session
   const refreshSession = useCallback(async (): Promise<void> => {
     try {
-      if (!auth.currentUser || !adminUser) {
+      // Use the current user from the centralized auth service
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser || !adminUser) {
+        console.error('AdminAuthProvider: Cannot refresh session - no authenticated user');
         throw new Error('No authenticated user');
       }
       
+      console.log('AdminAuthProvider: Refreshing admin session');
+      
       // Update last activity timestamp
-      await updateDoc(doc(db, 'admin_users', auth.currentUser.uid), {
+      await updateDoc(doc(db, 'admin_users', currentUser.uid), {
         lastActivityAt: new Date()
       });
       
-      // Call activity API endpoint
-      const idToken = await auth.currentUser.getIdToken();
+      // Call activity API endpoint with token from authService
+      const idToken = await authService.getIdToken();
       const response = await fetch('/api/admin/activity', {
         method: 'POST',
         headers: {
@@ -323,11 +355,14 @@ export function AdminAuthProvider({
       });
       
       if (!response.ok) {
+        console.error('AdminAuthProvider: Failed to refresh session via API');
         throw new Error('Failed to refresh session');
       }
+      
+      console.log('AdminAuthProvider: Session refreshed successfully');
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to refresh session';
-      console.error('Session refresh error:', err);
+      console.error('AdminAuthProvider: Session refresh error:', err);
       toast({
         title: 'Session Refresh Failed',
         description: errorMessage,
@@ -335,7 +370,7 @@ export function AdminAuthProvider({
       });
       throw err;
     }
-  }, [auth, adminUser, db, toast]);
+  }, [adminUser, db, toast]);
 
   // Context value
   const contextValue = {
