@@ -381,7 +381,7 @@ export default function PartnerDashboard() {
                                 <div className="text-right">
                                   <p className="font-medium">
                                     {formatCurrency(
-                                      booking.addOns?.reduce((sum: number, addon: BookingAddOn) => sum + (addon.price || 0), 0) || booking.partnerAddons?.reduce((sum: number, addon: BookingAddOn) => sum + (addon.price || 0), 0) || 0
+                                      booking.partnerAddons?.reduce((sum, addon) => sum + (addon.price || 0), 0) || 0
                                     )}
                                   </p>
                                   <Badge 
@@ -482,7 +482,7 @@ export default function PartnerDashboard() {
                                 <div className="text-right">
                                   <p className="font-medium">
                                     {formatCurrency(
-                                      booking.addOns?.reduce((sum: number, addon: BookingAddOn) => sum + (addon.price || 0), 0) || booking.partnerAddons?.reduce((sum: number, addon: BookingAddOn) => sum + (addon.price || 0), 0) || 0
+                                      booking.partnerAddons?.reduce((sum, addon) => sum + (addon.price || 0), 0) || 0
                                     )}
                                   </p>
                                 </div>
@@ -502,7 +502,7 @@ export default function PartnerDashboard() {
                               <div className="mt-3">
                                 <h4 className="text-sm font-medium mb-2">Your Add-ons in this booking:</h4>
                                 <div className="space-y-2">
-                                  {booking.addOns?.map((addon: BookingAddOn, index: number) || booking.partnerAddons?.map((addon: BookingAddOn, index: number) => (
+                                  {booking.partnerAddons?.map((addon: any, index: number) => (
                                     <div key={index} className="flex justify-between text-sm bg-muted p-2 rounded">
                                       <span>{addon.name || addon.id || 'Add-on'}</span>
                                       <span className="font-medium">{formatCurrency(addon.price || 0)}</span>
