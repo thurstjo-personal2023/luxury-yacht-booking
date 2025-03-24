@@ -447,7 +447,7 @@ export default function PartnerDashboard() {
                         <div className="space-y-4">
                           {bookings?.map((booking) => (
                             <div
-                              key={booking.id}
+                              key={booking.bookingId}
                               className="p-4 border rounded-lg"
                             >
                               <div className="flex justify-between items-center mb-2">
@@ -462,7 +462,7 @@ export default function PartnerDashboard() {
                                     <AlertCircle className="h-4 w-4 text-red-500 mr-1" />
                                   )}
                                   <p className="font-medium">
-                                    Booking #{booking.id.slice(0, 6)}
+                                    Booking #{booking.bookingId.slice(0, 6)}
                                   </p>
                                   <Badge 
                                     variant={

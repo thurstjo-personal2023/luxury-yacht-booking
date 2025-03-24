@@ -98,6 +98,7 @@ export interface BookingAddOn {
  */
 export interface PartnerBooking {
   bookingId: string;
+  id?: string; // For backward compatibility
   yachtId: string;
   yachtName: string;
   customerId: string;
@@ -107,6 +108,7 @@ export interface PartnerBooking {
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   totalPrice: number;
   addOns: BookingAddOn[];
+  partnerAddons?: BookingAddOn[]; // For backward compatibility
   addOnTotal: number;
   commissionTotal: number;
   createdAt: Timestamp;
