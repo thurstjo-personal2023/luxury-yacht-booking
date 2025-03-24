@@ -10,8 +10,20 @@ YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Get server URL
-SERVER_URL="http://localhost:3000"
+# Get server URL from user (required for Replit)
+echo -e "${YELLOW}Since you're running this in Replit, we need the URL of your application.${NC}"
+echo -e "Look for the URL in the webview tab (something like https://your-repl-name.your-username.repl.co)"
+
+# Let user input URL
+read -p "Enter your application URL: " SERVER_URL
+
+# Validate URL
+if [ -z "$SERVER_URL" ]; then
+  echo -e "${RED}Error: URL is required${NC}"
+  exit 1
+fi
+
+echo -e "Using server URL: ${GREEN}$SERVER_URL${NC}"
 
 echo -e "${BOLD}${BLUE}=== Create Super Admin Account for Testing ===${NC}"
 echo "This script will create a Super Administrator account for testing the Admin Registration process."
@@ -77,15 +89,41 @@ JSON_DATA=$(cat <<EOF
 EOF
 )
 
-# Make the API request with curl
+# First test if the server is reachable
+echo -e "Testing connection to $SERVER_URL..."
+CONNECTION_TEST=$(curl -s -o /dev/null -w "%{http_code}" $SERVER_URL)
+
+if [ "$CONNECTION_TEST" != "200" ]; then
+  echo -e "${RED}Error: Could not connect to $SERVER_URL (HTTP status: $CONNECTION_TEST)${NC}"
+  echo -e "${YELLOW}Make sure the URL is correct and the server is running.${NC}"
+  exit 1
+fi
+
+echo -e "${GREEN}Connection successful!${NC}"
+
+# Make the API request with curl with verbose output
+echo -e "Sending request to create Super Admin..."
 RESPONSE=$(curl -s -X POST \
   -H "Content-Type: application/json" \
   -d "$JSON_DATA" \
   $SERVER_URL/api/init-super-admin)
 
+# Save curl exit code
+CURL_EXIT_CODE=$?
+
 # Check if request was successful
-if [ $? -ne 0 ]; then
-  echo -e "${RED}Error: Failed to connect to the server.${NC}"
+if [ $CURL_EXIT_CODE -ne 0 ]; then
+  echo -e "${RED}Error: Failed to connect to the server. (curl exit code: $CURL_EXIT_CODE)${NC}"
+  echo -e "${YELLOW}Debugging information:${NC}"
+  echo -e "- Target URL: $SERVER_URL/api/init-super-admin"
+  echo -e "- Command: curl -v -X POST -H \"Content-Type: application/json\" [data omitted] $SERVER_URL/api/init-super-admin"
+  
+  # Try with verbose mode to see more details
+  echo -e "\n${YELLOW}Running with verbose output for more information:${NC}"
+  curl -v -X POST \
+    -H "Content-Type: application/json" \
+    -d "$JSON_DATA" \
+    $SERVER_URL/api/init-super-admin
   exit 1
 fi
 
@@ -98,6 +136,16 @@ if echo "$RESPONSE" | grep -q '"success":true'; then
   echo -e "This account can create invitations for other administrators."
 else
   echo -e "${RED}Error: Failed to create Super Admin account.${NC}"
-  echo "Response: $RESPONSE"
+  echo -e "${YELLOW}Response from server:${NC}"
+  echo "$RESPONSE" | sed 's/^/  /'
+  
+  # Try to detect if it's a JSON error response and extract the error message
+  if echo "$RESPONSE" | grep -q '"error"'; then
+    ERROR_MSG=$(echo "$RESPONSE" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
+    if [ -n "$ERROR_MSG" ]; then
+      echo -e "${RED}Error message: $ERROR_MSG${NC}"
+    fi
+  fi
+  
   exit 1
 fi
