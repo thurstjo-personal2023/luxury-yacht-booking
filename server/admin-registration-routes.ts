@@ -5,6 +5,14 @@ import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 // Import Firebase Admin SDK resources
 import { adminDb, adminAuth, verifyAuth, verifyAdminRole, verifySuperAdminRole } from './firebase-admin';
 
+// Import TOTP utilities
+import { 
+  generateTotpSecret, 
+  generateBackupCodes, 
+  verifyTotpToken, 
+  hashBackupCode 
+} from './utils/totp-utils';
+
 // Admin registration router
 const router = Router();
 
