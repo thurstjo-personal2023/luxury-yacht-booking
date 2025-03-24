@@ -7,37 +7,102 @@ import { getVerificationStatus,
 } from '@/services/admin/verification-service';
 import { useToast } from '@/hooks/use-toast';
 
+/**
+ * Verification State
+ * 
+ * This interface defines the full verification state for an administrator account,
+ * tracking each step in the verification and approval process.
+ */
 interface VerificationState {
+  /** Whether the user's email has been verified */
   isEmailVerified: boolean;
+  
+  /** Whether the user's phone has been verified */
   isPhoneVerified: boolean;
+  
+  /** Timestamp when email was verified */
   emailVerifiedAt?: string;
+  
+  /** Timestamp when phone was verified */
   phoneVerifiedAt?: string;
+  
+  /** Whether the account has been approved by a super admin */
   isApproved: boolean;
+  
+  /** Timestamp when the account was approved */
   approvedAt?: string;
+  
+  /** User ID of the admin who approved this account */
   approvedBy?: string;
+  
+  /** Whether MFA has been set up for this account */
   isMfaEnabled: boolean;
+  
+  /** Timestamp when MFA was enabled */
   mfaEnabledAt?: string;
+  
+  /** Type of MFA enabled: 'phone' or 'totp' (authenticator app) */
   mfaType?: 'phone' | 'totp';
+  
+  /** Whether TOTP-based MFA is enabled */
   totpMfaEnabled?: boolean;
+  
+  /** Whether phone-based MFA is enabled */
   phoneMfaEnabled?: boolean;
+  
+  /** Whether the entire registration process is complete */
   registrationComplete: boolean;
+  
+  /** User's phone number */
   phoneNumber?: string;
+  
+  /** User's department in the organization */
   department?: string;
+  
+  /** User's position/title in the organization */
   position?: string;
+  
+  /** User's administrative role (SUPER_ADMIN, ADMIN, MODERATOR) */
   adminRole?: string;
+  
+  /** User's full name */
   name?: string;
 }
 
+/**
+ * Admin Verification Context Type
+ * 
+ * This interface defines the shape of the context provided by AdminVerificationProvider
+ */
 interface AdminVerificationContextType {
+  /** The user ID being verified */
   userId: string | null;
+  
+  /** Function to set the user ID */
   setUserId: (id: string | null) => void;
+  
+  /** The current verification state */
   verificationState: VerificationState | null;
+  
+  /** Whether a verification operation is in progress */
   loading: boolean;
+  
+  /** Current error message, if any */
   error: string | null;
+  
+  /** Function to refresh the verification status */
   refreshStatus: () => Promise<void>;
+  
+  /** Function to update specific verification status fields */
   updateStatus: (updates: Partial<VerificationState>) => Promise<void>;
-  resetError: () => void;
+  
+  /** Function to reset error state and optionally retry */
+  resetError: (retry?: boolean) => void;
+  
+  /** Current step index in the verification process (1-based) */
   currentStepIndex: number;
+  
+  /** Percentage of verification process completed (0-100) */
   progressPercentage: number;
 }
 
@@ -63,8 +128,16 @@ const AdminVerificationContext = createContext<AdminVerificationContextType>(def
  */
 export const useAdminVerification = () => useContext(AdminVerificationContext);
 
+/**
+ * Admin Verification Provider Props
+ * 
+ * Props for the AdminVerificationProvider component
+ */
 interface AdminVerificationProviderProps {
+  /** Child components to be wrapped by the provider */
   children: ReactNode;
+  
+  /** Optional initial user ID to immediately start verification for */
   initialUserId?: string | null;
 }
 
@@ -116,15 +189,30 @@ export const AdminVerificationProvider: React.FC<AdminVerificationProviderProps>
     }
   }, [userId]);
   
-  // Refresh verification status from server
+  /**
+   * Refresh verification status from server
+   * 
+   * This function fetches the current verification status for the user
+   * and updates the local state. It includes enhanced error handling for different
+   * error scenarios with specific error messages and recovery hints.
+   */
   const refreshStatus = async () => {
-    if (!userId) return;
+    if (!userId) {
+      setError('User ID is missing. Please try registering again or contact support.');
+      return;
+    }
     
     setLoading(true);
     setError(null);
     
     try {
       const status = await getVerificationStatus(userId);
+      
+      // Verify that we received a valid status object
+      if (!status) {
+        throw new Error('No verification data received');
+      }
+      
       // Map verification status to state and add required fields
       setVerificationState({
         ...status,
@@ -133,13 +221,36 @@ export const AdminVerificationProvider: React.FC<AdminVerificationProviderProps>
                              status.isApproved && 
                              status.isMfaEnabled
       });
+      
+      // Clear any previous errors
+      if (error) {
+        resetError();
+        toast({
+          title: 'Connection Restored',
+          description: 'Successfully reconnected and loaded your verification status.',
+        });
+      }
     } catch (err: any) {
       console.error('Error fetching verification status:', err);
-      setError(err.message || 'Failed to load verification status');
+      
+      // Handle different types of errors with specific messages
+      if (err.name === 'AbortError' || err.code === 'ECONNABORTED') {
+        setError('Network timeout. Please check your internet connection and try again.');
+      } else if (err.response && err.response.status === 404) {
+        setError('User profile not found. The account may have been deleted or not properly created.');
+      } else if (err.response && err.response.status === 403) {
+        setError('Access denied. You may not have permission to view this information.');
+      } else if (err.response && err.response.status >= 500) {
+        setError('Server error. Our team has been notified. Please try again later.');
+      } else if (err.message.includes('Firebase') || err.code?.includes('auth/')) {
+        setError('Authentication error. Please sign out and sign in again.');
+      } else {
+        setError(err.message || 'Failed to load verification status');
+      }
       
       toast({
-        title: 'Error',
-        description: 'Failed to load verification status. Please try again.',
+        title: 'Error Loading Verification Status',
+        description: error || 'Please try again or contact support if the problem persists.',
         variant: 'destructive',
       });
     } finally {
@@ -147,45 +258,96 @@ export const AdminVerificationProvider: React.FC<AdminVerificationProviderProps>
     }
   };
   
-  // Update verification status
+  /**
+   * Update verification status
+   * 
+   * This function updates specific aspects of the verification status based on
+   * the provided updates object. It includes enhanced error handling with
+   * specific error messages depending on what's being updated.
+   * 
+   * @param updates - Object containing verification fields to update
+   */
   const updateStatus = async (updates: Partial<VerificationState>) => {
-    if (!userId) return;
+    if (!userId) {
+      setError('User ID is missing. Please try registering again or contact support.');
+      return;
+    }
     
     setLoading(true);
     setError(null);
     
+    // Track which verification types are being updated
+    const updateTypes: string[] = [];
+    if (updates.isEmailVerified !== undefined) updateTypes.push('email verification');
+    if (updates.isPhoneVerified !== undefined) updateTypes.push('phone verification');
+    if (updates.isApproved !== undefined) updateTypes.push('approval status');
+    if (updates.isMfaEnabled !== undefined) updateTypes.push('MFA status');
+    
+    // Create a descriptive update message
+    const updateDescription = updateTypes.length > 0 
+      ? `Updating ${updateTypes.join(', ')}` 
+      : 'Updating verification status';
+      
     try {
+      // Start with validation
+      if (Object.keys(updates).length === 0) {
+        throw new Error('No update fields provided');
+      }
+      
+      // Create an array of update operations
+      const updateOperations = [];
+      
       // Determine which update function to call based on the updates object
       if (updates.isEmailVerified !== undefined) {
-        await updateEmailVerificationStatus(userId, updates.isEmailVerified);
+        updateOperations.push(updateEmailVerificationStatus(userId, updates.isEmailVerified));
       }
       
       if (updates.isPhoneVerified !== undefined) {
-        await updatePhoneVerificationStatus(userId, updates.isPhoneVerified);
+        updateOperations.push(updatePhoneVerificationStatus(userId, updates.isPhoneVerified));
       }
       
       if (updates.isApproved !== undefined) {
-        await updateApprovalStatus(userId, updates.isApproved);
+        updateOperations.push(updateApprovalStatus(userId, updates.isApproved));
       }
       
       if (updates.isMfaEnabled !== undefined) {
-        await updateMfaStatus(userId, updates.isMfaEnabled);
+        updateOperations.push(updateMfaStatus(userId, updates.isMfaEnabled));
       }
+      
+      // Execute all update operations in parallel
+      await Promise.all(updateOperations);
       
       // Update local state with new values
       setVerificationState(prev => prev ? { ...prev, ...updates } : null);
       
       toast({
         title: 'Success',
-        description: 'Verification status updated successfully.',
+        description: `${updateDescription} completed successfully.`,
       });
     } catch (err: any) {
       console.error('Error updating verification status:', err);
-      setError(err.message || 'Failed to update verification status');
       
+      // Handle different types of errors with specific messages
+      if (err.name === 'AbortError' || err.code === 'ECONNABORTED') {
+        setError('Network timeout. Please check your internet connection and try again.');
+      } else if (err.response && err.response.status === 404) {
+        setError('User profile not found. The account may have been deleted or not properly created.');
+      } else if (err.response && err.response.status === 403) {
+        setError('Access denied. You do not have permission to update this information.');
+      } else if (err.response && err.response.status >= 500) {
+        setError('Server error while updating. Our team has been notified. Please try again later.');
+      } else if (err.message.includes('Firebase') || err.code?.includes('auth/')) {
+        setError('Authentication error. Please sign out and sign in again before updating.');
+      } else if (err.message === 'No update fields provided') {
+        setError('No valid update data provided. Please try again with proper values.');
+      } else {
+        setError(err.message || `Failed to update ${updateDescription}`);
+      }
+      
+      // Show toast with specific update type that failed
       toast({
-        title: 'Error',
-        description: 'Failed to update verification status. Please try again.',
+        title: `Error Updating ${updateTypes.join(', ')}`,
+        description: error || 'Please try again or contact support if the problem persists.',
         variant: 'destructive',
       });
       
@@ -195,10 +357,29 @@ export const AdminVerificationProvider: React.FC<AdminVerificationProviderProps>
     }
   };
   
-  // Reset error state
-  const resetError = () => setError(null);
+  /**
+   * Reset error state and potentially retry operation
+   * 
+   * This function clears the error state and optionally
+   * refreshes the verification status if requested.
+   * 
+   * @param retry - Whether to retry fetching the verification status
+   */
+  const resetError = (retry: boolean = false) => {
+    setError(null);
+    
+    if (retry && userId) {
+      // Include a small delay to ensure UI updates before retry
+      setTimeout(() => {
+        refreshStatus();
+      }, 500);
+    }
+  };
   
-  // Context value
+  /**
+   * Context value for the AdminVerificationProvider
+   * This object contains all the values and functions exposed by the context
+   */
   const contextValue: AdminVerificationContextType = {
     userId,
     setUserId,
