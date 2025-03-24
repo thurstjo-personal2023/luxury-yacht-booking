@@ -41,13 +41,13 @@ const PendingApprovalPage: React.FC = () => {
       
       if (!currentUser) {
         // No user is signed in, redirect to login
-        navigate('/admin/login');
+        navigate('/admin-login');
         return;
       }
       
       // If email or phone is not verified, go back to verification
       if (!currentUser.emailVerified) {
-        navigate('/admin/verify-email');
+        navigate(`/admin-email-verification/${currentUser.uid}`);
         return;
       }
       
@@ -89,7 +89,7 @@ const PendingApprovalPage: React.FC = () => {
       if (response.data.status === 'approved') {
         // Delay a bit so user can see the approved message
         setTimeout(() => {
-          navigate('/admin/setup-mfa');
+          navigate(`/admin-mfa-setup/${user.uid}`);
         }, 3000);
       }
     } catch (error) {
@@ -110,7 +110,7 @@ const PendingApprovalPage: React.FC = () => {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      navigate('/admin/login');
+      navigate('/admin-login');
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -170,7 +170,7 @@ const PendingApprovalPage: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button className="w-full" onClick={() => navigate('/admin/login')}>
+            <Button className="w-full" onClick={() => navigate('/admin-login')}>
               Go to Login
             </Button>
           </CardContent>

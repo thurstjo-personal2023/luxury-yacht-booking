@@ -224,7 +224,7 @@ const PhoneVerificationPage: React.FC = () => {
       
       // Redirect to pending approval page after a delay
       setTimeout(() => {
-        navigate('/admin/pending-approval');
+        navigate(`/admin-pending-approval/${user.uid}`);
       }, 2000);
     } catch (error: any) {
       console.error('Error verifying OTP:', error);
@@ -253,7 +253,7 @@ const PhoneVerificationPage: React.FC = () => {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      navigate('/admin/login');
+      navigate('/admin-login');
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -304,7 +304,7 @@ const PhoneVerificationPage: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button className="w-full" onClick={() => navigate('/admin/login')}>
+            <Button className="w-full" onClick={() => navigate('/admin-login')}>
               Go to Login
             </Button>
           </CardContent>
