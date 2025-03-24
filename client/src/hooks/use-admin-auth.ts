@@ -37,7 +37,7 @@ interface AdminUser {
 // Admin authentication context type
 interface AdminAuthContextType {
   adminUser: AdminUser | null;
-  loading: boolean;
+  isLoading: boolean;
   error: string | null;
   adminSignIn: (email: string, password: string) => Promise<FirebaseUser>;
   adminSignOut: () => Promise<void>;
@@ -51,7 +51,7 @@ interface AdminAuthContextType {
 // Create the context with default values
 const AdminAuthContext = createContext<AdminAuthContextType>({
   adminUser: null,
-  loading: true,
+  isLoading: true,
   error: null,
   adminSignIn: async () => { throw new Error('Not implemented'); },
   adminSignOut: async () => { throw new Error('Not implemented'); },
@@ -76,7 +76,7 @@ export function AdminAuthProvider({
   sessionTimeout = 900 // 15 minutes default
 }: AdminAuthProviderProps) {
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const auth = getAuth();
   const db = getFirestore();
@@ -134,7 +134,7 @@ export function AdminAuthProvider({
         setAdminUser(null);
       }
       
-      setLoading(false);
+      setIsLoading(false);
     });
     
     return () => unsubscribe();
@@ -143,7 +143,7 @@ export function AdminAuthProvider({
   // Sign in as admin
   const adminSignIn = async (email: string, password: string): Promise<FirebaseUser> => {
     try {
-      setLoading(true);
+      setIsLoading(true);
       setError(null);
       console.log('AdminAuthProvider: Attempting to sign in admin user');
       
@@ -189,7 +189,7 @@ export function AdminAuthProvider({
       setError(errorMessage);
       throw err;
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -375,7 +375,7 @@ export function AdminAuthProvider({
   // Context value
   const contextValue = {
     adminUser,
-    loading,
+    isLoading,
     error,
     adminSignIn,
     adminSignOut,
