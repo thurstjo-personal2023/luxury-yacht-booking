@@ -888,7 +888,21 @@ router.post('/api/admin/process-approval', verifyAuth, verifySuperAdminRole, asy
       updatedAt: FieldValue.serverTimestamp(),
     });
     
-    // If approved, update Firebase Auth custom claims
+    // If rejected, update the harmonized user to mark as rejected
+    if (!isApproved) {
+      const harmonizedUserRef = adminDb.collection('harmonized_users').doc(approval.adminId);
+      const harmonizedUserDoc = await harmonizedUserRef.get();
+      
+      if (harmonizedUserDoc.exists) {
+        await harmonizedUserRef.update({
+          isAdmin: true,
+          adminStatus: 'disabled',
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+    }
+    
+    // If approved, update Firebase Auth custom claims and harmonized user
     if (isApproved) {
       const adminProfileDoc = await adminProfileRef.get();
       const adminProfile = adminProfileDoc.data();
@@ -896,7 +910,42 @@ router.post('/api/admin/process-approval', verifyAuth, verifySuperAdminRole, asy
       // Set custom claims with role
       await adminAuth.setCustomUserClaims(approval.adminId, {
         role: adminProfile?.role || 'admin',
+        isAdmin: true,
       });
+      
+      // Update harmonized user with admin fields
+      const harmonizedUserRef = adminDb.collection('harmonized_users').doc(approval.adminId);
+      const harmonizedUserDoc = await harmonizedUserRef.get();
+      
+      if (harmonizedUserDoc.exists) {
+        await harmonizedUserRef.update({
+          isAdmin: true,
+          adminRole: adminProfile?.role?.toUpperCase() || 'ADMIN',
+          adminStatus: 'active',
+          adminDepartment: adminProfile?.department || '',
+          adminPosition: adminProfile?.position || '',
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Create a new harmonized user record if it doesn't exist
+        await harmonizedUserRef.set({
+          id: approval.adminId,
+          userId: approval.adminId,
+          name: adminProfile?.firstName + ' ' + adminProfile?.lastName,
+          email: adminProfile?.email || '',
+          phone: adminProfile?.phoneNumber || '',
+          role: 'admin',
+          isAdmin: true,
+          adminRole: adminProfile?.role?.toUpperCase() || 'ADMIN',
+          adminStatus: 'active',
+          adminDepartment: adminProfile?.department || '',
+          adminPosition: adminProfile?.position || '',
+          emailVerified: true,
+          points: 0,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
     }
     
     return res.json({

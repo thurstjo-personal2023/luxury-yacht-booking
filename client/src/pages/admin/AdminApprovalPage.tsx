@@ -92,8 +92,12 @@ const AdminApprovalPage: React.FC = () => {
   const { user, profileData } = useAuthService();
   
   // Determine admin status from profile data
-  const isAdmin = profileData?.harmonizedUser?.adminRole === 'ADMIN' || profileData?.harmonizedUser?.adminRole === 'SUPER_ADMIN';
-  const isSuperAdmin = profileData?.harmonizedUser?.adminRole === 'SUPER_ADMIN';
+  const isAdmin = profileData?.harmonizedUser?.isAdmin && (
+    profileData?.harmonizedUser?.adminRole === 'ADMIN' || 
+    profileData?.harmonizedUser?.adminRole === 'SUPER_ADMIN'
+  );
+  const isSuperAdmin = profileData?.harmonizedUser?.isAdmin && 
+    profileData?.harmonizedUser?.adminRole === 'SUPER_ADMIN';
   
   // Fetch approval requests on mount
   useEffect(() => {
