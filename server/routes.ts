@@ -3441,6 +3441,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Stripe-related routes
   registerStripeRoutes(app);
+  
+  // Register Admin Registration routes
+  try {
+    const { registerAdminRegistrationRoutes } = require('./admin-registration-routes');
+    registerAdminRegistrationRoutes(app);
+    console.log('Admin registration routes successfully registered');
+  } catch (error) {
+    console.error('Failed to register admin registration routes:', error);
+  }
 
   const httpServer = createServer(app);
   return httpServer;

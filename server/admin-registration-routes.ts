@@ -1,9 +1,9 @@
 import { Router, Request, Response, Express } from 'express';
 import { z } from 'zod';
-import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { getAuth } from 'firebase/auth';
-import { db, auth, functions } from './firebase';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+
+// Import Firebase Admin SDK resources
+import { adminDb, adminAuth } from './firebase-admin';
 
 // Admin registration router
 const router = Router();
@@ -31,12 +31,42 @@ router.post('/api/admin/validate-invitation', async (req: Request, res: Response
       });
     }
     
-    // Call Firebase function to validate token
-    const validateInvitation = httpsCallable(functions, 'validateInvitation');
-    const result = await validateInvitation({ token });
+    // Direct validation of invitation token using admin SDK
+    const invitationsRef = adminDb.collection('admin_invitations');
+    const invitationQuery = invitationsRef.where('token', '==', token).where('used', '==', false);
+    const invitationSnapshot = await invitationQuery.get();
+    
+    if (invitationSnapshot.empty) {
+      return res.json({
+        valid: false,
+        message: 'Invalid or already used invitation token',
+      });
+    }
+    
+    const invitationDoc = invitationSnapshot.docs[0];
+    const invitation = invitationDoc.data();
+    
+    // Check expiration
+    const expiresAt = invitation.expiresAt?.toDate?.() || null;
+    const now = new Date();
+    
+    if (expiresAt && now > expiresAt) {
+      return res.json({
+        valid: false,
+        message: 'Invitation token has expired',
+      });
+    }
     
     // Return validation result
-    return res.json(result.data);
+    return res.json({
+      valid: true,
+      data: {
+        email: invitation.email,
+        role: invitation.role || 'admin',
+        department: invitation.department || '',
+        invitedBy: invitation.createdBy || '',
+      }
+    });
   } catch (error: any) {
     console.error('Error validating invitation:', error);
     return res.status(500).json({
@@ -82,9 +112,9 @@ router.post('/api/admin/create-profile', async (req: Request, res: Response) => 
     }
     
     // Find the invitation to get its details
-    const invitationsRef = collection(db, 'admin_invitations');
-    const q = query(invitationsRef, where('token', '==', invitationToken), where('used', '==', false));
-    const invitationSnapshot = await getDocs(q);
+    const invitationsRef = adminDb.collection('admin_invitations');
+    const invitationQuery = invitationsRef.where('token', '==', invitationToken).where('used', '==', false);
+    const invitationSnapshot = await invitationQuery.get();
     
     if (invitationSnapshot.empty) {
       return res.status(400).json({
@@ -105,8 +135,8 @@ router.post('/api/admin/create-profile', async (req: Request, res: Response) => 
     }
     
     // Create admin profile
-    const adminProfileRef = doc(db, 'admin_profiles', uid);
-    await setDoc(adminProfileRef, {
+    const adminProfileRef = adminDb.collection('admin_profiles').doc(uid);
+    await adminProfileRef.set({
       uid,
       firstName,
       lastName,
@@ -122,8 +152,8 @@ router.post('/api/admin/create-profile', async (req: Request, res: Response) => 
       isEmailVerified: false,
       isPhoneVerified: false,
       mfaEnabled: false,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
     
     return res.json({
@@ -151,12 +181,30 @@ router.post('/api/admin/complete-invitation', async (req: Request, res: Response
       });
     }
     
-    // Call Firebase function to complete registration
-    const completeInvitation = httpsCallable(functions, 'completeInvitationRegistration');
-    const result = await completeInvitation({ token });
+    // Find the invitation
+    const invitationsRef = adminDb.collection('admin_invitations');
+    const invitationQuery = invitationsRef.where('token', '==', token).where('used', '==', false);
+    const invitationSnapshot = await invitationQuery.get();
     
-    // Return result
-    return res.json(result.data);
+    if (invitationSnapshot.empty) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or already used invitation',
+      });
+    }
+    
+    // Mark invitation as used
+    const invitationDoc = invitationSnapshot.docs[0];
+    await invitationDoc.ref.update({
+      used: true,
+      usedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    
+    return res.json({
+      success: true,
+      message: 'Invitation marked as used successfully',
+    });
   } catch (error: any) {
     console.error('Error completing invitation registration:', error);
     return res.status(500).json({
@@ -179,10 +227,10 @@ router.post('/api/admin/update-verification-status', async (req: Request, res: R
     }
     
     // Get admin profile
-    const adminProfileRef = doc(db, 'admin_profiles', uid);
-    const adminProfileDoc = await getDoc(adminProfileRef);
+    const adminProfileRef = adminDb.collection('admin_profiles').doc(uid);
+    const adminProfileDoc = await adminProfileRef.get();
     
-    if (!adminProfileDoc.exists()) {
+    if (!adminProfileDoc.exists) {
       return res.status(404).json({
         success: false,
         message: 'Admin profile not found',
@@ -190,7 +238,7 @@ router.post('/api/admin/update-verification-status', async (req: Request, res: R
     }
     
     const updateData: Record<string, any> = {
-      updatedAt: serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     };
     
     // Update email verification status if provided
@@ -209,30 +257,30 @@ router.post('/api/admin/update-verification-status', async (req: Request, res: R
     
     // Check if both email and phone are verified
     const currentData = adminProfileDoc.data();
-    const willEmailBeVerified = emailVerified !== undefined ? emailVerified : currentData.isEmailVerified;
-    const willPhoneBeVerified = isPhoneVerified !== undefined ? isPhoneVerified : currentData.isPhoneVerified;
+    const willEmailBeVerified = emailVerified !== undefined ? emailVerified : currentData?.isEmailVerified;
+    const willPhoneBeVerified = isPhoneVerified !== undefined ? isPhoneVerified : currentData?.isPhoneVerified;
     
     // If both are verified, update status and create approval request
-    if (willEmailBeVerified && willPhoneBeVerified && currentData.status === 'pending_verification') {
+    if (willEmailBeVerified && willPhoneBeVerified && currentData?.status === 'pending_verification') {
       updateData.status = 'pending_approval';
       
       // Create approval request
-      const approvalRef = doc(collection(db, 'admin_approval_requests'));
-      await setDoc(approvalRef, {
+      const approvalRef = adminDb.collection('admin_approval_requests').doc();
+      await approvalRef.set({
         adminId: uid,
         adminEmail: currentData.email,
         adminName: `${currentData.firstName} ${currentData.lastName}`,
         adminDepartment: currentData.department,
         adminPosition: currentData.position,
         status: 'pending',
-        requestedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        requestedAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
     }
     
     // Update admin profile
-    await updateDoc(adminProfileRef, updateData);
+    await adminProfileRef.update(updateData);
     
     return res.json({
       success: true,
@@ -260,10 +308,10 @@ router.get('/api/admin/profile/:uid', async (req: Request, res: Response) => {
     }
     
     // Get admin profile
-    const adminProfileRef = doc(db, 'admin_profiles', uid);
-    const adminProfileDoc = await getDoc(adminProfileRef);
+    const adminProfileRef = adminDb.collection('admin_profiles').doc(uid);
+    const adminProfileDoc = await adminProfileRef.get();
     
-    if (!adminProfileDoc.exists()) {
+    if (!adminProfileDoc.exists) {
       return res.status(404).json({
         success: false,
         message: 'Admin profile not found',
@@ -274,7 +322,7 @@ router.get('/api/admin/profile/:uid', async (req: Request, res: Response) => {
     
     // Convert Firestore timestamps to ISO strings
     const profileWithFormattedDates: Record<string, any> = {};
-    for (const [key, value] of Object.entries(adminProfile)) {
+    for (const [key, value] of Object.entries(adminProfile || {})) {
       if (value instanceof Timestamp) {
         profileWithFormattedDates[key] = value.toDate().toISOString();
       } else {
@@ -305,9 +353,9 @@ router.get('/api/admin/approval-status/:uid', async (req: Request, res: Response
     }
     
     // Find approval request
-    const approvalsRef = collection(db, 'admin_approval_requests');
-    const q = query(approvalsRef, where('adminId', '==', uid));
-    const approvalSnapshot = await getDocs(q);
+    const approvalsRef = adminDb.collection('admin_approval_requests');
+    const approvalQuery = approvalsRef.where('adminId', '==', uid);
+    const approvalSnapshot = await approvalQuery.get();
     
     if (approvalSnapshot.empty) {
       return res.status(404).json({
@@ -342,4 +390,3 @@ router.get('/api/admin/approval-status/:uid', async (req: Request, res: Response
     });
   }
 });
-
