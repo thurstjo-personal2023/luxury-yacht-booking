@@ -107,26 +107,31 @@ function App() {
         
         // Wrap the initialization with a try-catch for better error logging
         try {
-          // Skip verification for now (can be re-enabled after testing)
-          // Instead, just log completion without actually verifying collections
-          console.log("[DEBUG-AUTH] App.tsx: Skipping actual verification to prevent auth state changes");
-          
-          // Simulate verification completion
-          setTimeout(() => {
-            // Check auth state after "verification" completes
-            const currentUser = auth.currentUser;
-            const authStateAfter = { 
-              isAuthenticated: !!currentUser, 
-              authTime: new Date().toISOString(),
-              userId: currentUser?.uid || 'none'
-            };
-            console.log("[DEBUG-AUTH] App.tsx: Auth state AFTER skipped verification:", authStateAfter);
-            
-            // Log if a sign-out occurred
-            if (authStateBefore.isAuthenticated && !authStateAfter.isAuthenticated) {
-              console.error("[DEBUG-AUTH] App.tsx: CRITICAL - User was signed out during verification process!");
-            }
-          }, 500);
+          // Import the authService for sensitive operations
+          import('@/services/auth/auth-service').then(({ authService }) => {
+            // Use performSensitiveOperation to prevent auth state changes during verification
+            authService.performSensitiveOperation(async () => {
+              console.log("[DEBUG-AUTH] App.tsx: Performing actual verification with sensitive operation mode enabled");
+              // Now it's safe to verify collections without authentication state changes
+              await initializeFirestore(false);
+              
+              // Check auth state after verification completes
+              const currentUser = auth.currentUser;
+              const authStateAfter = { 
+                isAuthenticated: !!currentUser, 
+                authTime: new Date().toISOString(),
+                userId: currentUser?.uid || 'none'
+              };
+              console.log("[DEBUG-AUTH] App.tsx: Auth state AFTER protected verification:", authStateAfter);
+              
+              // Log if a sign-out occurred (should be prevented by sensitiveOperationInProgress)
+              if (authStateBefore.isAuthenticated && !authStateAfter.isAuthenticated) {
+                console.error("[DEBUG-AUTH] App.tsx: CRITICAL - User was signed out during protected verification!");
+              }
+            }).catch(error => {
+              console.error("[DEBUG-AUTH] App.tsx: Error during protected verification:", error);
+            });
+          });
         } catch (error) {
           console.error("[DEBUG-AUTH] App.tsx: Exception during Firestore initialization setup:", error);
           

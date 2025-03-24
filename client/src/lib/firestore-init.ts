@@ -70,6 +70,9 @@ async function verifyCollection(collectionName: string) {
   }
 }
 
+// Import the authService (at the top of the file, we'll dynamically import it later)
+// to avoid circular dependencies
+
 // Initialize Firestore collections
 export async function initializeFirestore(skipVerification = false) {
   const mode = USE_FIREBASE_EMULATORS ? "emulator" : "production";
@@ -93,26 +96,34 @@ export async function initializeFirestore(skipVerification = false) {
     // Verify all collections exist - do this one by one for better debugging
     console.log("[DEBUG-AUTH] firestore-init.ts: Verifying collections sequentially for debugging");
     
-    for (const collectionName of Object.values(collections)) {
-      console.log(`[DEBUG-AUTH] firestore-init.ts: Starting verification of collection: ${collectionName}`);
+    // Dynamically import authService to avoid circular dependencies
+    const { authService } = await import('../services/auth/auth-service');
+    
+    // Use the performSensitiveOperation method to prevent auth changes during verification
+    await authService.performSensitiveOperation(async () => {
+      console.log("[DEBUG-AUTH] firestore-init.ts: Performing collection verification in sensitive operation mode");
       
-      // Check auth state before each collection verification
-      const currentUser = auth.currentUser;
-      console.log(`[DEBUG-AUTH] firestore-init.ts: Auth state before verifying ${collectionName}:`, 
-        currentUser ? { uid: currentUser.uid } : 'Not authenticated');
-      
-      await verifyCollection(collectionName);
-      
-      // Check auth state after each collection verification
-      const userAfter = auth.currentUser;
-      console.log(`[DEBUG-AUTH] firestore-init.ts: Auth state after verifying ${collectionName}:`, 
-        userAfter ? { uid: userAfter.uid } : 'Not authenticated');
-      
-      // Detect if sign-out occurred during this collection verification
-      if (currentUser && !userAfter) {
-        console.error(`[DEBUG-AUTH] CRITICAL: User was signed out during verification of collection: ${collectionName}`);
+      for (const collectionName of Object.values(collections)) {
+        console.log(`[DEBUG-AUTH] firestore-init.ts: Starting verification of collection: ${collectionName}`);
+        
+        // Check auth state before each collection verification
+        const currentUser = auth.currentUser;
+        console.log(`[DEBUG-AUTH] firestore-init.ts: Auth state before verifying ${collectionName}:`, 
+          currentUser ? { uid: currentUser.uid } : 'Not authenticated');
+        
+        await verifyCollection(collectionName);
+        
+        // Check auth state after each collection verification
+        const userAfter = auth.currentUser;
+        console.log(`[DEBUG-AUTH] firestore-init.ts: Auth state after verifying ${collectionName}:`, 
+          userAfter ? { uid: userAfter.uid } : 'Not authenticated');
+        
+        // Detect if sign-out occurred during this collection verification
+        if (currentUser && !userAfter) {
+          console.error(`[DEBUG-AUTH] CRITICAL: User was signed out during verification of collection: ${collectionName}`);
+        }
       }
-    }
+    });
     
     // Log authentication state after all verifications
     const authStateAfter = {
