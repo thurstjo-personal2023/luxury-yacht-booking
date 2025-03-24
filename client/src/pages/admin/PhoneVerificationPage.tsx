@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'wouter';
+import { useLocation, useParams } from 'wouter';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { RecaptchaVerifier, PhoneAuthProvider, linkWithCredential } from 'firebase/auth';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import axios from 'axios';
+import { updatePhoneVerificationStatus, getVerificationStatus } from '@/services/admin/verification-service';
 
 // Define phone number schema - Valid UAE numbers
 const phoneSchema = z.object({
@@ -94,9 +95,9 @@ const PhoneVerificationPage: React.FC = () => {
       
       try {
         // Check if phone is already verified
-        const response = await axios.get(`/api/admin/profile/${currentUser.uid}`);
+        const status = await getVerificationStatus(currentUser.uid);
         
-        if (response.data.isPhoneVerified) {
+        if (status.isPhoneVerified) {
           setVerificationComplete(true);
           // Redirect to pending approval page after a delay
           setTimeout(() => {
@@ -104,7 +105,7 @@ const PhoneVerificationPage: React.FC = () => {
           }, 2000);
         }
       } catch (error) {
-        console.error('Error fetching admin profile:', error);
+        console.error('Error fetching verification status:', error);
       }
     });
     
@@ -209,11 +210,11 @@ const PhoneVerificationPage: React.FC = () => {
       await linkWithCredential(user, credential);
       
       // Update admin profile to mark phone as verified
-      await axios.post('/api/admin/update-verification-status', {
-        uid: user.uid,
-        isPhoneVerified: true,
-        phoneNumber: phoneForm.getValues('phoneNumber'),
-      });
+      await updatePhoneVerificationStatus(
+        user.uid, 
+        true,
+        phoneForm.getValues('phoneNumber')
+      );
       
       setVerificationComplete(true);
       

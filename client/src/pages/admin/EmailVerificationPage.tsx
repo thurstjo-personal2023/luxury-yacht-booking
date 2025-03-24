@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'wouter';
+import { useLocation, useParams } from 'wouter';
 import { getAuth, sendEmailVerification, onAuthStateChanged, signOut } from 'firebase/auth';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { toast } from '@/hooks/use-toast';
 import { Spinner } from '@/components/ui/spinner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { updateEmailVerificationStatus, getVerificationStatus } from '@/services/admin/verification-service';
 
 /**
  * Email Verification Page Component
@@ -15,6 +16,10 @@ import { CheckCircle, AlertTriangle, RefreshCcw } from 'lucide-react';
  * It displays verification status and guides the user through the verification process
  */
 const EmailVerificationPage: React.FC = () => {
+  // Get UID from URL params
+  const params = useParams<{ uid: string }>();
+  const uid = params?.uid;
+  
   // State
   const [, navigate] = useLocation();
   const [loading, setLoading] = useState(true);
@@ -44,16 +49,7 @@ const EmailVerificationPage: React.FC = () => {
       if (currentUser.emailVerified) {
         try {
           // Update profile to reflect verified email status
-          await fetch('/api/admin/update-verification-status', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              uid: currentUser.uid,
-              emailVerified: true,
-            }),
-          });
+          await updateEmailVerificationStatus(currentUser.uid, true);
           
           // Continue to phone verification
           navigate(`/admin-phone-verification/${currentUser.uid}`);
@@ -69,7 +65,7 @@ const EmailVerificationPage: React.FC = () => {
     
     // Cleanup function
     return () => unsubscribe();
-  }, [auth, navigate]);
+  }, [auth, navigate, uid]);
   
   // Check verification status at intervals
   useEffect(() => {
@@ -85,16 +81,7 @@ const EmailVerificationPage: React.FC = () => {
           setUser({...user, emailVerified: true});
           
           // Update profile to reflect verified email status
-          await fetch('/api/admin/update-verification-status', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              uid: auth.currentUser.uid,
-              emailVerified: true,
-            }),
-          });
+          await updateEmailVerificationStatus(auth.currentUser.uid, true);
           
           toast({
             title: 'Email Verified',
