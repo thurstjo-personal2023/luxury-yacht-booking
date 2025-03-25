@@ -13,12 +13,26 @@ import { useAdminAuth } from '@/hooks/use-admin-auth';
 import { useLocation } from 'wouter';
 
 export default function MediaManagement() {
-  const { adminUser, isAuthenticated } = useAdminAuth();
+  const { adminUser, isLoading, error } = useAdminAuth();
   const [, setLocation] = useLocation();
   
+  // Show loading state
+  if (isLoading) {
+    return <div className="container mx-auto py-10">Loading authentication...</div>;
+  }
+  
   // Redirect if user is not authenticated or not an admin
-  if (!isAuthenticated) {
+  if (!adminUser) {
     setLocation('/admin-login');
+    return null;
+  }
+  
+  // Check admin role
+  const adminRole = adminUser.role;
+  const hasAccess = adminRole && ['SUPER_ADMIN', 'ADMIN', 'super_admin', 'admin'].includes(adminRole);
+  
+  if (!hasAccess) {
+    setLocation('/admin-dashboard');
     return null;
   }
   

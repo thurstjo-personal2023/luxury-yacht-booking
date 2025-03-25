@@ -4,34 +4,40 @@ import { Button } from '@/components/ui/button';
 import { ImageValidationReports } from '@/components/admin/ImageValidationReports';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
-import { useAuth } from '@/hooks/use-auth';
+import { useAdminAuth } from '@/hooks/use-admin-auth';
 
 export function ImageValidator() {
-  const { user, userRole } = useAuth();
+  const { adminUser, isLoading, error } = useAdminAuth();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   
-  // Check if user is producer (admin)
-  // In a real app, this would check for a specific admin role
-  const isAdmin = userRole === 'producer';
-  
-  if (!user) {
+  // Check admin authentication status
+  if (!adminUser && !isLoading) {
     toast({
       title: 'Unauthorized',
-      description: 'Please log in to access this page.',
+      description: 'Please log in to access this admin page.',
       variant: 'destructive'
     });
-    navigate('/login');
+    navigate('/admin-login');
     return null;
   }
   
-  if (!isAdmin) {
+  // Show loading state
+  if (isLoading) {
+    return <div className="container mx-auto py-10">Loading authentication...</div>;
+  }
+  
+  // Check admin role - this is now using proper admin role check
+  const adminRole = adminUser?.role;
+  const hasAccess = adminRole && ['SUPER_ADMIN', 'ADMIN', 'super_admin', 'admin'].includes(adminRole);
+  
+  if (!hasAccess) {
     toast({
       title: 'Forbidden',
       description: 'You do not have permission to access this page.',
       variant: 'destructive'
     });
-    navigate('/');
+    navigate('/admin-dashboard');
     return null;
   }
 
