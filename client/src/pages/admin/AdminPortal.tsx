@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -79,7 +79,19 @@ const successVariants = {
 const AdminPortalInner: React.FC = () => {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
-  const { adminUser } = useAdminAuth();
+  const { adminUser, isLoading } = useAdminAuth();
+  
+  // Redirect to admin login if not authenticated
+  useEffect(() => {
+    if (!isLoading && !adminUser) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to access the admin portal",
+        variant: "destructive"
+      });
+      navigate('/admin-login');
+    }
+  }, [adminUser, isLoading, navigate, toast]);
   
   // Get verification state from context
   const { 
