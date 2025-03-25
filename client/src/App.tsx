@@ -248,6 +248,11 @@ function App() {
                       <MediaValidation />
                     </PrivateRoute>
                   </Route>
+                  <Route path="/admin/media-admin">
+                    <PrivateRoute routeType="admin">
+                      <MediaAdmin />
+                    </PrivateRoute>
+                  </Route>
                   <Route path="/admin/pubsub-validation">
                     <PrivateRoute routeType="admin">
                       <PubSubValidation />
