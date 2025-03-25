@@ -1,82 +1,82 @@
 /**
- * Admin Detail View Component
+ * AdminDetailView Component
  * 
  * This component displays detailed information about an administrator
- * including personal information, role, department, and status.
+ * and provides controls for super admins to manage administrator roles and status.
  */
-import { useState } from 'react';
-import {
-  User,
-  Mail,
-  Shield,
-  Building2,
-  Briefcase,
-  Calendar,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Edit,
-  ArrowLeftCircle,
-  UserCog,
-} from 'lucide-react';
-
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
-  DialogTitle,
+  DialogTitle
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import ConfirmationDialog from './ConfirmationDialog';
+import {
+  formatAdminRole,
+  formatAdminDepartment,
+  formatAdminStatus,
+  formatTimestamp,
+  hasPermission,
+  getRoleBadgeColor,
+  getStatusBadgeColor,
+  getAdminRoles,
+  getAvailableStatuses,
+  logAdminActivity
+} from '../../utils/admin-utils';
+import { useToast } from '@/hooks/use-toast';
 
-import { formatDate, formatDateTime, formatTimeDifference, getRoleBadge, getStatusBadge } from '../../utils/admin-utils';
-
-// Types
+// Types for the admin user object
 interface AdminUser {
   id: string;
   email: string;
-  name: string;
+  displayName?: string;
   role: string;
   department: string;
   position: string;
   status: string;
   createdAt: string;
-  updatedAt: string;
-  lastLoginAt?: string;
+  lastLogin?: string;
+  updatedAt?: string;
+  phoneNumber?: string;
+  photoURL?: string;
 }
 
+// Component props
 interface AdminDetailViewProps {
   isOpen: boolean;
   onClose: () => void;
   admin: AdminUser | null;
   currentUserRole: string;
-  onRoleChange: (adminId: string, role: string) => void;
-  onStatusChange: (adminId: string, status: string) => void;
+  onRoleChange: (adminId: string, newRole: string) => void;
+  onStatusChange: (adminId: string, newStatus: string) => void;
 }
 
 export default function AdminDetailView({
@@ -85,274 +85,342 @@ export default function AdminDetailView({
   admin,
   currentUserRole,
   onRoleChange,
-  onStatusChange,
+  onStatusChange
 }: AdminDetailViewProps) {
-  const [confirmRoleChange, setConfirmRoleChange] = useState<string | null>(null);
-  const [confirmStatusChange, setConfirmStatusChange] = useState<string | null>(null);
-  
-  // Can't edit if no admin is selected
-  if (!admin) return null;
-  
-  // Check if current user has permission to edit
-  const canEdit = currentUserRole.toUpperCase() === 'SUPER_ADMIN' || 
-    (currentUserRole.toUpperCase() === 'ADMIN' && admin.role.toUpperCase() !== 'SUPER_ADMIN');
-  
-  // Determine available roles based on current user's role
-  const availableRoles = () => {
-    if (currentUserRole.toUpperCase() === 'SUPER_ADMIN') {
-      return ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'];
-    } else if (currentUserRole.toUpperCase() === 'ADMIN') {
-      return ['ADMIN', 'MODERATOR'];
-    } else {
-      return [];
-    }
+  const [selectedTab, setSelectedTab] = useState('details');
+  const { toast } = useToast();
+
+  // Handle closing when admin is null (for safety)
+  if (!admin) {
+    return null;
+  }
+
+  // Generate initials for avatar fallback
+  const getInitials = (name: string) => {
+    if (!name) return 'AU';
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
   };
-  
-  // Handle role change confirmation
-  const handleRoleChangeRequest = (role: string) => {
-    setConfirmRoleChange(role);
+
+  // Handle role change
+  const handleRoleChange = async (newRole: string) => {
+    if (newRole === admin.role) return;
+    
+    // Log the action
+    await logAdminActivity(
+      'UPDATE_ADMIN',
+      `Changed role for ${admin.email} from ${admin.role} to ${newRole}`,
+      admin.id,
+      'admin_user'
+    );
+    
+    onRoleChange(admin.id, newRole);
   };
-  
-  // Handle status change confirmation
-  const handleStatusChangeRequest = (status: string) => {
-    setConfirmStatusChange(status);
+
+  // Handle status change
+  const handleStatusChange = async (newStatus: string) => {
+    if (newStatus === admin.status) return;
+    
+    const actionType = newStatus === 'ACTIVE' 
+      ? 'ENABLE_ADMIN' 
+      : newStatus === 'DISABLED'
+        ? 'DISABLE_ADMIN'
+        : newStatus === 'REJECTED'
+          ? 'REJECT_ADMIN'
+          : 'UPDATE_ADMIN';
+    
+    // Log the action
+    await logAdminActivity(
+      actionType,
+      `Changed status for ${admin.email} from ${admin.status} to ${newStatus}`,
+      admin.id,
+      'admin_user'
+    );
+    
+    onStatusChange(admin.id, newStatus);
   };
-  
-  // Execute role change
-  const executeRoleChange = () => {
-    if (confirmRoleChange && admin) {
-      onRoleChange(admin.id, confirmRoleChange);
-      setConfirmRoleChange(null);
-    }
-  };
-  
-  // Execute status change
-  const executeStatusChange = () => {
-    if (confirmStatusChange && admin) {
-      onStatusChange(admin.id, confirmStatusChange);
-      setConfirmStatusChange(null);
-    }
-  };
-  
+
   return (
-    <Dialog open={isOpen} onOpenChange={(isOpen) => !isOpen && onClose()}>
+    <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <UserCog className="h-5 w-5" />
-            Administrator Details
+          <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+            <span>Administrator Details</span>
+            <Badge className={getRoleBadgeColor(admin.role)}>
+              {formatAdminRole(admin.role)}
+            </Badge>
           </DialogTitle>
           <DialogDescription>
             View and manage administrator information
           </DialogDescription>
         </DialogHeader>
         
-        {/* Admin Profile */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Left Column - Basic Info */}
-          <div className="md:col-span-1">
+        <div className="flex flex-col md:flex-row gap-4 items-start">
+          {/* Admin profile quick view */}
+          <div className="w-full md:w-1/3">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-md">Profile</CardTitle>
+                <CardTitle className="text-lg">Profile</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-col items-center mb-4">
-                  <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-2">
-                    <User className="w-12 h-12 text-primary" />
+              <CardContent className="flex flex-col items-center text-center gap-3">
+                <Avatar className="h-24 w-24">
+                  <AvatarImage src={admin.photoURL || ''} alt={admin.displayName || admin.email} />
+                  <AvatarFallback className="text-lg">
+                    {getInitials(admin.displayName || admin.email)}
+                  </AvatarFallback>
+                </Avatar>
+                
+                <div>
+                  <h3 className="font-medium text-lg">{admin.displayName || admin.email}</h3>
+                  <p className="text-muted-foreground text-sm">{admin.email}</p>
+                </div>
+                
+                <div className="w-full">
+                  <Badge 
+                    className={`${getStatusBadgeColor(admin.status)} w-full py-1 text-sm`}
+                    variant="outline"
+                  >
+                    {formatAdminStatus(admin.status)}
+                  </Badge>
+                </div>
+                
+                <div className="text-sm text-left w-full">
+                  <div className="flex justify-between py-1">
+                    <span className="text-muted-foreground">Department:</span>
+                    <span className="font-medium">{formatAdminDepartment(admin.department)}</span>
                   </div>
-                  <h3 className="font-medium text-lg">{admin.name}</h3>
-                  <p className="text-sm text-muted-foreground">{admin.email}</p>
-                  <div className="mt-2">{getRoleBadge(admin.role)}</div>
-                  <div className="mt-1">{getStatusBadge(admin.status)}</div>
-                </div>
-                
-                <div>
-                  <h4 className="text-sm font-medium mb-1">Department</h4>
-                  <p className="flex items-center gap-1 text-sm">
-                    <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    {admin.department}
-                  </p>
-                </div>
-                
-                <div>
-                  <h4 className="text-sm font-medium mb-1">Position</h4>
-                  <p className="flex items-center gap-1 text-sm">
-                    <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
-                    {admin.position}
-                  </p>
+                  <div className="flex justify-between py-1">
+                    <span className="text-muted-foreground">Position:</span>
+                    <span className="font-medium">{admin.position}</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-muted-foreground">Joined:</span>
+                    <span className="font-medium">{formatTimestamp(admin.createdAt)}</span>
+                  </div>
+                  {admin.lastLogin && (
+                    <div className="flex justify-between py-1">
+                      <span className="text-muted-foreground">Last Active:</span>
+                      <span className="font-medium">{formatTimestamp(admin.lastLogin)}</span>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
           
-          {/* Right Column - Additional Info */}
-          <div className="md:col-span-2">
-            <Card className="h-full">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center justify-between">
-                  <span className="text-md">Account Information</span>
-                  
-                  {canEdit && (
-                    <div className="flex gap-2">
-                      {/* Role Dropdown */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            Change Role
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {availableRoles().map((role) => (
-                            <DropdownMenuItem
-                              key={role}
-                              onClick={() => handleRoleChangeRequest(role)}
-                              disabled={admin.role.toUpperCase() === role}
-                            >
-                              {role === 'SUPER_ADMIN' ? 'Super Admin' : 
-                               role === 'ADMIN' ? 'Admin' : 'Moderator'}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+          {/* Admin details tabs */}
+          <div className="w-full md:w-2/3">
+            <Tabs defaultValue="details" value={selectedTab} onValueChange={setSelectedTab}>
+              <TabsList className="w-full grid grid-cols-2">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="permissions">Permissions</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="details" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Personal Information</CardTitle>
+                    <CardDescription>
+                      Personal and contact details for this administrator
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Email</Label>
+                        <div className="p-2 border rounded-md bg-muted/20">{admin.email}</div>
+                      </div>
                       
-                      {/* Status Dropdown */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button 
-                            variant={admin.status.toUpperCase() === 'ACTIVE' ? 'destructive' : 'default'}
-                            size="sm"
-                          >
-                            {admin.status.toUpperCase() === 'ACTIVE' ? 'Disable Account' : 'Enable Account'}
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleStatusChangeRequest('ACTIVE')}
-                            disabled={admin.status.toUpperCase() === 'ACTIVE'}
-                            className="text-green-600"
-                          >
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
-                            Activate Account
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleStatusChangeRequest('DISABLED')}
-                            disabled={admin.status.toUpperCase() === 'DISABLED'}
-                            className="text-destructive"
-                          >
-                            <XCircle className="h-4 w-4 mr-2" />
-                            Disable Account
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">Email</h4>
-                    <p className="flex items-center gap-1 text-sm">
-                      <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                      {admin.email}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">Account Created</h4>
-                    <p className="flex items-center gap-1 text-sm">
-                      <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                      {formatDate(admin.createdAt)}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">Last Updated</h4>
-                    <p className="flex items-center gap-1 text-sm">
-                      <Edit className="h-3.5 w-3.5 text-muted-foreground" />
-                      {formatDateTime(admin.updatedAt)}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-sm font-medium mb-1">Last Login</h4>
-                    <p className="flex items-center gap-1 text-sm">
-                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                      {admin.lastLoginAt ? formatTimeDifference(admin.lastLoginAt) : 'Never'}
-                    </p>
-                  </div>
-                </div>
-                
-                <Separator className="my-4" />
-                
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Access Permissions</h4>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Dashboard Access</span>
-                      <Badge variant="success">Allowed</Badge>
+                      <div className="space-y-2">
+                        <Label>Phone</Label>
+                        <div className="p-2 border rounded-md bg-muted/20">
+                          {admin.phoneNumber || 'Not provided'}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Department</Label>
+                        <div className="p-2 border rounded-md bg-muted/20">
+                          {formatAdminDepartment(admin.department)}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Position</Label>
+                        <div className="p-2 border rounded-md bg-muted/20">{admin.position}</div>
+                      </div>
                     </div>
                     
+                    <Separator />
+                    
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-medium">Account Timeline</h3>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Account Created:</span>
+                          <span>{formatTimestamp(admin.createdAt)}</span>
+                        </div>
+                        
+                        {admin.lastLogin && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Last Login:</span>
+                            <span>{formatTimestamp(admin.lastLogin)}</span>
+                          </div>
+                        )}
+                        
+                        {admin.updatedAt && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Last Updated:</span>
+                            <span>{formatTimestamp(admin.updatedAt)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="permissions" className="mt-4 space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Role & Permissions</CardTitle>
+                    <CardDescription>
+                      Manage this administrator's role and access level
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div>
+                      <Label className="mb-2 block">Administrator Role</Label>
+                      <div className="flex gap-4 items-center">
+                        <Select
+                          defaultValue={admin.role}
+                          onValueChange={handleRoleChange}
+                          disabled={!hasPermission(currentUserRole, 'SUPER_ADMIN')}
+                        >
+                          <SelectTrigger className="w-full max-w-xs">
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectLabel>Available Roles</SelectLabel>
+                              {getAdminRoles().map(role => (
+                                <SelectItem key={role.value} value={role.value}>
+                                  {role.label}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        
+                        <Badge className={getRoleBadgeColor(admin.role)}>
+                          {formatAdminRole(admin.role)}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {admin.role.toUpperCase() === 'SUPER_ADMIN' 
+                          ? 'Super Administrators have full access to all platform features and can manage other administrators.'
+                          : admin.role.toUpperCase() === 'ADMIN'
+                            ? 'Administrators can manage content, user accounts, and settings, but cannot manage Super Administrators.'
+                            : 'Moderators have limited access focused on content moderation and support tasks.'}
+                      </p>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div>
+                      <Label className="mb-2 block">Account Status</Label>
+                      <div className="flex gap-4 items-center">
+                        <Select
+                          defaultValue={admin.status}
+                          onValueChange={handleStatusChange}
+                          disabled={!hasPermission(currentUserRole, 'ADMIN')}
+                        >
+                          <SelectTrigger className="w-full max-w-xs">
+                            <SelectValue placeholder="Update status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectLabel>Available Status Updates</SelectLabel>
+                              {getAvailableStatuses(admin.status).map(status => (
+                                <SelectItem key={status.value} value={status.value}>
+                                  {status.label}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        
+                        <Badge className={getStatusBadgeColor(admin.status)}>
+                          {formatAdminStatus(admin.status)}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {admin.status.toUpperCase() === 'ACTIVE' 
+                          ? 'Active administrators have full access to their assigned permissions.'
+                          : admin.status.toUpperCase() === 'DISABLED'
+                            ? 'Disabled accounts cannot log in to the platform. The account can be reactivated at any time.'
+                            : admin.status.toUpperCase() === 'PENDING'
+                              ? 'This account is waiting for approval before it can be used.'
+                              : 'This account has been rejected and cannot be used.'}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Security section */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Security Settings</CardTitle>
+                    <CardDescription>
+                      Security and access settings for this administrator
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm">User Management</span>
-                      <Badge variant={admin.role.toUpperCase() === 'MODERATOR' ? 'outline' : 'success'}>
-                        {admin.role.toUpperCase() === 'MODERATOR' ? 'Limited' : 'Allowed'}
+                      <div>
+                        <h4 className="font-medium">Multi-Factor Authentication</h4>
+                        <p className="text-sm text-muted-foreground">
+                          MFA is required for all administrator accounts
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                        Enabled
                       </Badge>
                     </div>
                     
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Content Management</span>
-                      <Badge variant="success">Allowed</Badge>
-                    </div>
+                    <Separator />
                     
                     <div className="flex items-center justify-between">
-                      <span className="text-sm">System Settings</span>
-                      <Badge variant={admin.role.toUpperCase() === 'SUPER_ADMIN' ? 'success' : 'outline'}>
-                        {admin.role.toUpperCase() === 'SUPER_ADMIN' ? 'Allowed' : 'Restricted'}
-                      </Badge>
+                      <div>
+                        <h4 className="font-medium">Login History</h4>
+                        <p className="text-sm text-muted-foreground">
+                          View login history and security events
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => {
+                        toast({
+                          title: "Coming Soon",
+                          description: "Login history tracking will be available in a future update.",
+                        });
+                      }}>
+                        View History
+                      </Button>
                     </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Media Validation</span>
-                      <Badge variant="success">Allowed</Badge>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
         
-        <DialogFooter className="sm:justify-between">
-          <Button variant="outline" onClick={onClose} className="flex items-center gap-1">
-            <ArrowLeftCircle className="h-4 w-4" />
-            Back to List
-          </Button>
-        </DialogFooter>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </div>
       </DialogContent>
-      
-      {/* Confirmation Dialogs */}
-      <ConfirmationDialog
-        isOpen={!!confirmRoleChange}
-        onClose={() => setConfirmRoleChange(null)}
-        onConfirm={executeRoleChange}
-        title="Change Administrator Role"
-        description={`Are you sure you want to change ${admin.name}'s role to ${confirmRoleChange === 'SUPER_ADMIN' ? 'Super Admin' : confirmRoleChange === 'ADMIN' ? 'Admin' : 'Moderator'}? This will modify their permissions on the platform.`}
-        confirmText="Change Role"
-      />
-      
-      <ConfirmationDialog
-        isOpen={!!confirmStatusChange}
-        onClose={() => setConfirmStatusChange(null)}
-        onConfirm={executeStatusChange}
-        title={confirmStatusChange === 'ACTIVE' ? 'Activate Account' : 'Disable Account'}
-        description={confirmStatusChange === 'ACTIVE' 
-          ? `Are you sure you want to activate ${admin.name}'s account? They will regain access to the platform.`
-          : `Are you sure you want to disable ${admin.name}'s account? They will no longer be able to access the platform.`
-        }
-        confirmText={confirmStatusChange === 'ACTIVE' ? 'Activate' : 'Disable'}
-        variant={confirmStatusChange === 'ACTIVE' ? 'default' : 'destructive'}
-      />
     </Dialog>
   );
 }

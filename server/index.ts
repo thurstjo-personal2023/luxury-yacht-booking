@@ -8,6 +8,7 @@ import { registerAdminRoutes } from "./admin-routes";
 import { registerAdminProfileRoutes } from "./admin-profile-routes";
 import { registerAdminAuthRoutes } from "./admin-auth-routes";
 import { registerAdminUserRoutes } from "./admin-user-routes";
+import { registerAdminActivityRoutes } from "./admin-activity-routes-register";
 import { testProductionStorage, runStorageTest } from "./test-storage";
 import { USE_FIREBASE_EMULATORS } from "./env-config";
 
@@ -71,6 +72,9 @@ app.use((req, res, next) => {
     
     // Register admin user management routes
     registerAdminUserRoutes(app);
+    
+    // Register admin activity routes
+    registerAdminActivityRoutes(app);
     
     // Test Firebase Storage in production
     if (!USE_FIREBASE_EMULATORS) {
