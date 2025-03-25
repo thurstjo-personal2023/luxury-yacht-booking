@@ -197,7 +197,7 @@ export default function UserManagement() {
       }
       return response.json();
     },
-    enabled: !!adminUser && adminUser.role === 'super_admin'
+    enabled: !!adminUser && hasPermission(adminUser.role, 'ADMIN')
   });
 
   // Handle pagination
@@ -833,121 +833,133 @@ export default function UserManagement() {
             )}
           </TabsContent>
           <TabsContent value="analytics">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {/* Admin Count Card */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Total Administrators
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {statsLoading ? (
-                    <Skeleton className="h-12 w-20" />
-                  ) : (
-                    <div className="text-4xl font-bold">
-                      {statsData?.totalAdmins || 0}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              
-              {/* Status Breakdown */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Status Breakdown
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {statsLoading ? (
-                    <div className="space-y-2">
-                      <Skeleton className="h-5 w-full" />
-                      <Skeleton className="h-5 w-full" />
-                      <Skeleton className="h-5 w-full" />
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center">
-                          <Badge variant="success" className="mr-2">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Active
-                          </Badge>
-                        </div>
-                        <div>{statsData?.byStatus.active || 0}</div>
+            {adminUser && hasPermission(adminUser.role, 'MODERATOR') ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {/* Admin Count Card */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Total Administrators
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {statsLoading ? (
+                      <Skeleton className="h-12 w-20" />
+                    ) : (
+                      <div className="text-4xl font-bold">
+                        {statsData?.totalAdmins || 0}
                       </div>
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center">
-                          <Badge variant="destructive" className="mr-2">
-                            <XCircle className="h-3 w-3 mr-1" />
-                            Disabled
-                          </Badge>
-                        </div>
-                        <div>{statsData?.byStatus.disabled || 0}</div>
+                    )}
+                  </CardContent>
+                </Card>
+                
+                {/* Status Breakdown */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Status Breakdown
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {statsLoading ? (
+                      <div className="space-y-2">
+                        <Skeleton className="h-5 w-full" />
+                        <Skeleton className="h-5 w-full" />
+                        <Skeleton className="h-5 w-full" />
                       </div>
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center">
-                          <Badge variant="outline" className="mr-2">
-                            <Clock className="h-3 w-3 mr-1" />
-                            Pending
-                          </Badge>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <Badge variant="success" className="mr-2">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Active
+                            </Badge>
+                          </div>
+                          <div>{statsData?.byStatus.active || 0}</div>
                         </div>
-                        <div>{statsData?.byStatus.pending || 0}</div>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              
-              {/* Role Breakdown */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Role Breakdown
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {statsLoading ? (
-                    <div className="space-y-2">
-                      <Skeleton className="h-5 w-full" />
-                      <Skeleton className="h-5 w-full" />
-                      <Skeleton className="h-5 w-full" />
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center">
-                          <Badge variant="default" className="mr-2 bg-red-600">
-                            <ShieldAlert className="h-3 w-3 mr-1" />
-                            Super Admin
-                          </Badge>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <Badge variant="destructive" className="mr-2">
+                              <XCircle className="h-3 w-3 mr-1" />
+                              Disabled
+                            </Badge>
+                          </div>
+                          <div>{statsData?.byStatus.disabled || 0}</div>
                         </div>
-                        <div>{statsData?.byRole.superAdmin || 0}</div>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center">
-                          <Badge variant="default" className="mr-2 bg-blue-600">
-                            <ShieldCheck className="h-3 w-3 mr-1" />
-                            Admin
-                          </Badge>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <Badge variant="outline" className="mr-2">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Pending
+                            </Badge>
+                          </div>
+                          <div>{statsData?.byStatus.pending || 0}</div>
                         </div>
-                        <div>{statsData?.byRole.admin || 0}</div>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center">
-                          <Badge variant="default" className="mr-2 bg-green-600">
-                            <Shield className="h-3 w-3 mr-1" />
-                            Moderator
-                          </Badge>
+                    )}
+                  </CardContent>
+                </Card>
+                
+                {/* Role Breakdown */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Role Breakdown
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {statsLoading ? (
+                      <div className="space-y-2">
+                        <Skeleton className="h-5 w-full" />
+                        <Skeleton className="h-5 w-full" />
+                        <Skeleton className="h-5 w-full" />
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <Badge variant="default" className="mr-2 bg-red-600">
+                              <ShieldAlert className="h-3 w-3 mr-1" />
+                              Super Admin
+                            </Badge>
+                          </div>
+                          <div>{statsData?.byRole.superAdmin || 0}</div>
                         </div>
-                        <div>{statsData?.byRole.moderator || 0}</div>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <Badge variant="default" className="mr-2 bg-blue-600">
+                              <ShieldCheck className="h-3 w-3 mr-1" />
+                              Admin
+                            </Badge>
+                          </div>
+                          <div>{statsData?.byRole.admin || 0}</div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            <Badge variant="default" className="mr-2 bg-green-600">
+                              <Shield className="h-3 w-3 mr-1" />
+                              Moderator
+                            </Badge>
+                          </div>
+                          <div>{statsData?.byRole.moderator || 0}</div>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-64 bg-white dark:bg-gray-950 rounded-md border">
+                <div className="text-center">
+                  <ShieldOff className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <h3 className="mt-4 text-lg font-medium">Permission Required</h3>
+                  <p className="mt-2 text-sm text-muted-foreground max-w-sm">
+                    You don't have sufficient permission to access analytics data.
+                  </p>
+                </div>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
