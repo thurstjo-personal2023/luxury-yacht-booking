@@ -204,12 +204,17 @@ export async function logAdminActivity(
   targetType?: string
 ): Promise<{ success: boolean; activityId?: string; error?: string }> {
   try {
-    // Using any type here to avoid TypeScript issues with apiRequest
-    // (In a real app, we'd define proper types for the API responses)
-    const result = await apiRequest<any>('/api/admin/activity', {
+    // Use the fetch API directly to avoid TypeScript issues with apiRequest
+    const response = await fetch('/api/admin/activity', {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`
+      },
       body: JSON.stringify({ type, details, targetId, targetType }),
     });
+    
+    const result = await response.json();
     
     return { success: true, activityId: result?.activityId };
   } catch (error) {
@@ -250,6 +255,68 @@ export function getAdminDepartments(): { value: string; label: string }[] {
     { value: 'human_resources', label: 'Human Resources' },
     { value: 'legal', label: 'Legal' }
   ];
+}
+
+/**
+ * Format date (YYYY-MM-DD)
+ * 
+ * @param date Date object or ISO string
+ * @returns Formatted date string
+ */
+export function formatDate(date: Date | string | null): string {
+  if (!date) return 'N/A';
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Format date and time (YYYY-MM-DD HH:MM)
+ * 
+ * @param date Date object or ISO string
+ * @returns Formatted date and time string
+ */
+export function formatDateTime(date: Date | string | null): string {
+  if (!date) return 'N/A';
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  const formattedDate = formatDate(dateObj);
+  const hours = String(dateObj.getHours()).padStart(2, '0');
+  const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+  
+  return `${formattedDate} ${hours}:${minutes}`;
+}
+
+/**
+ * Format time difference as a human-readable string
+ * 
+ * @param date Date object or ISO string
+ * @returns Human-readable time difference (e.g., "2 days ago")
+ */
+export function formatTimeDifference(date: Date | string | null): string {
+  if (!date) return 'N/A';
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  const now = new Date();
+  const diffMs = now.getTime() - dateObj.getTime();
+  
+  const seconds = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  const months = Math.floor(days / 30);
+  const years = Math.floor(days / 365);
+  
+  if (years > 0) return `${years} year${years > 1 ? 's' : ''} ago`;
+  if (months > 0) return `${months} month${months > 1 ? 's' : ''} ago`;
+  if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
+  if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+  if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+  return `${seconds} second${seconds !== 1 ? 's' : ''} ago`;
 }
 
 /**
