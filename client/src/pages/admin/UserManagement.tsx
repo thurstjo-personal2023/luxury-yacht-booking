@@ -179,7 +179,7 @@ export default function UserManagement() {
       }
       return response.json();
     },
-    enabled: !!adminUser
+    enabled: !!adminUser && hasPermission(adminUser.role, 'MODERATOR')
   });
   
   // Get pending approvals
