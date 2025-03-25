@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -224,9 +224,7 @@ function App() {
                     
                   {/* Admin Routes */}
                   <Route path="/admin">
-                    <PrivateRoute routeType="admin">
-                      <AdminDashboard />
-                    </PrivateRoute>
+                    <Redirect to="/admin-dashboard" />
                   </Route>
                   <Route path="/admin/email-test">
                     <PrivateRoute routeType="admin">
