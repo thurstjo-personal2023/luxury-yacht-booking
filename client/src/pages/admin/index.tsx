@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/providers/auth-provider';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
@@ -13,8 +13,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { CheckCircle, AlertTriangle, Image, Database, FileText, Settings } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
-  const { user, isAdmin, userRole } = useAuth();
+  const { user, profileData } = useAuth();
   const { toast } = useToast();
+  
+  // Determine if user has admin or producer role from profile data
+  const harmonizedUser = profileData?.harmonizedUser;
+  const userRole = harmonizedUser?.role;
+  const isAdmin = harmonizedUser?.isAdmin === true;
+  const isProducer = userRole === 'producer';
   
   // If user is not logged in
   if (!user) {
@@ -38,7 +44,7 @@ const AdminDashboard: React.FC = () => {
   }
   
   // If user is not authorized
-  if (!(isAdmin || user.role === 'producer')) {
+  if (!(isAdmin || isProducer)) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card>
