@@ -420,14 +420,19 @@ export default function UserManagement() {
         <Tabs defaultValue="all-users" className="space-y-4">
           <TabsList>
             <TabsTrigger value="all-users">All Administrators</TabsTrigger>
-            <TabsTrigger value="pending" className="relative">
-              Pending Approval
-              {!pendingLoading && pendingData?.pendingAdmins && pendingData.pendingAdmins.length > 0 && (
-                <Badge variant="destructive" className="ml-2">
-                  {pendingData.pendingAdmins.length}
-                </Badge>
-              )}
-            </TabsTrigger>
+            
+            {/* Only show Pending Approvals tab to users with Admin permissions or higher */}
+            {adminUser && hasPermission(adminUser.role, 'ADMIN') && (
+              <TabsTrigger value="pending" className="relative">
+                Pending Approval
+                {!pendingLoading && pendingData?.pendingAdmins && pendingData.pendingAdmins.length > 0 && (
+                  <Badge variant="destructive" className="ml-2">
+                    {pendingData.pendingAdmins.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            )}
+            
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
           
@@ -445,14 +450,16 @@ export default function UserManagement() {
                       <RefreshCw className="h-4 w-4" />
                       <span className="hidden md:inline">Refresh</span>
                     </Button>
-                    <Button 
-                      size="sm" 
-                      className="flex items-center gap-1"
-                      onClick={() => setShowInviteForm(true)}
-                    >
-                      <Plus className="h-4 w-4" />
-                      <span className="hidden md:inline">Invite Admin</span>
-                    </Button>
+                    {adminUser && hasPermission(adminUser.role, 'ADMIN') && (
+                      <Button 
+                        size="sm" 
+                        className="flex items-center gap-1"
+                        onClick={() => setShowInviteForm(true)}
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span className="hidden md:inline">Invite Admin</span>
+                      </Button>
+                    )}
                   </div>
                 </CardTitle>
                 <CardDescription>
@@ -575,11 +582,14 @@ export default function UserManagement() {
                                   <DropdownMenuLabel>Manage Admin</DropdownMenuLabel>
                                   <DropdownMenuSeparator />
                                   
-                                  {adminUser?.role === 'super_admin' && (
+                                  {/* View Details - Always available */}
+                                  <DropdownMenuItem onClick={() => setSelectedAdminId(admin.id)}>
+                                    View Details
+                                  </DropdownMenuItem>
+                                  
+                                  {/* Role Management - Only for Super Admins */}
+                                  {adminUser && hasPermission(adminUser.role, 'SUPER_ADMIN') && (
                                     <>
-                                      <DropdownMenuItem onClick={() => setSelectedAdminId(admin.id)}>
-                                        View Details
-                                      </DropdownMenuItem>
                                       <DropdownMenuSeparator />
                                       
                                       <DropdownMenuItem 
@@ -600,11 +610,21 @@ export default function UserManagement() {
                                       >
                                         Set as Moderator
                                       </DropdownMenuItem>
+                                    </>
+                                  )}
+                                  
+                                  {/* Status Management - For Super Admins and Admins */}
+                                  {adminUser && hasPermission(adminUser.role, 'ADMIN') && (
+                                    <>
                                       <DropdownMenuSeparator />
                                       
                                       {admin.status === 'ACTIVE' ? (
                                         <DropdownMenuItem 
-                                          disabled={admin.role.toUpperCase() === 'SUPER_ADMIN' && statsData?.byRole.superAdmin === 1}
+                                          disabled={
+                                            (admin.role.toUpperCase() === 'SUPER_ADMIN' && statsData?.byRole.superAdmin === 1) ||
+                                            // Prevent non-Super Admins from disabling Super Admins
+                                            (admin.role.toUpperCase() === 'SUPER_ADMIN' && !hasPermission(adminUser.role, 'SUPER_ADMIN'))
+                                          }
                                           onClick={() => handleStatusChange(admin.id, 'DISABLED')}
                                           className="text-red-600"
                                         >
@@ -612,6 +632,10 @@ export default function UserManagement() {
                                         </DropdownMenuItem>
                                       ) : (
                                         <DropdownMenuItem 
+                                          disabled={
+                                            // Prevent non-Super Admins from enabling Super Admins
+                                            (admin.role.toUpperCase() === 'SUPER_ADMIN' && !hasPermission(adminUser.role, 'SUPER_ADMIN'))
+                                          }
                                           onClick={() => handleStatusChange(admin.id, 'ACTIVE')}
                                           className="text-green-600"
                                         >
@@ -684,8 +708,9 @@ export default function UserManagement() {
           
           {/* Pending Approval Tab */}
           <TabsContent value="pending">
-            <Card>
-              <CardHeader>
+            {adminUser && hasPermission(adminUser.role, 'ADMIN') ? (
+              <Card>
+                <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     <Clock className="h-5 w-5" />
@@ -765,22 +790,26 @@ export default function UserManagement() {
                               </div>
                             </div>
                             <div className="flex gap-2 mt-2 md:mt-0">
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleProcessApproval(admin.id, false, 'Registration rejected by administrator')}
-                              >
-                                <XCircle className="mr-1 h-4 w-4" />
-                                Reject
-                              </Button>
-                              <Button
-                                variant="default"
-                                size="sm"
-                                onClick={() => handleProcessApproval(admin.id, true, 'Registration approved by administrator')}
-                              >
-                                <CheckCircle2 className="mr-1 h-4 w-4" />
-                                Approve
-                              </Button>
+                              {adminUser && hasPermission(adminUser.role, 'ADMIN') && (
+                                <>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleProcessApproval(admin.id, false, 'Registration rejected by administrator')}
+                                  >
+                                    <XCircle className="mr-1 h-4 w-4" />
+                                    Reject
+                                  </Button>
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={() => handleProcessApproval(admin.id, true, 'Registration approved by administrator')}
+                                  >
+                                    <CheckCircle2 className="mr-1 h-4 w-4" />
+                                    Approve
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </div>
                         </CardContent>
