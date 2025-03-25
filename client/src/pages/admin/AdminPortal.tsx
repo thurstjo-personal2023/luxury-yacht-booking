@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/providers/auth-provider';
+import { useAdminAuth } from '@/hooks/use-admin-auth';
 import { useAdminVerification, AdminVerificationProvider } from '@/providers/admin-verification-provider';
 
 // Animation variants
@@ -79,7 +79,7 @@ const successVariants = {
 const AdminPortalInner: React.FC = () => {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { adminUser } = useAdminAuth();
   
   // Get verification state from context
   const { 

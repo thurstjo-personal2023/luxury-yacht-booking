@@ -9,16 +9,16 @@ import BlobUrlResolution from '@/components/admin/BlobUrlResolution';
 import RelativeUrlFixer from '@/components/admin/RelativeUrlFixer';
 // Import directly using relative path to fix TypeScript module resolution
 import AdminLayout from '../../components/layouts/AdminLayout';
-import { useAuth } from '@/hooks/use-auth';
+import { useAdminAuth } from '@/hooks/use-admin-auth';
 import { useLocation } from 'wouter';
 
 export default function MediaManagement() {
-  const { user } = useAuth();
+  const { adminUser, isAuthenticated } = useAdminAuth();
   const [, setLocation] = useLocation();
   
   // Redirect if user is not authenticated or not an admin
-  if (!user) {
-    setLocation('/login');
+  if (!isAuthenticated) {
+    setLocation('/admin-login');
     return null;
   }
   

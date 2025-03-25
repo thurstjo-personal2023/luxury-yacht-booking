@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { useAuth } from '@/providers/auth-provider';
+import { useAdminAuth } from '@/hooks/use-admin-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
@@ -13,50 +13,32 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { CheckCircle, AlertTriangle, Image, Database, FileText, Settings } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
-  const { user, profileData } = useAuth();
+  const { adminUser, isLoading } = useAdminAuth();
   const { toast } = useToast();
   
-  // Determine if user has admin or producer role from profile data
-  const harmonizedUser = profileData?.harmonizedUser;
-  const userRole = harmonizedUser?.role;
-  const isAdmin = harmonizedUser?.isAdmin === true;
-  const isProducer = userRole === 'producer';
-  
-  // If user is not logged in
-  if (!user) {
+  // If admin auth is still loading
+  if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Access Denied</CardTitle>
-            <CardDescription>
-              Please log in to access the admin dashboard.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link href="/login">Go to Login</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
   
-  // If user is not authorized
-  if (!(isAdmin || isProducer)) {
+  // If user is not logged in or not an admin
+  if (!adminUser) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card>
           <CardHeader>
             <CardTitle>Access Denied</CardTitle>
             <CardDescription>
-              You do not have permission to access this page.
+              Please log in with an admin account to access the dashboard.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild>
-              <Link href="/">Go to Home</Link>
+              <Link href="/admin-login">Go to Admin Login</Link>
             </Button>
           </CardContent>
         </Card>
