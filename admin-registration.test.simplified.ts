@@ -208,27 +208,28 @@ describe('Administrator Registration & Validation Tests', () => {
         json: jest.fn()
       };
       
-      // Call the route handler
-      const handler = (expressApp as any)._routes.find(
-        (r: any) => r.path === '/api/admin/create-invitation'
-      )?.handler;
-      
-      if (handler) {
-        handler(req, res);
-      } else {
-        // Use our mock function directly
-        res.json(createInvitation(
-          req.body.email,
-          req.body.role,
-          req.body.department,
-          req.body.position
-        ));
-      }
+      // Skip trying to find the handler in routes (mock Express doesn't have _routes)
+      // Instead, use our mock function directly
+      res.json(createInvitation(
+        req.body.email,
+        req.body.role,
+        req.body.department,
+        req.body.position
+      ));
       
       // Verify the response
       expect(res.json).toHaveBeenCalled();
       
-      const response = res.json.mock.calls[0][0];
+      // Type assertion for response
+      const response = res.json.mock.calls[0][0] as {
+        success: boolean;
+        email: string;
+        token: string;
+        invitationId: string;
+        role: string;
+        department: string;
+        position: string;
+      };
       expect(response.success).toBe(true);
       expect(response.email).toBe('new-admin@example.com');
       expect(response.token).toBeTruthy();
@@ -253,7 +254,10 @@ describe('Administrator Registration & Validation Tests', () => {
       res.json(verifyInvitation(req.body.token));
       
       // Verify the response
-      const response = res.json.mock.calls[0][0];
+      const response = res.json.mock.calls[0][0] as {
+        success: boolean;
+        error: string;
+      };
       expect(response.success).toBe(false);
       expect(response.error).toBeTruthy();
     });

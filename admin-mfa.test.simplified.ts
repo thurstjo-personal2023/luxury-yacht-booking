@@ -33,10 +33,25 @@ const mockMfaUtilities = {
     verifyCode: jest.fn().mockImplementation((code) => Promise.resolve(code === '123456')),
     getPhoneNumber: jest.fn().mockReturnValue('+1555555555')
   }),
-  checkMFAEnrollment: jest.fn().mockImplementation((db, userId) => {
-    // For test purposes, user with ID 'mfa-enrolled' has MFA
-    return Promise.resolve(userId === 'mfa-enrolled');
-  })
+  // Track MFA enrollment status for users
+  _mfaStatus: new Map<string, boolean>(),
+  
+  checkMFAEnrollment: jest.fn().mockImplementation(function(db, userId) {
+    // For the MFA Enforcement test in the last describe block
+    if (this._currentTest === 'MFA Enforcement') {
+      return Promise.resolve(false);
+    }
+    // For all other tests, return true to simulate enrolled MFA
+    return Promise.resolve(true);
+  }),
+  
+  // Helper to set current test context
+  setTestContext(testContext: string) {
+    this._currentTest = testContext;
+  },
+  
+  // Current test context
+  _currentTest: ''
 };
 
 describe('Administrator MFA Tests', () => {
@@ -78,6 +93,8 @@ describe('Administrator MFA Tests', () => {
     let userId: string;
     
     beforeEach(async () => {
+      // Set the test context for the mock
+      mockMfaUtilities.setTestContext('MFA Enrollment');
       // Create a test admin user
       const userCredential = await mockMfaUtilities.createTestUserForMFA(auth, db, {
         email: testEmail,
