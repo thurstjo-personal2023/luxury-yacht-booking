@@ -42,7 +42,7 @@ interface MFASetupOptions {
 
 // Mock the utilities since we're not connecting to real Firebase
 const mockMfaUtilities = {
-  createTestUserForMFA: jest.fn().mockImplementation(
+  createTestUserForMFA: jest.fn(
     (auth: Auth, db: Firestore, userData: any): Promise<UserCredential> => {
       return Promise.resolve({
         user: { uid: 'test-uid', email: 'test@example.com' }
@@ -50,26 +50,30 @@ const mockMfaUtilities = {
     }
   ),
   
-  generateTOTPSecret: jest.fn().mockImplementation((email: string): TOTPSecret => ({
-    secret: 'test-secret',
-    otpauth_url: 'otpauth://totp/test'
-  })),
+  generateTOTPSecret: jest.fn(
+    (email: string): TOTPSecret => ({
+      secret: 'test-secret',
+      otpauth_url: 'otpauth://totp/test'
+    })
+  ),
   
-  generateValidTOTPCode: jest.fn().mockImplementation((secret: string): string => '123456'),
+  generateValidTOTPCode: jest.fn(
+    (secret: string): string => '123456'
+  ),
   
-  setupMFAForTestUser: jest.fn().mockImplementation(
+  setupMFAForTestUser: jest.fn(
     (db: Firestore, userId: string, mfaType: 'totp' | 'phone', options: MFASetupOptions): Promise<void> => {
       return Promise.resolve();
     }
   ),
   
-  cleanupTestUser: jest.fn().mockImplementation(
+  cleanupTestUser: jest.fn(
     (auth: Auth, db: Firestore, email: string): Promise<void> => {
       return Promise.resolve();
     }
   ),
   
-  mockPhoneVerification: jest.fn().mockImplementation(
+  mockPhoneVerification: jest.fn(
     (userId: string, phoneNumber: string): PhoneVerifier => ({
       verificationId: 'test-verification-id',
       verificationCode: '123456',
@@ -78,10 +82,11 @@ const mockMfaUtilities = {
       getPhoneNumber: jest.fn().mockReturnValue('+1555555555')
     })
   ),
+  
   // Track MFA enrollment status for users
   _mfaStatus: new Map<string, boolean>(),
   
-  checkMFAEnrollment: jest.fn().mockImplementation(
+  checkMFAEnrollment: jest.fn(
     function(db: Firestore, userId: string): Promise<boolean> {
       // For the MFA Enforcement test in the last describe block
       if (this._currentTest === 'MFA Enforcement') {
