@@ -367,7 +367,7 @@ export default function UserManagement() {
             <TabsTrigger value="all-users">All Administrators</TabsTrigger>
             <TabsTrigger value="pending" className="relative">
               Pending Approval
-              {!pendingLoading && pendingData?.pendingAdmins?.length > 0 && (
+              {!pendingLoading && pendingData?.pendingAdmins && pendingData.pendingAdmins.length > 0 && (
                 <Badge variant="destructive" className="ml-2">
                   {pendingData.pendingAdmins.length}
                 </Badge>
