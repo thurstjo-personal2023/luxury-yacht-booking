@@ -409,6 +409,16 @@ export class AuthService {
       throw error;
     }
   }
+  
+  /**
+   * Get the current user's ID token
+   * @param forceRefresh Whether to force a token refresh from the server
+   * @returns Fresh token string or null if no user is signed in
+   */
+  async getIdToken(forceRefresh = true): Promise<string | null> {
+    // This is a convenience wrapper around refreshToken for consistency
+    return this.refreshToken(forceRefresh);
+  }
 
   /**
    * Fetch user profile data from Firestore
