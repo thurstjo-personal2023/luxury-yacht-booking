@@ -2,6 +2,7 @@
  * Media Validation Page
  * 
  * This page provides an interface for administrators to validate and fix media URLs.
+ * Uses withAdminLayout HOC for consistent admin layout integration.
  */
 import React from 'react';
 import { Link } from 'wouter';
@@ -10,12 +11,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { CloudIcon, ArrowRight } from 'lucide-react';
 import { Helmet } from 'react-helmet';
-// Import directly using relative path to fix TypeScript module resolution
-import AdminLayout from '../../components/layouts/AdminLayout';
+import withAdminLayout from '@/components/admin/withAdminLayout';
 
-export default function MediaValidation() {
+function MediaValidation() {
   return (
-    <AdminLayout>
+    <>
       <Helmet>
         <title>Media Validation - Etoile Yachts Admin</title>
       </Helmet>
@@ -55,6 +55,8 @@ export default function MediaValidation() {
         
         <MediaValidationPanel />
       </div>
-    </AdminLayout>
+    </>
   );
 }
+
+export default withAdminLayout(MediaValidation);

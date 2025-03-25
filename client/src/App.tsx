@@ -224,7 +224,9 @@ function App() {
                     
                   {/* Admin Routes */}
                   <Route path="/admin">
-                    <Redirect to="/admin-dashboard" />
+                    {() => {
+                      return <Redirect to="/admin-dashboard" />;
+                    }}
                   </Route>
                   <Route path="/admin/email-test">
                     <PrivateRoute routeType="admin">
