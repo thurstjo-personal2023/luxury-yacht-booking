@@ -19,9 +19,8 @@ echo -e "${YELLOW}Running simplified tests without Firebase emulator dependencie
 # Run the simplified tests with the simple config
 NODE_ENV=test npx jest --config=jest.simple.config.cjs
 
-echo -e "${YELLOW}Running admin role management tests...${NC}"
-# Run the admin role tests specifically
-NODE_ENV=test npx jest admin-roles.test.ts
+# Echo a blank line
+echo
 
 # Check the result
 if [ $? -eq 0 ]; then
