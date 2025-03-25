@@ -240,6 +240,12 @@ export default function UserManagement() {
     }
   };
   
+  // State for detail view and confirmation dialogs
+  const [selectedAdminId, setSelectedAdminId] = useState<string | null>(null);
+  const [confirmRoleChange, setConfirmRoleChange] = useState<{ adminId: string; newRole: string; } | null>(null);
+  const [confirmStatusChange, setConfirmStatusChange] = useState<{ adminId: string; newStatus: string; } | null>(null);
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  
   // Handle change role
   const handleRoleChange = async (adminId: string, newRole: string) => {
     try {
@@ -407,7 +413,11 @@ export default function UserManagement() {
                       <RefreshCw className="h-4 w-4" />
                       <span className="hidden md:inline">Refresh</span>
                     </Button>
-                    <Button size="sm" className="flex items-center gap-1">
+                    <Button 
+                      size="sm" 
+                      className="flex items-center gap-1"
+                      onClick={() => setShowInviteForm(true)}
+                    >
                       <Plus className="h-4 w-4" />
                       <span className="hidden md:inline">Invite Admin</span>
                     </Button>
@@ -535,7 +545,7 @@ export default function UserManagement() {
                                   
                                   {adminUser?.role === 'super_admin' && (
                                     <>
-                                      <DropdownMenuItem onClick={() => setLocation(`/admin/users/${admin.id}`)}>
+                                      <DropdownMenuItem onClick={() => setSelectedAdminId(admin.id)}>
                                         View Details
                                       </DropdownMenuItem>
                                       <DropdownMenuSeparator />
@@ -870,6 +880,77 @@ export default function UserManagement() {
           </TabsContent>
         </Tabs>
       </div>
+      {/* Admin Invite Form */}
+      <AdminInviteForm
+        isOpen={showInviteForm}
+        onClose={() => setShowInviteForm(false)}
+        onSuccess={() => {
+          refetchUsers();
+          setShowInviteForm(false);
+        }}
+      />
+
+      {/* Admin Detail View */}
+      {selectedAdminId && (
+        <AdminDetailView
+          isOpen={!!selectedAdminId}
+          onClose={() => setSelectedAdminId(null)}
+          admin={userData?.admins.find(admin => admin.id === selectedAdminId) || null}
+          currentUserRole={adminUser?.role || ''}
+          onRoleChange={(adminId, role) => {
+            setConfirmRoleChange({ adminId, newRole: role });
+          }}
+          onStatusChange={(adminId, status) => {
+            setConfirmStatusChange({ adminId, newStatus: status });
+          }}
+        />
+      )}
+
+      {/* Confirmation Dialogs */}
+      <ConfirmationDialog
+        isOpen={!!confirmRoleChange}
+        onClose={() => setConfirmRoleChange(null)}
+        onConfirm={() => {
+          if (confirmRoleChange) {
+            handleRoleChange(confirmRoleChange.adminId, confirmRoleChange.newRole);
+            setConfirmRoleChange(null);
+          }
+        }}
+        title="Change Administrator Role"
+        description={
+          confirmRoleChange 
+            ? `Are you sure you want to change this administrator's role to ${
+                confirmRoleChange.newRole === 'SUPER_ADMIN' 
+                  ? 'Super Admin' 
+                  : confirmRoleChange.newRole === 'ADMIN' 
+                    ? 'Admin' 
+                    : 'Moderator'
+              }? This will modify their permissions on the platform.`
+            : ''
+        }
+        confirmText="Change Role"
+      />
+      
+      <ConfirmationDialog
+        isOpen={!!confirmStatusChange}
+        onClose={() => setConfirmStatusChange(null)}
+        onConfirm={() => {
+          if (confirmStatusChange) {
+            handleStatusChange(confirmStatusChange.adminId, confirmStatusChange.newStatus as 'ACTIVE' | 'DISABLED');
+            setConfirmStatusChange(null);
+          }
+        }}
+        title={confirmStatusChange?.newStatus === 'ACTIVE' ? 'Activate Account' : 'Disable Account'}
+        description={
+          confirmStatusChange
+            ? confirmStatusChange.newStatus === 'ACTIVE'
+              ? 'Are you sure you want to activate this administrator account? They will regain access to the platform.'
+              : 'Are you sure you want to disable this administrator account? They will no longer be able to access the platform.'
+            : ''
+        }
+        confirmText={confirmStatusChange?.newStatus === 'ACTIVE' ? 'Activate' : 'Disable'}
+        variant={confirmStatusChange?.newStatus === 'ACTIVE' ? 'default' : 'destructive'}
+      />
     </AdminLayout>
   );
 }
