@@ -18,7 +18,12 @@ import {
   Search,
   Plus,
   Filter,
-  RefreshCw
+  RefreshCw,
+  Eye,
+  User,
+  Mail,
+  Building2,
+  Briefcase
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
@@ -55,6 +60,13 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Skeleton } from '@/components/ui/skeleton';
+
+// Custom Components
+import AdminInviteForm from '../../components/admin/AdminInviteForm';
+import ConfirmationDialog from '../../components/admin/ConfirmationDialog';
+
+// Utilities
+import { formatDate, formatDateTime, formatTimeDifference, getRoleBadge, getStatusBadge, standardizeRole } from '../../utils/admin-utils';
 
 // Hooks
 import { useToast } from '@/hooks/use-toast';

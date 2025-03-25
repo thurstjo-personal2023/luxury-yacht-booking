@@ -2,28 +2,24 @@
  * Admin Detail View Component
  * 
  * This component displays detailed information about an administrator
- * and provides controls for managing their account.
+ * including personal information, role, department, and status.
  */
 import { useState } from 'react';
-import { 
-  User, 
-  Shield, 
-  Calendar, 
-  Building2, 
-  Briefcase, 
-  Mail, 
-  Clock, 
-  ShieldAlert, 
-  ShieldCheck, 
-  XCircle, 
+import {
+  User,
+  Mail,
+  Shield,
+  Building2,
+  Briefcase,
+  Calendar,
+  Clock,
   CheckCircle2,
-  RefreshCw
+  XCircle,
+  Edit,
+  ArrowLeftCircle,
+  UserCog,
 } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+
 import {
   Dialog,
   DialogContent,
@@ -32,431 +28,331 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import ConfirmationDialog from './ConfirmationDialog';
 
-import { 
-  formatDate, 
-  formatDateTime, 
-  getRoleBadge, 
-  getStatusBadge 
-} from '../../utils/admin-utils';
+import { formatDate, formatDateTime, formatTimeDifference, getRoleBadge, getStatusBadge } from '../../utils/admin-utils';
 
-export interface AdminDetailProps {
-  adminId: string;
-  isOpen: boolean;
-  onClose: () => void;
-  onRefresh: () => void;
-  currentUserRole: string;
+// Types
+interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  department: string;
+  position: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt?: string;
 }
 
-export default function AdminDetailView({ 
-  adminId, 
-  isOpen, 
-  onClose, 
-  onRefresh,
-  currentUserRole 
-}: AdminDetailProps) {
-  const { toast } = useToast();
-  const [adminData, setAdminData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('profile');
+interface AdminDetailViewProps {
+  isOpen: boolean;
+  onClose: () => void;
+  admin: AdminUser | null;
+  currentUserRole: string;
+  onRoleChange: (adminId: string, role: string) => void;
+  onStatusChange: (adminId: string, status: string) => void;
+}
+
+export default function AdminDetailView({
+  isOpen,
+  onClose,
+  admin,
+  currentUserRole,
+  onRoleChange,
+  onStatusChange,
+}: AdminDetailViewProps) {
+  const [confirmRoleChange, setConfirmRoleChange] = useState<string | null>(null);
+  const [confirmStatusChange, setConfirmStatusChange] = useState<string | null>(null);
   
-  // Load admin details when the dialog opens
-  useState(() => {
-    const fetchAdminDetails = async () => {
-      if (isOpen && adminId) {
-        setLoading(true);
-        setError(null);
-        
-        try {
-          const response = await fetch(`/api/admin/users/${adminId}`);
-          
-          if (!response.ok) {
-            throw new Error('Failed to load administrator details');
-          }
-          
-          const data = await response.json();
-          setAdminData(data);
-        } catch (err) {
-          console.error('Error fetching admin details:', err);
-          setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-    
-    if (isOpen) {
-      fetchAdminDetails();
-    }
-  });
+  // Can't edit if no admin is selected
+  if (!admin) return null;
   
-  // Handle role change
-  const handleRoleChange = async (newRole: string) => {
-    if (!adminData) return;
-    
-    try {
-      const response = await fetch(`/api/admin/users/${adminId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          role: newRole
-        })
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update role');
-      }
-      
-      toast({
-        title: 'Role Updated',
-        description: `Administrator role has been updated to ${newRole}.`
-      });
-      
-      // Refresh data
-      onRefresh();
-      
-      // Reload this admin's details
-      const detailsResponse = await fetch(`/api/admin/users/${adminId}`);
-      if (detailsResponse.ok) {
-        const updatedData = await detailsResponse.json();
-        setAdminData(updatedData);
-      }
-    } catch (error) {
-      console.error('Error updating role:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive'
-      });
-    }
-  };
+  // Check if current user has permission to edit
+  const canEdit = currentUserRole.toUpperCase() === 'SUPER_ADMIN' || 
+    (currentUserRole.toUpperCase() === 'ADMIN' && admin.role.toUpperCase() !== 'SUPER_ADMIN');
   
-  // Handle status change
-  const handleStatusChange = async (newStatus: string) => {
-    if (!adminData) return;
-    
-    try {
-      const response = await fetch(`/api/admin/users/${adminId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          status: newStatus
-        })
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update status');
-      }
-      
-      toast({
-        title: 'Status Updated',
-        description: `Administrator status has been updated to ${newStatus}.`
-      });
-      
-      // Refresh data
-      onRefresh();
-      
-      // Reload this admin's details
-      const detailsResponse = await fetch(`/api/admin/users/${adminId}`);
-      if (detailsResponse.ok) {
-        const updatedData = await detailsResponse.json();
-        setAdminData(updatedData);
-      }
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: 'destructive'
-      });
-    }
-  };
-  
-  // Determine if current user can modify this admin
-  const canModifyAdmin = () => {
-    if (!adminData || !currentUserRole) return false;
-    
-    // Super admin can modify anyone except the last super admin
+  // Determine available roles based on current user's role
+  const availableRoles = () => {
     if (currentUserRole.toUpperCase() === 'SUPER_ADMIN') {
-      return true;
+      return ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'];
+    } else if (currentUserRole.toUpperCase() === 'ADMIN') {
+      return ['ADMIN', 'MODERATOR'];
+    } else {
+      return [];
     }
-    
-    // Admin can modify moderators only
-    if (currentUserRole.toUpperCase() === 'ADMIN') {
-      return adminData.role.toUpperCase() === 'MODERATOR';
-    }
-    
-    // Moderators can't modify anyone
-    return false;
   };
   
-  // Check if this is the current user
-  const isSelf = () => {
-    // This would need the current user's ID to compare
-    // For now, we'll return false to allow self-editing in the UI
-    return false;
+  // Handle role change confirmation
+  const handleRoleChangeRequest = (role: string) => {
+    setConfirmRoleChange(role);
+  };
+  
+  // Handle status change confirmation
+  const handleStatusChangeRequest = (status: string) => {
+    setConfirmStatusChange(status);
+  };
+  
+  // Execute role change
+  const executeRoleChange = () => {
+    if (confirmRoleChange && admin) {
+      onRoleChange(admin.id, confirmRoleChange);
+      setConfirmRoleChange(null);
+    }
+  };
+  
+  // Execute status change
+  const executeStatusChange = () => {
+    if (confirmStatusChange && admin) {
+      onStatusChange(admin.id, confirmStatusChange);
+      setConfirmStatusChange(null);
+    }
   };
   
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+    <Dialog open={isOpen} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl flex items-center gap-2">
-            <User className="h-5 w-5" />
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <UserCog className="h-5 w-5" />
             Administrator Details
           </DialogTitle>
           <DialogDescription>
-            View and manage administrator account details
+            View and manage administrator information
           </DialogDescription>
         </DialogHeader>
         
-        {loading ? (
-          <div className="space-y-4 py-4">
-            <div className="flex items-center gap-4">
-              <Skeleton className="h-12 w-12 rounded-full" />
-              <div className="space-y-2">
-                <Skeleton className="h-5 w-[200px]" />
-                <Skeleton className="h-4 w-[150px]" />
-              </div>
-            </div>
-            <Separator />
-            <div className="grid grid-cols-2 gap-4">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-            </div>
-          </div>
-        ) : error ? (
-          <div className="py-8 text-center">
-            <XCircle className="mx-auto h-12 w-12 text-destructive" />
-            <h3 className="mt-2 text-lg font-medium">Error Loading Details</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{error}</p>
-            <Button 
-              variant="outline" 
-              className="mt-4"
-              onClick={() => {
-                setLoading(true);
-                setError(null);
-                // Try to reload data
-                fetch(`/api/admin/users/${adminId}`)
-                  .then(res => {
-                    if (!res.ok) throw new Error('Failed to load details');
-                    return res.json();
-                  })
-                  .then(data => {
-                    setAdminData(data);
-                    setLoading(false);
-                  })
-                  .catch(err => {
-                    setError(err instanceof Error ? err.message : 'An error occurred');
-                    setLoading(false);
-                  });
-              }}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Retry
-            </Button>
-          </div>
-        ) : adminData ? (
-          <ScrollArea className="flex-1 pr-4">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="profile">Profile</TabsTrigger>
-                <TabsTrigger value="audit">Activity Log</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="profile" className="space-y-4 py-4">
-                {/* Header with basic info */}
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="h-6 w-6" />
+        {/* Admin Profile */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Left Column - Basic Info */}
+          <div className="md:col-span-1">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-md">Profile</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col items-center mb-4">
+                  <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-2">
+                    <User className="w-12 h-12 text-primary" />
                   </div>
-                  <div>
-                    <h3 className="text-lg font-medium">{adminData.name}</h3>
-                    <p className="text-sm text-muted-foreground">{adminData.email}</p>
-                  </div>
+                  <h3 className="font-medium text-lg">{admin.name}</h3>
+                  <p className="text-sm text-muted-foreground">{admin.email}</p>
+                  <div className="mt-2">{getRoleBadge(admin.role)}</div>
+                  <div className="mt-1">{getStatusBadge(admin.status)}</div>
                 </div>
                 
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {getRoleBadge(adminData.role)}
-                  {getStatusBadge(adminData.status)}
-                </div>
-                
-                <Separator />
-                
-                {/* Department and Position */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium flex items-center gap-2">
-                      <Building2 className="h-4 w-4" />
-                      Department
-                    </p>
-                    <p className="text-sm">{adminData.department || 'Not assigned'}</p>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium flex items-center gap-2">
-                      <Briefcase className="h-4 w-4" />
-                      Position
-                    </p>
-                    <p className="text-sm">{adminData.position || 'Not assigned'}</p>
-                  </div>
-                </div>
-                
-                {/* Dates */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Account Created
-                    </p>
-                    <p className="text-sm">{formatDateTime(adminData.createdAt)}</p>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Last Login
-                    </p>
-                    <p className="text-sm">
-                      {adminData.lastLoginAt 
-                        ? formatDateTime(adminData.lastLoginAt) 
-                        : 'Never logged in'}
-                    </p>
-                  </div>
-                </div>
-                
-                {/* MFA Status */}
-                <div className="space-y-1 mt-2">
-                  <p className="text-sm font-medium flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    Multi-Factor Authentication
-                  </p>
-                  <p className="text-sm flex items-center gap-2">
-                    {adminData.mfaEnabled ? (
-                      <Badge variant="success">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Enabled
-                      </Badge>
-                    ) : (
-                      <Badge variant="destructive">
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Not Enabled
-                      </Badge>
-                    )}
+                <div>
+                  <h4 className="text-sm font-medium mb-1">Department</h4>
+                  <p className="flex items-center gap-1 text-sm">
+                    <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    {admin.department}
                   </p>
                 </div>
                 
-                {/* Additional info can be added here */}
-              </TabsContent>
-              
-              <TabsContent value="audit" className="space-y-4 py-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Activity Log</CardTitle>
-                    <CardDescription>
-                      Recent actions performed by this administrator
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {/* This would be populated with actual audit logs */}
-                    <p className="text-sm text-muted-foreground text-center py-6">
-                      Activity logs are not available for this user
-                    </p>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </ScrollArea>
-        ) : (
-          <div className="py-8 text-center">
-            <XCircle className="mx-auto h-12 w-12 text-muted-foreground" />
-            <h3 className="mt-2 text-lg font-medium">Administrator Not Found</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              The requested administrator profile could not be found.
-            </p>
+                <div>
+                  <h4 className="text-sm font-medium mb-1">Position</h4>
+                  <p className="flex items-center gap-1 text-sm">
+                    <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+                    {admin.position}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        )}
-        
-        <DialogFooter className="border-t pt-4 mt-2">
-          {adminData && canModifyAdmin() && !isSelf() && (
-            <div className="flex flex-wrap gap-2 mr-auto">
-              {/* Role management buttons */}
-              {currentUserRole.toUpperCase() === 'SUPER_ADMIN' && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <Shield className="mr-2 h-4 w-4" />
-                      Change Role
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      disabled={adminData.role.toUpperCase() === 'SUPER_ADMIN'}
-                      onClick={() => handleRoleChange('SUPER_ADMIN')}
-                    >
-                      <ShieldAlert className="mr-2 h-4 w-4" />
-                      Super Admin
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={adminData.role.toUpperCase() === 'ADMIN'}
-                      onClick={() => handleRoleChange('ADMIN')}
-                    >
-                      <ShieldCheck className="mr-2 h-4 w-4" />
-                      Admin
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={adminData.role.toUpperCase() === 'MODERATOR'}
-                      onClick={() => handleRoleChange('MODERATOR')}
-                    >
-                      <Shield className="mr-2 h-4 w-4" />
-                      Moderator
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              
-              {/* Status management */}
-              {adminData.status.toUpperCase() === 'ACTIVE' ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive border-destructive"
-                  onClick={() => handleStatusChange('DISABLED')}
-                >
-                  <XCircle className="mr-2 h-4 w-4" />
-                  Disable Account
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-success border-success"
-                  onClick={() => handleStatusChange('ACTIVE')}
-                >
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Enable Account
-                </Button>
-              )}
-            </div>
-          )}
           
-          <Button variant="outline" onClick={onClose}>
-            Close
+          {/* Right Column - Additional Info */}
+          <div className="md:col-span-2">
+            <Card className="h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center justify-between">
+                  <span className="text-md">Account Information</span>
+                  
+                  {canEdit && (
+                    <div className="flex gap-2">
+                      {/* Role Dropdown */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            Change Role
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {availableRoles().map((role) => (
+                            <DropdownMenuItem
+                              key={role}
+                              onClick={() => handleRoleChangeRequest(role)}
+                              disabled={admin.role.toUpperCase() === role}
+                            >
+                              {role === 'SUPER_ADMIN' ? 'Super Admin' : 
+                               role === 'ADMIN' ? 'Admin' : 'Moderator'}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      
+                      {/* Status Dropdown */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant={admin.status.toUpperCase() === 'ACTIVE' ? 'destructive' : 'default'}
+                            size="sm"
+                          >
+                            {admin.status.toUpperCase() === 'ACTIVE' ? 'Disable Account' : 'Enable Account'}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => handleStatusChangeRequest('ACTIVE')}
+                            disabled={admin.status.toUpperCase() === 'ACTIVE'}
+                            className="text-green-600"
+                          >
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Activate Account
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleStatusChangeRequest('DISABLED')}
+                            disabled={admin.status.toUpperCase() === 'DISABLED'}
+                            className="text-destructive"
+                          >
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Disable Account
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-sm font-medium mb-1">Email</h4>
+                    <p className="flex items-center gap-1 text-sm">
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                      {admin.email}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium mb-1">Account Created</h4>
+                    <p className="flex items-center gap-1 text-sm">
+                      <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                      {formatDate(admin.createdAt)}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium mb-1">Last Updated</h4>
+                    <p className="flex items-center gap-1 text-sm">
+                      <Edit className="h-3.5 w-3.5 text-muted-foreground" />
+                      {formatDateTime(admin.updatedAt)}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium mb-1">Last Login</h4>
+                    <p className="flex items-center gap-1 text-sm">
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                      {admin.lastLoginAt ? formatTimeDifference(admin.lastLoginAt) : 'Never'}
+                    </p>
+                  </div>
+                </div>
+                
+                <Separator className="my-4" />
+                
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Access Permissions</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Dashboard Access</span>
+                      <Badge variant="success">Allowed</Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">User Management</span>
+                      <Badge variant={admin.role.toUpperCase() === 'MODERATOR' ? 'outline' : 'success'}>
+                        {admin.role.toUpperCase() === 'MODERATOR' ? 'Limited' : 'Allowed'}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Content Management</span>
+                      <Badge variant="success">Allowed</Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">System Settings</span>
+                      <Badge variant={admin.role.toUpperCase() === 'SUPER_ADMIN' ? 'success' : 'outline'}>
+                        {admin.role.toUpperCase() === 'SUPER_ADMIN' ? 'Allowed' : 'Restricted'}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Media Validation</span>
+                      <Badge variant="success">Allowed</Badge>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+        
+        <DialogFooter className="sm:justify-between">
+          <Button variant="outline" onClick={onClose} className="flex items-center gap-1">
+            <ArrowLeftCircle className="h-4 w-4" />
+            Back to List
           </Button>
         </DialogFooter>
       </DialogContent>
+      
+      {/* Confirmation Dialogs */}
+      <ConfirmationDialog
+        isOpen={!!confirmRoleChange}
+        onClose={() => setConfirmRoleChange(null)}
+        onConfirm={executeRoleChange}
+        title="Change Administrator Role"
+        description={`Are you sure you want to change ${admin.name}'s role to ${confirmRoleChange === 'SUPER_ADMIN' ? 'Super Admin' : confirmRoleChange === 'ADMIN' ? 'Admin' : 'Moderator'}? This will modify their permissions on the platform.`}
+        confirmText="Change Role"
+      />
+      
+      <ConfirmationDialog
+        isOpen={!!confirmStatusChange}
+        onClose={() => setConfirmStatusChange(null)}
+        onConfirm={executeStatusChange}
+        title={confirmStatusChange === 'ACTIVE' ? 'Activate Account' : 'Disable Account'}
+        description={confirmStatusChange === 'ACTIVE' 
+          ? `Are you sure you want to activate ${admin.name}'s account? They will regain access to the platform.`
+          : `Are you sure you want to disable ${admin.name}'s account? They will no longer be able to access the platform.`
+        }
+        confirmText={confirmStatusChange === 'ACTIVE' ? 'Activate' : 'Disable'}
+        variant={confirmStatusChange === 'ACTIVE' ? 'default' : 'destructive'}
+      />
     </Dialog>
   );
 }
