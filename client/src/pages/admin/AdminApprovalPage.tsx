@@ -47,7 +47,7 @@ import {
   Bell
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useAuthService } from '@/services/auth/use-auth-service';
+import { useAdminAuth } from '@/hooks/use-admin-auth';
 import { createApprovalStatusNotification } from '@/services/notifications/admin-notification-service';
 
 /**
@@ -90,16 +90,13 @@ const AdminApprovalPage: React.FC = () => {
   // Get toast from hook
   const { toast } = useToast();
   
-  // Get auth from service
-  const { user, profileData } = useAuthService();
+  // Get admin auth
+  const { adminUser, isLoading } = useAdminAuth();
   
-  // Determine admin status from profile data
-  const isAdmin = profileData?.harmonizedUser?.isAdmin && (
-    profileData?.harmonizedUser?.adminRole === 'ADMIN' || 
-    profileData?.harmonizedUser?.adminRole === 'SUPER_ADMIN'
-  );
-  const isSuperAdmin = profileData?.harmonizedUser?.isAdmin && 
-    profileData?.harmonizedUser?.adminRole === 'SUPER_ADMIN';
+  // Determine super admin status using standardized approach
+  const adminRole = adminUser?.role;
+  const normalizedRole = typeof adminRole === 'string' ? adminRole.toUpperCase() : '';
+  const isSuperAdmin = normalizedRole === 'SUPER_ADMIN';
   
   // Fetch approval requests on mount
   useEffect(() => {

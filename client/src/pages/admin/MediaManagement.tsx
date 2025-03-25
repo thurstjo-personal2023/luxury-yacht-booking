@@ -29,16 +29,14 @@ export default function MediaManagement() {
   
   // Check admin role
   const adminRole = adminUser.role;
-  const hasAccess = adminRole && ['SUPER_ADMIN', 'ADMIN', 'super_admin', 'admin'].includes(adminRole);
+  // Standardize role name format (all uppercase)
+  const normalizedRole = typeof adminRole === 'string' ? adminRole.toUpperCase() : '';
+  const hasAccess = ['SUPER_ADMIN', 'ADMIN'].includes(normalizedRole);
   
   if (!hasAccess) {
     setLocation('/admin-dashboard');
     return null;
   }
-  
-  // For now, let any user access the admin section
-  // In production, we would check user's admin status
-  // but we'll skip this check for development
   
   return (
     <AdminLayout>

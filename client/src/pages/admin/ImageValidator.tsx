@@ -27,9 +27,11 @@ export function ImageValidator() {
     return <div className="container mx-auto py-10">Loading authentication...</div>;
   }
   
-  // Check admin role - this is now using proper admin role check
+  // Check admin role with standardized approach
   const adminRole = adminUser?.role;
-  const hasAccess = adminRole && ['SUPER_ADMIN', 'ADMIN', 'super_admin', 'admin'].includes(adminRole);
+  // Standardize role name format (all uppercase)
+  const normalizedRole = typeof adminRole === 'string' ? adminRole.toUpperCase() : '';
+  const hasAccess = ['SUPER_ADMIN', 'ADMIN'].includes(normalizedRole);
   
   if (!hasAccess) {
     toast({
@@ -52,8 +54,8 @@ export function ImageValidator() {
       
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <Button variant="outline" onClick={() => navigate('/dashboard')}>
-            ← Back to Dashboard
+          <Button variant="outline" onClick={() => navigate('/admin-dashboard')}>
+            ← Back to Admin Dashboard
           </Button>
         </div>
       </div>
