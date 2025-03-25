@@ -29,7 +29,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 
 // Components
-import AdminLayout from '../../components/layouts/AdminLayout';
+import withAdminLayout from '@/components/admin/withAdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -121,7 +121,7 @@ interface AdminStats {
   };
 }
 
-export default function UserManagement() {
+function UserManagement() {
   const [, setLocation] = useLocation();
   const { adminUser } = useAdminAuth();
   const { toast } = useToast();
@@ -405,7 +405,7 @@ export default function UserManagement() {
   };
   
   return (
-    <AdminLayout>
+    <>
       <Helmet>
         <title>User Management | Etoile Yachts Admin</title>
       </Helmet>
@@ -1034,6 +1034,8 @@ export default function UserManagement() {
         confirmText={confirmStatusChange?.newStatus === 'ACTIVE' ? 'Activate' : 'Disable'}
         variant={confirmStatusChange?.newStatus === 'ACTIVE' ? 'default' : 'destructive'}
       />
-    </AdminLayout>
+    </>
   );
 }
+
+export default withAdminLayout(UserManagement);
