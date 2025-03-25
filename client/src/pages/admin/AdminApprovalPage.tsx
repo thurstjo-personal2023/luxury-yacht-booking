@@ -100,7 +100,19 @@ const AdminApprovalPage: React.FC = () => {
   
   // Fetch approval requests on mount
   useEffect(() => {
-    if (!user) {
+    // Wait until authentication is completely loaded
+    if (isLoading) {
+      return;
+    }
+    
+    // Redirect if not authenticated
+    if (!adminUser) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please log in to access the admin portal',
+        variant: 'destructive'
+      });
+      navigate('/admin-login');
       setLoading(false);
       return;
     }
@@ -117,7 +129,7 @@ const AdminApprovalPage: React.FC = () => {
     }
     
     fetchApprovalRequests();
-  }, [user, isSuperAdmin, navigate, toast]);
+  }, [adminUser, isLoading, isSuperAdmin, navigate, toast]);
   
   // Fetch approval requests
   const fetchApprovalRequests = async () => {
@@ -391,7 +403,7 @@ const AdminApprovalPage: React.FC = () => {
   }
   
   // Not authenticated or not a super admin
-  if (!user || !isSuperAdmin) {
+  if (!adminUser || !isSuperAdmin) {
     return (
       <div className="container max-w-xl mx-auto py-10">
         <Card>
