@@ -68,12 +68,23 @@ export default function AdminDashboard() {
     setActiveSection(section);
     setMobileMenuOpen(false);
     
-    // For demonstration, just show a toast for sections other than dashboard
-    if (section !== 'dashboard') {
-      toast({
-        title: 'Section Not Implemented',
-        description: `The "${section}" section will be implemented in future updates.`,
-      });
+    // Handle navigation to implemented sections
+    switch(section) {
+      case 'users':
+        setLocation('/admin/users');
+        break;
+      case 'media-validation':
+        setLocation('/admin/media-validation');
+        break;
+      case 'dashboard':
+        // Already on dashboard, no need to navigate
+        break;
+      default:
+        // For sections that aren't yet implemented, show a toast
+        toast({
+          title: 'Section Not Implemented',
+          description: `The "${section}" section will be implemented in future updates.`,
+        });
     }
   };
 
@@ -226,7 +237,7 @@ export default function AdminDashboard() {
               icon={<Users className="h-5 w-5" />}
               label="User Management"
               active={activeSection === 'users'}
-              onClick={() => handleNavigation('users')}
+              onClick={() => setLocation('/admin/users')}
             />
             <SidebarLink
               icon={<Settings className="h-5 w-5" />}
@@ -301,7 +312,7 @@ export default function AdminDashboard() {
                   icon={<Users className="h-5 w-5" />}
                   label="User Management"
                   active={activeSection === 'users'}
-                  onClick={() => handleNavigation('users')}
+                  onClick={() => setLocation('/admin/users')}
                 />
                 <SidebarLink
                   icon={<Settings className="h-5 w-5" />}

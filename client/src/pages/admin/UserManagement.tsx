@@ -142,8 +142,8 @@ export default function UserManagement() {
 
   // Query params
   const queryParams = new URLSearchParams();
-  if (statusFilter) queryParams.append('status', statusFilter);
-  if (roleFilter) queryParams.append('role', roleFilter);
+  if (statusFilter && statusFilter !== 'ALL') queryParams.append('status', statusFilter);
+  if (roleFilter && roleFilter !== 'ALL') queryParams.append('role', roleFilter);
   queryParams.append('limit', limit.toString());
   queryParams.append('offset', ((page - 1) * limit).toString());
   
@@ -486,7 +486,7 @@ export default function UserManagement() {
                         <SelectValue placeholder="Status Filter" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All Statuses</SelectItem>
+                        <SelectItem value="ALL">All Statuses</SelectItem>
                         <SelectItem value="ACTIVE">Active</SelectItem>
                         <SelectItem value="DISABLED">Disabled</SelectItem>
                         <SelectItem value="PENDING_APPROVAL">Pending Approval</SelectItem>
@@ -498,7 +498,7 @@ export default function UserManagement() {
                         <SelectValue placeholder="Role Filter" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All Roles</SelectItem>
+                        <SelectItem value="ALL">All Roles</SelectItem>
                         <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
                         <SelectItem value="ADMIN">Admin</SelectItem>
                         <SelectItem value="MODERATOR">Moderator</SelectItem>
