@@ -28,7 +28,7 @@ interface AdminUser {
   mfaEnabled: boolean;
   mfaVerified: boolean;
   permissions: string[];
-  role: 'admin' | 'super_admin';
+  role: 'admin' | 'super_admin' | 'ADMIN' | 'SUPER_ADMIN' | 'MODERATOR';
   phoneNumber?: string | null;
   lastLoginAt?: any; // Firestore timestamp
   lastActivityAt?: any; // Firestore timestamp
@@ -451,6 +451,7 @@ export function AdminAuthProvider({
     setupMfa,
     confirmMfaSetup,
     refreshSession,
+    verifyAdminSession,
     sessionTimeout,
   };
 

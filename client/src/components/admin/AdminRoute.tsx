@@ -15,7 +15,7 @@ export function AdminLoadingSpinner() {
 interface AdminRouteProps {
   children: ReactNode;
   requiresMfa?: boolean;
-  requiredRole?: 'ADMIN' | 'SUPER_ADMIN' | 'MODERATOR';
+  requiredRole?: 'ADMIN' | 'SUPER_ADMIN' | 'MODERATOR' | 'admin' | 'super_admin';
 }
 
 export function AdminRoute({ 
@@ -95,13 +95,20 @@ export function AdminRoute({
     }
     
     // Check required role if specified
-    if (requiredRole && adminUser.role !== requiredRole) {
-      // Check for Super Admin override (Super Admins can access any admin page)
-      if (!(requiredRole !== 'SUPER_ADMIN' && adminUser.role === 'SUPER_ADMIN')) {
-        console.log(`AdminRoute: Insufficient permissions. Required: ${requiredRole}, User has: ${adminUser.role}`);
-        // Redirect to unauthorized page or dashboard
-        setLocation('/admin/unauthorized');
-        return;
+    if (requiredRole) {
+      // Normalize roles for comparison (handle both uppercase and lowercase)
+      const normalizedUserRole = adminUser.role.toUpperCase();
+      const normalizedRequiredRole = requiredRole.toUpperCase();
+      
+      // Only redirect if not sufficient permissions
+      if (normalizedUserRole !== normalizedRequiredRole) {
+        // Super Admin override - they can access any page
+        if (!(normalizedUserRole === 'SUPER_ADMIN')) {
+          console.log(`AdminRoute: Insufficient permissions. Required: ${requiredRole}, User has: ${adminUser.role}`);
+          // Redirect to unauthorized page or dashboard
+          setLocation('/admin/unauthorized');
+          return;
+        }
       }
     }
     
