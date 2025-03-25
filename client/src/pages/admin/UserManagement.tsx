@@ -63,10 +63,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 // Custom Components
 import AdminInviteForm from '../../components/admin/AdminInviteForm';
+import AdminDetailView from '../../components/admin/AdminDetailView';
 import ConfirmationDialog from '../../components/admin/ConfirmationDialog';
 
 // Utilities
-import { formatDate, formatDateTime, formatTimeDifference, getRoleBadge, getStatusBadge, standardizeRole } from '../../utils/admin-utils';
+import { 
+  formatDate, 
+  formatDateTime, 
+  formatTimeDifference, 
+  getRoleBadgeColor, 
+  getStatusBadgeColor, 
+  formatAdminRole, 
+  formatAdminStatus 
+} from '../../utils/admin-utils';
 
 // Hooks
 import { useToast } from '@/hooks/use-toast';
@@ -329,32 +338,54 @@ export default function UserManagement() {
   
   // Helper for rendering status badges
   const getStatusBadge = (status: string) => {
+    // Get the appropriate icon based on status
+    let StatusIcon;
     switch (status) {
       case 'ACTIVE':
-        return <Badge variant="success" className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Active</Badge>;
+        StatusIcon = CheckCircle2;
+        break;
       case 'DISABLED':
-        return <Badge variant="destructive" className="flex items-center gap-1"><XCircle className="h-3 w-3" /> Disabled</Badge>;
+        StatusIcon = XCircle;
+        break;
       case 'PENDING_APPROVAL':
-        return <Badge variant="outline" className="flex items-center gap-1"><Clock className="h-3 w-3" /> Pending</Badge>;
+        StatusIcon = Clock;
+        break;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        StatusIcon = Clock;
     }
+    
+    return (
+      <Badge className={getStatusBadgeColor(status)}>
+        <StatusIcon className="h-3 w-3 mr-1" />
+        {formatAdminStatus(status)}
+      </Badge>
+    );
   };
   
   // Helper for rendering role badges
   const getRoleBadge = (role: string) => {
-    const normalizedRole = role.toUpperCase();
-    
-    switch (normalizedRole) {
+    // Get the appropriate icon based on role
+    let RoleIcon;
+    switch (role.toUpperCase()) {
       case 'SUPER_ADMIN':
-        return <Badge variant="default" className="flex items-center gap-1 bg-red-600"><ShieldAlert className="h-3 w-3" /> Super Admin</Badge>;
+        RoleIcon = ShieldAlert;
+        break;
       case 'ADMIN':
-        return <Badge variant="default" className="flex items-center gap-1 bg-blue-600"><ShieldCheck className="h-3 w-3" /> Admin</Badge>;
+        RoleIcon = ShieldCheck;
+        break;
       case 'MODERATOR':
-        return <Badge variant="default" className="flex items-center gap-1 bg-green-600"><Shield className="h-3 w-3" /> Moderator</Badge>;
+        RoleIcon = Shield;
+        break;
       default:
-        return <Badge variant="secondary">{role}</Badge>;
+        RoleIcon = UserCog;
     }
+    
+    return (
+      <Badge className={getRoleBadgeColor(role)}>
+        <RoleIcon className="h-3 w-3 mr-1" />
+        {formatAdminRole(role)}
+      </Badge>
+    );
   };
   
   // Format date
@@ -897,10 +928,10 @@ export default function UserManagement() {
           onClose={() => setSelectedAdminId(null)}
           admin={userData?.admins.find(admin => admin.id === selectedAdminId) || null}
           currentUserRole={adminUser?.role || ''}
-          onRoleChange={(adminId, role) => {
+          onRoleChange={(adminId: string, role: string) => {
             setConfirmRoleChange({ adminId, newRole: role });
           }}
-          onStatusChange={(adminId, status) => {
+          onStatusChange={(adminId: string, status: string) => {
             setConfirmStatusChange({ adminId, newStatus: status });
           }}
         />

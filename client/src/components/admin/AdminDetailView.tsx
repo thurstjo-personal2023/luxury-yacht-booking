@@ -49,8 +49,9 @@ import {
   getStatusBadgeColor,
   getAdminRoles,
   getAvailableStatuses,
-  logAdminActivity
-} from '../../utils/admin-utils';
+  logAdminActivity,
+  ActivityType
+} from '@/utils/admin-utils';
 import { useToast } from '@/hooks/use-toast';
 
 // Types for the admin user object
