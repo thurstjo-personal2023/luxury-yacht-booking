@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'wouter';
 import { useLocation } from 'wouter';
-import { useAuth } from '@/hooks/use-auth';
+import { useAdminAuth } from '@/hooks/use-admin-auth';
 
 import {
   LayoutDashboardIcon,
@@ -34,7 +34,7 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const [location] = useLocation();
-  const { user } = useAuth();
+  const { adminUser } = useAdminAuth();
   
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboardIcon },
@@ -47,9 +47,23 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { name: 'Settings', href: '/admin/settings', icon: SettingsIcon },
   ];
   
-  const handleLogout = () => {
-    // Navigate to logout page
-    window.location.href = '/logout';
+  const handleLogout = async () => {
+    try {
+      // Log admin logout activity
+      await fetch('/api/admin/logout-audit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      // Use the Firebase Auth signOut and redirect
+      window.location.href = '/admin-login';
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Fallback to direct navigation
+      window.location.href = '/admin-login';
+    }
   };
   
   return (
@@ -73,16 +87,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || 'Admin'} />
-                    <AvatarFallback>{user?.displayName?.[0] || 'A'}</AvatarFallback>
+                    <AvatarFallback>{adminUser?.email?.[0].toUpperCase() || 'A'}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user?.displayName || 'Admin User'}</p>
-                    <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                    <p className="text-sm font-medium leading-none">{adminUser ? `${adminUser.role} Admin` : 'Admin User'}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{adminUser?.email}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
