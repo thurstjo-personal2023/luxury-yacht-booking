@@ -308,7 +308,7 @@ export default function AdminDetailView({
                           <SelectContent>
                             <SelectGroup>
                               <SelectLabel>Available Roles</SelectLabel>
-                              {getAdminRoles().map(role => (
+                              {getAdminRoles().map((role: { value: string; label: string }) => (
                                 <SelectItem key={role.value} value={role.value}>
                                   {role.label}
                                 </SelectItem>
@@ -346,7 +346,7 @@ export default function AdminDetailView({
                           <SelectContent>
                             <SelectGroup>
                               <SelectLabel>Available Status Updates</SelectLabel>
-                              {getAvailableStatuses(admin.status).map(status => (
+                              {getAvailableStatuses(admin.status).map((status: { value: string; label: string }) => (
                                 <SelectItem key={status.value} value={status.value}>
                                   {status.label}
                                 </SelectItem>
