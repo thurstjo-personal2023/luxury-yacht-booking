@@ -68,7 +68,7 @@ const ImageValidator = lazy(() => import("@/pages/admin/ImageValidator"));
 const MediaAdmin = lazy(() => import("@/pages/admin/MediaAdmin"));
 const MediaValidation = lazy(() => import("@/pages/admin/MediaValidation"));
 const PubSubValidation = lazy(() => import("@/pages/admin/PubSubValidation"));
-const UserManagement = lazy(() => import("@/pages/admin/UserManagement"));
+const UserManagement = lazy(() => import("@/pages/admin/UserManagement").then(module => ({ default: module.default })));
 
 // Secure Admin Portal
 const SecureAdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard"));
