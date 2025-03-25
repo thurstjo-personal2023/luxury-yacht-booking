@@ -1,26 +1,35 @@
-import { Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import React from 'react';
+import { cn } from '@/lib/utils';
 
 interface SpinnerProps {
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: 'sm' | 'md' | 'lg';
   className?: string;
 }
 
-export function Spinner({ size = "md", className }: SpinnerProps) {
+/**
+ * Spinner component for loading states
+ * 
+ * @param size - Size of the spinner (sm, md, lg)
+ * @param className - Additional classes to apply
+ */
+export function Spinner({ size = 'md', className }: SpinnerProps) {
   const sizeClasses = {
-    sm: "h-4 w-4",
-    md: "h-6 w-6",
-    lg: "h-8 w-8",
-    xl: "h-12 w-12",
+    sm: 'h-4 w-4 border-2',
+    md: 'h-6 w-6 border-2',
+    lg: 'h-8 w-8 border-3',
   };
 
   return (
-    <Loader2 
+    <div 
       className={cn(
-        "animate-spin text-muted-foreground", 
+        'animate-spin rounded-full border-solid border-primary border-t-transparent',
         sizeClasses[size],
         className
       )} 
-    />
+      role="status" 
+      aria-label="Loading"
+    >
+      <span className="sr-only">Loading...</span>
+    </div>
   );
 }

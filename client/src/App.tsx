@@ -274,7 +274,11 @@ function App() {
                     {(params) => <MfaOptionsPage />}
                   </Route>
                   <Route path="/admin-mfa-verify" component={AdminMfaVerify} />
-                  <Route path="/admin-dashboard" component={SecureAdminDashboard} />
+                  <Route path="/admin-dashboard">
+                    <PrivateRoute routeType="admin">
+                      <SecureAdminDashboard />
+                    </PrivateRoute>
+                  </Route>
                     
                   {/* Admin Registration Flow Routes */}
                   <Route path="/admin-registration/:inviteCode" component={AdminRegistrationPage} />

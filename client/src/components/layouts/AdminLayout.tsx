@@ -47,21 +47,31 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { name: 'Settings', href: '/admin/settings', icon: SettingsIcon },
   ];
   
+  const { adminSignOut } = useAdminAuth();
+  
   const handleLogout = async () => {
     try {
-      // Log admin logout activity
-      await fetch('/api/admin/logout-audit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+      console.log('AdminLayout: Logging out admin user');
       
-      // Use the Firebase Auth signOut and redirect
-      window.location.href = '/admin-login';
+      // Log admin logout activity
+      try {
+        await fetch('/api/admin/logout-audit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        console.log('AdminLayout: Logout audit recorded');
+      } catch (auditError) {
+        console.warn('AdminLayout: Failed to record logout audit:', auditError);
+      }
+      
+      // Use the AdminAuth context for proper sign out
+      await adminSignOut();
+      console.log('AdminLayout: Admin user signed out successfully');
     } catch (error) {
-      console.error('Logout error:', error);
-      // Fallback to direct navigation
+      console.error('AdminLayout: Logout error:', error);
+      // Fallback to direct navigation in case of errors
       window.location.href = '/admin-login';
     }
   };

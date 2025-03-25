@@ -1,11 +1,13 @@
 import React from 'react';
 import AdminLayout from '@/components/layouts/AdminLayout';
+import AdminAuthGuard from '@/components/admin/AdminAuthGuard';
 
 /**
  * withAdminLayout Higher-Order Component
  * 
- * This HOC wraps any component with the standard AdminLayout component
- * for consistent admin interface presentation.
+ * This HOC wraps any component with:
+ * 1. AdminAuthGuard - Ensures valid admin authentication with token refresh
+ * 2. AdminLayout - Provides consistent admin interface presentation
  * 
  * Usage:
  * ```
@@ -14,9 +16,11 @@ import AdminLayout from '@/components/layouts/AdminLayout';
  */
 export const withAdminLayout = <P extends object>(Component: React.ComponentType<P>) => {
   const WithAdminLayout: React.FC<P> = (props) => (
-    <AdminLayout>
-      <Component {...props} />
-    </AdminLayout>
+    <AdminAuthGuard>
+      <AdminLayout>
+        <Component {...props} />
+      </AdminLayout>
+    </AdminAuthGuard>
   );
 
   // Set display name for better debugging
