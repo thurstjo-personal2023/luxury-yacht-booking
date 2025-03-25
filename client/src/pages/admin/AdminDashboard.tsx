@@ -56,12 +56,16 @@ export default function AdminDashboard() {
 
   // Check admin authentication
   useEffect(() => {
-    // For now, we're just checking if adminUser exists
-    // In the future, this will be handled by the useAdminAuth hook
-    if (!adminUser && !localStorage.getItem('adminSessionActive')) {
+    // Redirect to login if not authenticated
+    if (!adminUser) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please log in to access the admin dashboard',
+        variant: 'destructive'
+      });
       setLocation('/admin-login');
     }
-  }, [adminUser, setLocation]);
+  }, [adminUser, setLocation, toast]);
 
   // Handle sidebar navigation
   const handleNavigation = (section: string) => {
