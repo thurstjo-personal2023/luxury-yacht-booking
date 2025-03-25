@@ -174,7 +174,7 @@ export default function UserManagement() {
       }
       return response.json();
     },
-    enabled: !!adminUser && adminUser.role === 'SUPER_ADMIN'
+    enabled: !!adminUser && adminUser.role === 'super_admin'
   });
 
   // Handle pagination
@@ -231,13 +231,16 @@ export default function UserManagement() {
   // Handle change role
   const handleRoleChange = async (adminId: string, newRole: string) => {
     try {
+      // Convert from UI role format (SUPER_ADMIN) to backend format (super_admin)
+      const backendRole = newRole.toLowerCase();
+      
       const response = await fetch(`/api/admin/users/${adminId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          role: newRole
+          role: backendRole
         })
       });
       
@@ -322,7 +325,9 @@ export default function UserManagement() {
   
   // Helper for rendering role badges
   const getRoleBadge = (role: string) => {
-    switch (role) {
+    const normalizedRole = role.toUpperCase();
+    
+    switch (normalizedRole) {
       case 'SUPER_ADMIN':
         return <Badge variant="default" className="flex items-center gap-1 bg-red-600"><ShieldAlert className="h-3 w-3" /> Super Admin</Badge>;
       case 'ADMIN':
@@ -516,7 +521,7 @@ export default function UserManagement() {
                                   <DropdownMenuLabel>Manage Admin</DropdownMenuLabel>
                                   <DropdownMenuSeparator />
                                   
-                                  {adminUser?.role === 'SUPER_ADMIN' && (
+                                  {adminUser?.role === 'super_admin' && (
                                     <>
                                       <DropdownMenuItem onClick={() => setLocation(`/admin/users/${admin.id}`)}>
                                         View Details
@@ -524,19 +529,19 @@ export default function UserManagement() {
                                       <DropdownMenuSeparator />
                                       
                                       <DropdownMenuItem 
-                                        disabled={admin.role === 'SUPER_ADMIN' && statsData?.byRole.superAdmin === 1}
+                                        disabled={admin.role.toUpperCase() === 'SUPER_ADMIN' && statsData?.byRole.superAdmin === 1}
                                         onClick={() => handleRoleChange(admin.id, 'SUPER_ADMIN')}
                                       >
                                         Set as Super Admin
                                       </DropdownMenuItem>
                                       <DropdownMenuItem 
-                                        disabled={admin.role === 'ADMIN'}
+                                        disabled={admin.role.toUpperCase() === 'ADMIN'}
                                         onClick={() => handleRoleChange(admin.id, 'ADMIN')}
                                       >
                                         Set as Admin
                                       </DropdownMenuItem>
                                       <DropdownMenuItem 
-                                        disabled={admin.role === 'MODERATOR'}
+                                        disabled={admin.role.toUpperCase() === 'MODERATOR'}
                                         onClick={() => handleRoleChange(admin.id, 'MODERATOR')}
                                       >
                                         Set as Moderator
@@ -545,7 +550,7 @@ export default function UserManagement() {
                                       
                                       {admin.status === 'ACTIVE' ? (
                                         <DropdownMenuItem 
-                                          disabled={admin.role === 'SUPER_ADMIN' && statsData?.byRole.superAdmin === 1}
+                                          disabled={admin.role.toUpperCase() === 'SUPER_ADMIN' && statsData?.byRole.superAdmin === 1}
                                           onClick={() => handleStatusChange(admin.id, 'DISABLED')}
                                           className="text-red-600"
                                         >
