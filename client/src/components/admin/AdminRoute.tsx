@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { useAdminAuth } from '@/hooks/use-admin-auth';
+import { authService } from '@/services/auth/auth-service';
 
 // Loading spinner component
 export function AdminLoadingSpinner() {
@@ -14,39 +15,107 @@ export function AdminLoadingSpinner() {
 interface AdminRouteProps {
   children: ReactNode;
   requiresMfa?: boolean;
+  requiredRole?: 'ADMIN' | 'SUPER_ADMIN' | 'MODERATOR';
 }
 
-export function AdminRoute({ children, requiresMfa = true }: AdminRouteProps) {
+export function AdminRoute({ 
+  children, 
+  requiresMfa = true,
+  requiredRole
+}: AdminRouteProps) {
   const [routeLoading, setRouteLoading] = useState(true);
-  const { adminUser, isLoading } = useAdminAuth();
+  const { adminUser, isLoading, verifyAdminSession } = useAdminAuth();
   const [location, setLocation] = useLocation();
+  const [sessionValid, setSessionValid] = useState<boolean | null>(null);
 
+  // Check token freshness and refresh if needed
+  useEffect(() => {
+    const checkTokenFreshness = async () => {
+      // If there's no token in localStorage but adminSessionActive is set, clear it 
+      // as it's likely stale
+      const hasToken = !!localStorage.getItem('authToken');
+      const hasAdminSession = !!localStorage.getItem('adminSessionActive');
+      
+      if (!hasToken && hasAdminSession) {
+        console.log('AdminRoute: Clearing stale admin session');
+        localStorage.removeItem('adminSessionActive');
+        localStorage.removeItem('adminLastActivity');
+      }
+      
+      // If admin user exists, ensure token is fresh
+      if (adminUser) {
+        try {
+          // This will refresh the token if needed
+          await authService.refreshToken(true);
+          console.log('AdminRoute: Token refreshed successfully');
+          
+          // Verify that the admin session is still valid
+          const isValid = await verifyAdminSession();
+          setSessionValid(isValid);
+          
+          if (!isValid) {
+            console.log('AdminRoute: Admin session verification failed');
+            // Will be handled in the next useEffect
+          }
+        } catch (error) {
+          console.error('AdminRoute: Token refresh failed:', error);
+          setSessionValid(false);
+        }
+      }
+    };
+    
+    if (!isLoading) {
+      checkTokenFreshness();
+    }
+  }, [adminUser, isLoading, verifyAdminSession]);
+
+  // Handle routing based on auth state
   useEffect(() => {
     // Wait for admin auth to initialize
-    if (isLoading) {
+    if (isLoading || sessionValid === null) {
       return;
     }
     
     // Check if user is authenticated as admin
-    if (!adminUser) {
+    if (!adminUser || sessionValid === false) {
       // Redirect to admin login, preserving the intended destination
-      setLocation(`/admin-login?returnUrl=${encodeURIComponent(location)}`);
+      const currentPath = encodeURIComponent(location);
+      console.log(`AdminRoute: Redirecting to login, return URL: ${currentPath}`);
+      setLocation(`/admin-login?returnUrl=${currentPath}`);
       return;
     }
     
     // Check MFA if required
     if (requiresMfa && !adminUser.mfaVerified) {
       // If MFA is not yet verified, redirect to MFA verification
-      setLocation(`/admin-mfa-verify?returnUrl=${encodeURIComponent(location)}`);
+      const currentPath = encodeURIComponent(location);
+      console.log(`AdminRoute: Redirecting to MFA verification, return URL: ${currentPath}`);
+      setLocation(`/admin-mfa-verify?returnUrl=${currentPath}`);
       return;
     }
     
-    // Authentication and MFA checks passed
+    // Check required role if specified
+    if (requiredRole && adminUser.role !== requiredRole) {
+      // Check for Super Admin override (Super Admins can access any admin page)
+      if (!(requiredRole !== 'SUPER_ADMIN' && adminUser.role === 'SUPER_ADMIN')) {
+        console.log(`AdminRoute: Insufficient permissions. Required: ${requiredRole}, User has: ${adminUser.role}`);
+        // Redirect to unauthorized page or dashboard
+        setLocation('/admin/unauthorized');
+        return;
+      }
+    }
+    
+    // Authentication, MFA, and role checks passed
+    console.log('AdminRoute: All checks passed, rendering protected content');
     setRouteLoading(false);
-  }, [adminUser, isLoading, setLocation, location, requiresMfa]);
+    
+    // Update the last activity timestamp for session timeout tracking
+    localStorage.setItem('adminLastActivity', Date.now().toString());
+    
+  }, [adminUser, isLoading, sessionValid, setLocation, location, requiresMfa, requiredRole]);
 
   // Show loading spinner while checking authentication
-  if (isLoading || routeLoading) {
+  if (isLoading || routeLoading || sessionValid === null) {
     return <AdminLoadingSpinner />;
   }
 

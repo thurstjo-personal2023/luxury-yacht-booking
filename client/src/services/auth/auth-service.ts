@@ -382,9 +382,10 @@ export class AuthService {
 
   /**
    * Refresh authentication token
+   * @param forceRefresh Whether to force a token refresh from the server
    * @returns Fresh token string
    */
-  async refreshToken(): Promise<string | null> {
+  async refreshToken(forceRefresh = true): Promise<string | null> {
     const user = this.getCurrentUser();
     if (!user) {
       console.warn('AuthService: Cannot refresh token - no current user');
@@ -393,9 +394,15 @@ export class AuthService {
     
     try {
       // Force token refresh
-      const token = await user.getIdToken(true);
+      const token = await user.getIdToken(forceRefresh);
+      
+      // Store in localStorage with a timestamp for expiration tracking
       localStorage.setItem('authToken', token);
-      console.log('AuthService: Token refreshed and stored');
+      localStorage.setItem('authTokenTimestamp', Date.now().toString());
+      
+      console.log('AuthService: Token refreshed and stored with timestamp');
+      
+      // Return the fresh token
       return token;
     } catch (error) {
       console.error('AuthService: Error refreshing token:', error);
@@ -627,11 +634,29 @@ export class AuthService {
           user.getIdToken().then(token => {
             console.log('[DEBUG-AUTH] Storing new auth token in localStorage, tokenLength:', token.length);
             localStorage.setItem('authToken', token);
+            localStorage.setItem('authTokenTimestamp', Date.now().toString());
+            
+            // Store a flag indicating whether this is an admin user
+            user.getIdTokenResult().then(idTokenResult => {
+              const isAdmin = idTokenResult.claims.role === 'admin' || 
+                            idTokenResult.claims.role === 'ADMIN' ||
+                            idTokenResult.claims.role === 'SUPER_ADMIN';
+              
+              if (isAdmin) {
+                console.log('[DEBUG-AUTH] Setting adminSessionActive flag');
+                localStorage.setItem('adminSessionActive', 'true');
+                localStorage.setItem('adminLastActivity', Date.now().toString());
+              }
+            });
           }).catch(error => {
             console.error('[DEBUG-AUTH] Error getting token during token change:', error);
           });
         } else {
           console.log('[DEBUG-AUTH] Removing auth token from localStorage due to null user');
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('authTokenTimestamp');
+          localStorage.removeItem('adminSessionActive');
+          localStorage.removeItem('adminLastActivity');
         }
       });
       

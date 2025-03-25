@@ -45,6 +45,7 @@ interface AdminAuthContextType {
   setupMfa: (phoneNumber: string) => Promise<string>;
   confirmMfaSetup: (otp: string) => Promise<boolean>;
   refreshSession: () => Promise<void>;
+  verifyAdminSession: () => Promise<boolean>;
   sessionTimeout: number;
 }
 
@@ -59,6 +60,7 @@ const AdminAuthContext = createContext<AdminAuthContextType>({
   setupMfa: async () => { throw new Error('Not implemented'); },
   confirmMfaSetup: async () => { throw new Error('Not implemented'); },
   refreshSession: async () => { throw new Error('Not implemented'); },
+  verifyAdminSession: async () => { throw new Error('Not implemented'); },
   sessionTimeout: 900, // 15 minutes default
 });
 
@@ -371,6 +373,72 @@ export function AdminAuthProvider({
       throw err;
     }
   }, [adminUser, db, toast]);
+  
+  // Verify admin session is valid
+  const verifyAdminSession = useCallback(async (): Promise<boolean> => {
+    try {
+      console.log('AdminAuthProvider: Verifying admin session');
+      
+      // Check if there's a current user
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser) {
+        console.log('AdminAuthProvider: No current user found');
+        return false;
+      }
+      
+      // Check if the token is fresh and valid
+      const idToken = await currentUser.getIdToken(true);
+      if (!idToken) {
+        console.log('AdminAuthProvider: Failed to get fresh ID token');
+        return false;
+      }
+      
+      // Verify admin status in Firestore
+      const userDoc = await getDoc(doc(db, 'admin_users', currentUser.uid));
+      if (!userDoc.exists()) {
+        console.log('AdminAuthProvider: User is not an admin');
+        return false;
+      }
+      
+      // Verify role in token claims
+      const idTokenResult = await currentUser.getIdTokenResult();
+      const adminRole = idTokenResult.claims.role;
+      
+      // Check if the role is an admin role
+      const isAdmin = 
+        adminRole === 'admin' || 
+        adminRole === 'ADMIN' || 
+        adminRole === 'super_admin' || 
+        adminRole === 'SUPER_ADMIN' || 
+        adminRole === 'MODERATOR';
+      
+      if (!isAdmin) {
+        console.log('AdminAuthProvider: User has no admin role in token claims');
+        return false;
+      }
+      
+      // Check if session has timed out
+      const lastActivity = localStorage.getItem('adminLastActivity');
+      if (lastActivity) {
+        const lastActivityTime = parseInt(lastActivity, 10);
+        const currentTime = Date.now();
+        const timeSinceLastActivity = (currentTime - lastActivityTime) / 1000; // In seconds
+        
+        if (timeSinceLastActivity > sessionTimeout) {
+          console.log(`AdminAuthProvider: Admin session timed out (${timeSinceLastActivity.toFixed(1)}s > ${sessionTimeout}s)`);
+          return false;
+        }
+      }
+      
+      // All checks passed, update the last activity time
+      localStorage.setItem('adminLastActivity', Date.now().toString());
+      console.log('AdminAuthProvider: Admin session verified successfully');
+      return true;
+    } catch (err: any) {
+      console.error('AdminAuthProvider: Session verification error:', err);
+      return false;
+    }
+  }, [db, sessionTimeout]);
 
   // Context value
   const contextValue = {
