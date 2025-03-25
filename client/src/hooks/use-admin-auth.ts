@@ -20,6 +20,28 @@ import {
 import { doc, getDoc, getFirestore, updateDoc } from 'firebase/firestore';
 import { authService } from '@/services/auth/auth-service';
 
+// Utility function to decode JWT tokens
+function decodeJwt(token: string): any {
+  try {
+    if (!token) return null;
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('Error decoding JWT token:', error);
+    return null;
+  }
+}
+
 // Admin user type with additional fields
 interface AdminUser {
   uid: string;
@@ -387,7 +409,7 @@ export function AdminAuthProvider({
       }
       
       // Check if the token is fresh and valid
-      const idToken = await currentUser.getIdToken(true);
+      const idToken = await authService.getIdToken(true);
       if (!idToken) {
         console.log('AdminAuthProvider: Failed to get fresh ID token');
         return false;
@@ -400,9 +422,13 @@ export function AdminAuthProvider({
         return false;
       }
       
-      // Verify role in token claims
-      const idTokenResult = await currentUser.getIdTokenResult();
-      const adminRole = idTokenResult.claims.role;
+      // Verify role in token claims - use auth service instead of direct Firebase call
+      // Get a fresh token result to ensure we have the latest claims
+      const idTokenResult = await authService.refreshToken(true);
+      
+      // Get the role from the decoded token
+      const decodedToken = decodeJwt(idTokenResult || '');
+      const adminRole = decodedToken?.role;
       
       // Check if the role is an admin role
       const isAdmin = 
