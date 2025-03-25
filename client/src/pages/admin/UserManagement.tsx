@@ -74,8 +74,9 @@ import {
   getRoleBadgeColor, 
   getStatusBadgeColor, 
   formatAdminRole, 
-  formatAdminStatus 
-} from '../../utils/admin-utils';
+  formatAdminStatus,
+  hasPermission
+} from '@/utils/admin-utils';
 
 // Hooks
 import { useToast } from '@/hooks/use-toast';
