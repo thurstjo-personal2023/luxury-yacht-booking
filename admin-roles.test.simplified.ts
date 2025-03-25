@@ -152,7 +152,10 @@ const mockRoleManagement = {
     async (auth: Auth, db: Firestore, userData: any): Promise<string> => {
       // In a real implementation, this would create a user in Firebase Auth
       // For our test, we'll simulate it
-      const uid = `test-admin-${Date.now()}`;
+      
+      // Use fixed timestamp if provided, otherwise use current timestamp
+      const timestamp = userData.timestamp || Date.now();
+      const uid = `test-admin-${timestamp}`;
       
       // Create the admin document in Firestore
       const adminData = {
@@ -579,31 +582,34 @@ describe('Administrator Role & Permissions Management Tests', () => {
     let targetAdminId: string;
     
     beforeEach(async () => {
-      // Create a Super Admin
+      // Create a Super Admin - Use a fixed timestamp to ensure unique IDs
       superAdminId = await mockRoleManagement.createTestAdmin(auth, db, {
         email: 'super-admin@example.com',
         role: 'SUPER_ADMIN',
         department: 'Technology',
         position: 'CTO',
-        isActive: true
+        isActive: true,
+        timestamp: 1000 // Use fixed timestamps to create distinct IDs
       });
       
-      // Create a regular Admin
+      // Create a regular Admin - Use a fixed timestamp to ensure unique IDs
       adminId = await mockRoleManagement.createTestAdmin(auth, db, {
         email: 'regular-admin@example.com',
         role: 'ADMIN',
         department: 'Customer Support',
         position: 'Support Lead',
-        isActive: true
+        isActive: true,
+        timestamp: 2000 // Use fixed timestamps to create distinct IDs
       });
       
-      // Create a target Admin to modify
+      // Create a target Admin to modify - Use a fixed timestamp to ensure unique IDs
       targetAdminId = await mockRoleManagement.createTestAdmin(auth, db, {
         email: 'target-admin@example.com',
         role: 'MODERATOR',
         department: 'Marketing',
         position: 'Content Moderator',
-        isActive: true
+        isActive: true,
+        timestamp: 3000 // Use fixed timestamps to create distinct IDs
       });
     });
     
@@ -689,31 +695,34 @@ describe('Administrator Role & Permissions Management Tests', () => {
     let targetAdminId: string;
     
     beforeEach(async () => {
-      // Create a Super Admin
+      // Create a Super Admin - Use a fixed timestamp to ensure unique IDs
       superAdminId = await mockRoleManagement.createTestAdmin(auth, db, {
         email: 'super-admin@example.com',
         role: 'SUPER_ADMIN',
         department: 'Technology',
         position: 'CTO',
-        isActive: true
+        isActive: true,
+        timestamp: 4000 // Use fixed timestamps to create distinct IDs
       });
       
-      // Create a regular Admin
+      // Create a regular Admin - Use a fixed timestamp to ensure unique IDs
       adminId = await mockRoleManagement.createTestAdmin(auth, db, {
         email: 'regular-admin@example.com',
         role: 'ADMIN',
         department: 'Customer Support',
         position: 'Support Lead',
-        isActive: true
+        isActive: true,
+        timestamp: 5000 // Use fixed timestamps to create distinct IDs
       });
       
-      // Create a target Admin to delete
+      // Create a target Admin to delete - Use a fixed timestamp to ensure unique IDs
       targetAdminId = await mockRoleManagement.createTestAdmin(auth, db, {
         email: 'target-admin@example.com',
         role: 'MODERATOR',
         department: 'Marketing',
         position: 'Content Moderator',
-        isActive: true
+        isActive: true,
+        timestamp: 6000 // Use fixed timestamps to create distinct IDs
       });
     });
     
@@ -765,17 +774,18 @@ describe('Administrator Role & Permissions Management Tests', () => {
     let targetAdminId: string;
     
     beforeEach(async () => {
-      // Create a Super Admin
+      // Create a Super Admin - Use a fixed timestamp to ensure unique IDs
       superAdminId = await mockRoleManagement.createTestAdmin(auth, db, {
         email: 'super-admin@example.com',
         role: 'SUPER_ADMIN',
         department: 'Technology',
         position: 'CTO',
-        isActive: true
+        isActive: true,
+        timestamp: 7000 // Use fixed timestamps to create distinct IDs
       });
       
       // Create a consumer user (non-admin)
-      consumerUserId = `consumer-${Date.now()}`;
+      consumerUserId = `consumer-${7000}`; // Use fixed value instead of Date.now()
       mockRoleManagement._collections.harmonized_users.set(consumerUserId, {
         uid: consumerUserId,
         email: 'consumer@example.com',
@@ -785,13 +795,14 @@ describe('Administrator Role & Permissions Management Tests', () => {
         updatedAt: new Date()
       });
       
-      // Create a target Admin
+      // Create a target Admin - Use a fixed timestamp to ensure unique IDs
       targetAdminId = await mockRoleManagement.createTestAdmin(auth, db, {
         email: 'target-admin@example.com',
         role: 'ADMIN',
         department: 'Customer Support',
         position: 'Support Manager',
-        isActive: true
+        isActive: true,
+        timestamp: 8000 // Use fixed timestamps to create distinct IDs
       });
     });
     
@@ -837,13 +848,14 @@ describe('Administrator Role & Permissions Management Tests', () => {
     let superAdminId: string;
     
     beforeEach(async () => {
-      // Create a single Super Admin
+      // Create a single Super Admin - Use a fixed timestamp to ensure unique IDs
       superAdminId = await mockRoleManagement.createTestAdmin(auth, db, {
         email: 'only-super-admin@example.com',
         role: 'SUPER_ADMIN',
         department: 'Technology',
         position: 'CTO',
-        isActive: true
+        isActive: true,
+        timestamp: 9000 // Use fixed timestamps to create distinct IDs
       });
     });
     
@@ -868,13 +880,14 @@ describe('Administrator Role & Permissions Management Tests', () => {
     });
     
     test('Can delete a Super Admin if there are multiple Super Admins', async () => {
-      // Create another Super Admin
+      // Create another Super Admin - Use a fixed timestamp to ensure unique IDs
       const anotherSuperAdminId = await mockRoleManagement.createTestAdmin(auth, db, {
         email: 'another-super-admin@example.com',
         role: 'SUPER_ADMIN',
         department: 'Operations',
         position: 'COO',
-        isActive: true
+        isActive: true,
+        timestamp: 10000 // Use fixed timestamps to create distinct IDs
       });
       
       // Verify there are now two Super Admins
