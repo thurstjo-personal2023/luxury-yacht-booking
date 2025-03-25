@@ -104,8 +104,9 @@ const mockRoleManagement = {
       get: jest.fn().mockImplementation(() => {
         // Filter the collection based on the provided filters
         const collectionData = mockRoleManagement._collections[collection];
-        const filteredData = Array.from(collectionData.entries())
-          .filter(([_, value]) => {
+        const entries = Array.from(collectionData.entries()) as Array<[string, any]>;
+        const filteredData = entries.filter((entry) => {
+            const [_, value] = entry;
             // Apply all filters
             return filters.every(filter => {
               if (filter.type === 'where') {
@@ -128,11 +129,14 @@ const mockRoleManagement = {
 
         return Promise.resolve({
           size: filteredData.length,
-          docs: filteredData.map(([id, data]) => ({
-            id,
-            exists: () => true,
-            data: () => data
-          }))
+          docs: filteredData.map((entry) => {
+            const [id, data] = entry;
+            return {
+              id,
+              exists: () => true,
+              data: () => data
+            };
+          })
         });
       })
     };
@@ -560,7 +564,7 @@ describe('Administrator Role & Permissions Management Tests', () => {
       expect(res.json).toHaveBeenCalled();
       
       // Get the admin ID from the mock response
-      const jsonCall = (res.json as jest.Mock).mock.calls[0][0];
+      const jsonCall = (res.json as jest.Mock).mock.calls[0][0] as { message: string; adminId: string };
       const adminId = jsonCall.adminId;
       
       // Verify the admin was created in Firestore
@@ -604,6 +608,9 @@ describe('Administrator Role & Permissions Management Tests', () => {
     });
     
     test('Super Admin can update another admin\'s role', async () => {
+      console.log('Super Admin ID:', superAdminId);
+      console.log('Target Admin ID:', targetAdminId);
+      
       // Update role using Super Admin credentials
       const success = await mockRoleManagement.updateAdminRole(
         db,
@@ -612,10 +619,13 @@ describe('Administrator Role & Permissions Management Tests', () => {
         'ADMIN' // Promote from MODERATOR to ADMIN
       );
       
-      expect(success).toBe(true);
+      console.log('Update success:', success);
       
       // Verify the role was updated
       const targetAdmin = await mockRoleManagement.getAdminById(db, targetAdminId);
+      console.log('Target admin after update:', targetAdmin);
+      
+      expect(success).toBe(true);
       expect(targetAdmin?.role).toBe('ADMIN');
     });
     
@@ -708,6 +718,13 @@ describe('Administrator Role & Permissions Management Tests', () => {
     });
     
     test('Super Admin can delete another admin', async () => {
+      console.log('Super Admin ID:', superAdminId);
+      console.log('Target Admin ID:', targetAdminId);
+      
+      // Verify admin exists before deletion
+      const initialExists = await mockRoleManagement.adminExists(db, targetAdminId);
+      console.log('Target admin exists before deletion:', initialExists);
+      
       // Delete admin using Super Admin credentials
       const result = await mockRoleManagement.deleteAdmin(
         db,
@@ -715,10 +732,13 @@ describe('Administrator Role & Permissions Management Tests', () => {
         targetAdminId
       );
       
-      expect(result.success).toBe(true);
+      console.log('Delete result:', result);
       
       // Verify the admin was deleted
       const exists = await mockRoleManagement.adminExists(db, targetAdminId);
+      console.log('Target admin exists after deletion:', exists);
+      
+      expect(result.success).toBe(true);
       expect(exists).toBe(false);
     });
     
