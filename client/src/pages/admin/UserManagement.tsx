@@ -819,9 +819,18 @@ export default function UserManagement() {
                 )}
               </CardContent>
             </Card>
+            ) : (
+              <div className="flex items-center justify-center h-64 bg-white dark:bg-gray-950 rounded-md border">
+                <div className="text-center">
+                  <ShieldOff className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <h3 className="mt-4 text-lg font-medium">Permission Required</h3>
+                  <p className="mt-2 text-sm text-muted-foreground max-w-sm">
+                    You don't have permission to view pending approvals.
+                  </p>
+                </div>
+              </div>
+            )}
           </TabsContent>
-          
-          {/* Analytics Tab */}
           <TabsContent value="analytics">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {/* Admin Count Card */}
