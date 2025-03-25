@@ -408,7 +408,7 @@ export function AdminAuthProvider({
         return false;
       }
       
-      // Check if the token is fresh and valid
+      // Get a fresh token and verify it's valid
       const idToken = await authService.getIdToken(true);
       if (!idToken) {
         console.log('AdminAuthProvider: Failed to get fresh ID token');
@@ -422,12 +422,8 @@ export function AdminAuthProvider({
         return false;
       }
       
-      // Verify role in token claims - use auth service instead of direct Firebase call
-      // Get a fresh token result to ensure we have the latest claims
-      const idTokenResult = await authService.refreshToken(true);
-      
-      // Get the role from the decoded token
-      const decodedToken = decodeJwt(idTokenResult || '');
+      // Decode the token to get role information
+      const decodedToken = decodeJwt(idToken);
       const adminRole = decodedToken?.role;
       
       // Check if the role is an admin role

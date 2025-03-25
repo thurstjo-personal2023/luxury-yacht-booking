@@ -416,8 +416,24 @@ export class AuthService {
    * @returns Fresh token string or null if no user is signed in
    */
   async getIdToken(forceRefresh = true): Promise<string | null> {
-    // This is a convenience wrapper around refreshToken for consistency
-    return this.refreshToken(forceRefresh);
+    const user = this.getCurrentUser();
+    if (!user) {
+      console.warn('No current user in auth - cannot get fresh token');
+      return null;
+    }
+    
+    try {
+      // Get fresh token from Firebase Auth
+      const token = await user.getIdToken(forceRefresh);
+      
+      // Store in localStorage for API calls
+      localStorage.setItem('authToken', token);
+      
+      return token;
+    } catch (error) {
+      console.error('AuthService: Error getting ID token:', error);
+      return null;
+    }
   }
 
   /**
