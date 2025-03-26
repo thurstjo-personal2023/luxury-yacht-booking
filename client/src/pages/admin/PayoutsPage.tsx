@@ -166,22 +166,22 @@ const PayoutsPage: React.FC = () => {
   
   // Fetch data using custom hooks
   const { 
-    data: transactions = [], 
+    transactions = [], 
     isLoading: isLoadingTransactions 
   } = usePayoutTransactions();
   
   const { 
-    data: accounts = [], 
+    accounts = [], 
     isLoading: isLoadingAccounts 
   } = usePayoutAccounts();
   
   const { 
-    data: disputes = [], 
+    disputes = [], 
     isLoading: isLoadingDisputes 
   } = usePayoutDisputes();
   
   const { 
-    data: settings, 
+    settings, 
     isLoading: isLoadingSettings 
   } = usePayoutSettings();
   
@@ -243,25 +243,25 @@ const PayoutsPage: React.FC = () => {
               <TabsList>
                 <TabsTrigger value="transactions" className="relative">
                   Transactions
-                  {transactions.filter(t => t.status === 'pending').length > 0 && (
+                  {transactions.filter((t: any) => t.status === 'pending').length > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
-                      {transactions.filter(t => t.status === 'pending').length}
+                      {transactions.filter((t: any) => t.status === 'pending').length}
                     </span>
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="accounts" className="relative">
                   Accounts
-                  {accounts.filter(a => !a.isVerified).length > 0 && (
+                  {accounts.filter((a: any) => !a.isVerified).length > 0 && (
                     <span className="absolute -top-1 -right-1 bg-yellow-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
-                      {accounts.filter(a => !a.isVerified).length}
+                      {accounts.filter((a: any) => !a.isVerified).length}
                     </span>
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="disputes" className="relative">
                   Disputes
-                  {disputes.filter(d => d.status === 'open').length > 0 && (
+                  {disputes.filter((d: any) => d.status === 'open').length > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
-                      {disputes.filter(d => d.status === 'open').length}
+                      {disputes.filter((d: any) => d.status === 'open').length}
                     </span>
                   )}
                 </TabsTrigger>

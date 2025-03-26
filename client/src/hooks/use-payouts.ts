@@ -87,7 +87,7 @@ export function usePayoutTransactions() {
       queryClient.invalidateQueries({ queryKey: [API_BASE, 'transactions', variables.transactionId] });
       queryClient.invalidateQueries({ queryKey: [API_BASE, 'transactions'] });
       
-      const statusMessages = {
+      const statusMessages: Record<string, string> = {
         'pending': 'Transaction marked as pending',
         'approved': 'Transaction approved',
         'processing': 'Transaction marked as processing',
@@ -97,7 +97,7 @@ export function usePayoutTransactions() {
       };
       
       toast({
-        title: statusMessages[variables.status] || 'Status updated',
+        title: statusMessages[variables.status as string] || 'Status updated',
         description: 'The transaction status has been updated successfully.',
       });
     },
