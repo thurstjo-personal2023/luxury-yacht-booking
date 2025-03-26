@@ -73,11 +73,8 @@ function extractMediaUrls(collection: string, data: any): { url: string; field: 
 
   if (!data) return media;
   
-  // Define patterns for video detection
-  const videoPatterns = [
-    '.mp4', '.mov', '.webm', '.avi', 'video', '.mp4',
-    '-SBV-', 'Dynamic motion', 'preview.mp4'
-  ];
+  // Use predefined patterns for video detection from media-type.ts
+  const videoPatterns = [...VideoFileExtensions, ...VideoUrlPatterns];
   
   // Helper function to determine media type from URL
   const detectMediaTypeFromUrl = (url: string): 'image' | 'video' | 'unknown' => {
@@ -232,10 +229,7 @@ async function testMediaUrl(
 
   // ======= SPECIAL CASE HANDLING =======
   
-  // 1. Import placeholder handler functions for consistent detection
-  import { isPlaceholderUrl, formatPlaceholderUrl, getPlaceholderMediaType } from '../core/domain/media/placeholder-handler';
-  import { MediaType } from '../core/domain/media/media-type';
-  
+  // 1. Use placeholder handler functions for consistent detection
   // Check if URL is a placeholder using the shared placeholder handler
   if (isPlaceholderUrl(url)) {
     // Get the properly formatted placeholder URL

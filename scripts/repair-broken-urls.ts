@@ -7,6 +7,7 @@
  */
 import { adminDb } from '../server/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { VideoFileExtensions, VideoUrlPatterns } from '../core/domain/media/media-type';
 
 interface BrokenUrlDetail {
   docId: string;
@@ -131,10 +132,7 @@ async function repairBrokenUrl(
     if (mediaType === 'video') {
       placeholderUrl = defaultVideoUrl;
     } else if (!mediaType) {
-      // Import media-type.ts for consistent video pattern detection
-      import { VideoFileExtensions, VideoUrlPatterns } from '../core/domain/media/media-type';
-      
-      // Use the shared patterns for consistency across the application
+      // Use shared patterns for consistency across the application
       const isVideoPattern = VideoUrlPatterns.some(pattern => 
         url.toLowerCase().includes(pattern.toLowerCase())
       );
