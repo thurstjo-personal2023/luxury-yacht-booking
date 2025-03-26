@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
-import { useAdminApiUtils } from '@/lib/adminApiUtils';
+import { adminApiRequestWithRetry } from '@/lib/adminApiUtils';
 
 export interface PlatformStats {
   bookings: {
@@ -46,14 +46,17 @@ export interface PlatformStats {
 }
 
 export function usePlatformStats(period: 'day' | 'week' | 'month' | 'year' = 'week') {
-  const { refreshTokenIfNeeded } = useAdminApiUtils();
-
   return useQuery({
     queryKey: ['/api/admin/platform-stats', period],
     queryFn: async () => {
-      await refreshTokenIfNeeded();
-      const response = await apiRequest.get(`/api/admin/platform-stats?period=${period}`);
-      return response.data as PlatformStats;
+      // Use the admin API request with retry for better auth handling
+      const response = await adminApiRequestWithRetry(`/api/admin/platform-stats?period=${period}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch platform stats: ${response.status} ${response.statusText}`);
+      }
+      
+      return await response.json() as PlatformStats;
     },
     refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000, // 5 minutes

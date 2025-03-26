@@ -22,6 +22,7 @@ import { useAdminAuth } from '@/hooks/use-admin-auth';
 import { useToast } from '@/hooks/use-toast';
 import MediaValidationSummary from '@/components/admin/MediaValidationSummary';
 import MediaValidationActivity from '@/components/admin/MediaValidationActivity';
+import { PlatformStatsOverview } from '@/components/admin/PlatformStatsOverview';
 
 // Sidebar link item
 interface SidebarLinkProps {
@@ -114,6 +115,11 @@ export default function AdminDashboard() {
       default:
         return (
           <>
+            {/* Platform Stats Overview */}
+            <div className="mb-6">
+              <PlatformStatsOverview />
+            </div>
+            
             <div className="flex flex-col md:flex-row gap-4 mb-4">
               <div className="flex-1">
                 <MediaValidationSummary />
