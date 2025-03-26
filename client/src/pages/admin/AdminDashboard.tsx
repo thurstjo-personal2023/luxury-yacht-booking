@@ -237,6 +237,12 @@ export default function AdminDashboard() {
               onClick={() => setLocation('/admin/users')}
             />
             <SidebarLink
+              icon={<FileSpreadsheet className="h-5 w-5" />}
+              label="Reports"
+              active={activeSection === 'reports'}
+              onClick={() => setLocation('/admin/reports')}
+            />
+            <SidebarLink
               icon={<Settings className="h-5 w-5" />}
               label="Settings"
               active={activeSection === 'settings'}
@@ -310,6 +316,15 @@ export default function AdminDashboard() {
                   label="User Management"
                   active={activeSection === 'users'}
                   onClick={() => setLocation('/admin/users')}
+                />
+                <SidebarLink
+                  icon={<FileSpreadsheet className="h-5 w-5" />}
+                  label="Reports"
+                  active={activeSection === 'reports'}
+                  onClick={() => {
+                    setLocation('/admin/reports');
+                    setMobileMenuOpen(false);
+                  }}
                 />
                 <SidebarLink
                   icon={<Settings className="h-5 w-5" />}

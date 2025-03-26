@@ -226,7 +226,7 @@ function ReportsTableView({ reports }: { reports: Report[] }) {
   );
 }
 
-function ReportsPage() {
+const ReportsPage: React.FC = () => {
   const [activeView, setActiveView] = useState<'grid' | 'table'>('grid');
   const [selectedType, setSelectedType] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
