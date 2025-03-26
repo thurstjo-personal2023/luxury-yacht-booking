@@ -5,7 +5,14 @@
  * It handles all types of media validation and can be used by various front-end components.
  */
 
-import { MediaType, getMediaTypeFromUrl, getMediaTypeFromMime, isMediaTypeMatch } from './media-type';
+import { 
+  MediaType, 
+  getMediaTypeFromUrl, 
+  getMediaTypeFromMime, 
+  isMediaTypeMatch,
+  VideoFileExtensions,
+  VideoUrlPatterns
+} from './media-type';
 import { isPlaceholderUrl, getPlaceholderMediaType, formatPlaceholderUrl } from './placeholder-handler';
 
 /**
@@ -124,20 +131,19 @@ export async function validateMediaUrl(
   // Handle URL detection for video files that might be in image fields
   const detectedType = getMediaTypeFromUrl(url);
   
-  // Auto-validate videos that are clearly videos based on URL patterns
-  const videoPatterns = [
-    '.mp4', '.mov', '.webm', '.avi', '.m4v', '.mkv', '.mpg', '.mpeg', '.3gp',
-    '-SBV-', 'SBV-', 'Dynamic motion', 'dynamic-motion',
-    'video-preview', 'preview.mp4', 'preview-video', 'yacht-video',
-    'tourist-luxury-yacht-during-vacation-holidays',
-    'night-town-tivat-in-porto-montenegro-hotel-and-sailing-boats-in-the-boka-bay',
-    'SBV-309363270', 'SBV-347241353', 
-    '309363270-preview', '347241353-preview',
-    'luxury-yacht-during-vacation-holidays'
-  ];
+  // Use the VideoPatterns from media-type.ts for consistency
+  const isVideoPattern = VideoUrlPatterns.some(pattern => 
+    url.toLowerCase().includes(pattern.toLowerCase())
+  );
   
-  if (detectedType === MediaType.VIDEO || 
-      videoPatterns.some(pattern => url.toLowerCase().includes(pattern.toLowerCase()))) {
+  const isVideoFileExtension = VideoFileExtensions.some(ext => 
+    url.toLowerCase().endsWith(ext) || 
+    url.toLowerCase().includes(`${ext}?`) || 
+    url.toLowerCase().includes(`${ext}&`) || 
+    url.toLowerCase().includes(`${ext}/`)
+  );
+  
+  if (detectedType === MediaType.VIDEO || isVideoPattern || isVideoFileExtension) {
     console.log(`Auto-validating video URL: ${url}`);
     result.isValid = true;
     result.actualType = MediaType.VIDEO;

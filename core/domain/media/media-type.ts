@@ -67,6 +67,7 @@ export const VideoFileExtensions = [
  */
 export const VideoUrlPatterns = [
   '-SBV-',                // Stock video pattern from providers
+  'SBV-',                 // Alternate stock video pattern
   'Dynamic motion',       // Common description in video filenames
   'dynamic-motion',
   'video-preview',
@@ -74,7 +75,13 @@ export const VideoUrlPatterns = [
   'preview-video',
   'yacht-video',
   '-preview.mp4',         // Another common video preview pattern
-  'tourist-luxury-yacht', // Specific stock video filename pattern
+  'tourist-luxury-yacht-during-vacation-holidays', // Specific stock video filename pattern
+  'night-town-tivat-in-porto-montenegro-hotel-and-sailing-boats-in-the-boka-bay',
+  'SBV-309363270',        // Specific stock video IDs
+  'SBV-347241353',
+  '309363270-preview',
+  '347241353-preview',
+  'luxury-yacht-during-vacation-holidays',
   'sailing-boats',        // Common video content descriptor
   'porto-montenegro'      // Specific location for video content
 ];
