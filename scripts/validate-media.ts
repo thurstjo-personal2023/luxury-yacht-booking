@@ -285,8 +285,9 @@ async function testMediaUrl(
   
   // 3. Identify video URLs - correct misidentified video URLs
   const videoPatterns = [
-    '.mp4', '.mov', '.webm', '.avi',
-    'video', 'Dynamic motion', '-SBV-'
+    '.mp4', '.mov', '.webm', '.avi', '.m4v', '.mkv', '.mpg', '.mpeg', '.3gp',
+    'video', 'Dynamic motion', '-SBV-', 'video-preview', 'preview.mp4', 
+    'preview-video', 'yacht-video', '/video/', '/videos/'
   ];
   
   if (mediaType === 'image') {
