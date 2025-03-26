@@ -362,9 +362,9 @@ export function registerAdminRoutes(app: Express) {
     try {
       console.log(`[${new Date().toISOString()}] Starting blob URL resolution via admin API...`);
       
-      // Import the resolve function from our ES module
-      // Using the new blob-url-resolver.mjs module which properly handles Firebase Admin initialization
-      const { resolveAllBlobUrls } = await import('../scripts/blob-url-resolver.mjs');
+      // Import the resolve function from our module
+      // Using the scripts/resolve-blob-urls.js module which contains the resolveAllBlobUrls function
+      const { resolveAllBlobUrls } = await import('../scripts/resolve-blob-urls.js');
       
       // Run resolution operation with improved logging
       console.log(`[${new Date().toISOString()}] Executing resolveAllBlobUrls function...`);
