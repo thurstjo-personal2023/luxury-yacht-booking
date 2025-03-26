@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useReports } from '@/hooks/use-reports';
 import { 
   FileBarChart, 
   FileCog, 
@@ -60,29 +61,7 @@ export interface Report {
   tags: string[];
 }
 
-function useReports(type?: string) {
-  return useQuery({
-    queryKey: ['/api/admin/reports', type],
-    queryFn: async () => {
-      try {
-        const url = type ? `/api/admin/reports?type=${type}` : '/api/admin/reports';
-        const response = await adminApiRequestWithRetry(url);
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch reports: ${response.status} ${response.statusText}`);
-        }
-        
-        return await response.json() as Report[];
-      } catch (error) {
-        console.error('Error fetching reports:', error);
-        // Return empty array to prevent UI crashes
-        return [];
-      }
-    },
-    refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-}
+
 
 function ReportCard({ report }: { report: Report }) {
   const getIcon = () => {
