@@ -324,7 +324,7 @@ export class PayoutService {
   ): Promise<string> {
     try {
       const payoutId = `payout-${uuidv4()}`;
-      const now = Timestamp.now();
+      const now = clientNow();
       
       // Get payout settings
       const settings = await this.getPayoutSettings();
@@ -408,7 +408,7 @@ export class PayoutService {
       }
       
       const payout = payoutDoc.data() as PayoutTransaction;
-      const now = Timestamp.now();
+      const now = clientNow();
       const updates: any = {
         status,
         adminId,
@@ -483,11 +483,11 @@ export class PayoutService {
       }
       
       if (filters.fromDate) {
-        query = query.where('createdAt', '>=', Timestamp.fromDate(filters.fromDate));
+        query = query.where('createdAt', '>=', clientFromDate(filters.fromDate));
       }
       
       if (filters.toDate) {
-        query = query.where('createdAt', '<=', Timestamp.fromDate(filters.toDate));
+        query = query.where('createdAt', '<=', clientFromDate(filters.toDate));
       }
       
       // Apply sorting
@@ -546,7 +546,7 @@ export class PayoutService {
       }
       
       const disputeId = `dispute-${uuidv4()}`;
-      const now = Timestamp.now();
+      const now = clientNow();
       
       const dispute: PayoutDispute = {
         id: disputeId,
@@ -632,7 +632,7 @@ export class PayoutService {
       }
       
       const dispute = disputeDoc.data() as PayoutDispute;
-      const now = Timestamp.now();
+      const now = clientNow();
       
       await disputeRef.update({
         status,
