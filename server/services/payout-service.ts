@@ -139,8 +139,8 @@ export class PayoutService {
           currency: account.currency || 'USD',
           isActive: true,
           isVerified: false,
-          createdAt: now,
-          updatedAt: now,
+          createdAt: Timestamp.fromDate(now.toDate()),
+          updatedAt: Timestamp.fromDate(now.toDate()),
           preferredFrequency: account.preferredFrequency || 'monthly',
           ...account
         };
@@ -183,7 +183,7 @@ export class PayoutService {
       availableBalance: 0,
       onHoldBalance: 0,
       currency: 'USD',
-      lastUpdatedAt: now
+      lastUpdatedAt: Timestamp.fromDate(now.toDate())
     };
     
     await this.earningsSummariesCollection.doc(summaryId).set(summary);
