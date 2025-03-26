@@ -9,6 +9,7 @@ import { registerAdminProfileRoutes } from "./admin-profile-routes";
 import { registerAdminAuthRoutes } from "./admin-auth-routes";
 import { registerAdminUserRoutes } from "./admin-user-routes";
 import { registerAdminActivityRoutes } from "./admin-activity-routes-register";
+import { registerAdminPayoutRoutes } from "./admin-payout-routes";
 import { testProductionStorage, runStorageTest } from "./test-storage";
 import { USE_FIREBASE_EMULATORS } from "./env-config";
 
