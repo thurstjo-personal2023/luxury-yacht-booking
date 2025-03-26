@@ -10,6 +10,8 @@ import fetch from 'node-fetch';
 import { adminDb } from '../server/firebase-admin';
 import { format } from 'date-fns';
 import { FieldValue } from 'firebase-admin/firestore';
+import { isPlaceholderUrl, formatPlaceholderUrl, getPlaceholderMediaType } from '../core/domain/media/placeholder-handler';
+import { MediaType, VideoFileExtensions, VideoUrlPatterns } from '../core/domain/media/media-type';
 
 // Enhanced types for media validation
 interface MediaValidationEntry {
@@ -230,30 +232,30 @@ async function testMediaUrl(
 
   // ======= SPECIAL CASE HANDLING =======
   
-  // 1. Handle known placeholder URLs as valid - with enhanced placeholder detection
-  const placeholderPatterns = [
-    '/yacht-placeholder.jpg',
-    '/service-placeholder.jpg',
-    '/product-placeholder.jpg',
-    '/user-placeholder.jpg',
-    'yacht-placeholder.jpg',
-    'service-placeholder.jpg',
-    'product-placeholder.jpg', 
-    'user-placeholder.jpg',
-    'placeholder',
-    'etoile-yachts.replit.app', // Production URLs
-    'etoileyachts.com',
-    'janeway.replit.dev'  // Development URL
-  ];
+  // 1. Import placeholder handler functions for consistent detection
+  import { isPlaceholderUrl, formatPlaceholderUrl, getPlaceholderMediaType } from '../core/domain/media/placeholder-handler';
+  import { MediaType } from '../core/domain/media/media-type';
   
-  if (placeholderPatterns.some(pattern => url.includes(pattern))) {
-    console.log(`Automatically accepting placeholder URL: ${url}`);
+  // Check if URL is a placeholder using the shared placeholder handler
+  if (isPlaceholderUrl(url)) {
+    // Get the properly formatted placeholder URL
+    const formattedUrl = formatPlaceholderUrl(url);
     
-    // Use a valid URL for the placeholder - set absolute path to match environment
+    // Log if we're fixing the URL
+    if (formattedUrl !== url) {
+      console.log(`Found placeholder URL with incorrect format: ${url} → ${formattedUrl}`);
+    } else {
+      console.log(`Found valid placeholder URL: ${url}`);
+    }
+    
+    // Determine the content type based on the media type from the placeholder
+    const placeholderType = getPlaceholderMediaType(formattedUrl);
+    const contentType = placeholderType === MediaType.VIDEO ? 'video/mp4' : 'image/jpeg';
+    
     const validEntry: ValidMediaEntry = {
       ...entry,
-      url: url, // Keep original URL for reference
-      contentType: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+      url: formattedUrl, // Use the properly formatted URL
+      contentType,
       contentLength: 0
     };
     

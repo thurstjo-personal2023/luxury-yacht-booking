@@ -131,21 +131,22 @@ async function repairBrokenUrl(
     if (mediaType === 'video') {
       placeholderUrl = defaultVideoUrl;
     } else if (!mediaType) {
-      // If mediaType is not specified, try to determine from URL
-      const videoPatterns = [
-        '.mp4', '.mov', '.webm', '.avi', '.m4v', '.mkv', '.mpg', '.mpeg', '.3gp',
-        '-SBV-', 'SBV-', 'Dynamic motion', 'dynamic-motion',
-        'video-preview', 'preview.mp4', 'preview-video', 'yacht-video',
-        'tourist-luxury-yacht-during-vacation-holidays',
-        'night-town-tivat-in-porto-montenegro-hotel-and-sailing-boats-in-the-boka-bay',
-        'SBV-309363270', 'SBV-347241353', 
-        '309363270-preview', '347241353-preview',
-        'luxury-yacht-during-vacation-holidays'
-      ];
+      // Import media-type.ts for consistent video pattern detection
+      import { VideoFileExtensions, VideoUrlPatterns } from '../core/domain/media/media-type';
       
-      const isVideo = videoPatterns.some(pattern => 
+      // Use the shared patterns for consistency across the application
+      const isVideoPattern = VideoUrlPatterns.some(pattern => 
         url.toLowerCase().includes(pattern.toLowerCase())
       );
+      
+      const isVideoFileExtension = VideoFileExtensions.some(ext => 
+        url.toLowerCase().endsWith(ext) || 
+        url.toLowerCase().includes(`${ext}?`) || 
+        url.toLowerCase().includes(`${ext}&`) || 
+        url.toLowerCase().includes(`${ext}/`)
+      );
+      
+      const isVideo = isVideoPattern || isVideoFileExtension;
       
       if (isVideo) {
         console.log(`Detected video URL pattern: ${url}`);
