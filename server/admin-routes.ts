@@ -9,6 +9,8 @@ import { verifyAuth, adminDb, verifyAdminRole } from './firebase-admin';
 import validateImageUrls from '../scripts/validate-images';
 import { PubSub } from '@google-cloud/pubsub';
 import { getPlatformBookingStats, getPlatformTransactionStats, getPlatformUserStats } from './services/admin-stats-service';
+import { SystemAlertsService } from './services/system-alerts-service';
+import { AlertStatus, AlertCategory, AlertSeverity } from '../shared/schema';
 // Import will be loaded dynamically to avoid initialization issues
 // import { validateMediaUrls, saveMediaValidationResults } from '../scripts/validate-media';
 

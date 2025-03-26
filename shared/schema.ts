@@ -1,5 +1,79 @@
 import { Timestamp } from "firebase/firestore";
 
+/**
+ * System Alert Model
+ * 
+ * Represents a system alert to notify administrators about system events,
+ * issues, or required actions.
+ */
+export enum AlertSeverity {
+  INFO = 'info',
+  WARNING = 'warning',
+  ERROR = 'error',
+  CRITICAL = 'critical'
+}
+
+export enum AlertCategory {
+  SYSTEM = 'system',
+  SECURITY = 'security',
+  PERFORMANCE = 'performance',
+  STORAGE = 'storage',
+  DATABASE = 'database',
+  MEDIA = 'media',
+  USER = 'user',
+  PAYMENT = 'payment',
+  BOOKING = 'booking',
+  OTHER = 'other'
+}
+
+export enum AlertStatus {
+  ACTIVE = 'active',
+  ACKNOWLEDGED = 'acknowledged',
+  RESOLVED = 'resolved',
+  DISMISSED = 'dismissed'
+}
+
+export interface AlertAction {
+  label: string;
+  action: string;
+  url?: string;
+  confirmationMessage?: string;
+}
+
+export interface SystemAlert {
+  id: string;
+  title: string;
+  message: string;
+  severity: AlertSeverity;
+  category: AlertCategory;
+  status: AlertStatus;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+  acknowledgedBy?: string;
+  acknowledgedAt?: Timestamp;
+  resolvedBy?: string;
+  resolvedAt?: Timestamp;
+  relatedEntity?: {
+    type: string;
+    id: string;
+  };
+  metadata?: Record<string, any>;
+  actions?: AlertAction[];
+}
+
+export interface CreateSystemAlertParams {
+  title: string;
+  message: string;
+  severity: AlertSeverity;
+  category: AlertCategory;
+  relatedEntity?: {
+    type: string;
+    id: string;
+  };
+  metadata?: Record<string, any>;
+  actions?: AlertAction[];
+}
+
 export interface Location {
   latitude: number;
   longitude: number;
