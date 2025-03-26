@@ -8,7 +8,8 @@ import {
   FileText, 
   Filter, 
   Download, 
-  Calendar 
+  Calendar,
+  Plus 
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { 
@@ -45,22 +46,9 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { adminApiRequestWithRetry } from '@/lib/adminApiUtils';
 import withAdminLayout from '@/components/layouts/withAdminLayout';
-
-// Define the types for reports
-export interface Report {
-  id: string;
-  title: string;
-  description: string;
-  type: 'analytics' | 'financial' | 'system' | 'user';
-  createdAt: string;
-  format: 'pdf' | 'csv' | 'xlsx' | 'json';
-  size: string;
-  url: string;
-  tags: string[];
-}
-
+import { GenerateReportDialog } from '@/components/admin/GenerateReportDialog';
+import { Report, ReportType } from '@/types/reports';
 
 
 function ReportCard({ report }: { report: Report }) {
@@ -87,7 +75,9 @@ function ReportCard({ report }: { report: Report }) {
         return <FileText className="h-4 w-4" />;
       case 'system':
         return <FileCog className="h-4 w-4" />;
-      case 'user':
+      case 'media':
+        return <FileText className="h-4 w-4" />;
+      case 'audit':
         return <FileText className="h-4 w-4" />;
       default:
         return <FileText className="h-4 w-4" />;
@@ -102,8 +92,10 @@ function ReportCard({ report }: { report: Report }) {
         return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Financial</Badge>;
       case 'system':
         return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">System</Badge>;
-      case 'user':
-        return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">User</Badge>;
+      case 'media':
+        return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Media</Badge>;
+      case 'audit':
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Audit</Badge>;
       default:
         return <Badge variant="outline">Unknown</Badge>;
     }
@@ -129,7 +121,7 @@ function ReportCard({ report }: { report: Report }) {
         <div className="flex flex-wrap gap-2 mb-2">
           {getTypeBadge()}
           <Badge variant="outline" className="uppercase">{report.format}</Badge>
-          {report.tags.map((tag, index) => (
+          {report.tags.map((tag: string, index: number) => (
             <Badge key={index} variant="secondary">{tag}</Badge>
           ))}
         </div>
@@ -241,7 +233,8 @@ const ReportsPage: React.FC = () => {
               <SelectItem value="analytics">Analytics</SelectItem>
               <SelectItem value="financial">Financial</SelectItem>
               <SelectItem value="system">System</SelectItem>
-              <SelectItem value="user">User</SelectItem>
+              <SelectItem value="media">Media</SelectItem>
+              <SelectItem value="audit">Audit</SelectItem>
             </SelectContent>
           </Select>
 
