@@ -119,8 +119,8 @@ async function findBrokenUrls(): Promise<BrokenUrlDetail[]> {
  */
 async function repairBrokenUrl(
   brokenUrl: BrokenUrlDetail,
-  defaultImageUrl: string = 'https://storage.googleapis.com/etoile-yachts.appspot.com/placeholders/image-placeholder.jpg',
-  defaultVideoUrl: string = 'https://storage.googleapis.com/etoile-yachts.appspot.com/placeholders/video-placeholder.mp4'
+  defaultImageUrl: string = 'https://491f404d-c45b-465e-abd0-1bf1a522988f-00-1vx2q8nj9olr6.janeway.replit.dev/images/yacht-placeholder.jpg',
+  defaultVideoUrl: string = 'https://491f404d-c45b-465e-abd0-1bf1a522988f-00-1vx2q8nj9olr6.janeway.replit.dev/images/video-placeholder.mp4'
 ): Promise<{ success: boolean; newUrl: string }> {
   try {
     const { docId, collection, field, subField, url, mediaType } = brokenUrl;
@@ -132,11 +132,23 @@ async function repairBrokenUrl(
       placeholderUrl = defaultVideoUrl;
     } else if (!mediaType) {
       // If mediaType is not specified, try to determine from URL
-      const isVideo = url.toLowerCase().endsWith('.mp4') || 
-                     url.toLowerCase().endsWith('.mov') || 
-                     url.toLowerCase().endsWith('.webm');
+      const videoPatterns = [
+        '.mp4', '.mov', '.webm', '.avi', '.m4v', '.mkv', '.mpg', '.mpeg', '.3gp',
+        '-SBV-', 'SBV-', 'Dynamic motion', 'dynamic-motion',
+        'video-preview', 'preview.mp4', 'preview-video', 'yacht-video',
+        'tourist-luxury-yacht-during-vacation-holidays',
+        'night-town-tivat-in-porto-montenegro-hotel-and-sailing-boats-in-the-boka-bay',
+        'SBV-309363270', 'SBV-347241353', 
+        '309363270-preview', '347241353-preview',
+        'luxury-yacht-during-vacation-holidays'
+      ];
+      
+      const isVideo = videoPatterns.some(pattern => 
+        url.toLowerCase().includes(pattern.toLowerCase())
+      );
       
       if (isVideo) {
+        console.log(`Detected video URL pattern: ${url}`);
         placeholderUrl = defaultVideoUrl;
       }
     }
