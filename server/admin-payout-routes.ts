@@ -410,7 +410,7 @@ export function registerAdminPayoutRoutes(app: Express) {
    */
   app.get('/api/admin/earnings/:userId',
     verifyAuth,
-    verifyAdminRole(['ADMIN', 'SUPER_ADMIN']),
+    verifyAdminRole(AdminRoleType.ADMIN),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const userId = req.params.userId;
@@ -438,7 +438,7 @@ export function registerAdminPayoutRoutes(app: Express) {
    */
   app.get('/api/admin/payout-disputes',
     verifyAuth,
-    verifyAdminRole(['ADMIN', 'SUPER_ADMIN']),
+    verifyAdminRole(AdminRoleType.ADMIN),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         // Extract query parameters
@@ -475,7 +475,7 @@ export function registerAdminPayoutRoutes(app: Express) {
    */
   app.post('/api/admin/payout-disputes/:id/resolve',
     verifyAuth,
-    verifyAdminRole(['ADMIN', 'SUPER_ADMIN']),
+    verifyAdminRole(AdminRoleType.ADMIN),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const disputeId = req.params.id;
