@@ -1,14 +1,13 @@
 /**
  * New Transaction Dialog Component
  * 
- * Provides a form for creating new payout transactions
+ * Provides a form for creating a new payout transaction
  */
-import React, { useState } from 'react';
-import { format } from 'date-fns';
-import { CalendarIcon, PlusCircle } from 'lucide-react';
+import React from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -18,7 +17,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -30,6 +28,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -37,138 +36,121 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+  RadioGroup,
+  RadioGroupItem,
+} from '@/components/ui/radio-group';
 
-import { PayoutTransaction, UserType, PayoutMethod } from '../../../../shared/payment-schema';
+import { PayoutAccount, PayoutStatus } from '../../../../shared/payment-schema';
 import { usePayoutTransactions } from '@/hooks/use-payouts';
 
-// Form schema for creating a new payout transaction
+// Form schema for payout transaction
 const formSchema = z.object({
-  userId: z.string().min(1, 'User ID is required'),
-  userType: z.enum(['producer', 'partner'] as const),
+  accountId: z.string({ required_error: 'Please select an account' }),
   amount: z.coerce.number().positive('Amount must be positive'),
-  currency: z.string().min(1, 'Currency is required'),
-  payoutMethod: z.enum(['bank_transfer', 'paypal', 'stripe', 'manual'] as const),
-  description: z.string().min(1, 'Description is required'),
-  periodStart: z.date(),
-  periodEnd: z.date(),
+  currency: z.string().default('USD'),
+  description: z.string().min(3, 'Description must be at least 3 characters'),
   notes: z.string().optional(),
+  status: z.enum(['pending', 'approved'], { required_error: 'Please select a status' }),
+  bookingIds: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
 
-const NewTransactionDialog: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
+interface NewTransactionDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  accounts: PayoutAccount[];
+}
+
+const NewTransactionDialog: React.FC<NewTransactionDialogProps> = ({ 
+  open, 
+  onOpenChange,
+  accounts 
+}) => {
   const { createTransaction, isCreating } = usePayoutTransactions();
   
-  // Get the current date
-  const today = new Date();
-  
-  // Create form with default values
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      userId: '',
-      userType: 'producer',
-      amount: undefined,
+      amount: 0,
       currency: 'USD',
-      payoutMethod: 'bank_transfer',
       description: '',
-      periodStart: new Date(today.getFullYear(), today.getMonth(), 1), // First day of current month
-      periodEnd: today,
       notes: '',
+      status: 'pending',
+      bookingIds: '',
     },
   });
-  
-  // Handle form submission
+
   const onSubmit = (data: FormData) => {
-    // Convert the form data to a PayoutTransaction object
-    const transaction: Partial<PayoutTransaction> = {
-      userId: data.userId,
-      userType: data.userType,
-      amount: data.amount,
-      currency: data.currency,
-      payoutMethod: data.payoutMethod,
-      description: data.description,
-      periodStart: data.periodStart,
-      periodEnd: data.periodEnd,
-      notes: data.notes,
-      // Other fields will be set by the backend service
-    };
-    
-    // Create the transaction
-    createTransaction(transaction, {
+    // Process booking IDs if provided
+    const bookingIds = data.bookingIds
+      ? data.bookingIds.split(',').map(id => id.trim()).filter(Boolean)
+      : undefined;
+      
+    createTransaction({
+      ...data,
+      bookingIds,
+    }, {
       onSuccess: () => {
-        setIsOpen(false);
+        onOpenChange(false);
         form.reset();
       }
     });
   };
   
+  // Close the dialog and reset the form
+  const handleClose = () => {
+    onOpenChange(false);
+    form.reset();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          New Payout
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[550px]">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Create New Payout Transaction</DialogTitle>
           <DialogDescription>
-            Enter the details for the new payout transaction.
+            Create a new payout transaction for a user. 
+            This will be processed according to the platform payout schedule.
           </DialogDescription>
         </DialogHeader>
         
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="userId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>User ID</FormLabel>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="accountId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payout Account</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <Input placeholder="User ID" {...field} />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select an account" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="userType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>User Type</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select user type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="producer">Producer</SelectItem>
-                        <SelectItem value="partner">Partner</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                    <SelectContent>
+                      {accounts.length === 0 ? (
+                        <SelectItem value="no-accounts" disabled>
+                          No accounts available
+                        </SelectItem>
+                      ) : (
+                        accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.accountName} - {account.userType}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Select the account to receive this payout
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -197,10 +179,7 @@ const NewTransactionDialog: React.FC = () => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Currency</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select currency" />
@@ -221,26 +200,16 @@ const NewTransactionDialog: React.FC = () => {
             
             <FormField
               control={form.control}
-              name="payoutMethod"
+              name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Payout Method</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select payout method" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                      <SelectItem value="paypal">PayPal</SelectItem>
-                      <SelectItem value="stripe">Stripe</SelectItem>
-                      <SelectItem value="manual">Manual</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Payment for services" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    This will be visible to the recipient
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -248,124 +217,97 @@ const NewTransactionDialog: React.FC = () => {
             
             <FormField
               control={form.control}
-              name="description"
+              name="bookingIds"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>Booking IDs (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="Payout description" {...field} />
+                    <Input 
+                      placeholder="booking-123, booking-456" 
+                      {...field} 
+                    />
                   </FormControl>
+                  <FormDescription>
+                    Comma-separated list of booking IDs related to this payout
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
             
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="periodStart"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Period Start</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className="w-full pl-3 text-left font-normal"
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="periodEnd"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Period End</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className="w-full pl-3 text-left font-normal"
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Transaction Status</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex flex-row space-x-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="pending" id="pending" />
+                        <FormLabel htmlFor="pending" className="font-normal cursor-pointer">
+                          Pending
+                        </FormLabel>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="approved" id="approved" />
+                        <FormLabel htmlFor="approved" className="font-normal cursor-pointer">
+                          Approved
+                        </FormLabel>
+                      </div>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormDescription>
+                    Set to "Approved" to queue for immediate processing
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
             <FormField
               control={form.control}
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes (Optional)</FormLabel>
+                  <FormLabel>Internal Notes (Optional)</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Additional notes about this payout"
+                      placeholder="Add internal notes about this transaction"
                       className="resize-none"
                       {...field}
                     />
                   </FormControl>
+                  <FormDescription>
+                    These notes are only visible to administrators
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
             
             <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setIsOpen(false)}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
                 disabled={isCreating}
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit"
-                disabled={isCreating}
-              >
-                {isCreating ? 'Creating...' : 'Create Payout'}
+              <Button type="submit" disabled={isCreating}>
+                {isCreating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Transaction'
+                )}
               </Button>
             </DialogFooter>
           </form>

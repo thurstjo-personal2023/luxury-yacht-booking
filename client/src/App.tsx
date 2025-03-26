@@ -70,6 +70,7 @@ const MediaValidation = lazy(() => import("@/pages/admin/MediaValidation"));
 const PubSubValidation = lazy(() => import("@/pages/admin/PubSubValidation"));
 const UserManagement = lazy(() => import("@/pages/admin/UserManagement").then(module => ({ default: module.default })));
 const ReportsPage = lazy(() => import("@/pages/admin/ReportsPage"));
+const PayoutsPage = lazy(() => import("@/pages/admin/PayoutsPage"));
 
 // Secure Admin Portal
 const SecureAdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard"));
@@ -267,6 +268,11 @@ function App() {
                   <Route path="/admin/reports">
                     <PrivateRoute routeType="admin">
                       <ReportsPage />
+                    </PrivateRoute>
+                  </Route>
+                  <Route path="/admin/payouts">
+                    <PrivateRoute routeType="admin">
+                      <PayoutsPage />
                     </PrivateRoute>
                   </Route>
                     

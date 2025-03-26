@@ -1,432 +1,339 @@
 /**
- * Payouts Management Page for Admin Panel
+ * Payouts Management Page
  * 
- * This page provides an interface for administrators to manage payouts
- * including transactions, accounts, settings, and dispute resolution.
+ * This page provides a comprehensive interface for managing payouts
+ * in the Etoile Yachts platform. It includes functionality for:
+ * - Viewing and managing payout transactions
+ * - Creating new payout transactions
+ * - Managing payout accounts
+ * - Handling payout disputes
+ * - Configuring global payout settings
  */
 import React, { useState } from 'react';
-import { Link } from 'wouter';
-import { Helmet } from 'react-helmet';
-import { 
-  Banknote, 
-  CreditCard, 
-  Users, 
-  Settings as SettingsIcon, 
-  AlertTriangle, 
-  Filter,
-  PlusCircle,
-  ChevronDown,
-  Calendar,
-  ChevronsUpDown,
-  Printer,
-  Download,
-  RefreshCw
-} from 'lucide-react';
-import { format } from 'date-fns';
+import { useLocation } from 'wouter';
+import { Loader2, CreditCard, Wallet, Shield, Settings, AlertTriangle, PlusCircle } from 'lucide-react';
 
-// UI Components
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// Custom components for Payouts
+// Dashboard-specific components for payout management
 import PayoutTransactionsTable from '@/components/admin/payouts/PayoutTransactionsTable';
 import PayoutAccountsTable from '@/components/admin/payouts/PayoutAccountsTable';
 import PayoutSettingsForm from '@/components/admin/payouts/PayoutSettingsForm';
 import PayoutDisputesTable from '@/components/admin/payouts/PayoutDisputesTable';
 import NewTransactionDialog from '@/components/admin/payouts/NewTransactionDialog';
 
-// Hooks and utilities
-import withAdminLayout from '@/components/layouts/withAdminLayout';
+// Hooks for data fetching and mutations
 import { 
   usePayoutTransactions, 
   usePayoutAccounts, 
-  usePayoutSettings, 
+  usePayoutSettings,
   usePayoutDisputes 
 } from '@/hooks/use-payouts';
-import { PayoutStatus, PayoutTransaction } from '../../shared/payment-schema';
 
-const PayoutsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('transactions');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  
-  const { 
-    transactions, 
-    isLoading: transactionsLoading, 
-    isError: transactionsError 
-  } = usePayoutTransactions();
-  
-  const { 
-    accounts, 
-    isLoading: accountsLoading, 
-    isError: accountsError 
-  } = usePayoutAccounts();
-  
-  const { 
-    settings, 
-    isLoading: settingsLoading, 
-    isError: settingsError 
-  } = usePayoutSettings();
-  
-  const { 
-    disputes, 
-    isLoading: disputesLoading, 
-    isError: disputesError 
-  } = usePayoutDisputes();
-  
-  // Filter transactions based on status and search query
-  const filteredTransactions = transactions?.filter((transaction: PayoutTransaction) => {
-    const matchesStatus = statusFilter === 'all' || transaction.status === statusFilter;
-    const matchesSearch = 
-      searchQuery === '' ||
-      transaction.userId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      transaction.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      transaction.id.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    return matchesStatus && matchesSearch;
-  }) || [];
+// Types
+import { 
+  PayoutSettings as PayoutSettingsType,
+  PayoutTransaction,
+  PayoutAccount,
+  PayoutDispute
+} from '../../shared/payment-schema';
 
-  // Calculate overview statistics
-  const pendingAmount = transactions
-    ?.filter(t => t.status === 'pending')
-    .reduce((sum, t) => sum + t.amount, 0) || 0;
-  
-  const completedAmount = transactions
-    ?.filter(t => t.status === 'completed')
-    .reduce((sum, t) => sum + t.amount, 0) || 0;
-  
-  const activeAccounts = accounts?.filter(a => a.isActive)?.length || 0;
-  const openDisputes = disputes?.filter(d => d.status === 'open')?.length || 0;
-  
-  // Format currency values
-  const formatCurrency = (amount: number, currency = 'USD') => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount);
-  };
+// Optional status badge for overall system health
+const StatusBadge: React.FC<{ isHealthy: boolean }> = ({ isHealthy }) => (
+  <TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className={`rounded-full w-3 h-3 ${isHealthy ? 'bg-green-500' : 'bg-red-500'}`}></div>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Payout System: {isHealthy ? 'Operational' : 'Issues Detected'}</p>
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+);
+
+// Page statistics display
+const PayoutStats: React.FC<{
+  transactions: PayoutTransaction[];
+  accounts: PayoutAccount[];
+  disputes: PayoutDispute[];
+  settings: PayoutSettingsType | null;
+}> = ({ transactions, accounts, disputes, settings }) => {
+  // Calculate key metrics
+  const pendingPayouts = transactions.filter(t => t.status === 'pending' || t.status === 'approved').length;
+  const totalPaidThisMonth = transactions
+    .filter(t => {
+      const date = t.completedAt?.toDate ? t.completedAt.toDate() : new Date(t.completedAt || 0);
+      const now = new Date();
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear() && t.status === 'completed';
+    })
+    .reduce((sum, t) => sum + t.amount, 0);
+  const pendingDisputes = disputes.filter(d => d.status === 'open').length;
+  const unverifiedAccounts = accounts.filter(a => !a.isVerified).length;
 
   return (
-    <>
-      <Helmet>
-        <title>Payout Management - Etoile Yachts Admin</title>
-      </Helmet>
-      
-      <div className="container py-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Payout Management</h1>
-            <p className="text-muted-foreground">
-              Manage payouts, accounts, settings, and disputes
-            </p>
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Pending Payouts</CardTitle>
+          <CreditCard className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{pendingPayouts}</div>
+          <p className="text-xs text-muted-foreground">
+            Transactions awaiting processing
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Paid This Month</CardTitle>
+          <Wallet className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">
+            {new Intl.NumberFormat('en-US', { 
+              style: 'currency', 
+              currency: 'USD',
+              maximumFractionDigits: 0
+            }).format(totalPaidThisMonth)}
           </div>
-          
-          <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
-            <NewTransactionDialog />
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="ml-auto">
-                  <Download className="mr-2 h-4 w-4" />
-                  Export
-                  <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem>
-                  <Download className="mr-2 h-4 w-4" />
-                  Export as CSV
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Printer className="mr-2 h-4 w-4" />
-                  Print Report
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-        
-        {/* Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Pending Payouts</CardTitle>
-              <Banknote className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {transactionsLoading ? (
-                  <Skeleton className="h-8 w-28" />
-                ) : (
-                  formatCurrency(pendingAmount)
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {transactions?.filter(t => t.status === 'pending').length || 0} pending transactions
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Completed Payouts</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {transactionsLoading ? (
-                  <Skeleton className="h-8 w-28" />
-                ) : (
-                  formatCurrency(completedAmount)
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {transactions?.filter(t => t.status === 'completed').length || 0} completed transactions
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Registered Accounts</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {accountsLoading ? (
-                  <Skeleton className="h-8 w-28" />
-                ) : (
-                  activeAccounts
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {accounts?.filter(a => a.isVerified).length || 0} verified accounts
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Open Disputes</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {disputesLoading ? (
-                  <Skeleton className="h-8 w-28" />
-                ) : (
-                  openDisputes
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {disputes?.filter(d => d.status === 'under_review').length || 0} currently under review
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-        
-        {/* Main Content Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="w-full border-b pb-0 pt-2 h-auto bg-transparent">
-            <div className="flex justify-between items-center w-full pr-2">
-              <div className="flex overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-                <TabsTrigger value="transactions" className="rounded-b-none border-b-2 border-transparent data-[state=active]:border-primary">
-                  <Banknote className="mr-2 h-4 w-4" />
-                  Transactions
-                </TabsTrigger>
-                <TabsTrigger value="accounts" className="rounded-b-none border-b-2 border-transparent data-[state=active]:border-primary">
-                  <Users className="mr-2 h-4 w-4" />
-                  Payment Accounts
-                </TabsTrigger>
-                <TabsTrigger value="disputes" className="rounded-b-none border-b-2 border-transparent data-[state=active]:border-primary">
-                  <AlertTriangle className="mr-2 h-4 w-4" />
-                  Disputes
-                </TabsTrigger>
-                <TabsTrigger value="settings" className="rounded-b-none border-b-2 border-transparent data-[state=active]:border-primary">
-                  <SettingsIcon className="mr-2 h-4 w-4" />
-                  Settings
-                </TabsTrigger>
-              </div>
-            </div>
-          </TabsList>
-          
-          {/* Filters for Transactions */}
-          {activeTab === 'transactions' && (
-            <div className="flex flex-col sm:flex-row gap-2 mb-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Input
-                    placeholder="Search transactions..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-8"
-                  />
-                  <Filter className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                </div>
-              </div>
-              
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="processing">Processing</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="on_hold">On Hold</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Button variant="outline" className="gap-2">
-                <Calendar className="h-4 w-4" />
-                <span className="hidden sm:inline">Date Range</span>
-              </Button>
-              
-              <Button variant="ghost" size="icon" title="Refresh">
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-          
-          {/* Transactions Tab */}
-          <TabsContent value="transactions" className="space-y-4">
-            {transactionsLoading ? (
-              <Card>
-                <CardContent className="p-6">
-                  <Skeleton className="h-6 w-full mb-4" />
-                  {Array(5).fill(0).map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full mb-2" />
-                  ))}
-                </CardContent>
-              </Card>
-            ) : transactionsError ? (
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Failed to load transactions</h3>
-                  <p className="text-muted-foreground mb-4">
-                    There was an error loading the payout transactions.
-                  </p>
-                  <Button>Retry</Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <PayoutTransactionsTable transactions={filteredTransactions} />
-            )}
-          </TabsContent>
-          
-          {/* Accounts Tab */}
-          <TabsContent value="accounts" className="space-y-4">
-            {accountsLoading ? (
-              <Card>
-                <CardContent className="p-6">
-                  <Skeleton className="h-6 w-full mb-4" />
-                  {Array(5).fill(0).map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full mb-2" />
-                  ))}
-                </CardContent>
-              </Card>
-            ) : accountsError ? (
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Failed to load accounts</h3>
-                  <p className="text-muted-foreground mb-4">
-                    There was an error loading the payout accounts.
-                  </p>
-                  <Button>Retry</Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <PayoutAccountsTable accounts={accounts || []} />
-            )}
-          </TabsContent>
-          
-          {/* Disputes Tab */}
-          <TabsContent value="disputes" className="space-y-4">
-            {disputesLoading ? (
-              <Card>
-                <CardContent className="p-6">
-                  <Skeleton className="h-6 w-full mb-4" />
-                  {Array(5).fill(0).map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full mb-2" />
-                  ))}
-                </CardContent>
-              </Card>
-            ) : disputesError ? (
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Failed to load disputes</h3>
-                  <p className="text-muted-foreground mb-4">
-                    There was an error loading the payout disputes.
-                  </p>
-                  <Button>Retry</Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <PayoutDisputesTable disputes={disputes || []} />
-            )}
-          </TabsContent>
-          
-          {/* Settings Tab */}
-          <TabsContent value="settings" className="space-y-4">
-            {settingsLoading ? (
-              <Card>
-                <CardContent className="p-6">
-                  <Skeleton className="h-6 w-full mb-4" />
-                  {Array(8).fill(0).map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full mb-4" />
-                  ))}
-                </CardContent>
-              </Card>
-            ) : settingsError ? (
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Failed to load settings</h3>
-                  <p className="text-muted-foreground mb-4">
-                    There was an error loading the payout settings.
-                  </p>
-                  <Button>Retry</Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <PayoutSettingsForm settings={settings} />
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
-    </>
+          <p className="text-xs text-muted-foreground">
+            {transactions.filter(t => t.status === 'completed').length} completed transactions
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Open Disputes</CardTitle>
+          <Shield className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{pendingDisputes}</div>
+          <p className="text-xs text-muted-foreground">
+            Active disputes requiring review
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Account Verification</CardTitle>
+          <Settings className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{unverifiedAccounts}</div>
+          <p className="text-xs text-muted-foreground">
+            Accounts awaiting verification
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
-export default withAdminLayout(PayoutsPage);
+const PayoutsPage: React.FC = () => {
+  const [location, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState('transactions');
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  
+  // Fetch data using custom hooks
+  const { 
+    data: transactions = [], 
+    isLoading: isLoadingTransactions 
+  } = usePayoutTransactions();
+  
+  const { 
+    data: accounts = [], 
+    isLoading: isLoadingAccounts 
+  } = usePayoutAccounts();
+  
+  const { 
+    data: disputes = [], 
+    isLoading: isLoadingDisputes 
+  } = usePayoutDisputes();
+  
+  const { 
+    data: settings, 
+    isLoading: isLoadingSettings 
+  } = usePayoutSettings();
+  
+  // Determine if everything is loading
+  const isLoading = isLoadingTransactions || isLoadingAccounts || isLoadingDisputes || isLoadingSettings;
+  
+  // Handle tab change
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+  };
+  
+  // Navigate to admin dashboard
+  const handleBackToDashboard = () => {
+    setLocation('/admin-dashboard');
+  };
+  
+  return (
+    <div className="container mx-auto py-6 space-y-6">
+      <PageHeader
+        title="Payout Management"
+        description="Manage payouts, accounts, and disputes across the platform"
+        actions={
+          <div className="flex items-center gap-2">
+            <Button onClick={handleBackToDashboard} variant="outline" size="sm">
+              Back to Dashboard
+            </Button>
+          </div>
+        }
+      />
+      
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/admin-dashboard">Admin</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/admin/payouts">Payouts</BreadcrumbLink>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+      
+      {isLoading ? (
+        <div className="flex justify-center items-center min-h-[300px]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2">Loading payout data...</span>
+        </div>
+      ) : (
+        <>
+          <PayoutStats 
+            transactions={transactions} 
+            accounts={accounts} 
+            disputes={disputes} 
+            settings={settings}
+          />
+          
+          <Tabs defaultValue="transactions" value={activeTab} onValueChange={handleTabChange}>
+            <div className="flex justify-between items-center mb-4">
+              <TabsList>
+                <TabsTrigger value="transactions" className="relative">
+                  Transactions
+                  {transactions.filter(t => t.status === 'pending').length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
+                      {transactions.filter(t => t.status === 'pending').length}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="accounts" className="relative">
+                  Accounts
+                  {accounts.filter(a => !a.isVerified).length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-yellow-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
+                      {accounts.filter(a => !a.isVerified).length}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="disputes" className="relative">
+                  Disputes
+                  {disputes.filter(d => d.status === 'open').length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
+                      {disputes.filter(d => d.status === 'open').length}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="settings">Settings</TabsTrigger>
+              </TabsList>
+              
+              {activeTab === 'transactions' && (
+                <Button onClick={() => setCreateDialogOpen(true)} size="sm">
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  New Transaction
+                </Button>
+              )}
+            </div>
+            
+            <TabsContent value="transactions" className="space-y-4">
+              {transactions.length === 0 ? (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>No transactions found</AlertTitle>
+                  <AlertDescription>
+                    No payout transactions have been created yet. Use the "New Transaction" button to create one.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <PayoutTransactionsTable transactions={transactions} />
+              )}
+            </TabsContent>
+            
+            <TabsContent value="accounts" className="space-y-4">
+              {accounts.length === 0 ? (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>No accounts found</AlertTitle>
+                  <AlertDescription>
+                    No payout accounts have been created yet. Accounts are created when users set up their payment details.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <PayoutAccountsTable accounts={accounts} />
+              )}
+            </TabsContent>
+            
+            <TabsContent value="disputes" className="space-y-4">
+              {disputes.length === 0 ? (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>No disputes found</AlertTitle>
+                  <AlertDescription>
+                    No payout disputes have been created yet. Disputes are created when users contest a transaction.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <PayoutDisputesTable disputes={disputes} />
+              )}
+            </TabsContent>
+            
+            <TabsContent value="settings" className="space-y-4">
+              <PayoutSettingsForm settings={settings} />
+            </TabsContent>
+          </Tabs>
+          
+          {createDialogOpen && (
+            <NewTransactionDialog
+              open={createDialogOpen}
+              onOpenChange={setCreateDialogOpen}
+              accounts={accounts}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+export default PayoutsPage;
