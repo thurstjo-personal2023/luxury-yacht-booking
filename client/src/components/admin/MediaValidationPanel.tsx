@@ -265,21 +265,36 @@ const MediaValidationPanel = () => {
                 </div>
               </div>
               
-              {report.invalidResults.length > 0 && (
+              {/* Handle both invalidResults array and invalid array properties */}
+              {((report.invalidResults && report.invalidResults.length > 0) || 
+                (report.invalid && report.invalid.length > 0)) && (
                 <div>
                   <p className="text-sm font-medium mb-2">Issues</p>
                   <ScrollArea className="h-32 rounded-md border p-2">
-                    {report.invalidResults.slice(0, 5).map((result, idx) => (
-                      <div key={idx} className="mb-2">
-                        <p className="text-xs font-medium">{result.collection} • {result.documentId.substring(0, 8)}...</p>
+                    {/* Handle original format with invalidResults */}
+                    {report.invalidResults?.slice(0, 5).map((result, idx) => (
+                      <div key={`result-${idx}`} className="mb-2">
+                        <p className="text-xs font-medium">{result.collection} • {result.documentId?.substring(0, 8) || 'unknown'}...</p>
                         <p className="text-xs text-gray-500 truncate">{result.field}: {result.url}</p>
                         <p className="text-xs text-red-500">{result.error}</p>
                         <Separator className="my-2" />
                       </div>
                     ))}
-                    {report.invalidResults.length > 5 && (
+                    
+                    {/* Handle new format with invalid array */}
+                    {report.invalid?.slice(0, 5).map((result, idx) => (
+                      <div key={`invalid-${idx}`} className="mb-2">
+                        <p className="text-xs font-medium">{result.collection || 'unknown'} • {(result.documentId || result.id || 'unknown').substring(0, 8)}...</p>
+                        <p className="text-xs text-gray-500 truncate">{result.field || 'unknown'}: {result.url || 'unknown'}</p>
+                        <p className="text-xs text-red-500">{result.error || 'Unknown error'}</p>
+                        <Separator className="my-2" />
+                      </div>
+                    ))}
+                    
+                    {/* Display count of additional issues */}
+                    {((report.invalidResults?.length || 0) > 5 || (report.invalid?.length || 0) > 5) && (
                       <p className="text-xs text-gray-500 text-center">
-                        +{report.invalidResults.length - 5} more issues
+                        +{Math.max((report.invalidResults?.length || 0), (report.invalid?.length || 0)) - 5} more issues
                       </p>
                     )}
                   </ScrollArea>
@@ -303,9 +318,41 @@ const MediaValidationPanel = () => {
       );
     }
 
+    // Extract collection summaries from either format
+    const getCollectionSummaries = () => {
+      if (latestReport && latestReport.collectionSummaries && Array.isArray(latestReport.collectionSummaries) && latestReport.collectionSummaries.length > 0) {
+        return latestReport.collectionSummaries;
+      } else if (latestReport?.stats?.byCollection) {
+        // Convert stats.byCollection object to array of collection summaries
+        return Object.entries(latestReport.stats.byCollection).map(([collection, stats]: [string, any]) => ({
+          collection,
+          totalUrls: stats.total || 0,
+          validUrls: stats.valid || 0,
+          invalidUrls: stats.invalid || 0,
+          missingUrls: stats.missing || 0,
+          validPercent: stats.total > 0 ? (stats.valid / stats.total) * 100 : 0,
+          invalidPercent: stats.total > 0 ? (stats.invalid / stats.total) * 100 : 0,
+          missingPercent: stats.total > 0 ? (stats.missing / stats.total) * 100 : 0
+        }));
+      }
+      return [];
+    };
+
+    const collectionSummaries = getCollectionSummaries();
+
+    if (collectionSummaries.length === 0) {
+      return (
+        <div className="py-8 text-center text-gray-500">
+          <FileWarning className="mx-auto h-12 w-12 text-gray-400" />
+          <p className="mt-2">No collection summaries available</p>
+          <p className="text-sm">Run a validation to see collection details</p>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4">
-        {latestReport.collectionSummaries.map((summary) => (
+        {collectionSummaries.map((summary) => (
           <Card key={summary.collection}>
             <CardHeader>
               <div className="flex justify-between items-center">
