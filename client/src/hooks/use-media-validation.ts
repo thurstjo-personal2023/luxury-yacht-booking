@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApiRequest, adminApiRequestWithRetry, createAdminQueryFn, handleAdminApiError } from '@/lib/adminApiUtils';
 
+/**
+ * Represents a single media validation result for an individual URL
+ */
 interface ValidationResult {
   field: string;
   url: string;
@@ -13,58 +16,56 @@ interface ValidationResult {
   documentId: string;
 }
 
-interface CollectionSummary {
-  collection: string;
+/**
+ * Collection statistics in standardized format
+ */
+interface CollectionStats {
+  total: number;
+  valid: number;
+  invalid: number;
+  missing: number;
+}
+
+/**
+ * Statistics about the validation run
+ */
+interface ValidationStats {
+  totalDocuments: number;
   totalUrls: number;
   validUrls: number;
   invalidUrls: number;
   missingUrls: number;
-  validPercent: number;
-  invalidPercent: number;
-  missingPercent: number;
-}
-
-interface ValidationStats {
-  totalDocuments?: number;
-  totalUrls?: number;
-  validUrls?: number;
-  invalidUrls?: number;
-  missingUrls?: number;
-  badContentTypes?: number;
-  imageStats?: {
+  badContentTypes: number;
+  imageStats: {
     total: number;
     valid: number;
     invalid: number;
   };
-  videoStats?: {
+  videoStats: {
     total: number;
     valid: number;
     invalid: number;
   };
-  byCollection?: Record<string, any>;
+  byCollection: Record<string, CollectionStats>;
 }
 
+/**
+ * Standard validation report format
+ */
 interface ValidationReport {
   id: string;
   startTime: Date;
   endTime: Date;
   duration: number;
   
-  // Direct properties (original format)
-  totalDocuments?: number;
-  totalFields?: number;
-  validUrls?: number;
-  invalidUrls?: number;
-  missingUrls?: number;
-  collectionSummaries?: CollectionSummary[];
-  invalidResults?: ValidationResult[];
+  // Primary statistics
+  stats: ValidationStats;
   
-  // Nested stats object (new format)
-  stats?: ValidationStats;
+  // Invalid results for detailed reporting
+  invalid: ValidationResult[];
   
   // For repair reports
-  invalid?: any[];
-  errors?: any[];
+  errors?: string[];
   timestamp?: Date;
 }
 

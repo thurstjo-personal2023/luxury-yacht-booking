@@ -265,36 +265,22 @@ const MediaValidationPanel = () => {
                 </div>
               </div>
               
-              {/* Handle both invalidResults array and invalid array properties */}
-              {((report.invalidResults && report.invalidResults.length > 0) || 
-                (report.invalid && report.invalid.length > 0)) && (
+              {report.invalid.length > 0 && (
                 <div>
                   <p className="text-sm font-medium mb-2">Issues</p>
                   <ScrollArea className="h-32 rounded-md border p-2">
-                    {/* Handle original format with invalidResults */}
-                    {report.invalidResults?.slice(0, 5).map((result, idx) => (
-                      <div key={`result-${idx}`} className="mb-2">
-                        <p className="text-xs font-medium">{result.collection} • {result.documentId?.substring(0, 8) || 'unknown'}...</p>
-                        <p className="text-xs text-gray-500 truncate">{result.field}: {result.url}</p>
-                        <p className="text-xs text-red-500">{result.error}</p>
-                        <Separator className="my-2" />
-                      </div>
-                    ))}
-                    
-                    {/* Handle new format with invalid array */}
-                    {report.invalid?.slice(0, 5).map((result, idx) => (
+                    {report.invalid.slice(0, 5).map((result, idx) => (
                       <div key={`invalid-${idx}`} className="mb-2">
-                        <p className="text-xs font-medium">{result.collection || 'unknown'} • {(result.documentId || result.id || 'unknown').substring(0, 8)}...</p>
-                        <p className="text-xs text-gray-500 truncate">{result.field || 'unknown'}: {result.url || 'unknown'}</p>
+                        <p className="text-xs font-medium">{result.collection} • {result.documentId.substring(0, 8)}...</p>
+                        <p className="text-xs text-gray-500 truncate">{result.field}: {result.url}</p>
                         <p className="text-xs text-red-500">{result.error || 'Unknown error'}</p>
                         <Separator className="my-2" />
                       </div>
                     ))}
                     
-                    {/* Display count of additional issues */}
-                    {((report.invalidResults?.length || 0) > 5 || (report.invalid?.length || 0) > 5) && (
+                    {report.invalid.length > 5 && (
                       <p className="text-xs text-gray-500 text-center">
-                        +{Math.max((report.invalidResults?.length || 0), (report.invalid?.length || 0)) - 5} more issues
+                        +{report.invalid.length - 5} more issues
                       </p>
                     )}
                   </ScrollArea>
