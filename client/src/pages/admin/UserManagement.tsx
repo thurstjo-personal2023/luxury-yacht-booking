@@ -157,11 +157,16 @@ function UserManagement() {
   } = useQuery<AdminUserResponse>({
     queryKey: ['/api/admin/users', statusFilter, roleFilter, page, limit],
     queryFn: async () => {
-      const response = await fetch(`/api/admin/users?${queryParams}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch admin users');
+      try {
+        const response = await adminApiRequestWithRetry(`/api/admin/users?${queryParams}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch admin users');
+        }
+        return response.json();
+      } catch (error) {
+        console.error('Error fetching admin users:', handleAdminApiError(error));
+        throw error;
       }
-      return response.json();
     },
     enabled: !!adminUser && hasPermission(adminUser.role, 'MODERATOR')
   });
@@ -174,11 +179,16 @@ function UserManagement() {
   } = useQuery<AdminStats>({
     queryKey: ['/api/admin/stats'],
     queryFn: async () => {
-      const response = await fetch('/api/admin/stats');
-      if (!response.ok) {
-        throw new Error('Failed to fetch admin stats');
+      try {
+        const response = await adminApiRequestWithRetry('/api/admin/stats');
+        if (!response.ok) {
+          throw new Error('Failed to fetch admin stats');
+        }
+        return response.json();
+      } catch (error) {
+        console.error('Error fetching admin stats:', handleAdminApiError(error));
+        throw error;
       }
-      return response.json();
     },
     enabled: !!adminUser && hasPermission(adminUser.role, 'MODERATOR')
   });
@@ -192,11 +202,16 @@ function UserManagement() {
   } = useQuery<{ pendingAdmins: AdminUser[] }>({
     queryKey: ['/api/admin/pending-approvals'],
     queryFn: async () => {
-      const response = await fetch('/api/admin/pending-approvals');
-      if (!response.ok) {
-        throw new Error('Failed to fetch pending approvals');
+      try {
+        const response = await adminApiRequestWithRetry('/api/admin/pending-approvals');
+        if (!response.ok) {
+          throw new Error('Failed to fetch pending approvals');
+        }
+        return response.json();
+      } catch (error) {
+        console.error('Error fetching pending approvals:', handleAdminApiError(error));
+        throw error;
       }
-      return response.json();
     },
     enabled: !!adminUser && hasPermission(adminUser.role, 'ADMIN')
   });
@@ -215,7 +230,7 @@ function UserManagement() {
   // Handle approve/reject admin
   const handleProcessApproval = async (adminId: string, approved: boolean, notes: string = '') => {
     try {
-      const response = await fetch('/api/admin/process-approval', {
+      const response = await adminApiRequestWithRetry('/api/admin/process-approval', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -243,7 +258,7 @@ function UserManagement() {
       refetchPending();
       refetchUsers();
     } catch (error) {
-      console.error('Error processing approval:', error);
+      console.error('Error processing approval:', handleAdminApiError(error));
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'An error occurred',
@@ -264,7 +279,7 @@ function UserManagement() {
       // Convert from UI role format (SUPER_ADMIN) to backend format (super_admin)
       const backendRole = newRole.toLowerCase();
       
-      const response = await fetch(`/api/admin/users/${adminId}`, {
+      const response = await adminApiRequestWithRetry(`/api/admin/users/${adminId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -287,7 +302,7 @@ function UserManagement() {
       // Refetch users
       refetchUsers();
     } catch (error) {
-      console.error('Error updating role:', error);
+      console.error('Error updating role:', handleAdminApiError(error));
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'An error occurred',
@@ -299,7 +314,7 @@ function UserManagement() {
   // Handle disable/enable admin
   const handleStatusChange = async (adminId: string, newStatus: 'ACTIVE' | 'DISABLED') => {
     try {
-      const response = await fetch(`/api/admin/users/${adminId}`, {
+      const response = await adminApiRequestWithRetry(`/api/admin/users/${adminId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -322,7 +337,7 @@ function UserManagement() {
       // Refetch users
       refetchUsers();
     } catch (error) {
-      console.error('Error updating status:', error);
+      console.error('Error updating status:', handleAdminApiError(error));
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'An error occurred',
