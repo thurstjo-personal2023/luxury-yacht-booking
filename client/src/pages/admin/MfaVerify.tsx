@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminAuth } from '@/hooks/use-admin-auth';
+import { authService } from '@/services/auth/auth-service';
 
 // OTP verification schema
 const verifySchema = z.object({
@@ -72,11 +73,28 @@ export default function MfaVerify() {
       if (verified) {
         toast({
           title: 'Verification Successful',
-          description: 'Redirecting to admin dashboard...',
+          description: 'Preparing admin dashboard...',
         });
         
-        // Redirect to returnUrl or dashboard
-        setLocation(returnUrl);
+        // Force a token refresh to ensure claims are updated
+        try {
+          await authService.refreshToken(true);
+          console.log('Admin token refreshed after MFA verification');
+        } catch (refreshError) {
+          console.error('Error refreshing token after MFA:', refreshError);
+        }
+        
+        // Add a small delay to ensure auth state propagation
+        setTimeout(() => {
+          // Extract returnUrl more reliably
+          const searchParams = new URLSearchParams(window.location.search);
+          const returnUrl = searchParams.get('returnUrl') || '/admin-dashboard';
+          
+          console.log('MfaVerify: Redirecting to', returnUrl);
+          
+          // Use replace:true to avoid back button issues
+          setLocation(returnUrl);
+        }, 500);
       } else {
         toast({
           title: 'Verification Failed',
