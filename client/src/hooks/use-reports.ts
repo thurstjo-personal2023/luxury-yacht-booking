@@ -89,7 +89,7 @@ export function useReports(type?: string) {
         // For now, use mock data and apply type filter if provided
         let reports = [...MOCK_REPORTS];
         
-        if (type) {
+        if (type && type !== 'all') {
           reports = reports.filter(report => report.type === type);
         }
         

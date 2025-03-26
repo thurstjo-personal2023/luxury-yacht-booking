@@ -207,7 +207,7 @@ function ReportsTableView({ reports }: { reports: Report[] }) {
 
 const ReportsPage: React.FC = () => {
   const [activeView, setActiveView] = useState<'grid' | 'table'>('grid');
-  const [selectedType, setSelectedType] = useState<string>('');
+  const [selectedType, setSelectedType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const { data: reports, isLoading, isError } = useReports(selectedType);
@@ -237,7 +237,7 @@ const ReportsPage: React.FC = () => {
               <SelectValue placeholder="All report types" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All report types</SelectItem>
+              <SelectItem value="all">All report types</SelectItem>
               <SelectItem value="analytics">Analytics</SelectItem>
               <SelectItem value="financial">Financial</SelectItem>
               <SelectItem value="system">System</SelectItem>
@@ -326,7 +326,7 @@ const ReportsPage: React.FC = () => {
             <p className="text-muted-foreground">
               {searchQuery 
                 ? `No reports matching "${searchQuery}" were found.` 
-                : selectedType 
+                : selectedType !== 'all'
                   ? `No ${selectedType} reports are available.` 
                   : 'No reports are available.'}
             </p>
