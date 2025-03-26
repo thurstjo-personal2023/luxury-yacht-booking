@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { adminApiRequest, adminApiRequestWithRetry, createAdminQueryFn, handleAdminApiError } from '@/lib/adminApiUtils';
 
 interface ValidationResult {
   field: string;
@@ -76,16 +77,19 @@ export const useMediaValidation = (): MediaValidationProps => {
     refetch: refetchReports 
   } = useQuery({
     queryKey: ['/api/admin/media-validation-reports'],
-    queryFn: async () => {
+    queryFn: async ({ queryKey }) => {
       try {
-        const response = await fetch('/api/admin/media-validation-reports');
+        const url = queryKey[0] as string;
+        const response = await adminApiRequestWithRetry(url);
+        
         if (!response.ok) {
           throw new Error(`Failed to fetch validation reports: ${response.status} ${response.statusText}`);
         }
+        
         const data = await response.json();
         return data;
       } catch (error) {
-        setError(`Error fetching reports: ${error instanceof Error ? error.message : String(error)}`);
+        setError(`Error fetching reports: ${handleAdminApiError(error)}`);
         return { reports: [] };
       }
     },
@@ -107,15 +111,17 @@ export const useMediaValidation = (): MediaValidationProps => {
     refetch: refetchStatus
   } = useQuery({
     queryKey: ['/api/admin/media-validation-status'],
-    queryFn: async () => {
+    queryFn: async ({ queryKey }) => {
       try {
-        const response = await fetch('/api/admin/media-validation-status');
+        const url = queryKey[0] as string;
+        const response = await adminApiRequestWithRetry(url);
+        
         if (!response.ok) {
           throw new Error(`Failed to fetch validation status: ${response.status} ${response.statusText}`);
         }
         return response.json();
       } catch (error) {
-        setError(`Error fetching status: ${error instanceof Error ? error.message : String(error)}`);
+        setError(`Error fetching status: ${handleAdminApiError(error)}`);
         return { isValidating: false, isRepairing: false };
       }
     },
@@ -125,7 +131,7 @@ export const useMediaValidation = (): MediaValidationProps => {
   // Start validation mutation
   const { mutate: startValidationMutation, isPending: isStartingValidation } = useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/admin/validate-media', {
+      const response = await adminApiRequestWithRetry('/api/admin/validate-media', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -146,14 +152,14 @@ export const useMediaValidation = (): MediaValidationProps => {
       refetchReports();
     },
     onError: (error) => {
-      setError(`Failed to start validation: ${error instanceof Error ? error.message : String(error)}`);
+      setError(`Failed to start validation: ${handleAdminApiError(error)}`);
     },
   });
 
   // Start repair mutation
   const { mutate: startRepairMutation, isPending: isStartingRepair } = useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/admin/fix-media-issues', {
+      const response = await adminApiRequestWithRetry('/api/admin/fix-media-issues', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -172,7 +178,7 @@ export const useMediaValidation = (): MediaValidationProps => {
       refetchReports();
     },
     onError: (error) => {
-      setError(`Failed to start repair: ${error instanceof Error ? error.message : String(error)}`);
+      setError(`Failed to start repair: ${handleAdminApiError(error)}`);
     },
   });
 
@@ -189,7 +195,7 @@ export const useMediaValidation = (): MediaValidationProps => {
             ? '/api/admin/validation-progress' 
             : '/api/admin/repair-progress';
           
-          const response = await fetch(endpoint);
+          const response = await adminApiRequestWithRetry(endpoint);
           if (!response.ok) return;
           
           const data = await response.json();
@@ -200,7 +206,7 @@ export const useMediaValidation = (): MediaValidationProps => {
             setRepairProgress(data);
           }
         } catch (error) {
-          console.error('Error fetching progress:', error);
+          console.error('Error fetching progress:', handleAdminApiError(error));
         }
       }, 1000);
     }
