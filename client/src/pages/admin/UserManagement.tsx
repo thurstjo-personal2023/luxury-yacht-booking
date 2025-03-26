@@ -27,6 +27,7 @@ import {
   Briefcase
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { adminApiRequest, adminApiRequestWithRetry, handleAdminApiError } from '@/lib/adminApiUtils';
 
 // Components
 import withAdminLayout from '@/components/admin/withAdminLayout';

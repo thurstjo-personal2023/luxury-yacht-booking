@@ -19,6 +19,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, getFirestore, updateDoc } from 'firebase/firestore';
 import { authService } from '@/services/auth/auth-service';
+import { adminApiRequest, adminApiRequestWithRetry, handleAdminApiError } from '@/lib/adminApiUtils';
 
 // Utility function to decode JWT tokens
 function decodeJwt(token: string): any {
@@ -191,11 +192,10 @@ export function AdminAuthProvider({
       
       // Call login audit API
       try {
-        const response = await fetch('/api/admin/login-audit', {
+        const response = await adminApiRequest('/api/admin/login-audit', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${await authResult.user.getIdToken()}`
+            'Content-Type': 'application/json'
           }
         });
         
@@ -203,7 +203,7 @@ export function AdminAuthProvider({
           console.warn('Failed to record login audit:', await response.text());
         }
       } catch (auditError) {
-        console.warn('Error recording login audit:', auditError);
+        console.warn('Error recording login audit:', handleAdminApiError(auditError));
       }
       
       return authResult.user;
@@ -368,13 +368,11 @@ export function AdminAuthProvider({
         lastActivityAt: new Date()
       });
       
-      // Call activity API endpoint with token from authService
-      const idToken = await authService.getIdToken();
-      const response = await fetch('/api/admin/activity', {
+      // Call activity API endpoint using adminApiRequest
+      const response = await adminApiRequestWithRetry('/api/admin/activity', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
+          'Content-Type': 'application/json'
         }
       });
       
