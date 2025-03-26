@@ -15,8 +15,74 @@ import {
   PayoutStatus,
   DisputeStatus
 } from '../../shared/payment-schema';
-import { clientNow } from '../../shared/schema-helpers';
+import { clientNow, toClientDate } from '../../shared/schema-helpers';
 import { v4 as uuidv4 } from 'uuid';
+
+// Types needed for the service
+type PayoutTransactionType = 'regular' | 'refund' | 'early_payout';
+type PayoutDisputeStatus = DisputeStatus;
+
+// Helper function to convert account timestamps
+function convertPayoutAccountTimestamps(account: any): PayoutAccount {
+  if (!account) return account;
+  
+  return {
+    ...account,
+    createdAt: account.createdAt,
+    updatedAt: account.updatedAt,
+    verifiedAt: account.verifiedAt || null,
+    // Add missing properties with default values
+    isDefault: account.isDefault || false,
+    isVerified: account.isVerified || false,
+  };
+}
+
+// Helper function to convert transaction timestamps
+function convertPayoutTransactionTimestamps(transaction: any): PayoutTransaction {
+  if (!transaction) return transaction;
+  
+  return {
+    ...transaction,
+    createdAt: transaction.createdAt,
+    updatedAt: transaction.updatedAt,
+    processedAt: transaction.processedAt || null,
+    completedAt: transaction.completedAt || null
+  };
+}
+
+// Helper function to convert dispute timestamps
+function convertPayoutDisputeTimestamps(dispute: any): PayoutDispute {
+  if (!dispute) return dispute;
+  
+  return {
+    ...dispute,
+    createdAt: dispute.createdAt,
+    updatedAt: dispute.updatedAt,
+    resolvedAt: dispute.resolvedAt || null
+  };
+}
+
+// Helper function to convert earnings summary timestamps
+function convertEarningsSummaryTimestamps(summary: any): EarningsSummary {
+  if (!summary) return summary;
+  
+  return {
+    ...summary,
+    periodStart: summary.periodStart,
+    periodEnd: summary.periodEnd,
+    lastUpdated: summary.lastUpdated
+  };
+}
+
+// Helper function to convert payout settings timestamps
+function convertPayoutSettingsTimestamps(settings: any): PayoutSettings {
+  if (!settings) return settings;
+  
+  return {
+    ...settings,
+    updatedAt: settings.updatedAt
+  };
+}
 
 /**
  * Payout Service class
@@ -321,7 +387,7 @@ export class PayoutService {
       
       const transactionsQuery = await query.get();
       
-      return transactionsQuery.docs.map(doc => convertPayoutTransactionTimestamps({
+      return transactionsQuery.docs.map((doc: any) => convertPayoutTransactionTimestamps({
         id: doc.id,
         ...doc.data()
       }));
@@ -352,8 +418,8 @@ export class PayoutService {
         throw new Error('Payout account not found');
       }
       
-      if (!account.isActive) {
-        throw new Error('Payout account is inactive');
+      if (account.isVerified === false) {
+        throw new Error('Payout account is not verified');
       }
       
       // Generate a transaction ID
@@ -495,7 +561,7 @@ export class PayoutService {
       
       const disputesQuery = await query.get();
       
-      return disputesQuery.docs.map(doc => convertPayoutDisputeTimestamps({
+      return disputesQuery.docs.map((doc: any) => convertPayoutDisputeTimestamps({
         id: doc.id,
         ...doc.data()
       }));
@@ -572,8 +638,8 @@ export class PayoutService {
         updates.adminNotes = adminNotes;
       }
       
-      // Add resolved information if status is 'resolved' or 'rejected'
-      if ((status === 'resolved' || status === 'rejected') && !dispute.resolvedAt) {
+      // Add resolved information if dispute is resolved
+      if (status === 'resolved' && !dispute.resolvedAt) {
         updates.resolvedAt = FieldValue.serverTimestamp();
         updates.resolvedBy = adminUserId;
       }
@@ -628,7 +694,7 @@ export class PayoutService {
       
       const summariesQuery = await query.get();
       
-      return summariesQuery.docs.map(doc => convertEarningsSummaryTimestamps({
+      return summariesQuery.docs.map((doc: any) => convertEarningsSummaryTimestamps({
         id: doc.id,
         ...doc.data()
       }));
@@ -724,7 +790,7 @@ export class PayoutService {
       const transactionIds: string[] = [];
       
       // Process each transaction
-      transactionsQuery.forEach(doc => {
+      transactionsQuery.forEach((doc: any) => {
         const transaction = doc.data();
         transactionIds.push(doc.id);
         
