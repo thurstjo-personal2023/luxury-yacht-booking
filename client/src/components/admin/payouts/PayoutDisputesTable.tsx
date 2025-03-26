@@ -340,7 +340,7 @@ const DisputeDetailsDialog: React.FC<DisputeDetailsDialogProps> = ({
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {dispute.attachments.map((url, index) => (
+                  {dispute.attachments.map((url: string, index: number) => (
                     <Button 
                       key={index} 
                       variant="outline" 
@@ -414,7 +414,7 @@ const PayoutDisputesTable: React.FC<PayoutDisputesTableProps> = ({ disputes }) =
                   </TableCell>
                 </TableRow>
               ) : (
-                disputes.map((dispute) => (
+                disputes.map((dispute: PayoutDispute) => (
                   <TableRow key={dispute.id}>
                     <TableCell className="font-mono text-xs">{dispute.id}</TableCell>
                     <TableCell>
