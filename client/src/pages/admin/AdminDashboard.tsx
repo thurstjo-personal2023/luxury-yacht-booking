@@ -10,7 +10,8 @@ import {
   Menu,
   X,
   FileWarning,
-  Image 
+  FileSpreadsheet,
+  Image
 } from 'lucide-react';
 
 // UI Components
@@ -23,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import MediaValidationSummary from '@/components/admin/MediaValidationSummary';
 import MediaValidationActivity from '@/components/admin/MediaValidationActivity';
 import { PlatformStatsOverview } from '@/components/admin/PlatformStatsOverview';
+import { SystemAlertsCard } from '@/components/admin/SystemAlertsCard';
 
 // Sidebar link item
 interface SidebarLinkProps {
@@ -125,24 +127,9 @@ export default function AdminDashboard() {
                 <MediaValidationSummary />
               </div>
               
-              <Card className="flex-1">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">System Status</CardTitle>
-                  <CardDescription>Current service health and metrics</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div>
-                      <div className="text-3xl font-bold text-green-500">Online</div>
-                      <div className="text-xs text-muted-foreground">API Status</div>
-                    </div>
-                    <div>
-                      <div className="text-3xl font-bold">12ms</div>
-                      <div className="text-xs text-muted-foreground">Avg. Response Time</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="flex-1">
+                <SystemAlertsCard />
+              </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
