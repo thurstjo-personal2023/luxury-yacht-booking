@@ -24,18 +24,48 @@ interface CollectionSummary {
   missingPercent: number;
 }
 
+interface ValidationStats {
+  totalDocuments?: number;
+  totalUrls?: number;
+  validUrls?: number;
+  invalidUrls?: number;
+  missingUrls?: number;
+  badContentTypes?: number;
+  imageStats?: {
+    total: number;
+    valid: number;
+    invalid: number;
+  };
+  videoStats?: {
+    total: number;
+    valid: number;
+    invalid: number;
+  };
+  byCollection?: Record<string, any>;
+}
+
 interface ValidationReport {
   id: string;
   startTime: Date;
   endTime: Date;
   duration: number;
-  totalDocuments: number;
-  totalFields: number;
-  validUrls: number;
-  invalidUrls: number;
-  missingUrls: number;
-  collectionSummaries: CollectionSummary[];
-  invalidResults: ValidationResult[];
+  
+  // Direct properties (original format)
+  totalDocuments?: number;
+  totalFields?: number;
+  validUrls?: number;
+  invalidUrls?: number;
+  missingUrls?: number;
+  collectionSummaries?: CollectionSummary[];
+  invalidResults?: ValidationResult[];
+  
+  // Nested stats object (new format)
+  stats?: ValidationStats;
+  
+  // For repair reports
+  invalid?: any[];
+  errors?: any[];
+  timestamp?: Date;
 }
 
 interface ProgressState {
