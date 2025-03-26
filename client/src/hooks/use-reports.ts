@@ -2,6 +2,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Report, ReportType, ReportFormat, GenerateReportParams } from '@/types/reports';
 import { adminApiRequestWithRetry } from '@/lib/adminApiUtils';
 
+// Extend the adminApiRequestWithRetry function return type
+declare module '@/lib/adminApiUtils' {
+  interface ApiResponse {
+    reports?: Report[];
+    report?: Report;
+    success?: boolean;
+    reportId?: string;
+    url?: string;
+    error?: string;
+  }
+}
+
 /**
  * Hook for fetching admin reports
  * @param type Optional filter for report type
@@ -16,7 +28,10 @@ export function useReports(type?: string) {
         const queryParams = type && type !== 'all' ? `?type=${type}` : '';
         
         // Make API request to get reports
-        const { reports } = await adminApiRequestWithRetry(`/api/admin/reports${queryParams}`);
+        const response = await adminApiRequestWithRetry(`/api/admin/reports${queryParams}`);
+        // Cast the response to any to handle the potential type mismatch
+        const data = response as any;
+        const reports = data.reports || [];
         
         console.log(`Fetched ${reports.length} reports from API`);
         return reports;
@@ -47,8 +62,10 @@ export function useGenerateReport() {
           body: JSON.stringify(params),
         });
         
-        console.log('Report generation response:', response);
-        return response;
+        // Cast the response to any to handle the potential type mismatch
+        const data = response as any;
+        console.log('Report generation response:', data);
+        return data;
       } catch (error) {
         console.error('Error generating report:', error);
         throw error;
@@ -72,8 +89,10 @@ export function useReport(reportId: string | null) {
       if (!reportId) return null;
       
       try {
-        const report = await adminApiRequestWithRetry(`/api/admin/reports/${reportId}`);
-        return report;
+        const response = await adminApiRequestWithRetry(`/api/admin/reports/${reportId}`);
+        // Cast the response to any to handle the potential type mismatch
+        const data = response as any;
+        return data.report;
       } catch (error) {
         console.error(`Error fetching report ${reportId}:`, error);
         throw error;
