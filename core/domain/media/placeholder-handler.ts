@@ -9,13 +9,14 @@ import { MediaType } from './media-type';
 
 /**
  * Map of placeholder images by type
+ * Using both relative and absolute URLs for better compatibility
  */
 export const PLACEHOLDER_IMAGES = {
-  yacht: '/images/yacht-placeholder.jpg',
-  service: '/images/service-placeholder.jpg',
-  product: '/images/product-placeholder.jpg',
-  user: '/images/user-placeholder.jpg',
-  default: '/images/yacht-placeholder.jpg'
+  yacht: 'https://firebasestorage.googleapis.com/v0/b/etoile-yachts.appspot.com/o/placeholders%2Fyacht-placeholder.jpg?alt=media',
+  service: 'https://firebasestorage.googleapis.com/v0/b/etoile-yachts.appspot.com/o/placeholders%2Fservice-placeholder.jpg?alt=media',
+  product: 'https://firebasestorage.googleapis.com/v0/b/etoile-yachts.appspot.com/o/placeholders%2Fproduct-placeholder.jpg?alt=media',
+  user: 'https://firebasestorage.googleapis.com/v0/b/etoile-yachts.appspot.com/o/placeholders%2Fuser-placeholder.jpg?alt=media',
+  default: 'https://firebasestorage.googleapis.com/v0/b/etoile-yachts.appspot.com/o/placeholders%2Fyacht-placeholder.jpg?alt=media'
 };
 
 /**

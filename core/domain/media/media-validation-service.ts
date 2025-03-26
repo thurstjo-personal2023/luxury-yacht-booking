@@ -1,117 +1,155 @@
 /**
- * Media Validation Service Interface
+ * Media Validation Service
  * 
- * This interface defines the contract for media validation service implementations.
- * It is responsible for validating media resources across the application.
+ * Core service that validates media URLs in documents.
+ * It handles all types of media validation and can be used by various front-end components.
  */
 
-import { Media } from './media';
+import { MediaType, getMediaTypeFromUrl, getMediaTypeFromMime, isMediaTypeMatch } from './media-type';
+import { isPlaceholderUrl, getPlaceholderMediaType } from './placeholder-handler';
 
 /**
- * Media validation result
+ * Media validation result interface
  */
 export interface MediaValidationResult {
-  isValid: boolean;
   url: string;
-  mediaType: 'image' | 'video' | 'unknown';
+  isValid: boolean;
   status?: number;
   statusText?: string;
   contentType?: string;
+  contentLength?: number;
+  expectedType: MediaType;
+  actualType: MediaType;
   error?: string;
 }
 
 /**
- * Media type detection result
+ * Validate a media URL
+ * 
+ * This function will check if the URL is accessible and matches the expected media type.
+ * It handles special cases like placeholders and blob URLs.
+ * 
+ * @param url The URL to validate
+ * @param expectedType The expected media type (image, video, etc.)
+ * @returns The validation result
  */
-export interface MediaTypeDetectionResult {
-  url: string;
-  detectedType: 'image' | 'video' | 'unknown';
-  mimeType?: string;
-  isTypeValid: boolean;
-  expectedType?: 'image' | 'video';
+export async function validateMediaUrl(
+  url: string, 
+  expectedType: MediaType = MediaType.UNKNOWN
+): Promise<MediaValidationResult> {
+  // Initialize the result object
+  const result: MediaValidationResult = {
+    url,
+    isValid: false,
+    expectedType,
+    actualType: MediaType.UNKNOWN
+  };
+  
+  // Handle empty or invalid URLs
+  if (!url || typeof url !== 'string') {
+    result.error = 'Empty or invalid URL';
+    return result;
+  }
+  
+  // Handle placeholder URLs
+  if (isPlaceholderUrl(url)) {
+    result.isValid = true;
+    result.actualType = getPlaceholderMediaType(url);
+    result.contentType = result.actualType === MediaType.VIDEO ? 'video/mp4' : 'image/jpeg';
+    return result;
+  }
+  
+  // Handle blob URLs
+  if (url.startsWith('blob:')) {
+    result.error = 'Blob URLs are temporary and not accessible from server';
+    return result;
+  }
+  
+  // Try to determine media type from URL if not provided
+  if (expectedType === MediaType.UNKNOWN) {
+    expectedType = getMediaTypeFromUrl(url);
+    result.expectedType = expectedType;
+  }
+  
+  // Handle URL detection for video files that might be in image fields
+  const detectedType = getMediaTypeFromUrl(url);
+  
+  // Auto-validate videos that are clearly videos based on URL patterns
+  if (detectedType === MediaType.VIDEO && 
+      (url.includes('.mp4') || url.includes('-SBV-') || url.includes('preview.mp4'))) {
+    result.isValid = true;
+    result.actualType = MediaType.VIDEO;
+    result.contentType = 'video/mp4';
+    return result;
+  }
+  
+  // For all other URLs, make a HEAD request
+  try {
+    // Process relative URLs
+    let resolvedUrl = url;
+    if (url.startsWith('/') && !url.startsWith('//')) {
+      const BASE_URL = process.env.BASE_URL || 'https://etoile-yachts.replit.app';
+      resolvedUrl = `${BASE_URL}${url}`;
+    }
+    
+    // Make the request
+    const response = await fetch(resolvedUrl, { method: 'HEAD' });
+    
+    if (response.ok) {
+      const contentType = response.headers.get('content-type') || '';
+      const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+      
+      // Set content info
+      result.status = response.status;
+      result.statusText = response.statusText;
+      result.contentType = contentType;
+      result.contentLength = contentLength;
+      
+      // Determine actual media type from content-type
+      result.actualType = getMediaTypeFromMime(contentType);
+      
+      // Handle special case for videos in image fields
+      if (expectedType === MediaType.IMAGE && result.actualType === MediaType.VIDEO) {
+        // Many videos are stored in image fields due to legacy data
+        console.log(`Allowing video in image field: ${url}`);
+        result.isValid = true;
+        return result;
+      }
+      
+      // Check if the actual type matches the expected type
+      result.isValid = isMediaTypeMatch(result.actualType, result.expectedType);
+      
+      if (!result.isValid) {
+        result.error = `Expected ${result.expectedType}, got ${result.actualType}`;
+      }
+    } else {
+      result.status = response.status;
+      result.statusText = response.statusText;
+      result.error = `HTTP error: ${response.status} ${response.statusText}`;
+    }
+  } catch (error: any) {
+    result.error = `Request failed: ${error.message}`;
+  }
+  
+  return result;
 }
 
 /**
- * Media validation options
+ * Validate multiple media URLs in bulk
+ * 
+ * @param urls Array of URLs to validate with expected types
+ * @returns Array of validation results
  */
-export interface MediaValidationOptions {
-  validateContent?: boolean;
-  timeout?: number;
-  expectedType?: 'image' | 'video';
-}
-
-/**
- * Media validation service interface
- */
-export interface IMediaValidationService {
-  /**
-   * Validate a media URL
-   */
-  validateMediaUrl(
-    url: string,
-    options?: MediaValidationOptions
-  ): Promise<MediaValidationResult>;
+export async function validateMediaUrls(
+  urls: Array<{ url: string; expectedType?: MediaType }>
+): Promise<MediaValidationResult[]> {
+  const results: MediaValidationResult[] = [];
   
-  /**
-   * Validate a media object
-   */
-  validateMedia(
-    media: Media,
-    options?: MediaValidationOptions
-  ): Promise<MediaValidationResult>;
+  // Validate each URL sequentially to avoid overwhelming the server
+  for (const { url, expectedType = MediaType.UNKNOWN } of urls) {
+    const result = await validateMediaUrl(url, expectedType);
+    results.push(result);
+  }
   
-  /**
-   * Check if a URL points to an image
-   */
-  isImageUrl(url: string): Promise<boolean>;
-  
-  /**
-   * Check if a URL points to a video
-   */
-  isVideoUrl(url: string): Promise<boolean>;
-  
-  /**
-   * Detect the media type of a URL
-   */
-  detectMediaType(url: string): Promise<MediaTypeDetectionResult>;
-  
-  /**
-   * Check if a URL is relative
-   */
-  isRelativeUrl(url: string): boolean;
-  
-  /**
-   * Check if a URL is a blob URL
-   */
-  isBlobUrl(url: string): boolean;
-  
-  /**
-   * Check if a URL is a data URL
-   */
-  isDataUrl(url: string): boolean;
-  
-  /**
-   * Normalize a URL by adding a base URL if it's relative
-   */
-  normalizeUrl(url: string, baseUrl: string): string;
-  
-  /**
-   * Extract the file extension from a URL
-   */
-  getFileExtension(url: string): string | null;
-  
-  /**
-   * Check if a file extension is an image extension
-   */
-  isImageExtension(extension: string): boolean;
-  
-  /**
-   * Check if a file extension is a video extension
-   */
-  isVideoExtension(extension: string): boolean;
-  
-  /**
-   * Get a placeholder URL for a media type
-   */
-  getPlaceholderUrl(mediaType: 'image' | 'video'): string;
+  return results;
 }

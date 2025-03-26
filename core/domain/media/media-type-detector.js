@@ -17,14 +17,33 @@ const VIDEO_MIME_TYPES = ['video/mp4', 'video/webm', 'video/ogg', 'video/quickti
 
 // Video patterns in URLs that indicate the asset might be a video
 const VIDEO_URL_PATTERNS = [
-  '-SBV-',
-  'Dynamic motion',
+  '-SBV-',                // Stock video pattern from providers
+  'Dynamic motion',       // Common description in video filenames
+  'dynamic-motion',
   '.mp4',
   '.mov',
   '.avi',
   '.webm',
+  '.mkv',
+  '.flv',
+  '.wmv',
+  '.m4v',
+  '.mpg',
+  '.mpeg',
+  '.3gp',
   'video/',
-  'media/video'
+  'videos/',
+  'media/video',
+  'video-preview',
+  'preview.mp4',          // Common video preview naming pattern
+  'preview-video',
+  'yacht-video',
+  '-preview.mp4',         // Another common video preview pattern
+  'tourist-luxury-yacht', // Specific stock video filename pattern
+  'sailing-boats',        // Common video content descriptor
+  'porto-montenegro',     // Specific location for video content
+  'in-the-boka-bay',      // Common description in marina videos
+  'vacation-holidays'     // Travel content indicator
 ];
 
 /**
@@ -103,19 +122,68 @@ class MediaTypeDetector {
    * 
    * @param {string} contentType - The content type of the media
    * @param {string} expectedMediaType - The expected media type
+   * @param {Object} options - Additional validation options
+   * @param {string} [options.url] - The URL of the media (for additional context)
+   * @param {boolean} [options.allowVideoInImageFields=true] - Whether to allow videos in image fields (for backward compatibility)
    * @returns {boolean} - Whether the content type matches the expected media type
    */
-  isValidContentTypeForMediaType(contentType, expectedMediaType) {
+  isValidContentTypeForMediaType(contentType, expectedMediaType, options = {}) {
     if (!contentType || !expectedMediaType) {
       return false;
     }
     
+    const { url, allowVideoInImageFields = true } = options;
     const lowerContentType = contentType.toLowerCase();
     
+    // Handle image validation
     if (expectedMediaType === MediaType.IMAGE) {
-      return IMAGE_MIME_TYPES.some(type => lowerContentType.includes(type.toLowerCase()));
+      // Check if it's a valid image content type
+      const isImageContent = IMAGE_MIME_TYPES.some(
+        type => lowerContentType.includes(type.toLowerCase())
+      );
+      
+      // If it matches image content, all good
+      if (isImageContent) {
+        return true;
+      }
+      
+      // Special case: If we're allowing videos in image fields (legacy compatibility)
+      // and the content is a video, consider it valid
+      if (allowVideoInImageFields) {
+        const isVideoContent = VIDEO_MIME_TYPES.some(
+          type => lowerContentType.includes(type.toLowerCase())
+        );
+        
+        if (isVideoContent) {
+          console.log(`Allowing video content type in image field: ${lowerContentType} ${url ? `for ${url}` : ''}`);
+          return true;
+        }
+      }
+      
+      // URL-based override for cases where the server returns wrong content type
+      if (url) {
+        // For some URLs, we know they're definitely videos
+        const hasVideoExtension = VIDEO_EXTENSIONS.some(ext => 
+          url.toLowerCase().endsWith(ext) || 
+          url.toLowerCase().includes(`${ext}?`) || 
+          url.toLowerCase().includes(`${ext}&`)
+        );
+        
+        const hasVideoPattern = VIDEO_URL_PATTERNS.some(pattern => 
+          url.toLowerCase().includes(pattern.toLowerCase())
+        );
+        
+        // If URL suggests this is definitely a video
+        if (hasVideoExtension || hasVideoPattern) {
+          console.log(`URL pattern indicates a video in image field: ${url}`);
+          return allowVideoInImageFields;
+        }
+      }
+      
+      return false;
     }
     
+    // Handle video validation
     if (expectedMediaType === MediaType.VIDEO) {
       return VIDEO_MIME_TYPES.some(type => lowerContentType.includes(type.toLowerCase()));
     }

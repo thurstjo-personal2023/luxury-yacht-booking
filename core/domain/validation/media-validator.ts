@@ -7,6 +7,7 @@
 import { getMediaTypeFromMime, getMediaTypeFromUrl, isMediaTypeMatch, MediaType } from '../media/media-type';
 import { isBlobUrl, isRelativeUrl } from '../media/media';
 import { ValidationResult } from './validation-result';
+import { isPlaceholderUrl, formatPlaceholderUrl } from '../media/placeholder-handler';
 
 /**
  * Media validation options
