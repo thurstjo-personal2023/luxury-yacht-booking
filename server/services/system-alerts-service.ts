@@ -5,35 +5,13 @@
  * providing functionality to create, update, and query alerts.
  */
 
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  getDoc, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy, 
-  limit,
-  Firestore,
-  Timestamp,
-  serverTimestamp,
-  DocumentReference,
-} from 'firebase/firestore';
-
-import { SystemAlert, CreateSystemAlertParams, AlertStatus } from '../../shared/schema';
-import { db } from '../firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
+import { SystemAlert, CreateSystemAlertParams, AlertStatus, AlertSeverity } from '../../shared/schema';
+import { adminDb } from '../firebase-admin';
 
 const COLLECTION_NAME = 'system_alerts';
 
 export class SystemAlertsService {
-  private db: Firestore;
-  
-  constructor(firestore: Firestore = db) {
-    this.db = firestore;
-  }
-
   /**
    * Create a new system alert
    * 
@@ -42,24 +20,21 @@ export class SystemAlertsService {
    */
   async createAlert(alertData: CreateSystemAlertParams): Promise<SystemAlert> {
     try {
-      const alertsCollection = collection(this.db, COLLECTION_NAME);
+      const alertsCollection = adminDb.collection(COLLECTION_NAME);
       
       const newAlert = {
         ...alertData,
         status: AlertStatus.ACTIVE,
-        createdAt: serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
       };
       
-      const docRef = await addDoc(alertsCollection, newAlert);
+      const docRef = await alertsCollection.add(newAlert);
+      const createdDoc = await docRef.get();
       
-      const createdAlert = {
+      return {
         id: docRef.id,
-        ...alertData,
-        status: AlertStatus.ACTIVE,
-        createdAt: Timestamp.now(),
+        ...createdDoc.data()
       } as SystemAlert;
-      
-      return createdAlert;
     } catch (error) {
       console.error('Error creating system alert:', error);
       throw new Error('Failed to create system alert');
@@ -79,38 +54,27 @@ export class SystemAlertsService {
     limit?: number;
   } = {}): Promise<SystemAlert[]> {
     try {
-      const alertsCollection = collection(this.db, COLLECTION_NAME);
-      
-      let alertsQuery = query(
-        alertsCollection,
-        orderBy('createdAt', 'desc')
-      );
+      let alertsQuery = adminDb.collection(COLLECTION_NAME)
+        .orderBy('createdAt', 'desc');
       
       // Apply status filter if provided
       if (options.status) {
         const statuses = Array.isArray(options.status) ? options.status : [options.status];
-        alertsQuery = query(
-          alertsQuery,
-          where('status', 'in', statuses)
-        );
+        alertsQuery = alertsQuery.where('status', 'in', statuses);
       }
       
       // Apply limit if provided
       if (options.limit) {
-        alertsQuery = query(
-          alertsQuery,
-          limit(options.limit)
-        );
+        alertsQuery = alertsQuery.limit(options.limit);
       }
       
-      const querySnapshot = await getDocs(alertsQuery);
+      const querySnapshot = await alertsQuery.get();
       
       const alerts: SystemAlert[] = [];
       querySnapshot.forEach((doc) => {
-        const data = doc.data();
         alerts.push({
           id: doc.id,
-          ...data,
+          ...doc.data()
         } as SystemAlert);
       });
       
@@ -142,16 +106,16 @@ export class SystemAlertsService {
    */
   async getAlertById(alertId: string): Promise<SystemAlert | null> {
     try {
-      const alertRef = doc(this.db, COLLECTION_NAME, alertId);
-      const alertSnap = await getDoc(alertRef);
+      const alertRef = adminDb.collection(COLLECTION_NAME).doc(alertId);
+      const alertSnap = await alertRef.get();
       
-      if (!alertSnap.exists()) {
+      if (!alertSnap.exists) {
         return null;
       }
       
       return {
         id: alertSnap.id,
-        ...alertSnap.data(),
+        ...alertSnap.data()
       } as SystemAlert;
     } catch (error) {
       console.error(`Error fetching alert ${alertId}:`, error);
@@ -173,35 +137,35 @@ export class SystemAlertsService {
     userId: string
   ): Promise<SystemAlert | null> {
     try {
-      const alertRef = doc(this.db, COLLECTION_NAME, alertId);
-      const alertSnap = await getDoc(alertRef);
+      const alertRef = adminDb.collection(COLLECTION_NAME).doc(alertId);
+      const alertSnap = await alertRef.get();
       
-      if (!alertSnap.exists()) {
+      if (!alertSnap.exists) {
         return null;
       }
       
       const updateData: Record<string, any> = {
         status,
-        updatedAt: serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       };
       
       // Add appropriate timestamp and user fields based on the status
       if (status === AlertStatus.ACKNOWLEDGED) {
         updateData.acknowledgedBy = userId;
-        updateData.acknowledgedAt = serverTimestamp();
+        updateData.acknowledgedAt = FieldValue.serverTimestamp();
       } else if (status === AlertStatus.RESOLVED) {
         updateData.resolvedBy = userId;
-        updateData.resolvedAt = serverTimestamp();
+        updateData.resolvedAt = FieldValue.serverTimestamp();
       }
       
-      await updateDoc(alertRef, updateData);
+      await alertRef.update(updateData);
       
       // Get the updated document
-      const updatedAlertSnap = await getDoc(alertRef);
+      const updatedAlertSnap = await alertRef.get();
       
       return {
         id: updatedAlertSnap.id,
-        ...updatedAlertSnap.data(),
+        ...updatedAlertSnap.data()
       } as SystemAlert;
     } catch (error) {
       console.error(`Error updating alert ${alertId}:`, error);
@@ -258,7 +222,7 @@ export class SystemAlertsService {
     const alertData: CreateSystemAlertParams = {
       title: `System Error: ${error.name || 'Unknown Error'}`,
       message: error.message || 'An unknown error occurred',
-      severity: 'error',
+      severity: AlertSeverity.ERROR,
       category: category as any,
       metadata: {
         stack: error.stack,

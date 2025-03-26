@@ -10,7 +10,7 @@ import validateImageUrls from '../scripts/validate-images';
 import { PubSub } from '@google-cloud/pubsub';
 import { getPlatformBookingStats, getPlatformTransactionStats, getPlatformUserStats } from './services/admin-stats-service';
 import { SystemAlertsService } from './services/system-alerts-service';
-import { AlertStatus, AlertCategory, AlertSeverity } from '../shared/schema';
+import { AlertStatus, AlertCategory, AlertSeverity, CreateSystemAlertParams } from '../shared/schema';
 // Import will be loaded dynamically to avoid initialization issues
 // import { validateMediaUrls, saveMediaValidationResults } from '../scripts/validate-media';
 
@@ -937,6 +937,234 @@ export function registerAdminRoutes(app: Express) {
       });
       
       res.status(500).json({ error: 'Failed to fetch platform statistics' });
+    }
+  });
+
+  /**
+   * System Alerts API Routes
+   * 
+   * These routes handle system alerts functionality
+   */
+  
+  // Initialize the System Alerts Service
+  const systemAlertsService = new SystemAlertsService();
+
+  /**
+   * Get all system alerts with optional filtering
+   */
+  app.get('/api/admin/alerts', verifyAuth, verifyAdminRole, async (req: Request, res: Response) => {
+    try {
+      const { status, category, severity, limit } = req.query;
+      
+      // Parse query parameters
+      const options: {
+        status?: AlertStatus | AlertStatus[];
+        category?: string | string[];
+        severity?: string | string[];
+        limit?: number;
+      } = {};
+      
+      if (status) {
+        options.status = Array.isArray(status) 
+          ? status.map(s => s as AlertStatus)
+          : status as AlertStatus;
+      }
+      
+      if (category) {
+        options.category = category as string | string[];
+      }
+      
+      if (severity) {
+        options.severity = severity as string | string[];
+      }
+      
+      if (limit && !isNaN(Number(limit))) {
+        options.limit = Number(limit);
+      }
+      
+      const alerts = await systemAlertsService.getAlerts(options);
+      
+      res.json({ alerts });
+    } catch (error) {
+      console.error('Error fetching alerts:', error);
+      res.status(500).json({ error: 'Failed to fetch alerts' });
+    }
+  });
+
+  /**
+   * Get active alerts (those that need attention)
+   */
+  app.get('/api/admin/alerts/active', verifyAuth, verifyAdminRole, async (req: Request, res: Response) => {
+    try {
+      const { limit } = req.query;
+      let limitValue = 10; // Default limit
+      
+      if (limit && !isNaN(Number(limit))) {
+        limitValue = Number(limit);
+      }
+      
+      const alerts = await systemAlertsService.getActiveAlerts(limitValue);
+      
+      res.json({ alerts });
+    } catch (error) {
+      console.error('Error fetching active alerts:', error);
+      res.status(500).json({ error: 'Failed to fetch active alerts' });
+    }
+  });
+
+  /**
+   * Get a specific alert by ID
+   */
+  app.get('/api/admin/alerts/:alertId', verifyAuth, verifyAdminRole, async (req: Request, res: Response) => {
+    try {
+      const { alertId } = req.params;
+      
+      const alert = await systemAlertsService.getAlertById(alertId);
+      
+      if (!alert) {
+        return res.status(404).json({ error: 'Alert not found' });
+      }
+      
+      res.json({ alert });
+    } catch (error) {
+      console.error(`Error fetching alert ${req.params.alertId}:`, error);
+      res.status(500).json({ error: 'Failed to fetch alert' });
+    }
+  });
+
+  /**
+   * Create a new system alert
+   */
+  app.post('/api/admin/alerts', verifyAuth, verifyAdminRole, async (req: Request, res: Response) => {
+    try {
+      const alertData = req.body as CreateSystemAlertParams;
+      
+      // Basic validation
+      if (!alertData.title || !alertData.message || !alertData.severity || !alertData.category) {
+        return res.status(400).json({ 
+          error: 'Invalid alert data',
+          details: 'Title, message, severity, and category are required'
+        });
+      }
+      
+      const createdAlert = await systemAlertsService.createAlert(alertData);
+      
+      res.status(201).json({ alert: createdAlert });
+    } catch (error) {
+      console.error('Error creating alert:', error);
+      res.status(500).json({ error: 'Failed to create alert' });
+    }
+  });
+
+  /**
+   * Update an alert's status (acknowledge, resolve, or dismiss)
+   */
+  app.patch('/api/admin/alerts/:alertId/status', verifyAuth, verifyAdminRole, async (req: Request, res: Response) => {
+    try {
+      const { alertId } = req.params;
+      const { status } = req.body;
+      
+      if (!status || !Object.values(AlertStatus).includes(status as AlertStatus)) {
+        return res.status(400).json({ 
+          error: 'Invalid status',
+          details: `Status must be one of: ${Object.values(AlertStatus).join(', ')}`
+        });
+      }
+      
+      const userId = req.user?.uid;
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID not found in request' });
+      }
+      
+      const updatedAlert = await systemAlertsService.updateAlertStatus(
+        alertId,
+        status as AlertStatus,
+        userId
+      );
+      
+      if (!updatedAlert) {
+        return res.status(404).json({ error: 'Alert not found' });
+      }
+      
+      res.json({ alert: updatedAlert });
+    } catch (error) {
+      console.error(`Error updating alert ${req.params.alertId}:`, error);
+      res.status(500).json({ error: 'Failed to update alert' });
+    }
+  });
+
+  /**
+   * Acknowledge an alert
+   */
+  app.post('/api/admin/alerts/:alertId/acknowledge', verifyAuth, verifyAdminRole, async (req: Request, res: Response) => {
+    try {
+      const { alertId } = req.params;
+      const userId = req.user?.uid;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID not found in request' });
+      }
+      
+      const updatedAlert = await systemAlertsService.acknowledgeAlert(alertId, userId);
+      
+      if (!updatedAlert) {
+        return res.status(404).json({ error: 'Alert not found' });
+      }
+      
+      res.json({ alert: updatedAlert });
+    } catch (error) {
+      console.error(`Error acknowledging alert ${req.params.alertId}:`, error);
+      res.status(500).json({ error: 'Failed to acknowledge alert' });
+    }
+  });
+
+  /**
+   * Resolve an alert
+   */
+  app.post('/api/admin/alerts/:alertId/resolve', verifyAuth, verifyAdminRole, async (req: Request, res: Response) => {
+    try {
+      const { alertId } = req.params;
+      const userId = req.user?.uid;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID not found in request' });
+      }
+      
+      const updatedAlert = await systemAlertsService.resolveAlert(alertId, userId);
+      
+      if (!updatedAlert) {
+        return res.status(404).json({ error: 'Alert not found' });
+      }
+      
+      res.json({ alert: updatedAlert });
+    } catch (error) {
+      console.error(`Error resolving alert ${req.params.alertId}:`, error);
+      res.status(500).json({ error: 'Failed to resolve alert' });
+    }
+  });
+
+  /**
+   * Dismiss an alert
+   */
+  app.post('/api/admin/alerts/:alertId/dismiss', verifyAuth, verifyAdminRole, async (req: Request, res: Response) => {
+    try {
+      const { alertId } = req.params;
+      const userId = req.user?.uid;
+      
+      if (!userId) {
+        return res.status(401).json({ error: 'User ID not found in request' });
+      }
+      
+      const updatedAlert = await systemAlertsService.dismissAlert(alertId, userId);
+      
+      if (!updatedAlert) {
+        return res.status(404).json({ error: 'Alert not found' });
+      }
+      
+      res.json({ alert: updatedAlert });
+    } catch (error) {
+      console.error(`Error dismissing alert ${req.params.alertId}:`, error);
+      res.status(500).json({ error: 'Failed to dismiss alert' });
     }
   });
 }
