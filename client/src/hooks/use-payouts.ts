@@ -1,303 +1,300 @@
 /**
- * Custom hook for managing payout data
- * Provides access to payout transactions, accounts, settings, and disputes
+ * Payouts Management Hooks
+ * 
+ * These hooks provide data fetching and mutations for the payouts management system.
+ * They handle API interactions for transactions, accounts, settings, and disputes.
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
+
 import { 
-  PayoutAccount, 
   PayoutTransaction, 
+  PayoutAccount, 
   PayoutSettings, 
-  PayoutDispute, 
-  EarningsSummary, 
+  PayoutDispute,
   PayoutStatus 
 } from '../../shared/payment-schema';
-import { apiRequest } from '@/lib/queryClient';
-import { toast } from '@/hooks/use-toast';
 
-// Hook for accessing payout settings
-export function usePayoutSettings() {
-  const queryClient = useQueryClient();
+// API base path for payouts
+const API_BASE = '/api/admin/payouts';
 
-  // Get global payout settings
-  const { 
-    data: settings, 
-    isLoading, 
-    isError 
-  } = useQuery({
-    queryKey: ['/api/admin/payout-settings'],
-    retry: 1
-  });
-
-  // Update payout settings
-  const { mutate: updateSettings, isPending: isUpdating } = useMutation({
-    mutationFn: async (updatedSettings: Partial<PayoutSettings>) => {
-      return apiRequest('/api/admin/payout-settings', 'POST', updatedSettings);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/payout-settings'] });
-      toast({
-        title: 'Settings Updated',
-        description: 'Payout settings have been updated successfully.',
-      });
-    },
-    onError: (error) => {
-      console.error('Failed to update payout settings:', error);
-      toast({
-        title: 'Update Failed',
-        description: 'There was an error updating the payout settings.',
-        variant: 'destructive',
-      });
-    }
-  });
-
-  return { 
-    settings: settings as PayoutSettings | null, 
-    isLoading, 
-    isError, 
-    updateSettings, 
-    isUpdating 
-  };
-}
-
-// Hook for managing payout accounts
-export function usePayoutAccounts(filters = {}) {
+/**
+ * Hook for managing payout transactions
+ */
+export function usePayoutTransactions() {
   const queryClient = useQueryClient();
   
-  // Get payout accounts with optional filtering
-  const { 
-    data: accounts, 
-    isLoading, 
-    isError 
-  } = useQuery({
-    queryKey: ['/api/admin/payout-accounts', filters],
-    retry: 1
+  // Query for fetching transactions
+  const { data, isLoading, isError } = useQuery<PayoutTransaction[]>({
+    queryKey: [API_BASE, 'transactions'],
+    staleTime: 1000 * 60, // 1 minute
   });
-
-  // Get a specific payout account by ID
-  const getPayoutAccount = (id: string) => {
-    return useQuery({
-      queryKey: [`/api/admin/payout-accounts/${id}`],
-      enabled: !!id,
-      retry: 1
-    });
-  };
-
-  // Verify a payout account
-  const { mutate: verifyAccount, isPending: isVerifying } = useMutation({
-    mutationFn: async ({ accountId, verificationData }: { accountId: string, verificationData: any }) => {
-      return apiRequest(`/api/admin/payout-accounts/${accountId}/verify`, 'POST', verificationData);
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/payout-accounts'] });
-      queryClient.invalidateQueries({ queryKey: [`/api/admin/payout-accounts/${variables.accountId}`] });
-      toast({
-        title: 'Account Verified',
-        description: 'The payout account has been verified successfully.',
-      });
-    },
-    onError: (error) => {
-      console.error('Failed to verify payout account:', error);
-      toast({
-        title: 'Verification Failed',
-        description: 'There was an error verifying the payout account.',
-        variant: 'destructive',
-      });
-    }
-  });
-
-  return { 
-    accounts: accounts as PayoutAccount[] | null, 
-    isLoading, 
-    isError, 
-    getPayoutAccount, 
-    verifyAccount, 
-    isVerifying 
-  };
-}
-
-// Hook for managing payout transactions
-export function usePayoutTransactions(filters = {}) {
-  const queryClient = useQueryClient();
   
-  // Get payout transactions with optional filtering
-  const { 
-    data: transactions, 
-    isLoading, 
-    isError 
-  } = useQuery({
-    queryKey: ['/api/admin/payout-transactions', filters],
-    retry: 1
-  });
-
-  // Get a specific payout transaction by ID
+  // Query function for a single transaction
   const getPayoutTransaction = (id: string) => {
     return useQuery({
-      queryKey: [`/api/admin/payout-transactions/${id}`],
+      queryKey: [API_BASE, 'transactions', id],
       enabled: !!id,
-      retry: 1
     });
   };
-
-  // Create a new payout transaction
+  
+  // Mutation for creating a new transaction
   const { mutate: createTransaction, isPending: isCreating } = useMutation({
     mutationFn: async (transactionData: Partial<PayoutTransaction>) => {
-      return apiRequest('/api/admin/payout-transactions', 'POST', transactionData);
+      const response = await apiRequest(`${API_BASE}/transactions`, {
+        method: 'POST',
+        data: transactionData,
+      });
+      return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/payout-transactions'] });
+      // Invalidate transactions query to refresh data
+      queryClient.invalidateQueries({ queryKey: [API_BASE, 'transactions'] });
       toast({
-        title: 'Transaction Created',
+        title: 'Transaction created',
         description: 'The payout transaction has been created successfully.',
       });
     },
-    onError: (error) => {
-      console.error('Failed to create payout transaction:', error);
+    onError: (error: any) => {
       toast({
-        title: 'Creation Failed',
-        description: 'There was an error creating the payout transaction.',
+        title: 'Failed to create transaction',
+        description: error.message || 'An error occurred while creating the transaction.',
         variant: 'destructive',
       });
-    }
+    },
   });
-
-  // Update payout transaction status
+  
+  // Mutation for updating transaction status
   const { mutate: updateTransactionStatus, isPending: isUpdatingStatus } = useMutation({
     mutationFn: async ({ 
       transactionId, 
       status, 
       notes 
     }: { 
-      transactionId: string, 
-      status: PayoutStatus, 
-      notes?: string 
+      transactionId: string; 
+      status: PayoutStatus; 
+      notes?: string;
     }) => {
-      return apiRequest(`/api/admin/payout-transactions/${transactionId}/status`, 'POST', { status, notes });
+      const response = await apiRequest(`${API_BASE}/transactions/${transactionId}/status`, {
+        method: 'PATCH',
+        data: { status, notes },
+      });
+      return response;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/payout-transactions'] });
-      queryClient.invalidateQueries({ queryKey: [`/api/admin/payout-transactions/${variables.transactionId}`] });
+      // Invalidate specific transaction and all transactions
+      queryClient.invalidateQueries({ queryKey: [API_BASE, 'transactions', variables.transactionId] });
+      queryClient.invalidateQueries({ queryKey: [API_BASE, 'transactions'] });
       
-      // Update earnings summaries when status changes
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/earnings'] });
+      const statusMessages = {
+        'pending': 'Transaction marked as pending',
+        'approved': 'Transaction approved',
+        'processing': 'Transaction marked as processing',
+        'completed': 'Transaction completed',
+        'rejected': 'Transaction rejected',
+        'on_hold': 'Transaction placed on hold'
+      };
       
       toast({
-        title: 'Status Updated',
-        description: `The payout status has been updated to ${variables.status}.`,
+        title: statusMessages[variables.status] || 'Status updated',
+        description: 'The transaction status has been updated successfully.',
       });
     },
-    onError: (error) => {
-      console.error('Failed to update payout status:', error);
+    onError: (error: any) => {
       toast({
-        title: 'Update Failed',
-        description: 'There was an error updating the payout status.',
+        title: 'Failed to update status',
+        description: error.message || 'An error occurred while updating the status.',
         variant: 'destructive',
       });
-    }
+    },
   });
-
-  return { 
-    transactions: transactions as PayoutTransaction[] | null, 
-    isLoading, 
-    isError, 
-    getPayoutTransaction, 
-    createTransaction, 
+  
+  return {
+    transactions: data,
+    isLoading,
+    isError,
+    getPayoutTransaction,
+    createTransaction,
     isCreating,
-    updateTransactionStatus, 
-    isUpdatingStatus 
+    updateTransactionStatus,
+    isUpdatingStatus,
   };
 }
 
-// Hook for managing payout disputes
-export function usePayoutDisputes(filters = {}) {
+/**
+ * Hook for managing payout accounts
+ */
+export function usePayoutAccounts() {
   const queryClient = useQueryClient();
   
-  // Get payout disputes with optional filtering
-  const { 
-    data: disputes, 
-    isLoading, 
-    isError 
-  } = useQuery({
-    queryKey: ['/api/admin/payout-disputes', filters],
-    retry: 1
+  // Query for fetching accounts
+  const { data, isLoading, isError } = useQuery<PayoutAccount[]>({
+    queryKey: [API_BASE, 'accounts'],
+    staleTime: 1000 * 60, // 1 minute
   });
+  
+  // Query function for a single account
+  const getPayoutAccount = (id: string) => {
+    return useQuery({
+      queryKey: [API_BASE, 'accounts', id],
+      enabled: !!id,
+    });
+  };
+  
+  // Mutation for verifying an account
+  const { mutate: verifyAccount, isPending: isVerifying } = useMutation({
+    mutationFn: async ({ 
+      accountId, 
+      verificationData 
+    }: { 
+      accountId: string; 
+      verificationData: { isVerified: boolean; notes?: string }
+    }) => {
+      const response = await apiRequest(`${API_BASE}/accounts/${accountId}/verify`, {
+        method: 'PATCH',
+        data: verificationData,
+      });
+      return response;
+    },
+    onSuccess: (_, variables) => {
+      // Invalidate specific account and all accounts
+      queryClient.invalidateQueries({ queryKey: [API_BASE, 'accounts', variables.accountId] });
+      queryClient.invalidateQueries({ queryKey: [API_BASE, 'accounts'] });
+      
+      const message = variables.verificationData.isVerified
+        ? 'Account marked as verified'
+        : 'Account marked as unverified';
+      
+      toast({
+        title: message,
+        description: 'The account verification status has been updated.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Failed to update verification',
+        description: error.message || 'An error occurred while updating the verification status.',
+        variant: 'destructive',
+      });
+    },
+  });
+  
+  return {
+    accounts: data,
+    isLoading,
+    isError,
+    getPayoutAccount,
+    verifyAccount,
+    isVerifying,
+  };
+}
 
-  // Resolve a payout dispute
+/**
+ * Hook for managing payout disputes
+ */
+export function usePayoutDisputes() {
+  const queryClient = useQueryClient();
+  
+  // Query for fetching disputes
+  const { data, isLoading, isError } = useQuery<PayoutDispute[]>({
+    queryKey: [API_BASE, 'disputes'],
+    staleTime: 1000 * 60, // 1 minute
+  });
+  
+  // Mutation for resolving a dispute
   const { mutate: resolveDispute, isPending: isResolving } = useMutation({
     mutationFn: async ({ 
       disputeId, 
       resolution, 
       notes 
     }: { 
-      disputeId: string, 
-      resolution: string, 
-      notes?: string 
+      disputeId: string; 
+      resolution: string;
+      notes?: string;
     }) => {
-      return apiRequest(`/api/admin/payout-disputes/${disputeId}/resolve`, 'POST', { resolution, notes });
+      const response = await apiRequest(`${API_BASE}/disputes/${disputeId}/resolve`, {
+        method: 'PATCH',
+        data: { resolution, notes },
+      });
+      return response;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/payout-disputes'] });
+    onSuccess: (_, variables) => {
+      // Invalidate all disputes
+      queryClient.invalidateQueries({ queryKey: [API_BASE, 'disputes'] });
+      
+      const resolutionMessages = {
+        'resolved': 'Dispute has been resolved',
+        'rejected': 'Dispute claim has been rejected'
+      };
+      
       toast({
-        title: 'Dispute Resolved',
-        description: 'The payout dispute has been resolved successfully.',
+        title: resolutionMessages[variables.resolution as 'resolved' | 'rejected'] || 'Dispute updated',
+        description: 'The dispute has been successfully processed.',
       });
     },
-    onError: (error) => {
-      console.error('Failed to resolve payout dispute:', error);
+    onError: (error: any) => {
       toast({
-        title: 'Resolution Failed',
-        description: 'There was an error resolving the payout dispute.',
+        title: 'Failed to resolve dispute',
+        description: error.message || 'An error occurred while processing the dispute.',
         variant: 'destructive',
       });
-    }
+    },
   });
-
-  return { 
-    disputes: disputes as PayoutDispute[] | null, 
-    isLoading, 
-    isError, 
-    resolveDispute, 
-    isResolving 
+  
+  return {
+    disputes: data,
+    isLoading,
+    isError,
+    resolveDispute,
+    isResolving,
   };
 }
 
-// Hook for managing user earnings summaries
-export function useEarningsSummaries() {
+/**
+ * Hook for managing payout settings
+ */
+export function usePayoutSettings() {
   const queryClient = useQueryClient();
   
-  // Get earnings summary for a specific user
-  const getEarningsSummary = (userId: string) => {
-    return useQuery({
-      queryKey: [`/api/admin/earnings/${userId}`],
-      enabled: !!userId,
-      retry: 1
-    });
-  };
-
-  // Calculate earnings (trigger calculation for a user)
-  const { mutate: calculateEarnings, isPending: isCalculating } = useMutation({
-    mutationFn: async ({ userId, userType }: { userId: string, userType: string }) => {
-      return apiRequest('/api/admin/calculate-earnings', 'POST', { userId, userType });
+  // Query for fetching settings
+  const { data, isLoading, isError } = useQuery<PayoutSettings>({
+    queryKey: [API_BASE, 'settings'],
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+  
+  // Mutation for updating settings
+  const { mutate: updateSettings, isPending: isUpdating } = useMutation({
+    mutationFn: async (settingsData: Partial<PayoutSettings>) => {
+      const response = await apiRequest(`${API_BASE}/settings`, {
+        method: 'PATCH',
+        data: settingsData,
+      });
+      return response;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/admin/earnings/${variables.userId}`] });
+    onSuccess: () => {
+      // Invalidate settings query
+      queryClient.invalidateQueries({ queryKey: [API_BASE, 'settings'] });
+      
       toast({
-        title: 'Earnings Calculated',
-        description: 'The earnings have been calculated successfully.',
+        title: 'Settings updated',
+        description: 'Payout settings have been updated successfully.',
       });
     },
-    onError: (error) => {
-      console.error('Failed to calculate earnings:', error);
+    onError: (error: any) => {
       toast({
-        title: 'Calculation Failed',
-        description: 'There was an error calculating the earnings.',
+        title: 'Failed to update settings',
+        description: error.message || 'An error occurred while updating the settings.',
         variant: 'destructive',
       });
-    }
+    },
   });
-
-  return { 
-    getEarningsSummary, 
-    calculateEarnings, 
-    isCalculating 
+  
+  return {
+    settings: data,
+    isLoading,
+    isError,
+    updateSettings,
+    isUpdating,
   };
 }

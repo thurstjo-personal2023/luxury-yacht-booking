@@ -1,515 +1,281 @@
 /**
  * Admin Payout Routes
  * 
- * This module registers payout management routes for admin users.
- * These routes allow administrators to manage payouts to Producers and Partners.
+ * This file contains the Express routes for managing payouts in the admin panel.
+ * These routes handle operations like creating/updating payout accounts, 
+ * processing transactions, and managing platform payout settings.
  */
-import { Request, Response, Express, NextFunction } from 'express';
-import { verifyAuth } from './firebase-admin';
+import { Router, Request, Response } from 'express';
+import { z } from 'zod';
+import { verifyAuth } from './middleware/auth';
+import { verifyFinanceAdmin } from './middleware/admin';
 import { PayoutService } from './services/payout-service';
-import { 
-  PayoutStatus, 
-  PayoutSettings,
-  PayoutAccount,
-  PayoutTransaction,
-  PayoutDispute
-} from '../shared/payment-schema';
-import { log } from './vite';
-import { verifyAdminRole } from './admin-user-routes';
-import { AdminRoleType } from '../core/domain/admin/admin-role';
-import { Timestamp } from 'firebase-admin/firestore';
 
-// Initialize payout service
+// Create a new router
+const router = Router();
+
+// Initialize the payout service
 const payoutService = new PayoutService();
 
-/**
- * Register payout management routes
- */
-export function registerAdminPayoutRoutes(app: Express) {
-  /**
-   * Get payout settings
-   * 
-   * Retrieves the global payout settings for the platform
-   * Required role: ADMIN or SUPER_ADMIN
-   */
-  app.get('/api/admin/payout-settings', 
-    verifyAuth, 
-    verifyAdminRole(AdminRoleType.ADMIN), 
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const settings = await payoutService.getPayoutSettings();
-        
-        // If settings don't exist yet, return default values
-        if (!settings) {
-          return res.status(200).json({
-            id: 'global',
-            defaultPayoutFrequency: 'monthly',
-            minimumPayoutAmount: 100,
-            platformFeePercentage: 10,
-            automaticPayoutsEnabled: false,
-            requireAdminApproval: true,
-            payoutMethods: ['bank_transfer', 'paypal'],
-            supportedCurrencies: ['USD', 'AED'],
-          });
-        }
-        
-        res.status(200).json(settings);
-      } catch (error) {
-        console.error('Error retrieving payout settings:', error);
-        res.status(500).json({ error: 'Failed to retrieve payout settings' });
-      }
+// Get payout settings
+router.get('/settings', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+  try {
+    const settings = await payoutService.getPayoutSettings();
+    return res.json(settings);
+  } catch (error) {
+    console.error('Error fetching payout settings:', error);
+    return res.status(500).json({ error: 'Failed to fetch payout settings' });
+  }
+});
+
+// Update payout settings
+router.put('/settings', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+  try {
+    const settingsSchema = z.object({
+      automaticPayoutsEnabled: z.boolean(),
+      minimumPayoutAmount: z.number().positive(),
+      payoutSchedule: z.enum(['daily', 'weekly', 'biweekly', 'monthly']),
+      platformFeePercentage: z.number().min(0).max(100),
+      withdrawalFee: z.number().min(0),
+      payoutMethods: z.array(z.string()),
+      maxRetryAttempts: z.number().int().positive(),
+      supportContact: z.string().email(),
+      allowEarlyPayout: z.boolean(),
+      earlyPayoutFee: z.number().min(0)
+    });
+
+    const validatedData = settingsSchema.parse(req.body);
+    const updatedSettings = await payoutService.updatePayoutSettings(validatedData);
+    return res.json(updatedSettings);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid settings data', details: error.errors });
     }
-  );
-  
-  /**
-   * Update payout settings
-   * 
-   * Updates the global payout settings for the platform
-   * Required role: SUPER_ADMIN
-   */
-  app.post('/api/admin/payout-settings',
-    verifyAuth,
-    verifyAdminRole(AdminRoleType.SUPER_ADMIN),
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const settings: Partial<PayoutSettings> = req.body;
-        const adminId = req.user?.uid;
-        
-        if (!adminId) {
-          return res.status(401).json({ error: 'Authentication required' });
-        }
-        
-        // Validate request
-        if (!settings) {
-          return res.status(400).json({ error: 'Settings data is required' });
-        }
-        
-        await payoutService.updatePayoutSettings(settings, adminId);
-        
-        log(`Payout settings updated by admin ${adminId}`);
-        res.status(200).json({ success: true, message: 'Payout settings updated successfully' });
-      } catch (error) {
-        console.error('Error updating payout settings:', error);
-        res.status(500).json({ error: 'Failed to update payout settings' });
-      }
+    console.error('Error updating payout settings:', error);
+    return res.status(500).json({ error: 'Failed to update payout settings' });
+  }
+});
+
+// Get all payout accounts
+router.get('/accounts', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+  try {
+    const accounts = await payoutService.getAllPayoutAccounts();
+    return res.json(accounts);
+  } catch (error) {
+    console.error('Error fetching payout accounts:', error);
+    return res.status(500).json({ error: 'Failed to fetch payout accounts' });
+  }
+});
+
+// Get a specific payout account
+router.get('/accounts/:accountId', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+  try {
+    const { accountId } = req.params;
+    const account = await payoutService.getPayoutAccountById(accountId);
+    
+    if (!account) {
+      return res.status(404).json({ error: 'Payout account not found' });
     }
-  );
-  
-  /**
-   * Get payout accounts
-   * 
-   * Retrieves all payout accounts with optional filtering
-   * Required role: ADMIN or SUPER_ADMIN
-   */
-  app.get('/api/admin/payout-accounts',
-    verifyAuth,
-    verifyAdminRole(AdminRoleType.ADMIN),
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        // Extract query parameters
-        const { userId, userType, isActive, isVerified } = req.query;
-        
-        // Fetch accounts from Firestore
-        const accountsSnapshot = await payoutService['payoutAccountsCollection']
-          .where('isActive', '==', isActive === 'false' ? false : true)
-          .get();
-        
-        if (accountsSnapshot.empty) {
-          return res.status(200).json([]);
-        }
-        
-        // Convert to array and apply any additional filtering
-        let accounts = accountsSnapshot.docs.map(doc => doc.data() as PayoutAccount);
-        
-        // Apply additional filtering if needed
-        if (userId) {
-          accounts = accounts.filter(account => account.userId === userId);
-        }
-        
-        if (userType) {
-          accounts = accounts.filter(account => account.userType === userType);
-        }
-        
-        if (isVerified !== undefined) {
-          const verified = isVerified === 'true';
-          accounts = accounts.filter(account => account.isVerified === verified);
-        }
-        
-        res.status(200).json(accounts);
-      } catch (error) {
-        console.error('Error retrieving payout accounts:', error);
-        res.status(500).json({ error: 'Failed to retrieve payout accounts' });
-      }
+    
+    return res.json(account);
+  } catch (error) {
+    console.error('Error fetching payout account:', error);
+    return res.status(500).json({ error: 'Failed to fetch payout account' });
+  }
+});
+
+// Update a payout account verification status
+router.patch('/accounts/:accountId/verify', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+  try {
+    const { accountId } = req.params;
+    const statusSchema = z.object({
+      verified: z.boolean(),
+      notes: z.string().optional()
+    });
+
+    const validatedData = statusSchema.parse(req.body);
+    const updatedAccount = await payoutService.updateAccountVerificationStatus(
+      accountId, 
+      validatedData.verified, 
+      validatedData.notes
+    );
+    
+    return res.json(updatedAccount);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid data', details: error.errors });
     }
-  );
-  
-  /**
-   * Get payout account
-   * 
-   * Retrieves a specific payout account by ID
-   * Required role: ADMIN or SUPER_ADMIN
-   */
-  app.get('/api/admin/payout-accounts/:id',
-    verifyAuth,
-    verifyAdminRole(AdminRoleType.ADMIN),
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const accountId = req.params.id;
-        
-        // Fetch the account
-        const accountDoc = await payoutService['payoutAccountsCollection'].doc(accountId).get();
-        
-        if (!accountDoc.exists) {
-          return res.status(404).json({ error: 'Payout account not found' });
-        }
-        
-        res.status(200).json(accountDoc.data());
-      } catch (error) {
-        console.error('Error retrieving payout account:', error);
-        res.status(500).json({ error: 'Failed to retrieve payout account' });
-      }
+    console.error('Error updating account verification status:', error);
+    return res.status(500).json({ error: 'Failed to update account verification status' });
+  }
+});
+
+// Get all payout transactions with optional filtering
+router.get('/transactions', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+  try {
+    const { status, payeeId, startDate, endDate, limit } = req.query;
+    
+    const filters: any = {};
+    if (status) filters.status = status as string;
+    if (payeeId) filters.payeeId = payeeId as string;
+    
+    if (startDate && !isNaN(Date.parse(startDate as string))) {
+      filters.startDate = new Date(startDate as string);
     }
-  );
-  
-  /**
-   * Verify payout account
-   * 
-   * Updates a payout account's verification status
-   * Required role: ADMIN or SUPER_ADMIN
-   */
-  app.post('/api/admin/payout-accounts/:id/verify',
-    verifyAuth,
-    verifyAdminRole(AdminRoleType.ADMIN),
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const accountId = req.params.id;
-        const { verified } = req.body;
-        const adminId = req.user?.uid;
-        
-        if (!adminId) {
-          return res.status(401).json({ error: 'Authentication required' });
-        }
-        
-        // Validate request
-        if (verified === undefined) {
-          return res.status(400).json({ error: 'Verification status is required' });
-        }
-        
-        // Fetch the account to make sure it exists
-        const accountDoc = await payoutService['payoutAccountsCollection'].doc(accountId).get();
-        
-        if (!accountDoc.exists) {
-          return res.status(404).json({ error: 'Payout account not found' });
-        }
-        
-        // Update verification status
-        await payoutService['payoutAccountsCollection'].doc(accountId).update({
-          isVerified: verified,
-          verificationDate: verified ? Timestamp.now() : null,
-          updatedAt: Timestamp.now()
-        });
-        
-        log(`Payout account ${accountId} verification status updated to ${verified} by admin ${adminId}`);
-        res.status(200).json({ success: true, message: 'Payout account verification updated' });
-      } catch (error) {
-        console.error('Error verifying payout account:', error);
-        res.status(500).json({ error: 'Failed to update account verification' });
-      }
+    
+    if (endDate && !isNaN(Date.parse(endDate as string))) {
+      filters.endDate = new Date(endDate as string);
     }
-  );
-  
-  /**
-   * Get payout transactions
-   * 
-   * Retrieves all payout transactions with optional filtering
-   * Required role: ADMIN or SUPER_ADMIN
-   */
-  app.get('/api/admin/payout-transactions',
-    verifyAuth,
-    verifyAdminRole(AdminRoleType.ADMIN),
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        // Extract query parameters
-        const { 
-          userId, 
-          status, 
-          fromDate, 
-          toDate, 
-          limit = '50' 
-        } = req.query;
-        
-        const filters: any = {
-          limit: parseInt(limit as string, 10)
-        };
-        
-        if (userId) {
-          filters.userId = userId as string;
-        }
-        
-        if (status) {
-          filters.status = status as PayoutStatus;
-        }
-        
-        if (fromDate) {
-          // Convert string date to JavaScript Date and then to Firestore Timestamp
-          const date = new Date(fromDate as string);
-          filters.fromDate = date; // The service will handle the conversion
-        }
-        
-        if (toDate) {
-          // Convert string date to JavaScript Date and then to Firestore Timestamp
-          const date = new Date(toDate as string);
-          filters.toDate = date; // The service will handle the conversion
-        }
-        
-        // Fetch transactions
-        const transactions = await payoutService.getPayoutTransactions(filters);
-        
-        res.status(200).json(transactions);
-      } catch (error) {
-        console.error('Error retrieving payout transactions:', error);
-        res.status(500).json({ error: 'Failed to retrieve payout transactions' });
-      }
+    
+    const transactions = await payoutService.getPayoutTransactions(
+      filters, 
+      limit ? parseInt(limit as string) : undefined
+    );
+    
+    return res.json(transactions);
+  } catch (error) {
+    console.error('Error fetching payout transactions:', error);
+    return res.status(500).json({ error: 'Failed to fetch payout transactions' });
+  }
+});
+
+// Get a specific transaction
+router.get('/transactions/:transactionId', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+  try {
+    const { transactionId } = req.params;
+    const transaction = await payoutService.getTransactionById(transactionId);
+    
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
     }
-  );
-  
-  /**
-   * Get payout transaction
-   * 
-   * Retrieves a specific payout transaction by ID
-   * Required role: ADMIN or SUPER_ADMIN
-   */
-  app.get('/api/admin/payout-transactions/:id',
-    verifyAuth,
-    verifyAdminRole(AdminRoleType.ADMIN),
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const payoutId = req.params.id;
-        
-        // Fetch the transaction
-        const transaction = await payoutService.getPayoutTransaction(payoutId);
-        
-        if (!transaction) {
-          return res.status(404).json({ error: 'Payout transaction not found' });
-        }
-        
-        res.status(200).json(transaction);
-      } catch (error) {
-        console.error('Error retrieving payout transaction:', error);
-        res.status(500).json({ error: 'Failed to retrieve payout transaction' });
-      }
+    
+    return res.json(transaction);
+  } catch (error) {
+    console.error('Error fetching transaction:', error);
+    return res.status(500).json({ error: 'Failed to fetch transaction' });
+  }
+});
+
+// Create a new payout transaction
+router.post('/transactions', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+  try {
+    const transactionSchema = z.object({
+      payeeId: z.string(),
+      payeeType: z.enum(['producer', 'partner']),
+      accountId: z.string(),
+      amount: z.number().positive(),
+      currency: z.string().length(3),
+      description: z.string(),
+      notes: z.string().optional(),
+      metadata: z.record(z.string()).optional()
+    });
+
+    const validatedData = transactionSchema.parse(req.body);
+    const newTransaction = await payoutService.createPayoutTransaction(validatedData);
+    
+    return res.status(201).json(newTransaction);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid transaction data', details: error.errors });
     }
-  );
-  
-  /**
-   * Create a new payout transaction
-   * 
-   * Creates a manual payout transaction
-   * Required role: ADMIN or SUPER_ADMIN
-   */
-  app.post('/api/admin/payout-transactions',
-    verifyAuth,
-    verifyAdminRole(AdminRoleType.ADMIN),
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const payoutData: Partial<PayoutTransaction> = req.body;
-        const adminId = req.user?.uid;
-        
-        if (!adminId) {
-          return res.status(401).json({ error: 'Authentication required' });
-        }
-        
-        // Validate required fields
-        if (!payoutData.userId || !payoutData.userType || !payoutData.amount) {
-          return res.status(400).json({ error: 'Missing required payout information' });
-        }
-        
-        // Create the payout transaction
-        const payoutId = await payoutService.createPayoutTransaction(payoutData, adminId);
-        
-        log(`New payout transaction ${payoutId} created by admin ${adminId}`);
-        res.status(201).json({ success: true, payoutId, message: 'Payout transaction created' });
-      } catch (error) {
-        console.error('Error creating payout transaction:', error);
-        res.status(500).json({ error: 'Failed to create payout transaction' });
-      }
+    console.error('Error creating payout transaction:', error);
+    return res.status(500).json({ error: 'Failed to create payout transaction' });
+  }
+});
+
+// Update a transaction status
+router.patch('/transactions/:transactionId/status', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+  try {
+    const { transactionId } = req.params;
+    const statusSchema = z.object({
+      status: z.enum(['pending', 'processing', 'completed', 'failed', 'cancelled']),
+      notes: z.string().optional(),
+      metadata: z.record(z.string()).optional()
+    });
+
+    const validatedData = statusSchema.parse(req.body);
+    const updatedTransaction = await payoutService.updateTransactionStatus(
+      transactionId,
+      validatedData.status,
+      validatedData.notes,
+      validatedData.metadata
+    );
+    
+    return res.json(updatedTransaction);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid status data', details: error.errors });
     }
-  );
-  
-  /**
-   * Update payout transaction status
-   * 
-   * Updates the status of a payout transaction (approve, reject, process, complete)
-   * Required role: ADMIN or SUPER_ADMIN
-   */
-  app.post('/api/admin/payout-transactions/:id/status',
-    verifyAuth,
-    verifyAdminRole(AdminRoleType.ADMIN),
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const payoutId = req.params.id;
-        const { status, notes } = req.body;
-        const adminId = req.user?.uid;
-        
-        if (!adminId) {
-          return res.status(401).json({ error: 'Authentication required' });
-        }
-        
-        // Validate request
-        if (!status || !['pending', 'approved', 'processing', 'completed', 'rejected', 'on_hold'].includes(status)) {
-          return res.status(400).json({ error: 'Invalid payout status' });
-        }
-        
-        // Update status
-        await payoutService.updatePayoutStatus(payoutId, status as PayoutStatus, adminId, notes);
-        
-        log(`Payout transaction ${payoutId} status updated to ${status} by admin ${adminId}`);
-        res.status(200).json({ success: true, message: 'Payout status updated' });
-      } catch (error) {
-        console.error('Error updating payout status:', error);
-        res.status(500).json({ error: 'Failed to update payout status' });
-      }
+    console.error('Error updating transaction status:', error);
+    return res.status(500).json({ error: 'Failed to update transaction status' });
+  }
+});
+
+// Get all payout disputes
+router.get('/disputes', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+  try {
+    const { status, userId } = req.query;
+    
+    const filters: any = {};
+    if (status) filters.status = status as string;
+    if (userId) filters.userId = userId as string;
+    
+    const disputes = await payoutService.getPayoutDisputes(filters);
+    return res.json(disputes);
+  } catch (error) {
+    console.error('Error fetching payout disputes:', error);
+    return res.status(500).json({ error: 'Failed to fetch payout disputes' });
+  }
+});
+
+// Update a dispute status
+router.patch('/disputes/:disputeId/status', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+  try {
+    const { disputeId } = req.params;
+    const statusSchema = z.object({
+      status: z.enum(['open', 'under_review', 'resolved', 'rejected']),
+      resolution: z.string().optional(),
+      adminNotes: z.string().optional()
+    });
+
+    const validatedData = statusSchema.parse(req.body);
+    const updatedDispute = await payoutService.updateDisputeStatus(
+      disputeId,
+      validatedData.status,
+      validatedData.resolution,
+      validatedData.adminNotes
+    );
+    
+    return res.json(updatedDispute);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid dispute status data', details: error.errors });
     }
-  );
-  
-  /**
-   * Calculate earnings
-   * 
-   * Triggers earnings calculation for a specific user or all users
-   * Required role: ADMIN or SUPER_ADMIN
-   */
-  app.post('/api/admin/calculate-earnings',
-    verifyAuth,
-    verifyAdminRole(AdminRoleType.ADMIN),
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const { userId, userType } = req.body;
-        const adminId = req.user?.uid;
-        
-        if (!adminId) {
-          return res.status(401).json({ error: 'Authentication required' });
-        }
-        
-        // Validate request
-        if (!userId || !userType) {
-          return res.status(400).json({ error: 'User ID and type are required' });
-        }
-        
-        // Calculate earnings for the specified user
-        await payoutService.calculateEarnings(userId, userType);
-        
-        log(`Earnings calculated for user ${userId} by admin ${adminId}`);
-        res.status(200).json({ success: true, message: 'Earnings calculated successfully' });
-      } catch (error) {
-        console.error('Error calculating earnings:', error);
-        res.status(500).json({ error: 'Failed to calculate earnings' });
-      }
+    console.error('Error updating dispute status:', error);
+    return res.status(500).json({ error: 'Failed to update dispute status' });
+  }
+});
+
+// Get earning summaries
+router.get('/earnings', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userId, period } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
     }
-  );
-  
-  /**
-   * Get earnings summary
-   * 
-   * Retrieves earnings summary for a specific user
-   * Required role: ADMIN or SUPER_ADMIN
-   */
-  app.get('/api/admin/earnings/:userId',
-    verifyAuth,
-    verifyAdminRole(AdminRoleType.ADMIN),
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const userId = req.params.userId;
-        
-        // Fetch earnings summary
-        const earnings = await payoutService.getEarningsSummary(userId);
-        
-        if (!earnings) {
-          return res.status(404).json({ error: 'Earnings summary not found' });
-        }
-        
-        res.status(200).json(earnings);
-      } catch (error) {
-        console.error('Error retrieving earnings summary:', error);
-        res.status(500).json({ error: 'Failed to retrieve earnings summary' });
-      }
-    }
-  );
-  
-  /**
-   * Get payout disputes
-   * 
-   * Retrieves all payout disputes with optional filtering
-   * Required role: ADMIN or SUPER_ADMIN
-   */
-  app.get('/api/admin/payout-disputes',
-    verifyAuth,
-    verifyAdminRole(AdminRoleType.ADMIN),
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        // Extract query parameters
-        const { userId, status, limit = '50' } = req.query;
-        
-        const filters: any = {
-          limit: parseInt(limit as string, 10)
-        };
-        
-        if (userId) {
-          filters.userId = userId as string;
-        }
-        
-        if (status) {
-          filters.status = status as string;
-        }
-        
-        // Fetch disputes
-        const disputes = await payoutService.getPayoutDisputes(filters);
-        
-        res.status(200).json(disputes);
-      } catch (error) {
-        console.error('Error retrieving payout disputes:', error);
-        res.status(500).json({ error: 'Failed to retrieve payout disputes' });
-      }
-    }
-  );
-  
-  /**
-   * Resolve payout dispute
-   * 
-   * Resolves or rejects a payout dispute
-   * Required role: ADMIN or SUPER_ADMIN
-   */
-  app.post('/api/admin/payout-disputes/:id/resolve',
-    verifyAuth,
-    verifyAdminRole(AdminRoleType.ADMIN),
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const disputeId = req.params.id;
-        const { resolution, status } = req.body;
-        const adminId = req.user?.uid;
-        
-        if (!adminId) {
-          return res.status(401).json({ error: 'Authentication required' });
-        }
-        
-        // Validate request
-        if (!resolution || !status || !['resolved', 'rejected'].includes(status)) {
-          return res.status(400).json({ error: 'Resolution and valid status are required' });
-        }
-        
-        // Resolve the dispute
-        await payoutService.resolvePayoutDispute(
-          disputeId,
-          resolution,
-          status as 'resolved' | 'rejected',
-          adminId
-        );
-        
-        log(`Payout dispute ${disputeId} ${status} by admin ${adminId}`);
-        res.status(200).json({ success: true, message: `Dispute ${status}` });
-      } catch (error) {
-        console.error('Error resolving payout dispute:', error);
-        res.status(500).json({ error: 'Failed to resolve payout dispute' });
-      }
-    }
-  );
-}
+    
+    const summaries = await payoutService.getEarningsSummaries(
+      userId as string,
+      period as string
+    );
+    
+    return res.json(summaries);
+  } catch (error) {
+    console.error('Error fetching earnings summaries:', error);
+    return res.status(500).json({ error: 'Failed to fetch earnings summaries' });
+  }
+});
+
+// Export the router
+export { router as adminPayoutRoutes };

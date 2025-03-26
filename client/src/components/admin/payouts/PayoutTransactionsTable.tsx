@@ -1,18 +1,21 @@
 /**
  * Payout Transactions Table Component
  * 
- * Displays a table of payout transactions with actions for status updates
+ * Displays a table of payout transactions with status management actions
  */
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { 
-  ChevronDown, 
   MoreHorizontal, 
   Eye, 
-  CheckCircle, 
-  XCircle, 
-  PauseCircle,
-  PlayCircle
+  Check, 
+  X, 
+  CreditCard, 
+  AlertTriangle, 
+  ExternalLink,
+  FileText,
+  Clock,
+  CheckCircle
 } from 'lucide-react';
 
 import {
@@ -50,8 +53,9 @@ import {
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
-import { PayoutTransaction, PayoutStatus } from '../../../../shared/payment-schema';
+import { PayoutTransaction, PayoutStatus, UserType } from '../../../../shared/payment-schema';
 import { usePayoutTransactions } from '@/hooks/use-payouts';
 
 // Helper function to format timestamp
@@ -63,24 +67,9 @@ const formatTimestamp = (timestamp: any) => {
   return format(date, 'MMM d, yyyy h:mm a');
 };
 
-// Helper function to render status badge
-const getStatusBadge = (status: PayoutStatus) => {
-  switch (status) {
-    case 'pending':
-      return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending</Badge>;
-    case 'approved':
-      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Approved</Badge>;
-    case 'processing':
-      return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Processing</Badge>;
-    case 'completed':
-      return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Completed</Badge>;
-    case 'rejected':
-      return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Rejected</Badge>;
-    case 'on_hold':
-      return <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">On Hold</Badge>;
-    default:
-      return <Badge variant="outline">Unknown</Badge>;
-  }
+// Format User Type
+const formatUserType = (type: UserType) => {
+  return type.charAt(0).toUpperCase() + type.slice(1);
 };
 
 // Format currency values
@@ -91,39 +80,55 @@ const formatCurrency = (amount: number, currency = 'USD') => {
   }).format(amount);
 };
 
+// Status badge colors
+const statusColors = {
+  pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+  approved: 'bg-blue-50 text-blue-700 border-blue-200',
+  processing: 'bg-purple-50 text-purple-700 border-purple-200',
+  completed: 'bg-green-50 text-green-700 border-green-200',
+  rejected: 'bg-red-50 text-red-700 border-red-200',
+  on_hold: 'bg-gray-50 text-gray-700 border-gray-200'
+};
+
+// Status label mapping
+const statusLabels = {
+  pending: 'Pending',
+  approved: 'Approved',
+  processing: 'Processing',
+  completed: 'Completed',
+  rejected: 'Rejected',
+  on_hold: 'On Hold'
+};
+
 interface PayoutTransactionsTableProps {
   transactions: PayoutTransaction[];
 }
 
-interface UpdateStatusDialogProps {
+interface StatusUpdateDialogProps {
   transaction: PayoutTransaction;
-  newStatus: PayoutStatus;
   isOpen: boolean;
   onClose: () => void;
 }
 
-const UpdateStatusDialog: React.FC<UpdateStatusDialogProps> = ({ 
+interface TransactionDetailsDialogProps {
+  transaction: PayoutTransaction | null;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const StatusUpdateDialog: React.FC<StatusUpdateDialogProps> = ({ 
   transaction, 
-  newStatus, 
   isOpen, 
   onClose 
 }) => {
+  const [status, setStatus] = useState<PayoutStatus>(transaction.status);
   const [notes, setNotes] = useState('');
   const { updateTransactionStatus, isUpdatingStatus } = usePayoutTransactions();
-  
-  const statusLabels = {
-    'pending': 'Pending',
-    'approved': 'Approved',
-    'processing': 'Processing',
-    'completed': 'Completed',
-    'rejected': 'Rejected',
-    'on_hold': 'On Hold'
-  };
   
   const handleSubmit = () => {
     updateTransactionStatus({
       transactionId: transaction.id,
-      status: newStatus,
+      status,
       notes: notes.trim() || undefined
     }, {
       onSuccess: () => {
@@ -133,65 +138,92 @@ const UpdateStatusDialog: React.FC<UpdateStatusDialogProps> = ({
     });
   };
   
-  const getStatusDescription = () => {
-    switch (newStatus) {
-      case 'approved':
-        return 'The payout has been approved and is ready for processing.';
-      case 'processing':
-        return 'The payout is now being processed by the payment provider.';
-      case 'completed':
-        return 'The payout has been successfully completed and funds have been transferred.';
-      case 'rejected':
-        return 'The payout has been rejected and will not be processed.';
-      case 'on_hold':
-        return 'The payout has been placed on hold pending further review.';
-      default:
-        return 'Update the status of this payout transaction.';
-    }
-  };
-  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Update Payout Status</DialogTitle>
+          <DialogTitle>Update Transaction Status</DialogTitle>
           <DialogDescription>
-            {getStatusDescription()}
+            Change the status of transaction {transaction.id}
           </DialogDescription>
         </DialogHeader>
         
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 gap-4 items-center">
-            <Label className="text-right">Payout ID</Label>
-            <div className="col-span-3 font-mono text-sm">{transaction.id}</div>
+            <Label className="text-right">Current Status</Label>
+            <div className="col-span-3">
+              <Badge variant="outline" className={statusColors[transaction.status]}>
+                {statusLabels[transaction.status]}
+              </Badge>
+            </div>
           </div>
           
           <div className="grid grid-cols-4 gap-4 items-center">
             <Label className="text-right">Amount</Label>
-            <div className="col-span-3 font-semibold">
+            <div className="col-span-3 font-medium">
               {formatCurrency(transaction.amount, transaction.currency)}
             </div>
           </div>
           
-          <div className="grid grid-cols-4 gap-4 items-center">
-            <Label className="text-right">Current Status</Label>
+          <div className="grid grid-cols-4 gap-4 items-start">
+            <Label className="text-right pt-2">New Status</Label>
             <div className="col-span-3">
-              {getStatusBadge(transaction.status)}
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-4 gap-4 items-center">
-            <Label className="text-right">New Status</Label>
-            <div className="col-span-3">
-              {getStatusBadge(newStatus)}
+              <RadioGroup 
+                value={status} 
+                onValueChange={(value: PayoutStatus) => setStatus(value)}
+                className="space-y-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="pending" id="pending" disabled={transaction.status === 'pending'} />
+                  <Label htmlFor="pending" className="flex items-center">
+                    <Clock className="h-4 w-4 mr-2 text-yellow-600" />
+                    Pending
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="approved" id="approved" disabled={transaction.status === 'approved'} />
+                  <Label htmlFor="approved" className="flex items-center">
+                    <Check className="h-4 w-4 mr-2 text-blue-600" />
+                    Approved
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="processing" id="processing" disabled={transaction.status === 'processing'} />
+                  <Label htmlFor="processing" className="flex items-center">
+                    <CreditCard className="h-4 w-4 mr-2 text-purple-600" />
+                    Processing
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="completed" id="completed" disabled={transaction.status === 'completed'} />
+                  <Label htmlFor="completed" className="flex items-center">
+                    <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                    Completed
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="rejected" id="rejected" disabled={transaction.status === 'rejected'} />
+                  <Label htmlFor="rejected" className="flex items-center">
+                    <X className="h-4 w-4 mr-2 text-red-600" />
+                    Rejected
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="on_hold" id="on_hold" disabled={transaction.status === 'on_hold'} />
+                  <Label htmlFor="on_hold" className="flex items-center">
+                    <AlertTriangle className="h-4 w-4 mr-2 text-gray-600" />
+                    On Hold
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
           </div>
           
           <div className="grid grid-cols-4 gap-4 items-start">
-            <Label className="text-right pt-2">Notes</Label>
+            <Label className="text-right pt-2">Status Notes</Label>
             <div className="col-span-3">
               <Textarea
-                placeholder="Add optional notes about this status update"
+                placeholder="Add notes explaining the status change"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
@@ -210,21 +242,15 @@ const UpdateStatusDialog: React.FC<UpdateStatusDialogProps> = ({
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={isUpdatingStatus}
+            disabled={isUpdatingStatus || status === transaction.status}
           >
-            Update to {statusLabels[newStatus]}
+            {isUpdatingStatus ? 'Updating...' : 'Update Status'}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 };
-
-interface TransactionDetailsDialogProps {
-  transaction: PayoutTransaction | null;
-  isOpen: boolean;
-  onClose: () => void;
-}
 
 const TransactionDetailsDialog: React.FC<TransactionDetailsDialogProps> = ({ 
   transaction, 
@@ -237,9 +263,9 @@ const TransactionDetailsDialog: React.FC<TransactionDetailsDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Payout Transaction Details</DialogTitle>
+          <DialogTitle>Transaction Details</DialogTitle>
           <DialogDescription>
-            Complete details for payout transaction
+            Complete details for transaction {transaction.id}
           </DialogDescription>
         </DialogHeader>
         
@@ -256,7 +282,9 @@ const TransactionDetailsDialog: React.FC<TransactionDetailsDialogProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Status:</span>
-                  <span>{getStatusBadge(transaction.status)}</span>
+                  <Badge variant="outline" className={statusColors[transaction.status]}>
+                    {statusLabels[transaction.status]}
+                  </Badge>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Created:</span>
@@ -279,32 +307,36 @@ const TransactionDetailsDialog: React.FC<TransactionDetailsDialogProps> = ({
             
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Financial Details</CardTitle>
+                <CardTitle className="text-sm font-medium">Payment Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Amount:</span>
-                  <span className="font-semibold">{formatCurrency(transaction.amount, transaction.currency)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Platform Fee:</span>
-                  <span>{formatCurrency(transaction.platformFee, transaction.currency)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Net Amount:</span>
-                  <span className="font-semibold">{formatCurrency(transaction.netAmount, transaction.currency)}</span>
+                  <span className="font-semibold">
+                    {formatCurrency(transaction.amount, transaction.currency)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Method:</span>
-                  <span className="capitalize">{transaction.payoutMethod.replace('_', ' ')}</span>
+                  <span>{transaction.payoutMethod}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Account:</span>
+                  <span className="font-mono text-xs truncate max-w-[160px]">{transaction.accountId}</span>
+                </div>
+                {transaction.paymentReference && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Reference:</span>
+                    <span className="font-mono">{transaction.paymentReference}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
           
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">User Details</CardTitle>
+              <CardTitle className="text-sm font-medium">Recipient</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -313,14 +345,37 @@ const TransactionDetailsDialog: React.FC<TransactionDetailsDialogProps> = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">User Type:</span>
-                <span className="capitalize">{transaction.userType}</span>
+                <span>{formatUserType(transaction.userType)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Account ID:</span>
-                <span className="font-mono">{transaction.accountId}</span>
+                <span className="text-muted-foreground">Description:</span>
+                <span>{transaction.description}</span>
               </div>
             </CardContent>
           </Card>
+          
+          {transaction.bookingIds && transaction.bookingIds.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Related Bookings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {transaction.bookingIds.map((bookingId, index) => (
+                    <Button 
+                      key={index} 
+                      variant="outline" 
+                      className="text-left justify-start"
+                      onClick={() => window.open(`/bookings/${bookingId}`, '_blank')}
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      <span className="font-mono text-xs truncate">{bookingId}</span>
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
           
           {transaction.notes && (
             <Card>
@@ -328,22 +383,20 @@ const TransactionDetailsDialog: React.FC<TransactionDetailsDialogProps> = ({
                 <CardTitle className="text-sm font-medium">Notes</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm">{transaction.notes}</p>
+                <p className="text-sm whitespace-pre-line">{transaction.notes}</p>
               </CardContent>
             </Card>
           )}
           
-          {transaction.relatedBookings && transaction.relatedBookings.length > 0 && (
+          {transaction.processorData && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Related Bookings</CardTitle>
+                <CardTitle className="text-sm font-medium">Processor Data</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-sm space-y-1">
-                  {transaction.relatedBookings.map((bookingId, index) => (
-                    <div key={index} className="font-mono">{bookingId}</div>
-                  ))}
-                </div>
+                <pre className="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-[200px]">
+                  {JSON.stringify(transaction.processorData, null, 2)}
+                </pre>
               </CardContent>
             </Card>
           )}
@@ -361,11 +414,9 @@ const PayoutTransactionsTable: React.FC<PayoutTransactionsTableProps> = ({ trans
   const [selectedTransaction, setSelectedTransaction] = useState<PayoutTransaction | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
-  const [newStatus, setNewStatus] = useState<PayoutStatus>('pending');
   
-  const handleStatusUpdate = (transaction: PayoutTransaction, status: PayoutStatus) => {
+  const handleUpdateStatus = (transaction: PayoutTransaction) => {
     setSelectedTransaction(transaction);
-    setNewStatus(status);
     setStatusDialogOpen(true);
   };
   
@@ -384,40 +435,6 @@ const PayoutTransactionsTable: React.FC<PayoutTransactionsTableProps> = ({ trans
     setSelectedTransaction(null);
   };
   
-  // Determine available actions based on current status
-  const getAvailableActions = (transaction: PayoutTransaction) => {
-    const { status } = transaction;
-    
-    switch (status) {
-      case 'pending':
-        return [
-          { label: 'Approve', status: 'approved' as PayoutStatus, icon: CheckCircle },
-          { label: 'Reject', status: 'rejected' as PayoutStatus, icon: XCircle },
-          { label: 'Hold', status: 'on_hold' as PayoutStatus, icon: PauseCircle }
-        ];
-      case 'approved':
-        return [
-          { label: 'Process', status: 'processing' as PayoutStatus, icon: PlayCircle },
-          { label: 'Hold', status: 'on_hold' as PayoutStatus, icon: PauseCircle },
-          { label: 'Reject', status: 'rejected' as PayoutStatus, icon: XCircle }
-        ];
-      case 'processing':
-        return [
-          { label: 'Complete', status: 'completed' as PayoutStatus, icon: CheckCircle },
-          { label: 'Hold', status: 'on_hold' as PayoutStatus, icon: PauseCircle }
-        ];
-      case 'on_hold':
-        return [
-          { label: 'Resume', status: 'approved' as PayoutStatus, icon: PlayCircle },
-          { label: 'Reject', status: 'rejected' as PayoutStatus, icon: XCircle }
-        ];
-      case 'rejected':
-      case 'completed':
-      default:
-        return [];
-    }
-  };
-  
   return (
     <>
       <Card>
@@ -425,7 +442,7 @@ const PayoutTransactionsTable: React.FC<PayoutTransactionsTableProps> = ({ trans
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Transaction ID</TableHead>
+                <TableHead className="w-[100px]">ID</TableHead>
                 <TableHead>User</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Status</TableHead>
@@ -438,25 +455,39 @@ const PayoutTransactionsTable: React.FC<PayoutTransactionsTableProps> = ({ trans
               {transactions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                    No payout transactions found
+                    No transactions found
                   </TableCell>
                 </TableRow>
               ) : (
                 transactions.map((transaction) => (
                   <TableRow key={transaction.id}>
-                    <TableCell className="font-mono text-xs">{transaction.id}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {transaction.id.substring(0, 8)}...
+                    </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-medium">{transaction.userId}</span>
-                        <span className="text-xs text-muted-foreground capitalize">{transaction.userType}</span>
+                        <span className="font-medium truncate max-w-[120px]">
+                          {transaction.userId.substring(0, 8)}...
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatUserType(transaction.userType)}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">
                       {formatCurrency(transaction.amount, transaction.currency)}
                     </TableCell>
-                    <TableCell>{getStatusBadge(transaction.status)}</TableCell>
-                    <TableCell className="capitalize">{transaction.payoutMethod.replace('_', ' ')}</TableCell>
-                    <TableCell>{formatTimestamp(transaction.createdAt)}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={statusColors[transaction.status]}>
+                        {statusLabels[transaction.status]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {transaction.payoutMethod}
+                    </TableCell>
+                    <TableCell>
+                      {formatTimestamp(transaction.createdAt)}
+                    </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -470,21 +501,14 @@ const PayoutTransactionsTable: React.FC<PayoutTransactionsTableProps> = ({ trans
                             View Details
                           </DropdownMenuItem>
                           
-                          {getAvailableActions(transaction).length > 0 && (
+                          {/* Don't allow status changes for completed transactions */}
+                          {transaction.status !== 'completed' && (
                             <>
                               <DropdownMenuSeparator />
-                              {getAvailableActions(transaction).map((action, index) => {
-                                const ActionIcon = action.icon;
-                                return (
-                                  <DropdownMenuItem 
-                                    key={index}
-                                    onClick={() => handleStatusUpdate(transaction, action.status)}
-                                  >
-                                    <ActionIcon className="mr-2 h-4 w-4" />
-                                    {action.label}
-                                  </DropdownMenuItem>
-                                );
-                              })}
+                              <DropdownMenuItem onClick={() => handleUpdateStatus(transaction)}>
+                                <FileText className="mr-2 h-4 w-4" />
+                                Update Status
+                              </DropdownMenuItem>
                             </>
                           )}
                         </DropdownMenuContent>
@@ -500,9 +524,8 @@ const PayoutTransactionsTable: React.FC<PayoutTransactionsTableProps> = ({ trans
       
       {/* Dialogs */}
       {selectedTransaction && statusDialogOpen && (
-        <UpdateStatusDialog
+        <StatusUpdateDialog
           transaction={selectedTransaction}
-          newStatus={newStatus}
           isOpen={statusDialogOpen}
           onClose={closeStatusDialog}
         />

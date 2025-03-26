@@ -1,174 +1,241 @@
-import { Timestamp } from 'firebase/firestore';
-
-export type PaymentMethod = 'credit_card' | 'digital_wallet';
-export type PaymentStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'refunded';
-export type PayoutStatus = 'pending' | 'approved' | 'processing' | 'completed' | 'rejected' | 'on_hold';
-export type PayoutMethod = 'bank_transfer' | 'paypal' | 'stripe' | 'manual';
-export type UserType = 'producer' | 'partner';
-export type PayoutFrequency = 'weekly' | 'biweekly' | 'monthly';
-
-export interface CreditCardDetails {
-  cardNumber: string;
-  cardholderName: string;
-  expiryDate: string;
-  cvv: string;
-}
-
-export interface DigitalWalletDetails {
-  provider: 'apple_pay' | 'google_pay' | 'paypal';
-  accountEmail?: string;
-}
-
-export interface PaymentDetails {
-  method: PaymentMethod;
-  creditCardDetails?: CreditCardDetails;
-  digitalWalletDetails?: DigitalWalletDetails;
-}
-
-export interface BookingPayment {
-  paymentId: string;
-  bookingId: string;
-  userId: string;
-  amount: number;
-  currency: string;
-  paymentMethod: PaymentMethod;
-  status: PaymentStatus;
-  transactionReference?: string;
-  receiptUrl?: string;
-  createdDate: Timestamp;
-  lastUpdatedDate: Timestamp;
-}
-
-export interface BookingConfirmation {
-  confirmationId: string;
-  bookingId: string;
-  userId: string;
-  packageId: string;
-  paymentId: string;
-  confirmationDate: Timestamp;
-  emailSent: boolean;
-  notificationSent: boolean;
-}
-
 /**
- * PayoutAccount - Contains banking/payment information for Producers and Partners
- * Used for handling payouts to service providers
+ * Payment Schema
+ * 
+ * This file defines the schemas and types for the payment and payout system
  */
-export interface PayoutAccount {
-  id: string;
-  userId: string;
-  userType: UserType;
-  accountName: string;
-  payoutMethod: PayoutMethod;
-  currency: string;
-  isActive: boolean;
-  isVerified: boolean;
-  verificationDate?: Timestamp;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  // Method-specific details
-  bankDetails?: {
-    bankName: string;
-    accountNumber: string;
-    routingNumber?: string;
-    iban?: string;
-    swiftCode?: string;
-    bankAddress?: string;
-  };
-  paypalDetails?: {
-    email: string;
-  };
-  stripeDetails?: {
-    accountId: string;
-    connectedAccountStatus: string;
-  };
-  preferredFrequency: PayoutFrequency;
-  notes?: string;
-}
+import { z } from 'zod';
+import { createInsertSchema } from 'drizzle-zod';
+import { clientNow } from './schema-helpers';
 
 /**
- * PayoutTransaction - Represents a single payout to a Producer or Partner
- * Tracks the complete lifecycle of a payout
+ * User types for payout system
+ */
+export type UserType = 'producer' | 'partner' | 'admin';
+
+/**
+ * Payout methods supported by the platform
+ */
+export type PayoutMethod = 'paypal' | 'stripe' | 'bank_account' | 'crypto_wallet';
+
+/**
+ * Payout transaction statuses
+ */
+export type PayoutStatus = 'pending' | 'approved' | 'processing' | 'completed' | 'rejected' | 'on_hold';
+
+/**
+ * Payout dispute statuses
+ */
+export type DisputeStatus = 'open' | 'under_review' | 'resolved' | 'canceled';
+
+/**
+ * Payout dispute reasons
+ */
+export type DisputeReason = 'incorrect_amount' | 'missing_payment' | 'processing_delay' | 'other';
+
+/**
+ * Payout schedule options
+ */
+export type PayoutSchedule = 'daily' | 'weekly' | 'biweekly' | 'monthly';
+
+/**
+ * Payout transaction model
  */
 export interface PayoutTransaction {
   id: string;
   userId: string;
   userType: UserType;
-  accountId: string; // Reference to PayoutAccount
+  accountId: string;
   amount: number;
-  platformFee: number;
-  netAmount: number;
   currency: string;
-  status: PayoutStatus;
-  payoutMethod: PayoutMethod;
-  reference?: string;
   description: string;
-  periodStart: Timestamp;
-  periodEnd: Timestamp;
-  createdAt: Timestamp;
-  processedAt?: Timestamp;
-  completedAt?: Timestamp;
-  // For internal tracking
-  adminId?: string; // ID of admin who approved/processed
-  transactionDetails?: any; // Provider-specific transaction details
+  payoutMethod: PayoutMethod;
+  status: PayoutStatus;
   notes?: string;
-  // For reconciliation
-  relatedBookings: string[]; // Array of booking IDs this payout covers
+  bookingIds?: string[];
+  paymentReference?: string;
+  processorData?: Record<string, any>;
+  createdAt: any; // Timestamp type
+  processedAt?: any; // Timestamp type
+  completedAt?: any; // Timestamp type
+  updatedAt: any; // Timestamp type
 }
 
 /**
- * EarningsSummary - Provides a summary of earnings for a Producer or Partner
- * Used for dashboard display and reporting
+ * Payout account model
+ */
+export interface PayoutAccount {
+  id: string;
+  userId: string;
+  userType: UserType;
+  accountType: PayoutMethod;
+  accountDetails: Record<string, any>;
+  isVerified: boolean;
+  isDefault: boolean;
+  verificationNotes?: string;
+  createdAt: any; // Timestamp type
+  updatedAt: any; // Timestamp type
+  verifiedAt?: any; // Timestamp type
+}
+
+/**
+ * Payout settings model
+ */
+export interface PayoutSettings {
+  id: string;
+  minimumPayoutAmount: number;
+  platformFeePercentage: number;
+  automaticPayoutsEnabled: boolean;
+  payoutMethods: PayoutMethod[];
+  allowEarlyPayout: boolean;
+  maxRetryAttempts: number;
+  payoutSchedule: PayoutSchedule;
+  withdrawalFee: number;
+  supportContact: string;
+  earlyPayoutFee: number;
+  updatedAt: any; // Timestamp type
+  updatedBy: string;
+}
+
+/**
+ * Earnings summary model
  */
 export interface EarningsSummary {
   id: string;
   userId: string;
   userType: UserType;
-  totalEarnings: number; // Lifetime earnings
-  totalPaidOut: number; // Total amount paid out
-  pendingBalance: number; // Current balance awaiting payout
-  availableBalance: number; // Balance cleared for payout
-  onHoldBalance: number; // Balance on hold due to disputes or verification
+  periodStart: any; // Timestamp type
+  periodEnd: any; // Timestamp type
+  totalEarnings: number;
+  pendingPayouts: number;
+  completedPayouts: number;
+  availableBalance: number;
   currency: string;
-  lastPayoutDate?: Timestamp;
-  lastPayoutAmount?: number;
-  lastUpdatedAt: Timestamp;
+  lastUpdated: any; // Timestamp type
 }
 
 /**
- * PayoutSettings - Global settings for the payout system
- * Managed by platform administrators
- */
-export interface PayoutSettings {
-  id: string; // Usually a singleton like 'global'
-  defaultPayoutFrequency: PayoutFrequency;
-  minimumPayoutAmount: number;
-  platformFeePercentage: number; // e.g., 10 for 10%
-  automaticPayoutsEnabled: boolean;
-  requireAdminApproval: boolean;
-  payoutMethods: PayoutMethod[];
-  supportedCurrencies: string[];
-  updatedAt: Timestamp;
-  updatedBy: string; // Admin ID
-}
-
-/**
- * PayoutDispute - Handles disputed payouts
- * Tracks resolution process for payout disagreements
+ * Payout dispute model
  */
 export interface PayoutDispute {
   id: string;
-  payoutId: string;
+  transactionId: string;
   userId: string;
   userType: UserType;
-  reason: string;
-  status: 'open' | 'under_review' | 'resolved' | 'rejected';
-  amount: number;
-  currency: string;
-  createdAt: Timestamp;
-  resolvedAt?: Timestamp;
-  resolvedBy?: string; // Admin ID
+  reason: DisputeReason;
+  description: string;
+  status: DisputeStatus;
+  supportingDocuments?: string[];
+  adminNotes?: string;
   resolution?: string;
-  attachments?: string[]; // URLs to supporting documents
-  notes?: string;
+  createdAt: any; // Timestamp type
+  updatedAt: any; // Timestamp type
+  resolvedAt?: any; // Timestamp type
 }
+
+// Zod schemas for validation
+
+/**
+ * Payout Transaction Schema
+ */
+export const PayoutTransactionSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  userType: z.enum(['producer', 'partner', 'admin']),
+  accountId: z.string(),
+  amount: z.number().positive(),
+  currency: z.string().default('USD'),
+  description: z.string(),
+  payoutMethod: z.enum(['paypal', 'stripe', 'bank_account', 'crypto_wallet']),
+  status: z.enum(['pending', 'approved', 'processing', 'completed', 'rejected', 'on_hold']).default('pending'),
+  notes: z.string().optional(),
+  bookingIds: z.array(z.string()).optional(),
+  paymentReference: z.string().optional(),
+  processorData: z.record(z.any()).optional(),
+  createdAt: z.any().default(() => clientNow()),
+  processedAt: z.any().optional(),
+  completedAt: z.any().optional(),
+  updatedAt: z.any().default(() => clientNow()),
+});
+
+/**
+ * Payout Account Schema
+ */
+export const PayoutAccountSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  userType: z.enum(['producer', 'partner', 'admin']),
+  accountType: z.enum(['paypal', 'stripe', 'bank_account', 'crypto_wallet']),
+  accountDetails: z.record(z.any()),
+  isVerified: z.boolean().default(false),
+  isDefault: z.boolean().default(false),
+  verificationNotes: z.string().optional(),
+  createdAt: z.any().default(() => clientNow()),
+  updatedAt: z.any().default(() => clientNow()),
+  verifiedAt: z.any().optional(),
+});
+
+/**
+ * Payout Settings Schema
+ */
+export const PayoutSettingsSchema = z.object({
+  id: z.string().default('default'),
+  minimumPayoutAmount: z.number().positive().default(50),
+  platformFeePercentage: z.number().min(0).max(100).default(5),
+  automaticPayoutsEnabled: z.boolean().default(true),
+  payoutMethods: z.array(z.enum(['paypal', 'stripe', 'bank_account', 'crypto_wallet'])),
+  allowEarlyPayout: z.boolean().default(true),
+  maxRetryAttempts: z.number().int().nonnegative().default(3),
+  payoutSchedule: z.enum(['daily', 'weekly', 'biweekly', 'monthly']).default('weekly'),
+  withdrawalFee: z.number().nonnegative().default(1),
+  supportContact: z.string().email().default('payments@etoileyachts.com'),
+  earlyPayoutFee: z.number().nonnegative().default(2),
+  updatedAt: z.any().default(() => clientNow()),
+  updatedBy: z.string(),
+});
+
+/**
+ * Earnings Summary Schema
+ */
+export const EarningsSummarySchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  userType: z.enum(['producer', 'partner', 'admin']),
+  periodStart: z.any(),
+  periodEnd: z.any(),
+  totalEarnings: z.number().nonnegative(),
+  pendingPayouts: z.number().nonnegative(),
+  completedPayouts: z.number().nonnegative(),
+  availableBalance: z.number().nonnegative(),
+  currency: z.string().default('USD'),
+  lastUpdated: z.any().default(() => clientNow()),
+});
+
+/**
+ * Payout Dispute Schema
+ */
+export const PayoutDisputeSchema = z.object({
+  id: z.string(),
+  transactionId: z.string(),
+  userId: z.string(),
+  userType: z.enum(['producer', 'partner', 'admin']),
+  reason: z.enum(['incorrect_amount', 'missing_payment', 'processing_delay', 'other']),
+  description: z.string(),
+  status: z.enum(['open', 'under_review', 'resolved', 'canceled']).default('open'),
+  supportingDocuments: z.array(z.string()).optional(),
+  adminNotes: z.string().optional(),
+  resolution: z.string().optional(),
+  createdAt: z.any().default(() => clientNow()),
+  updatedAt: z.any().default(() => clientNow()),
+  resolvedAt: z.any().optional(),
+});
+
+// Insert schemas for creating new records
+export const InsertPayoutTransactionSchema = PayoutTransactionSchema.omit({ id: true });
+export const InsertPayoutAccountSchema = PayoutAccountSchema.omit({ id: true });
+export const InsertPayoutDisputeSchema = PayoutDisputeSchema.omit({ id: true });
+
+// Export type definitions
+export type PayoutTransactionInput = z.infer<typeof InsertPayoutTransactionSchema>;
+export type PayoutAccountInput = z.infer<typeof InsertPayoutAccountSchema>;
+export type PayoutDisputeInput = z.infer<typeof InsertPayoutDisputeSchema>;
+export type PayoutSettingsInput = z.infer<typeof PayoutSettingsSchema>;
