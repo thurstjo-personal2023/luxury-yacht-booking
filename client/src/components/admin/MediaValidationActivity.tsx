@@ -12,12 +12,7 @@ const MediaValidationActivity = () => {
   
   // Helper function to get the number of collections in a report
   const getCollectionCount = (report: any): number => {
-    if (report.collectionSummaries && Array.isArray(report.collectionSummaries)) {
-      return report.collectionSummaries.length;
-    } else if (report.stats && report.stats.byCollection) {
-      return Object.keys(report.stats.byCollection).length;
-    }
-    return 0;
+    return Object.keys(report.stats.byCollection).length;
   };
   
   // Format date for display with improved validation
@@ -141,10 +136,7 @@ const MediaValidationActivity = () => {
   return (
     <>
       {sortedReports.slice(0, 2).map((report, index) => {
-        // Use optional chaining with fallbacks for potentially undefined properties
-        const invalidUrls = report.invalidUrls ?? report.stats?.invalidUrls ?? 0;
-        const missingUrls = report.missingUrls ?? report.stats?.missingUrls ?? 0;
-        const invalidCount = invalidUrls + missingUrls;
+        const invalidCount = report.stats.invalidUrls + report.stats.missingUrls;
         const borderColor = invalidCount > 0 ? 'border-orange-500' : 'border-green-500';
         
         return (
@@ -153,7 +145,7 @@ const MediaValidationActivity = () => {
             <div className="text-sm text-muted-foreground">
               {invalidCount > 0 
                 ? `Found ${invalidCount} issues across ${getCollectionCount(report)} collections`
-                : `Validated ${report.totalFields || 0} URLs with no issues found`
+                : `Validated ${report.stats.totalUrls} URLs with no issues found`
               }
             </div>
             <div className="text-xs text-muted-foreground">{getTimeAgo(report.endTime)}</div>

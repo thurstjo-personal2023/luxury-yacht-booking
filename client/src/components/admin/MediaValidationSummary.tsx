@@ -94,7 +94,7 @@ const MediaValidationSummary = () => {
     return formatDate(dateObj);
   };
 
-  // Calculate validation statistics
+  // Calculate validation statistics using the standardized format
   const stats = React.useMemo(() => {
     if (!latestReport) {
       return {
@@ -108,19 +108,13 @@ const MediaValidationSummary = () => {
       };
     }
 
-    // Handle different report formats - check for the collectionSummaries property 
-    // or fall back to stats.byCollection if using the new format
-    let collectionsCount = 0;
-    if (latestReport.collectionSummaries) {
-      collectionsCount = latestReport.collectionSummaries.length;
-    } else if (latestReport.stats && latestReport.stats.byCollection) {
-      collectionsCount = Object.keys(latestReport.stats.byCollection).length;
-    }
-
-    // Check for stats-based structure vs. direct properties
-    const validUrls = latestReport.validUrls || (latestReport.stats && latestReport.stats.validUrls) || 0;
-    const invalidUrls = latestReport.invalidUrls || (latestReport.stats && latestReport.stats.invalidUrls) || 0;
-    const missingUrls = latestReport.missingUrls || (latestReport.stats && latestReport.stats.missingUrls) || 0;
+    // Get collection count from byCollection object
+    const collectionsCount = Object.keys(latestReport.stats.byCollection).length;
+    
+    // Get URL statistics from stats object
+    const validUrls = latestReport.stats.validUrls;
+    const invalidUrls = latestReport.stats.invalidUrls;
+    const missingUrls = latestReport.stats.missingUrls;
 
     const total = validUrls + invalidUrls + missingUrls;
     const validPercent = total > 0 ? Math.round((validUrls / total) * 100) : 0;
