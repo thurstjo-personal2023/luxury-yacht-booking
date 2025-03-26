@@ -230,17 +230,26 @@ async function testMediaUrl(
 
   // ======= SPECIAL CASE HANDLING =======
   
-  // 1. Handle known placeholder URLs as valid
-  if (url === '/yacht-placeholder.jpg' || 
-      url === '/service-placeholder.jpg' || 
-      url === '/product-placeholder.jpg' || 
-      url === '/user-placeholder.jpg' ||
-      url.includes('placeholder')) {
-      
+  // 1. Handle known placeholder URLs as valid - with enhanced placeholder detection
+  const placeholderPatterns = [
+    '/yacht-placeholder.jpg',
+    '/service-placeholder.jpg',
+    '/product-placeholder.jpg',
+    '/user-placeholder.jpg',
+    'yacht-placeholder.jpg',
+    'service-placeholder.jpg',
+    'product-placeholder.jpg', 
+    'user-placeholder.jpg',
+    'placeholder'
+  ];
+  
+  if (placeholderPatterns.some(pattern => url.includes(pattern))) {
     console.log(`Automatically accepting placeholder URL: ${url}`);
     
+    // Use a valid URL for the placeholder - set absolute path to match environment
     const validEntry: ValidMediaEntry = {
       ...entry,
+      url: url, // Keep original URL for reference
       contentType: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
       contentLength: 0
     };
