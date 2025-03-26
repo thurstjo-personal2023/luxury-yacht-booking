@@ -8,6 +8,7 @@ import { Request, Response, Express, NextFunction } from 'express';
 import { verifyAuth, adminDb, verifyAdminRole } from './firebase-admin';
 import validateImageUrls from '../scripts/validate-images';
 import { PubSub } from '@google-cloud/pubsub';
+import { getPlatformBookingStats, getPlatformTransactionStats, getPlatformUserStats } from './services/admin-stats-service';
 // Import will be loaded dynamically to avoid initialization issues
 // import { validateMediaUrls, saveMediaValidationResults } from '../scripts/validate-media';
 
@@ -872,6 +873,68 @@ export function registerAdminRoutes(app: Express) {
         error: 'Failed to fetch validation report',
         details: error.message
       });
+    }
+  });
+
+  /**
+   * Get platform statistics for the admin dashboard
+   * 
+   * This endpoint provides aggregated statistics about bookings, transactions, and users
+   * for display on the admin dashboard. It supports different time periods for analysis.
+   */
+  app.get('/api/admin/platform-stats', verifyAdminRole, async (req: Request, res: Response) => {
+    try {
+      // Get stats for the requested time period
+      const { period = 'day' } = req.query;
+      
+      // Validate period
+      const validPeriods = ['day', 'week', 'month', 'year'];
+      const validPeriod = validPeriods.includes(period as string) ? period as string : 'day';
+      
+      console.log(`Fetching platform stats for period: ${validPeriod}`);
+      
+      // Get booking stats
+      const bookingStats = await getPlatformBookingStats(validPeriod);
+      
+      // Get transaction stats
+      const transactionStats = await getPlatformTransactionStats(validPeriod);
+      
+      // Get user stats
+      const userStats = await getPlatformUserStats(validPeriod);
+      
+      // Return all stats in a single response
+      res.json({
+        bookings: bookingStats,
+        transactions: transactionStats,
+        users: userStats,
+        timestamp: new Date().toISOString(),
+        period: validPeriod
+      });
+      
+      // Log activity
+      adminDb.collection('admin_activity_logs').add({
+        type: 'VIEW_PLATFORM_STATS',
+        adminId: req.user?.uid || 'unknown',
+        adminEmail: req.user?.email || 'unknown',
+        details: { period: validPeriod },
+        timestamp: new Date()
+      }).catch(err => {
+        console.error('Error logging admin activity:', err);
+      });
+    } catch (error) {
+      console.error('Error fetching platform stats:', error);
+      
+      // Log the error
+      adminDb.collection('admin_activity_logs').add({
+        type: 'ERROR',
+        adminId: req.user?.uid || 'system',
+        details: `Error fetching platform stats: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date()
+      }).catch(err => {
+        console.error('Error logging admin error:', err);
+      });
+      
+      res.status(500).json({ error: 'Failed to fetch platform statistics' });
     }
   });
 }
