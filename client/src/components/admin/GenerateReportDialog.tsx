@@ -23,7 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { CalendarIcon, FileText, Plus } from 'lucide-react';
-import { format } from 'date-fns';
+import { format as formatDate } from 'date-fns';
 import {
   Popover,
   PopoverContent,
@@ -190,7 +190,7 @@ export function GenerateReportDialog() {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate ? String(format(startDate, "PPP")) : "Start date"}
+                      {startDate ? format(startDate, "PPP") : "Start date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -212,7 +212,7 @@ export function GenerateReportDialog() {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {endDate ? String(format(endDate, "PPP")) : "End date"}
+                      {endDate ? format(endDate, "PPP") : "End date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
