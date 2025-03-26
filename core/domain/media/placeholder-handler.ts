@@ -25,6 +25,16 @@ export const PLACEHOLDER_IMAGES = {
 };
 
 /**
+ * Map of placeholder videos by type
+ * Using development URLs while in Replit environment
+ */
+export const PLACEHOLDER_VIDEOS = {
+  yacht: `${DEV_URL_BASE}/images/video-placeholder.mp4`,
+  service: `${DEV_URL_BASE}/images/video-placeholder.mp4`,
+  default: `${DEV_URL_BASE}/images/video-placeholder.mp4`
+};
+
+/**
  * Get the URL for a placeholder image
  * 
  * @param type The type of placeholder needed
@@ -32,6 +42,16 @@ export const PLACEHOLDER_IMAGES = {
  */
 export function getPlaceholderUrl(type: 'yacht' | 'service' | 'product' | 'user' | 'default' = 'default'): string {
   return PLACEHOLDER_IMAGES[type];
+}
+
+/**
+ * Get the URL for a placeholder video
+ * 
+ * @param type The type of placeholder needed
+ * @returns The URL for the placeholder video
+ */
+export function getVideoPlaceholderUrl(type: 'yacht' | 'service' | 'default' = 'default'): string {
+  return PLACEHOLDER_VIDEOS[type];
 }
 
 /**
@@ -48,25 +68,25 @@ export function isPlaceholderUrl(url: string): boolean {
   
   // Check if URL is on etoile-yachts.replit.app domain with placeholder path
   if (lowerUrl.includes('etoile-yachts.replit.app/images/') && 
-      lowerUrl.includes('placeholder')) {
+      (lowerUrl.includes('placeholder') || lowerUrl.includes('video-placeholder'))) {
     return true;
   }
   
   // Check if URL is on etoileyachts.com domain with placeholder path
   if (lowerUrl.includes('etoileyachts.com/images/') && 
-      lowerUrl.includes('placeholder')) {
+      (lowerUrl.includes('placeholder') || lowerUrl.includes('video-placeholder'))) {
     return true;
   }
   
   // Check if URL is on our Replit development URL with placeholder path
   if (lowerUrl.includes('janeway.replit.dev/images/') && 
-      lowerUrl.includes('placeholder')) {
+      (lowerUrl.includes('placeholder') || lowerUrl.includes('video-placeholder'))) {
     return true;
   }
   
   // Check for relative placeholder paths
   if ((lowerUrl.startsWith('/images/') || lowerUrl.startsWith('images/')) && 
-      lowerUrl.includes('placeholder')) {
+      (lowerUrl.includes('placeholder') || lowerUrl.includes('video-placeholder'))) {
     return true;
   }
   
@@ -77,10 +97,12 @@ export function isPlaceholderUrl(url: string): boolean {
   }
   
   // Check if URL matches any of our known placeholder patterns
-  return Object.values(PLACEHOLDER_IMAGES).some(placeholder => {
-    return lowerUrl === placeholder.toLowerCase();
+  return Object.values(PLACEHOLDER_IMAGES).some(placeholder => 
+    lowerUrl === placeholder.toLowerCase()
+  ) || Object.values(PLACEHOLDER_VIDEOS).some(placeholder => 
+    lowerUrl === placeholder.toLowerCase()
   // Simple 'placeholder' keyword check as a fallback
-  }) || lowerUrl.includes('placeholder');
+  ) || lowerUrl.includes('placeholder') || lowerUrl.includes('video-placeholder');
 }
 
 /**
@@ -90,8 +112,22 @@ export function isPlaceholderUrl(url: string): boolean {
  * @returns The media type for the placeholder
  */
 export function getPlaceholderMediaType(url: string): MediaType {
-  // Placeholders are always images in our application
-  return MediaType.IMAGE;
+  if (!url) return MediaType.IMAGE;
+  
+  // Convert to lowercase for case-insensitive comparison
+  const lowerUrl = url.toLowerCase();
+  
+  // Check if it's a video placeholder
+  if (lowerUrl.includes('video-placeholder') || lowerUrl.endsWith('.mp4')) {
+    return MediaType.VIDEO;
+  }
+  
+  // Check if it matches any of our video placeholders
+  const isVideoPlaceholder = Object.values(PLACEHOLDER_VIDEOS).some(placeholder => 
+    lowerUrl === placeholder.toLowerCase()
+  );
+  
+  return isVideoPlaceholder ? MediaType.VIDEO : MediaType.IMAGE;
 }
 
 /**
@@ -105,6 +141,13 @@ export function formatPlaceholderUrl(url: string): string {
   
   // Extract the filename from the URL
   const filename = url.split('/').pop() || '';
+  const lowerFilename = filename.toLowerCase();
+  
+  // Check if it's a video file
+  const isVideo = lowerFilename.endsWith('.mp4') || 
+                 lowerFilename.endsWith('.mov') || 
+                 lowerFilename.endsWith('.webm') ||
+                 lowerFilename.includes('video');
   
   // Known production URLs that need conversion to development URLs
   if (url.includes('etoile-yachts.replit.app') || 
@@ -113,14 +156,25 @@ export function formatPlaceholderUrl(url: string): string {
       // Check if it's already a Replit URL but with the wrong format
       (url.includes('janeway.replit.dev') && !url.includes(DEV_URL_BASE))) {
     
-    // Handle different placeholder types based on filename
-    if (filename.includes('yacht')) {
+    // Return video placeholders if it's a video
+    if (isVideo) {
+      if (lowerFilename.includes('yacht')) {
+        return PLACEHOLDER_VIDEOS.yacht;
+      } else if (lowerFilename.includes('service')) {
+        return PLACEHOLDER_VIDEOS.service;
+      } else {
+        return PLACEHOLDER_VIDEOS.default;
+      }
+    }
+    
+    // Otherwise return image placeholders
+    if (lowerFilename.includes('yacht')) {
       return PLACEHOLDER_IMAGES.yacht;
-    } else if (filename.includes('service')) {
+    } else if (lowerFilename.includes('service')) {
       return PLACEHOLDER_IMAGES.service;
-    } else if (filename.includes('product')) {
+    } else if (lowerFilename.includes('product')) {
       return PLACEHOLDER_IMAGES.product;
-    } else if (filename.includes('user')) {
+    } else if (lowerFilename.includes('user')) {
       return PLACEHOLDER_IMAGES.user;
     } else {
       return PLACEHOLDER_IMAGES.default;
@@ -129,14 +183,25 @@ export function formatPlaceholderUrl(url: string): string {
   
   // Local/relative URL paths that need the full development URL
   if (url.startsWith('/images/') || url.startsWith('images/')) {
-    // Handle different placeholder types based on filename
-    if (filename.includes('yacht')) {
+    // Return video placeholders if it's a video
+    if (isVideo) {
+      if (lowerFilename.includes('yacht')) {
+        return PLACEHOLDER_VIDEOS.yacht;
+      } else if (lowerFilename.includes('service')) {
+        return PLACEHOLDER_VIDEOS.service;
+      } else {
+        return PLACEHOLDER_VIDEOS.default;
+      }
+    }
+    
+    // Otherwise return image placeholders
+    if (lowerFilename.includes('yacht')) {
       return PLACEHOLDER_IMAGES.yacht;
-    } else if (filename.includes('service')) {
+    } else if (lowerFilename.includes('service')) {
       return PLACEHOLDER_IMAGES.service;
-    } else if (filename.includes('product')) {
+    } else if (lowerFilename.includes('product')) {
       return PLACEHOLDER_IMAGES.product;
-    } else if (filename.includes('user')) {
+    } else if (lowerFilename.includes('user')) {
       return PLACEHOLDER_IMAGES.user;
     } else {
       return PLACEHOLDER_IMAGES.default;
@@ -144,15 +209,26 @@ export function formatPlaceholderUrl(url: string): string {
   }
   
   // Catch-all for any other placeholder URLs
-  if (filename.includes('placeholder')) {
-    // Handle different placeholder types based on filename
-    if (filename.includes('yacht')) {
+  if (lowerFilename.includes('placeholder')) {
+    // Return video placeholders if it's a video
+    if (isVideo) {
+      if (lowerFilename.includes('yacht')) {
+        return PLACEHOLDER_VIDEOS.yacht;
+      } else if (lowerFilename.includes('service')) {
+        return PLACEHOLDER_VIDEOS.service;
+      } else {
+        return PLACEHOLDER_VIDEOS.default;
+      }
+    }
+    
+    // Otherwise return image placeholders
+    if (lowerFilename.includes('yacht')) {
       return PLACEHOLDER_IMAGES.yacht;
-    } else if (filename.includes('service')) {
+    } else if (lowerFilename.includes('service')) {
       return PLACEHOLDER_IMAGES.service;
-    } else if (filename.includes('product')) {
+    } else if (lowerFilename.includes('product')) {
       return PLACEHOLDER_IMAGES.product;
-    } else if (filename.includes('user')) {
+    } else if (lowerFilename.includes('user')) {
       return PLACEHOLDER_IMAGES.user;
     } else {
       return PLACEHOLDER_IMAGES.default;
