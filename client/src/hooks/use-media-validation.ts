@@ -91,13 +91,50 @@ export const useMediaValidation = (): MediaValidationProps => {
   const [validationProgress, setValidationProgress] = useState<ProgressState>({ total: 0, processed: 0 });
   const [repairProgress, setRepairProgress] = useState<ProgressState>({ total: 0, processed: 0 });
 
-  // Transform dates in the reports from strings to Date objects
+  // Transform dates in the reports from strings to Date objects with improved validation
   const transformReports = (reports: any[]): ValidationReport[] => {
-    return reports.map(report => ({
-      ...report,
-      startTime: new Date(report.startTime),
-      endTime: new Date(report.endTime)
-    }));
+    return reports.map(report => {
+      // Create a safe date converter function
+      const safeDate = (dateValue: any): Date | null => {
+        if (!dateValue) return null;
+        
+        let dateObj: Date;
+        if (dateValue instanceof Date) {
+          dateObj = dateValue;
+        } else if (typeof dateValue === 'number') {
+          dateObj = new Date(dateValue);
+        } else if (typeof dateValue === 'string') {
+          // Try to parse the string as a date
+          dateObj = new Date(dateValue);
+          
+          // Check if the date is valid
+          if (isNaN(dateObj.getTime())) {
+            console.warn(`Invalid date string encountered: ${dateValue}`);
+            return null;
+          }
+        } else {
+          console.warn(`Unsupported date format: ${typeof dateValue}`);
+          return null;
+        }
+        
+        // Final validity check
+        return isNaN(dateObj.getTime()) ? null : dateObj;
+      };
+      
+      // Create transformed report with safe dates
+      const transformed = {
+        ...report,
+        startTime: safeDate(report.startTime) || new Date(0),  // Fallback to epoch
+        endTime: safeDate(report.endTime) || new Date()        // Fallback to now
+      };
+      
+      // If the report has a timestamp property (used in some report types)
+      if (report.timestamp) {
+        transformed.timestamp = safeDate(report.timestamp) || new Date();
+      }
+      
+      return transformed;
+    });
   };
 
   // Fetch validation reports

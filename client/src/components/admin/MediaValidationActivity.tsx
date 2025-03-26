@@ -20,28 +20,58 @@ const MediaValidationActivity = () => {
     return 0;
   };
   
-  // Format date for display
-  const formatDate = (date: Date | undefined) => {
+  // Format date for display with improved validation
+  const formatDate = (date: Date | undefined | string | number) => {
     if (!date) return 'N/A';
     
-    // Validate that the date is valid
-    const timestamp = date.getTime();
-    if (isNaN(timestamp)) return 'Invalid date';
+    // Convert to Date object if it's not already one
+    let dateObj: Date;
+    if (date instanceof Date) {
+      dateObj = date;
+    } else if (typeof date === 'number') {
+      dateObj = new Date(date);
+    } else if (typeof date === 'string') {
+      // Try to parse the string as a date
+      dateObj = new Date(date);
+    } else {
+      // If it's an unsupported type, return a fallback
+      return 'Invalid date format';
+    }
     
+    // Validate the date object
+    if (isNaN(dateObj.getTime())) {
+      return 'Invalid date';
+    }
+    
+    // Format the valid date
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
-    }).format(date);
+    }).format(dateObj);
   };
 
-  // Calculate time ago
-  const getTimeAgo = (date: Date | undefined) => {
+  // Calculate time ago with improved validation
+  const getTimeAgo = (date: Date | undefined | string | number) => {
     if (!date) return 'Never';
     
+    // Convert to Date object if it's not already one
+    let dateObj: Date;
+    if (date instanceof Date) {
+      dateObj = date;
+    } else if (typeof date === 'number') {
+      dateObj = new Date(date);
+    } else if (typeof date === 'string') {
+      // Try to parse the string as a date
+      dateObj = new Date(date);
+    } else {
+      // If it's an unsupported type, return a fallback
+      return 'Unknown date';
+    }
+    
     // Validate that the date is valid
-    const timestamp = date.getTime();
+    const timestamp = dateObj.getTime();
     if (isNaN(timestamp)) return 'Invalid date';
     
     const now = new Date();
@@ -60,7 +90,7 @@ const MediaValidationActivity = () => {
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
     
-    return formatDate(date);
+    return formatDate(dateObj);
   };
 
   // Get sorted reports
@@ -111,7 +141,10 @@ const MediaValidationActivity = () => {
   return (
     <>
       {sortedReports.slice(0, 2).map((report, index) => {
-        const invalidCount = report.invalidUrls + report.missingUrls;
+        // Use optional chaining with fallbacks for potentially undefined properties
+        const invalidUrls = report.invalidUrls ?? report.stats?.invalidUrls ?? 0;
+        const missingUrls = report.missingUrls ?? report.stats?.missingUrls ?? 0;
+        const invalidCount = invalidUrls + missingUrls;
         const borderColor = invalidCount > 0 ? 'border-orange-500' : 'border-green-500';
         
         return (
