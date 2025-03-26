@@ -364,8 +364,9 @@ export class PayoutService {
         status: settings.requireAdminApproval ? 'pending' : 'approved',
         payoutMethod: account.payoutMethod,
         description: payout.description || `Payout for ${payout.userId}`,
-        periodStart: payout.periodStart || now,
-        periodEnd: payout.periodEnd || now,
+        // Ensure we use client-compatible timestamps
+        periodStart: payout.periodStart ? toClientTimestamp(payout.periodStart as any) : now,
+        periodEnd: payout.periodEnd ? toClientTimestamp(payout.periodEnd as any) : now,
         createdAt: now,
         adminId,
         relatedBookings: payout.relatedBookings || [],
@@ -557,7 +558,7 @@ export class PayoutService {
         status: 'open',
         amount: payout.amount,
         currency: payout.currency,
-        createdAt: now
+        createdAt: now // already using clientNow() which is compatible
       };
       
       await this.payoutDisputesCollection.doc(disputeId).set(dispute);
