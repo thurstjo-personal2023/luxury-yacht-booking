@@ -57,7 +57,7 @@ export function registerAdminRoutes(app: Express) {
    * Run image validation across all collections
    * This endpoint validates all image URLs in the system
    */
-  app.get('/api/admin/validate-images', verifyAuth, verifyAdminRole, async (req: Request, res: Response) => {
+  app.get('/api/admin/validate-images', verifyAdminRole('admin'), async (req: Request, res: Response) => {
     try {
       console.log('Starting image validation via admin API...');
       
