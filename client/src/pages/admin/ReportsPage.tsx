@@ -204,10 +204,10 @@ const ReportsPage: React.FC = () => {
 
   const { data: reports, isLoading, isError } = useReports(selectedType);
 
-  const filteredReports = reports?.filter(report => 
+  const filteredReports = reports?.filter((report: Report) => 
     report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     report.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    report.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    report.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
   ) || [];
 
   return (
@@ -221,6 +221,7 @@ const ReportsPage: React.FC = () => {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 mt-4 md:mt-0 w-full md:w-auto">
+          <GenerateReportDialog />
           <Select
             value={selectedType}
             onValueChange={setSelectedType}
@@ -327,7 +328,7 @@ const ReportsPage: React.FC = () => {
         </Card>
       ) : activeView === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredReports.map((report) => (
+          {filteredReports.map((report: Report) => (
             <ReportCard key={report.id} report={report} />
           ))}
         </div>

@@ -140,7 +140,10 @@ export function GenerateReportDialog() {
               <Label htmlFor="type" className="text-right">
                 Type
               </Label>
-              <Select value={type} onValueChange={(value) => setType(value as ReportType)}>
+              <Select 
+                value={type} 
+                onValueChange={(value: string) => setType(value as ReportType)}
+              >
                 <SelectTrigger id="type" className="col-span-3">
                   <SelectValue placeholder="Select report type" />
                 </SelectTrigger>
@@ -157,7 +160,10 @@ export function GenerateReportDialog() {
               <Label htmlFor="format" className="text-right">
                 Format
               </Label>
-              <Select value={format} onValueChange={(value) => setFormat(value as ReportFormat)}>
+              <Select 
+                value={format} 
+                onValueChange={(value: string) => setFormat(value as ReportFormat)}
+              >
                 <SelectTrigger id="format" className="col-span-3">
                   <SelectValue placeholder="Select format" />
                 </SelectTrigger>
@@ -184,7 +190,7 @@ export function GenerateReportDialog() {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate ? format(startDate, "PPP") : "Start date"}
+                      {startDate ? String(format(startDate, "PPP")) : "Start date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -206,7 +212,7 @@ export function GenerateReportDialog() {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {endDate ? format(endDate, "PPP") : "End date"}
+                      {endDate ? String(format(endDate, "PPP")) : "End date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
