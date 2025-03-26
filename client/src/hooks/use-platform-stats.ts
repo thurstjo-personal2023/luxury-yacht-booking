@@ -49,14 +49,52 @@ export function usePlatformStats(period: 'day' | 'week' | 'month' | 'year' = 'we
   return useQuery({
     queryKey: ['/api/admin/platform-stats', period],
     queryFn: async () => {
-      // Use the admin API request with retry for better auth handling
-      const response = await adminApiRequestWithRetry(`/api/admin/platform-stats?period=${period}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch platform stats: ${response.status} ${response.statusText}`);
+      try {
+        // Use the admin API request with retry for better auth handling
+        const response = await adminApiRequestWithRetry(`/api/admin/platform-stats?period=${period}`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch platform stats: ${response.status} ${response.statusText}`);
+        }
+        
+        return await response.json() as PlatformStats;
+      } catch (error) {
+        console.error('Error fetching platform stats:', error);
+        
+        // Return fallback empty data structure to prevent UI crashes
+        return {
+          bookings: {
+            total: 0,
+            totalInPeriod: 0,
+            byStatus: {
+              pending: 0,
+              confirmed: 0,
+              canceled: 0
+            },
+            trend: []
+          },
+          transactions: {
+            total: 0,
+            totalInPeriod: 0,
+            volume: 0,
+            byStatus: {
+              successful: 0,
+              failed: 0
+            },
+            trend: []
+          },
+          users: {
+            total: 0,
+            newInPeriod: 0,
+            byRole: {
+              consumer: 0,
+              producer: 0,
+              partner: 0
+            },
+            trend: []
+          }
+        };
       }
-      
-      return await response.json() as PlatformStats;
     },
     refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
