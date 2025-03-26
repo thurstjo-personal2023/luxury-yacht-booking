@@ -113,7 +113,7 @@ export class PayoutService {
           requireAdminApproval: true,
           payoutMethods: ['bank_transfer', 'paypal'],
           supportedCurrencies: ['USD', 'AED'],
-          updatedAt: Timestamp.now(),
+          updatedAt: clientNow(),
           updatedBy: adminId,
           ...settings
         });
@@ -121,7 +121,7 @@ export class PayoutService {
         // Update existing settings
         await settingsRef.update({
           ...settings,
-          updatedAt: Timestamp.now(),
+          updatedAt: clientNow(),
           updatedBy: adminId
         });
       }
@@ -159,7 +159,7 @@ export class PayoutService {
   async createOrUpdatePayoutAccount(account: Partial<PayoutAccount>): Promise<string> {
     try {
       let accountId = account.id;
-      const now = Timestamp.now();
+      const now = clientNow();
       
       if (!accountId) {
         // Creating a new account
@@ -206,7 +206,7 @@ export class PayoutService {
    */
   private async initializeEarningsSummary(userId: string, userType: UserType): Promise<void> {
     const summaryId = `earnings-${userId}`;
-    const now = Timestamp.now();
+    const now = clientNow();
     
     const summary: EarningsSummary = {
       id: summaryId,
@@ -294,7 +294,7 @@ export class PayoutService {
         await summaryRef.update({
           totalEarnings: FieldValue.increment(totalNewEarnings),
           availableBalance: FieldValue.increment(totalNewEarnings),
-          lastUpdatedAt: Timestamp.now()
+          lastUpdatedAt: clientNow()
         });
         
         // Mark bookings as processed for earnings
