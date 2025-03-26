@@ -12,49 +12,90 @@ import { Timestamp } from 'firebase-admin/firestore';
  * @param period The time period for which to retrieve stats ('day', 'week', 'month', 'year')
  */
 export async function getPlatformBookingStats(period: string) {
-  // Calculate date range
-  const { startDate, endDate } = getDateRangeForPeriod(period);
-  
-  // Get total bookings
-  const totalBookingsSnapshot = await adminDb.collection('bookings').count().get();
-  const totalBookings = totalBookingsSnapshot.data().count;
-  
-  // Get bookings in period
-  const periodBookingsSnapshot = await adminDb.collection('bookings')
-    .where('createdAt', '>=', Timestamp.fromDate(startDate))
-    .where('createdAt', '<=', Timestamp.fromDate(endDate))
-    .count().get();
-  const periodBookings = periodBookingsSnapshot.data().count;
-  
-  // Get bookings by status
-  const pendingBookingsSnapshot = await adminDb.collection('bookings')
-    .where('status', '==', 'pending')
-    .count().get();
-  const pendingBookings = pendingBookingsSnapshot.data().count;
-  
-  const confirmedBookingsSnapshot = await adminDb.collection('bookings')
-    .where('status', '==', 'confirmed')
-    .count().get();
-  const confirmedBookings = confirmedBookingsSnapshot.data().count;
-  
-  const canceledBookingsSnapshot = await adminDb.collection('bookings')
-    .where('status', '==', 'canceled')
-    .count().get();
-  const canceledBookings = canceledBookingsSnapshot.data().count;
-  
-  // Get trend data
-  const trendData = await getBookingTrend(period, startDate, endDate);
-  
-  return {
-    total: totalBookings,
-    totalInPeriod: periodBookings,
-    byStatus: {
-      pending: pendingBookings,
-      confirmed: confirmedBookings,
-      canceled: canceledBookings
-    },
-    trend: trendData
-  };
+  try {
+    // Calculate date range
+    const { startDate, endDate } = getDateRangeForPeriod(period);
+    
+    // Get total bookings - safely handle if collection doesn't exist
+    let totalBookings = 0;
+    try {
+      const totalBookingsSnapshot = await adminDb.collection('bookings').count().get();
+      totalBookings = totalBookingsSnapshot.data().count;
+    } catch (error) {
+      console.log('Error getting total bookings count, collection may not exist:', error);
+    }
+    
+    // Get bookings in period
+    let periodBookings = 0;
+    try {
+      const periodBookingsSnapshot = await adminDb.collection('bookings')
+        .where('createdAt', '>=', Timestamp.fromDate(startDate))
+        .where('createdAt', '<=', Timestamp.fromDate(endDate))
+        .count().get();
+      periodBookings = periodBookingsSnapshot.data().count;
+    } catch (error) {
+      console.log('Error getting period bookings count:', error);
+    }
+    
+    // Get bookings by status
+    let pendingBookings = 0;
+    let confirmedBookings = 0;
+    let canceledBookings = 0;
+    
+    try {
+      const pendingBookingsSnapshot = await adminDb.collection('bookings')
+        .where('status', '==', 'pending')
+        .count().get();
+      pendingBookings = pendingBookingsSnapshot.data().count;
+    } catch (error) {
+      console.log('Error getting pending bookings count:', error);
+    }
+    
+    try {
+      const confirmedBookingsSnapshot = await adminDb.collection('bookings')
+        .where('status', '==', 'confirmed')
+        .count().get();
+      confirmedBookings = confirmedBookingsSnapshot.data().count;
+    } catch (error) {
+      console.log('Error getting confirmed bookings count:', error);
+    }
+    
+    try {
+      const canceledBookingsSnapshot = await adminDb.collection('bookings')
+        .where('status', '==', 'canceled')
+        .count().get();
+      canceledBookings = canceledBookingsSnapshot.data().count;
+    } catch (error) {
+      console.log('Error getting canceled bookings count:', error);
+    }
+    
+    // Get trend data
+    const trendData = await getBookingTrend(period, startDate, endDate);
+    
+    return {
+      total: totalBookings,
+      totalInPeriod: periodBookings,
+      byStatus: {
+        pending: pendingBookings,
+        confirmed: confirmedBookings,
+        canceled: canceledBookings
+      },
+      trend: trendData
+    };
+  } catch (error) {
+    console.error('Error in getPlatformBookingStats:', error);
+    // Return empty stats object in case of error
+    return {
+      total: 0,
+      totalInPeriod: 0,
+      byStatus: {
+        pending: 0,
+        confirmed: 0,
+        canceled: 0
+      },
+      trend: []
+    };
+  }
 }
 
 /**
@@ -62,56 +103,96 @@ export async function getPlatformBookingStats(period: string) {
  * @param period The time period for which to retrieve stats ('day', 'week', 'month', 'year')
  */
 export async function getPlatformTransactionStats(period: string) {
-  // Calculate date range
-  const { startDate, endDate } = getDateRangeForPeriod(period);
-  
-  // Get total transactions
-  const totalTransactionsSnapshot = await adminDb.collection('transactions').count().get();
-  const totalTransactions = totalTransactionsSnapshot.data().count;
-  
-  // Get transactions in period
-  const periodTransactionsSnapshot = await adminDb.collection('transactions')
-    .where('createdAt', '>=', Timestamp.fromDate(startDate))
-    .where('createdAt', '<=', Timestamp.fromDate(endDate))
-    .count().get();
-  const periodTransactions = periodTransactionsSnapshot.data().count;
-  
-  // Get transaction volume
-  const transactionsSnapshot = await adminDb.collection('transactions')
-    .where('createdAt', '>=', Timestamp.fromDate(startDate))
-    .where('createdAt', '<=', Timestamp.fromDate(endDate))
-    .get();
-  
-  let volume = 0;
-  transactionsSnapshot.forEach(doc => {
-    const transaction = doc.data();
-    volume += transaction.amount || 0;
-  });
-  
-  // Get transactions by status
-  const successfulTransactionsSnapshot = await adminDb.collection('transactions')
-    .where('status', '==', 'successful')
-    .count().get();
-  const successfulTransactions = successfulTransactionsSnapshot.data().count;
-  
-  const failedTransactionsSnapshot = await adminDb.collection('transactions')
-    .where('status', '==', 'failed')
-    .count().get();
-  const failedTransactions = failedTransactionsSnapshot.data().count;
-  
-  // Get trend data
-  const trendData = await getTransactionTrend(period, startDate, endDate);
-  
-  return {
-    total: totalTransactions,
-    totalInPeriod: periodTransactions,
-    volume,
-    byStatus: {
-      successful: successfulTransactions,
-      failed: failedTransactions
-    },
-    trend: trendData
-  };
+  try {
+    // Calculate date range
+    const { startDate, endDate } = getDateRangeForPeriod(period);
+    
+    // Get total transactions - safely handle if collection doesn't exist
+    let totalTransactions = 0;
+    try {
+      const totalTransactionsSnapshot = await adminDb.collection('transactions').count().get();
+      totalTransactions = totalTransactionsSnapshot.data().count;
+    } catch (error) {
+      console.log('Error getting total transactions count, collection may not exist:', error);
+    }
+    
+    // Get transactions in period
+    let periodTransactions = 0;
+    try {
+      const periodTransactionsSnapshot = await adminDb.collection('transactions')
+        .where('createdAt', '>=', Timestamp.fromDate(startDate))
+        .where('createdAt', '<=', Timestamp.fromDate(endDate))
+        .count().get();
+      periodTransactions = periodTransactionsSnapshot.data().count;
+    } catch (error) {
+      console.log('Error getting period transactions count:', error);
+    }
+    
+    // Get transaction volume
+    let volume = 0;
+    try {
+      const transactionsSnapshot = await adminDb.collection('transactions')
+        .where('createdAt', '>=', Timestamp.fromDate(startDate))
+        .where('createdAt', '<=', Timestamp.fromDate(endDate))
+        .get();
+      
+      transactionsSnapshot.forEach(doc => {
+        const transaction = doc.data();
+        volume += transaction.amount || 0;
+      });
+    } catch (error) {
+      console.log('Error calculating transaction volume:', error);
+    }
+    
+    // Get transactions by status
+    let successfulTransactions = 0;
+    let failedTransactions = 0;
+    
+    try {
+      const successfulTransactionsSnapshot = await adminDb.collection('transactions')
+        .where('status', '==', 'successful')
+        .count().get();
+      successfulTransactions = successfulTransactionsSnapshot.data().count;
+    } catch (error) {
+      console.log('Error getting successful transactions count:', error);
+    }
+    
+    try {
+      const failedTransactionsSnapshot = await adminDb.collection('transactions')
+        .where('status', '==', 'failed')
+        .count().get();
+      failedTransactions = failedTransactionsSnapshot.data().count;
+    } catch (error) {
+      console.log('Error getting failed transactions count:', error);
+    }
+    
+    // Get trend data
+    const trendData = await getTransactionTrend(period, startDate, endDate);
+    
+    return {
+      total: totalTransactions,
+      totalInPeriod: periodTransactions,
+      volume,
+      byStatus: {
+        successful: successfulTransactions,
+        failed: failedTransactions
+      },
+      trend: trendData
+    };
+  } catch (error) {
+    console.error('Error in getPlatformTransactionStats:', error);
+    // Return empty stats object in case of error
+    return {
+      total: 0,
+      totalInPeriod: 0,
+      volume: 0,
+      byStatus: {
+        successful: 0,
+        failed: 0
+      },
+      trend: []
+    };
+  }
 }
 
 /**
@@ -119,131 +200,215 @@ export async function getPlatformTransactionStats(period: string) {
  * @param period The time period for which to retrieve stats ('day', 'week', 'month', 'year')
  */
 export async function getPlatformUserStats(period: string) {
-  // Calculate date range
-  const { startDate, endDate } = getDateRangeForPeriod(period);
-  
-  // Get total users
-  const totalUsersSnapshot = await adminDb.collection('harmonized_users').count().get();
-  const totalUsers = totalUsersSnapshot.data().count;
-  
-  // Get new users in period
-  const newUsersSnapshot = await adminDb.collection('harmonized_users')
-    .where('createdAt', '>=', Timestamp.fromDate(startDate))
-    .where('createdAt', '<=', Timestamp.fromDate(endDate))
-    .count().get();
-  const newUsers = newUsersSnapshot.data().count;
-  
-  // Get users by role
-  const consumerUsersSnapshot = await adminDb.collection('harmonized_users')
-    .where('role', '==', 'consumer')
-    .count().get();
-  const consumerUsers = consumerUsersSnapshot.data().count;
-  
-  const producerUsersSnapshot = await adminDb.collection('harmonized_users')
-    .where('role', '==', 'producer')
-    .count().get();
-  const producerUsers = producerUsersSnapshot.data().count;
-  
-  const partnerUsersSnapshot = await adminDb.collection('harmonized_users')
-    .where('role', '==', 'partner')
-    .count().get();
-  const partnerUsers = partnerUsersSnapshot.data().count;
-  
-  // Get trend data
-  const trendData = await getUserTrend(period, startDate, endDate);
-  
-  return {
-    total: totalUsers,
-    newInPeriod: newUsers,
-    byRole: {
-      consumer: consumerUsers,
-      producer: producerUsers,
-      partner: partnerUsers
-    },
-    trend: trendData
-  };
+  try {
+    // Calculate date range
+    const { startDate, endDate } = getDateRangeForPeriod(period);
+    
+    // Get total users - safely handle if collection doesn't exist
+    let totalUsers = 0;
+    try {
+      const totalUsersSnapshot = await adminDb.collection('harmonized_users').count().get();
+      totalUsers = totalUsersSnapshot.data().count;
+    } catch (error) {
+      console.log('Error getting total users count, collection may not exist:', error);
+    }
+    
+    // Get new users in period
+    let newUsers = 0;
+    try {
+      const newUsersSnapshot = await adminDb.collection('harmonized_users')
+        .where('createdAt', '>=', Timestamp.fromDate(startDate))
+        .where('createdAt', '<=', Timestamp.fromDate(endDate))
+        .count().get();
+      newUsers = newUsersSnapshot.data().count;
+    } catch (error) {
+      console.log('Error getting new users count:', error);
+    }
+    
+    // Get users by role
+    let consumerUsers = 0;
+    let producerUsers = 0;
+    let partnerUsers = 0;
+    
+    try {
+      const consumerUsersSnapshot = await adminDb.collection('harmonized_users')
+        .where('role', '==', 'consumer')
+        .count().get();
+      consumerUsers = consumerUsersSnapshot.data().count;
+    } catch (error) {
+      console.log('Error getting consumer users count:', error);
+    }
+    
+    try {
+      const producerUsersSnapshot = await adminDb.collection('harmonized_users')
+        .where('role', '==', 'producer')
+        .count().get();
+      producerUsers = producerUsersSnapshot.data().count;
+    } catch (error) {
+      console.log('Error getting producer users count:', error);
+    }
+    
+    try {
+      const partnerUsersSnapshot = await adminDb.collection('harmonized_users')
+        .where('role', '==', 'partner')
+        .count().get();
+      partnerUsers = partnerUsersSnapshot.data().count;
+    } catch (error) {
+      console.log('Error getting partner users count:', error);
+    }
+    
+    // Get trend data
+    const trendData = await getUserTrend(period, startDate, endDate);
+    
+    return {
+      total: totalUsers,
+      newInPeriod: newUsers,
+      byRole: {
+        consumer: consumerUsers,
+        producer: producerUsers,
+        partner: partnerUsers
+      },
+      trend: trendData
+    };
+  } catch (error) {
+    console.error('Error in getPlatformUserStats:', error);
+    // Return empty stats object in case of error
+    return {
+      total: 0,
+      newInPeriod: 0,
+      byRole: {
+        consumer: 0,
+        producer: 0,
+        partner: 0
+      },
+      trend: []
+    };
+  }
 }
 
 /**
  * Helper function to get booking trend over time
  */
 async function getBookingTrend(period: string, startDate: Date, endDate: Date) {
-  const intervals = getIntervals(period, startDate, endDate);
-  const trend: { date: string; count: number }[] = [];
-  
-  for (let i = 0; i < intervals.length - 1; i++) {
-    const intervalStart = intervals[i];
-    const intervalEnd = intervals[i + 1];
+  try {
+    const intervals = getIntervals(period, startDate, endDate);
+    const trend: { date: string; count: number }[] = [];
     
-    const snapshot = await adminDb.collection('bookings')
-      .where('createdAt', '>=', Timestamp.fromDate(intervalStart))
-      .where('createdAt', '<', Timestamp.fromDate(intervalEnd))
-      .count().get();
+    for (let i = 0; i < intervals.length - 1; i++) {
+      const intervalStart = intervals[i];
+      const intervalEnd = intervals[i + 1];
+      
+      try {
+        const snapshot = await adminDb.collection('bookings')
+          .where('createdAt', '>=', Timestamp.fromDate(intervalStart))
+          .where('createdAt', '<', Timestamp.fromDate(intervalEnd))
+          .count().get();
+        
+        trend.push({
+          date: formatTrendDate(intervalStart, period),
+          count: snapshot.data().count
+        });
+      } catch (error) {
+        console.log(`Error getting booking trend for interval ${formatTrendDate(intervalStart, period)}:`, error);
+        // Still add the interval with 0 count
+        trend.push({
+          date: formatTrendDate(intervalStart, period),
+          count: 0
+        });
+      }
+    }
     
-    trend.push({
-      date: formatTrendDate(intervalStart, period),
-      count: snapshot.data().count
-    });
+    return trend;
+  } catch (error) {
+    console.error('Error in getBookingTrend:', error);
+    return [];
   }
-  
-  return trend;
 }
 
 /**
  * Helper function to get transaction trend over time
  */
 async function getTransactionTrend(period: string, startDate: Date, endDate: Date) {
-  const intervals = getIntervals(period, startDate, endDate);
-  const trend: { date: string; count: number; volume: number }[] = [];
-  
-  for (let i = 0; i < intervals.length - 1; i++) {
-    const intervalStart = intervals[i];
-    const intervalEnd = intervals[i + 1];
+  try {
+    const intervals = getIntervals(period, startDate, endDate);
+    const trend: { date: string; count: number; volume: number }[] = [];
     
-    const snapshot = await adminDb.collection('transactions')
-      .where('createdAt', '>=', Timestamp.fromDate(intervalStart))
-      .where('createdAt', '<', Timestamp.fromDate(intervalEnd))
-      .get();
+    for (let i = 0; i < intervals.length - 1; i++) {
+      const intervalStart = intervals[i];
+      const intervalEnd = intervals[i + 1];
+      
+      try {
+        const snapshot = await adminDb.collection('transactions')
+          .where('createdAt', '>=', Timestamp.fromDate(intervalStart))
+          .where('createdAt', '<', Timestamp.fromDate(intervalEnd))
+          .get();
+        
+        let volume = 0;
+        snapshot.forEach(doc => {
+          const transaction = doc.data();
+          volume += transaction.amount || 0;
+        });
+        
+        trend.push({
+          date: formatTrendDate(intervalStart, period),
+          count: snapshot.size,
+          volume
+        });
+      } catch (error) {
+        console.log(`Error getting transaction trend for interval ${formatTrendDate(intervalStart, period)}:`, error);
+        // Still add the interval with 0 count and volume
+        trend.push({
+          date: formatTrendDate(intervalStart, period),
+          count: 0,
+          volume: 0
+        });
+      }
+    }
     
-    let volume = 0;
-    snapshot.forEach(doc => {
-      const transaction = doc.data();
-      volume += transaction.amount || 0;
-    });
-    
-    trend.push({
-      date: formatTrendDate(intervalStart, period),
-      count: snapshot.size,
-      volume
-    });
+    return trend;
+  } catch (error) {
+    console.error('Error in getTransactionTrend:', error);
+    return [];
   }
-  
-  return trend;
 }
 
 /**
  * Helper function to get user trend over time
  */
 async function getUserTrend(period: string, startDate: Date, endDate: Date) {
-  const intervals = getIntervals(period, startDate, endDate);
-  const trend: { date: string; count: number }[] = [];
-  
-  for (let i = 0; i < intervals.length - 1; i++) {
-    const intervalStart = intervals[i];
-    const intervalEnd = intervals[i + 1];
+  try {
+    const intervals = getIntervals(period, startDate, endDate);
+    const trend: { date: string; count: number }[] = [];
     
-    const snapshot = await adminDb.collection('harmonized_users')
-      .where('createdAt', '>=', Timestamp.fromDate(intervalStart))
-      .where('createdAt', '<', Timestamp.fromDate(intervalEnd))
-      .count().get();
+    for (let i = 0; i < intervals.length - 1; i++) {
+      const intervalStart = intervals[i];
+      const intervalEnd = intervals[i + 1];
+      
+      try {
+        const snapshot = await adminDb.collection('harmonized_users')
+          .where('createdAt', '>=', Timestamp.fromDate(intervalStart))
+          .where('createdAt', '<', Timestamp.fromDate(intervalEnd))
+          .count().get();
+        
+        trend.push({
+          date: formatTrendDate(intervalStart, period),
+          count: snapshot.data().count
+        });
+      } catch (error) {
+        console.log(`Error getting user trend for interval ${formatTrendDate(intervalStart, period)}:`, error);
+        // Still add the interval with 0 count
+        trend.push({
+          date: formatTrendDate(intervalStart, period),
+          count: 0
+        });
+      }
+    }
     
-    trend.push({
-      date: formatTrendDate(intervalStart, period),
-      count: snapshot.data().count
-    });
+    return trend;
+  } catch (error) {
+    console.error('Error in getUserTrend:', error);
+    return [];
   }
-  
-  return trend;
 }
 
 /**
