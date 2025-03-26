@@ -77,6 +77,9 @@ app.use((req, res, next) => {
     // Register admin activity routes
     registerAdminActivityRoutes(app);
     
+    // Register admin payout management routes
+    registerAdminPayoutRoutes(app);
+    
     // Test Firebase Storage in production
     if (!USE_FIREBASE_EMULATORS) {
       log("Testing Firebase Storage in production...");

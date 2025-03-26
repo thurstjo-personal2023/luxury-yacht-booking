@@ -5,7 +5,7 @@
  * These routes allow administrators to manage payouts to Producers and Partners.
  */
 import { Request, Response, Express, NextFunction } from 'express';
-import { verifyAuth, verifyAdminRole } from './firebase-admin';
+import { verifyAuth } from './firebase-admin';
 import { PayoutService } from './services/payout-service';
 import { 
   PayoutStatus, 
@@ -15,6 +15,8 @@ import {
   PayoutDispute
 } from '../shared/payment-schema';
 import { log } from './vite';
+import { verifyAdminRole } from './admin-user-routes';
+import { AdminRoleType } from '../core/domain/admin/admin-role';
 
 // Initialize payout service
 const payoutService = new PayoutService();
@@ -32,7 +34,7 @@ export function registerAdminPayoutRoutes(app: Express) {
   app.get('/api/admin/payout-settings', 
     verifyAuth, 
     verifyAdminRole(['ADMIN', 'SUPER_ADMIN']), 
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const settings = await payoutService.getPayoutSettings();
         
@@ -67,7 +69,7 @@ export function registerAdminPayoutRoutes(app: Express) {
   app.post('/api/admin/payout-settings',
     verifyAuth,
     verifyAdminRole(['SUPER_ADMIN']),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const settings: Partial<PayoutSettings> = req.body;
         const adminId = req.user?.uid;
@@ -101,7 +103,7 @@ export function registerAdminPayoutRoutes(app: Express) {
   app.get('/api/admin/payout-accounts',
     verifyAuth,
     verifyAdminRole(['ADMIN', 'SUPER_ADMIN']),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         // Extract query parameters
         const { userId, userType, isActive, isVerified } = req.query;
@@ -149,7 +151,7 @@ export function registerAdminPayoutRoutes(app: Express) {
   app.get('/api/admin/payout-accounts/:id',
     verifyAuth,
     verifyAdminRole(['ADMIN', 'SUPER_ADMIN']),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const accountId = req.params.id;
         
@@ -177,7 +179,7 @@ export function registerAdminPayoutRoutes(app: Express) {
   app.post('/api/admin/payout-accounts/:id/verify',
     verifyAuth,
     verifyAdminRole(['ADMIN', 'SUPER_ADMIN']),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const accountId = req.params.id;
         const { verified } = req.body;
@@ -224,7 +226,7 @@ export function registerAdminPayoutRoutes(app: Express) {
   app.get('/api/admin/payout-transactions',
     verifyAuth,
     verifyAdminRole(['ADMIN', 'SUPER_ADMIN']),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         // Extract query parameters
         const { 
@@ -275,7 +277,7 @@ export function registerAdminPayoutRoutes(app: Express) {
   app.get('/api/admin/payout-transactions/:id',
     verifyAuth,
     verifyAdminRole(['ADMIN', 'SUPER_ADMIN']),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const payoutId = req.params.id;
         
@@ -303,7 +305,7 @@ export function registerAdminPayoutRoutes(app: Express) {
   app.post('/api/admin/payout-transactions',
     verifyAuth,
     verifyAdminRole(['ADMIN', 'SUPER_ADMIN']),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const payoutData: Partial<PayoutTransaction> = req.body;
         const adminId = req.user?.uid;
@@ -338,7 +340,7 @@ export function registerAdminPayoutRoutes(app: Express) {
   app.post('/api/admin/payout-transactions/:id/status',
     verifyAuth,
     verifyAdminRole(['ADMIN', 'SUPER_ADMIN']),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const payoutId = req.params.id;
         const { status, notes } = req.body;
@@ -374,7 +376,7 @@ export function registerAdminPayoutRoutes(app: Express) {
   app.post('/api/admin/calculate-earnings',
     verifyAuth,
     verifyAdminRole(['ADMIN', 'SUPER_ADMIN']),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { userId, userType } = req.body;
         const adminId = req.user?.uid;
@@ -409,7 +411,7 @@ export function registerAdminPayoutRoutes(app: Express) {
   app.get('/api/admin/earnings/:userId',
     verifyAuth,
     verifyAdminRole(['ADMIN', 'SUPER_ADMIN']),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const userId = req.params.userId;
         
@@ -437,7 +439,7 @@ export function registerAdminPayoutRoutes(app: Express) {
   app.get('/api/admin/payout-disputes',
     verifyAuth,
     verifyAdminRole(['ADMIN', 'SUPER_ADMIN']),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         // Extract query parameters
         const { userId, status, limit = '50' } = req.query;
@@ -474,7 +476,7 @@ export function registerAdminPayoutRoutes(app: Express) {
   app.post('/api/admin/payout-disputes/:id/resolve',
     verifyAuth,
     verifyAdminRole(['ADMIN', 'SUPER_ADMIN']),
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const disputeId = req.params.id;
         const { resolution, status } = req.body;
