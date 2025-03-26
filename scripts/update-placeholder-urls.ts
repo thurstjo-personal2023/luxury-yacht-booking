@@ -1,8 +1,8 @@
 /**
  * Update Placeholder URLs Script
  * 
- * This script updates invalid placeholder URLs in Firestore to use proper Firebase Storage URLs.
- * It fixes old relative and broken placeholder URLs to ensure consistent media validation.
+ * This script updates placeholder URLs in Firestore to use proper development environment URLs.
+ * It fixes relative, production, and broken placeholder URLs to ensure consistent media validation.
  */
 
 import { adminDb } from '../server/firebase-admin';

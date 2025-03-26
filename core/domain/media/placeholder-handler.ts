@@ -8,15 +8,20 @@
 import { MediaType } from './media-type';
 
 /**
+ * Development URL base (Replit environment)
+ */
+const DEV_URL_BASE = 'https://491f404d-c45b-465e-abd0-1bf1a522988f-00-1vx2q8nj9olr6.janeway.replit.dev';
+
+/**
  * Map of placeholder images by type
- * Using both relative and absolute URLs for better compatibility
+ * Using development URLs while in Replit environment
  */
 export const PLACEHOLDER_IMAGES = {
-  yacht: 'https://firebasestorage.googleapis.com/v0/b/etoile-yachts.appspot.com/o/placeholders%2Fyacht-placeholder.jpg?alt=media',
-  service: 'https://firebasestorage.googleapis.com/v0/b/etoile-yachts.appspot.com/o/placeholders%2Fservice-placeholder.jpg?alt=media',
-  product: 'https://firebasestorage.googleapis.com/v0/b/etoile-yachts.appspot.com/o/placeholders%2Fproduct-placeholder.jpg?alt=media',
-  user: 'https://firebasestorage.googleapis.com/v0/b/etoile-yachts.appspot.com/o/placeholders%2Fuser-placeholder.jpg?alt=media',
-  default: 'https://firebasestorage.googleapis.com/v0/b/etoile-yachts.appspot.com/o/placeholders%2Fyacht-placeholder.jpg?alt=media'
+  yacht: `${DEV_URL_BASE}/images/yacht-placeholder.jpg`,
+  service: `${DEV_URL_BASE}/images/service-placeholder.jpg`,
+  product: `${DEV_URL_BASE}/images/product-placeholder.jpg`,
+  user: `${DEV_URL_BASE}/images/user-placeholder.jpg`,
+  default: `${DEV_URL_BASE}/images/yacht-placeholder.jpg`
 };
 
 /**
@@ -41,10 +46,34 @@ export function isPlaceholderUrl(url: string): boolean {
   // Convert to lowercase for case-insensitive comparison
   const lowerUrl = url.toLowerCase();
   
-  // Check if URL contains any placeholder keywords
+  // Check if URL is on etoile-yachts.replit.app domain with placeholder path
+  if (lowerUrl.includes('etoile-yachts.replit.app/images/') && 
+      lowerUrl.includes('placeholder')) {
+    return true;
+  }
+  
+  // Check if URL is on etoileyachts.com domain with placeholder path
+  if (lowerUrl.includes('etoileyachts.com/images/') && 
+      lowerUrl.includes('placeholder')) {
+    return true;
+  }
+  
+  // Check for relative placeholder paths
+  if ((lowerUrl.startsWith('/images/') || lowerUrl.startsWith('images/')) && 
+      lowerUrl.includes('placeholder')) {
+    return true;
+  }
+  
+  // Check for Firebase Storage placeholder URLs
+  if (lowerUrl.includes('firebasestorage.googleapis.com') && 
+      lowerUrl.includes('placeholders')) {
+    return true;
+  }
+  
+  // Check if URL matches any of our known placeholder patterns
   return Object.values(PLACEHOLDER_IMAGES).some(placeholder => {
-    const filename = placeholder.split('/').pop()?.toLowerCase() || '';
-    return lowerUrl.includes(filename);
+    return lowerUrl === placeholder.toLowerCase();
+  // Simple 'placeholder' keyword check as a fallback
   }) || lowerUrl.includes('placeholder');
 }
 
@@ -71,9 +100,44 @@ export function formatPlaceholderUrl(url: string): string {
   // Extract the filename from the URL
   const filename = url.split('/').pop() || '';
   
-  // Ensure URL has proper path
+  // Known production URLs that need conversion to development URLs
+  if (url.includes('etoile-yachts.replit.app') || 
+      url.includes('etoileyachts.com') ||
+      url.includes('firebasestorage.googleapis.com')) {
+    
+    // Handle different placeholder types based on filename
+    if (filename.includes('yacht')) {
+      return PLACEHOLDER_IMAGES.yacht;
+    } else if (filename.includes('service')) {
+      return PLACEHOLDER_IMAGES.service;
+    } else if (filename.includes('product')) {
+      return PLACEHOLDER_IMAGES.product;
+    } else if (filename.includes('user')) {
+      return PLACEHOLDER_IMAGES.user;
+    } else {
+      return PLACEHOLDER_IMAGES.default;
+    }
+  }
+  
+  // Local/relative URL paths that need the full development URL
+  if (url.startsWith('/images/') || url.startsWith('images/')) {
+    // Handle different placeholder types based on filename
+    if (filename.includes('yacht')) {
+      return PLACEHOLDER_IMAGES.yacht;
+    } else if (filename.includes('service')) {
+      return PLACEHOLDER_IMAGES.service;
+    } else if (filename.includes('product')) {
+      return PLACEHOLDER_IMAGES.product;
+    } else if (filename.includes('user')) {
+      return PLACEHOLDER_IMAGES.user;
+    } else {
+      return PLACEHOLDER_IMAGES.default;
+    }
+  }
+  
+  // Catch-all for any other placeholder URLs
   if (filename.includes('placeholder')) {
-    // Handle different placeholder types
+    // Handle different placeholder types based on filename
     if (filename.includes('yacht')) {
       return PLACEHOLDER_IMAGES.yacht;
     } else if (filename.includes('service')) {
