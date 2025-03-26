@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { verifyAuth } from './middleware/auth';
 import { verifyFinanceAdmin } from './middleware/admin';
 import { PayoutService } from './services/payout-service';
+import { PayoutMethod, PayoutSchedule } from '../shared/payment-schema';
 
 // Create a new router
 const router = Router();
@@ -37,7 +38,7 @@ router.put('/settings', verifyAuth, verifyFinanceAdmin, async (req: Request, res
       payoutSchedule: z.enum(['daily', 'weekly', 'biweekly', 'monthly']),
       platformFeePercentage: z.number().min(0).max(100),
       withdrawalFee: z.number().min(0),
-      payoutMethods: z.array(z.string()),
+      payoutMethods: z.array(z.enum(['paypal', 'stripe', 'bank_account', 'crypto_wallet'])),
       maxRetryAttempts: z.number().int().positive(),
       supportContact: z.string().email(),
       allowEarlyPayout: z.boolean(),
@@ -71,7 +72,7 @@ router.get('/accounts', verifyAuth, verifyFinanceAdmin, async (req: Request, res
 router.get('/accounts/:accountId', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
   try {
     const { accountId } = req.params;
-    const account = await payoutService.getPayoutAccountById(accountId);
+    const account = await payoutService.getPayoutAccount(accountId);
     
     if (!account) {
       return res.status(404).json({ error: 'Payout account not found' });
@@ -143,7 +144,7 @@ router.get('/transactions', verifyAuth, verifyFinanceAdmin, async (req: Request,
 router.get('/transactions/:transactionId', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
   try {
     const { transactionId } = req.params;
-    const transaction = await payoutService.getTransactionById(transactionId);
+    const transaction = await payoutService.getTransaction(transactionId);
     
     if (!transaction) {
       return res.status(404).json({ error: 'Transaction not found' });
@@ -188,7 +189,7 @@ router.patch('/transactions/:transactionId/status', verifyAuth, verifyFinanceAdm
   try {
     const { transactionId } = req.params;
     const statusSchema = z.object({
-      status: z.enum(['pending', 'processing', 'completed', 'failed', 'cancelled']),
+      status: z.enum(['pending', 'approved', 'processing', 'completed', 'rejected', 'on_hold']),
       notes: z.string().optional(),
       metadata: z.record(z.string()).optional()
     });
@@ -233,7 +234,7 @@ router.patch('/disputes/:disputeId/status', verifyAuth, verifyFinanceAdmin, asyn
   try {
     const { disputeId } = req.params;
     const statusSchema = z.object({
-      status: z.enum(['open', 'under_review', 'resolved', 'rejected']),
+      status: z.enum(['open', 'under_review', 'resolved', 'canceled']),
       resolution: z.string().optional(),
       adminNotes: z.string().optional()
     });
@@ -265,7 +266,7 @@ router.get('/earnings', verifyAuth, verifyFinanceAdmin, async (req: Request, res
       return res.status(400).json({ error: 'User ID is required' });
     }
     
-    const summaries = await payoutService.getEarningsSummaries(
+    const summaries = await payoutService.getEarningsSummary(
       userId as string,
       period as string
     );
