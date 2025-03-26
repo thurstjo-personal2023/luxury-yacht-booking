@@ -21,11 +21,23 @@ import { Timestamp, FieldValue } from 'firebase-admin/firestore';
  * Use this when returning data to clients or storing to Firestore
  * 
  * @param adminTimestamp Firebase Admin Timestamp
- * @returns Client-compatible Timestamp (as type assertion)
+ * @returns Client-compatible Timestamp with serialization support
  */
 function toClientTimestamp(adminTimestamp: FirebaseFirestore.Timestamp): Timestamp {
-  // At runtime, the Timestamps are compatible, but TypeScript needs this assertion
-  return adminTimestamp as unknown as Timestamp;
+  // Create a compatible object that includes toJSON method required by client Timestamp
+  const timestamp = adminTimestamp as any;
+  
+  // Add toJSON method if it doesn't exist (required by client Timestamp)
+  if (!timestamp.toJSON) {
+    timestamp.toJSON = function() {
+      return {
+        seconds: this.seconds,
+        nanoseconds: this.nanoseconds
+      };
+    };
+  }
+  
+  return timestamp as Timestamp;
 }
 
 /**

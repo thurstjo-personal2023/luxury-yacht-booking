@@ -205,8 +205,8 @@ export function registerAdminPayoutRoutes(app: Express) {
         // Update verification status
         await payoutService['payoutAccountsCollection'].doc(accountId).update({
           isVerified: verified,
-          verificationDate: verified ? new Date() : null,
-          updatedAt: new Date()
+          verificationDate: verified ? Timestamp.now() : null,
+          updatedAt: Timestamp.now()
         });
         
         log(`Payout account ${accountId} verification status updated to ${verified} by admin ${adminId}`);
@@ -251,11 +251,15 @@ export function registerAdminPayoutRoutes(app: Express) {
         }
         
         if (fromDate) {
-          filters.fromDate = new Date(fromDate as string);
+          // Convert string date to JavaScript Date and then to Firestore Timestamp
+          const date = new Date(fromDate as string);
+          filters.fromDate = date; // The service will handle the conversion
         }
         
         if (toDate) {
-          filters.toDate = new Date(toDate as string);
+          // Convert string date to JavaScript Date and then to Firestore Timestamp
+          const date = new Date(toDate as string);
+          filters.toDate = date; // The service will handle the conversion
         }
         
         // Fetch transactions
