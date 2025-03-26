@@ -10,9 +10,24 @@ import { useMediaValidation } from '@/hooks/use-media-validation';
 const MediaValidationActivity = () => {
   const { reports, latestReport, isValidating, isRepairing } = useMediaValidation();
   
+  // Helper function to get the number of collections in a report
+  const getCollectionCount = (report: any): number => {
+    if (report.collectionSummaries && Array.isArray(report.collectionSummaries)) {
+      return report.collectionSummaries.length;
+    } else if (report.stats && report.stats.byCollection) {
+      return Object.keys(report.stats.byCollection).length;
+    }
+    return 0;
+  };
+  
   // Format date for display
   const formatDate = (date: Date | undefined) => {
     if (!date) return 'N/A';
+    
+    // Validate that the date is valid
+    const timestamp = date.getTime();
+    if (isNaN(timestamp)) return 'Invalid date';
+    
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
@@ -25,8 +40,12 @@ const MediaValidationActivity = () => {
   const getTimeAgo = (date: Date | undefined) => {
     if (!date) return 'Never';
     
+    // Validate that the date is valid
+    const timestamp = date.getTime();
+    if (isNaN(timestamp)) return 'Invalid date';
+    
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
+    const diffMs = now.getTime() - timestamp;
     const diffMins = Math.floor(diffMs / 60000);
     
     if (diffMins < 1) return 'Just now';
@@ -47,7 +66,19 @@ const MediaValidationActivity = () => {
   // Get sorted reports
   const sortedReports = React.useMemo(() => {
     if (!reports.length) return [];
-    return [...reports].sort((a, b) => b.endTime.getTime() - a.endTime.getTime());
+    
+    // Sort reports by end time, handling invalid dates
+    return [...reports].sort((a, b) => {
+      // Check if dates are valid
+      const aTime = a.endTime instanceof Date && !isNaN(a.endTime.getTime()) 
+        ? a.endTime.getTime() 
+        : 0;
+      const bTime = b.endTime instanceof Date && !isNaN(b.endTime.getTime()) 
+        ? b.endTime.getTime() 
+        : 0;
+      
+      return bTime - aTime; // Newest first
+    });
   }, [reports]);
 
   // No reports case
@@ -88,8 +119,8 @@ const MediaValidationActivity = () => {
             <div className="font-medium">Media Validation</div>
             <div className="text-sm text-muted-foreground">
               {invalidCount > 0 
-                ? `Found ${invalidCount} issues across ${report.collectionSummaries.length} collections`
-                : `Validated ${report.totalFields} URLs with no issues found`
+                ? `Found ${invalidCount} issues across ${getCollectionCount(report)} collections`
+                : `Validated ${report.totalFields || 0} URLs with no issues found`
               }
             </div>
             <div className="text-xs text-muted-foreground">{getTimeAgo(report.endTime)}</div>

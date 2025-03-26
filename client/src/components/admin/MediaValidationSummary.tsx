@@ -68,17 +68,31 @@ const MediaValidationSummary = () => {
       };
     }
 
-    const total = latestReport.validUrls + latestReport.invalidUrls + latestReport.missingUrls;
-    const validPercent = total > 0 ? Math.round((latestReport.validUrls / total) * 100) : 0;
-    const invalidPercent = total > 0 ? Math.round(((latestReport.invalidUrls + latestReport.missingUrls) / total) * 100) : 0;
+    // Handle different report formats - check for the collectionSummaries property 
+    // or fall back to stats.byCollection if using the new format
+    let collectionsCount = 0;
+    if (latestReport.collectionSummaries) {
+      collectionsCount = latestReport.collectionSummaries.length;
+    } else if (latestReport.stats && latestReport.stats.byCollection) {
+      collectionsCount = Object.keys(latestReport.stats.byCollection).length;
+    }
+
+    // Check for stats-based structure vs. direct properties
+    const validUrls = latestReport.validUrls || (latestReport.stats && latestReport.stats.validUrls) || 0;
+    const invalidUrls = latestReport.invalidUrls || (latestReport.stats && latestReport.stats.invalidUrls) || 0;
+    const missingUrls = latestReport.missingUrls || (latestReport.stats && latestReport.stats.missingUrls) || 0;
+
+    const total = validUrls + invalidUrls + missingUrls;
+    const validPercent = total > 0 ? Math.round((validUrls / total) * 100) : 0;
+    const invalidPercent = total > 0 ? Math.round(((invalidUrls + missingUrls) / total) * 100) : 0;
     
     return {
       validPercent,
       invalidPercent,
       total,
-      valid: latestReport.validUrls,
-      invalid: latestReport.invalidUrls + latestReport.missingUrls,
-      collections: latestReport.collectionSummaries.length,
+      valid: validUrls,
+      invalid: invalidUrls + missingUrls,
+      collections: collectionsCount,
       lastRun: latestReport.endTime
     };
   }, [latestReport]);
