@@ -17,6 +17,7 @@ import {
 import { log } from './vite';
 import { verifyAdminRole } from './admin-user-routes';
 import { AdminRoleType } from '../core/domain/admin/admin-role';
+import { Timestamp } from 'firebase-admin/firestore';
 
 // Initialize payout service
 const payoutService = new PayoutService();
