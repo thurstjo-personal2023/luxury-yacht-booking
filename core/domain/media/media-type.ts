@@ -69,7 +69,10 @@ export const VideoUrlPatterns = [
   '-SBV-',                // Stock video pattern from providers
   'Dynamic motion',       // Common description in video filenames
   'dynamic-motion',
-  'video-preview'
+  'video-preview',
+  'preview.mp4',          // Common video preview naming pattern
+  'preview-video',
+  'yacht-video'
 ];
 
 /**
@@ -97,7 +100,7 @@ export function getMediaTypeFromUrl(url: string): MediaType {
 
   // Check for video patterns in URL
   const hasVideoExtension = VideoFileExtensions.some(ext => 
-    urlLower.endsWith(ext) || urlLower.includes(`${ext}?`)
+    urlLower.endsWith(ext) || urlLower.includes(`${ext}?`) || urlLower.includes(`${ext}&`) || urlLower.includes(`${ext}/`)
   );
   
   if (hasVideoExtension) return MediaType.VIDEO;
@@ -107,6 +110,16 @@ export function getMediaTypeFromUrl(url: string): MediaType {
   );
   
   if (hasVideoPattern) return MediaType.VIDEO;
+  
+  // Check for video-specific path patterns
+  if (
+    urlLower.includes('/videos/') || 
+    urlLower.includes('/video/') || 
+    urlLower.includes('_video/') ||
+    urlLower.includes('_videos/')
+  ) {
+    return MediaType.VIDEO;
+  }
   
   // Default to image if no specific patterns are found
   // (most media in this application are images)
