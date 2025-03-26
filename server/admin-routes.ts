@@ -10,6 +10,7 @@ import validateImageUrls from '../scripts/validate-images';
 import { PubSub } from '@google-cloud/pubsub';
 import { getPlatformBookingStats, getPlatformTransactionStats, getPlatformUserStats } from './services/admin-stats-service';
 import { SystemAlertsService } from './services/system-alerts-service';
+import { ReportsService } from './services/reports-service';
 import { AlertStatus, AlertCategory, AlertSeverity, CreateSystemAlertParams } from '../shared/schema';
 // Import will be loaded dynamically to avoid initialization issues
 // import { validateMediaUrls, saveMediaValidationResults } from '../scripts/validate-media';
@@ -56,6 +57,8 @@ export const verifyAdminAuth = async (req: Request, res: Response, next: NextFun
  * Register admin-related routes
  */
 export function registerAdminRoutes(app: Express) {
+  // Create service instances
+  const reportsService = new ReportsService();
   /**
    * Run image validation across all collections
    * This endpoint validates all image URLs in the system
@@ -1165,6 +1168,90 @@ export function registerAdminRoutes(app: Express) {
     } catch (error) {
       console.error(`Error dismissing alert ${req.params.alertId}:`, error);
       res.status(500).json({ error: 'Failed to dismiss alert' });
+    }
+  });
+
+  // Reports endpoints
+
+  /**
+   * Generate a new report
+   */
+  app.post('/api/admin/reports', verifyAdminRole, async (req: Request, res: Response) => {
+    try {
+      const params = req.body;
+      const userId = req.user?.uid || 'unknown';
+      
+      if (!params.title || !params.type || !params.format) {
+        return res.status(400).json({ error: 'Missing required parameters' });
+      }
+      
+      console.log(`Generating ${params.type} report in ${params.format} format`);
+      
+      const result = await reportsService.generateReport(params, userId);
+      
+      res.json({
+        success: true,
+        reportId: result.id,
+        url: result.url
+      });
+    } catch (error) {
+      console.error('Error generating report:', error);
+      res.status(500).json({ 
+        error: 'Failed to generate report',
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+  
+  /**
+   * Get a list of reports
+   */
+  app.get('/api/admin/reports', verifyAdminRole, async (req: Request, res: Response) => {
+    try {
+      const { limit = '20', type } = req.query;
+      const limitNum = parseInt(limit as string, 10) || 20;
+      
+      const reports = await reportsService.listReports(limitNum, type as string);
+      
+      res.json({ reports });
+    } catch (error) {
+      console.error('Error listing reports:', error);
+      res.status(500).json({ error: 'Failed to list reports' });
+    }
+  });
+  
+  /**
+   * Get a report by ID
+   */
+  app.get('/api/admin/reports/:reportId', verifyAdminRole, async (req: Request, res: Response) => {
+    try {
+      const { reportId } = req.params;
+      const { format } = req.query;
+      
+      // If format is specified, return report in that format
+      if (format) {
+        const report = await reportsService.getReportInFormat(reportId, format as string);
+        
+        // Set content type
+        res.setHeader('Content-Type', report.contentType);
+        
+        // Set filename for download
+        res.setHeader('Content-Disposition', `attachment; filename="report-${reportId}.${format}"`);
+        
+        // Send report data
+        return res.send(report.data);
+      }
+      
+      // Otherwise return JSON
+      const report = await reportsService.getReport(reportId);
+      
+      res.json(report);
+    } catch (error) {
+      console.error('Error getting report:', error);
+      res.status(500).json({ 
+        error: 'Failed to get report',
+        details: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 }
