@@ -81,7 +81,7 @@ const formatCurrency = (amount: number, currency = 'USD') => {
 };
 
 // Status badge colors
-const statusColors = {
+const statusColors: Record<string, string> = {
   pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
   approved: 'bg-blue-50 text-blue-700 border-blue-200',
   processing: 'bg-purple-50 text-purple-700 border-purple-200',
@@ -91,7 +91,7 @@ const statusColors = {
 };
 
 // Status label mapping
-const statusLabels = {
+const statusLabels: Record<string, string> = {
   pending: 'Pending',
   approved: 'Approved',
   processing: 'Processing',
@@ -361,7 +361,7 @@ const TransactionDetailsDialog: React.FC<TransactionDetailsDialogProps> = ({
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {transaction.bookingIds.map((bookingId, index) => (
+                  {transaction.bookingIds.map((bookingId: string, index: number) => (
                     <Button 
                       key={index} 
                       variant="outline" 

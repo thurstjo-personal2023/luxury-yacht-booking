@@ -223,13 +223,13 @@ export function usePayoutDisputes() {
       // Invalidate all disputes
       queryClient.invalidateQueries({ queryKey: [API_BASE, 'disputes'] });
       
-      const resolutionMessages = {
+      const resolutionMessages: Record<string, string> = {
         'resolved': 'Dispute has been resolved',
         'rejected': 'Dispute claim has been rejected'
       };
       
       toast({
-        title: resolutionMessages[variables.resolution as 'resolved' | 'rejected'] || 'Dispute updated',
+        title: resolutionMessages[variables.resolution as string] || 'Dispute updated',
         description: 'The dispute has been successfully processed.',
       });
     },
