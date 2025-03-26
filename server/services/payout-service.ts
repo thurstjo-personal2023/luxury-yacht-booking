@@ -483,11 +483,11 @@ export class PayoutService {
       }
       
       if (filters.fromDate) {
-        query = query.where('createdAt', '>=', clientFromDate(filters.fromDate));
+        query = query.where('createdAt', '>=', dateToClientTimestamp(filters.fromDate));
       }
       
       if (filters.toDate) {
-        query = query.where('createdAt', '<=', clientFromDate(filters.toDate));
+        query = query.where('createdAt', '<=', dateToClientTimestamp(filters.toDate));
       }
       
       // Apply sorting
