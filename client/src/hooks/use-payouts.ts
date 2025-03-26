@@ -42,10 +42,11 @@ export function usePayoutTransactions() {
   // Mutation for creating a new transaction
   const { mutate: createTransaction, isPending: isCreating } = useMutation({
     mutationFn: async (transactionData: Partial<PayoutTransaction>) => {
-      const response = await apiRequest(`${API_BASE}/transactions`, {
-        method: 'POST',
-        data: transactionData,
-      });
+      const response = await apiRequest(
+        'POST',
+        `${API_BASE}/transactions`, 
+        transactionData
+      );
       return response;
     },
     onSuccess: () => {
@@ -76,10 +77,11 @@ export function usePayoutTransactions() {
       status: PayoutStatus; 
       notes?: string;
     }) => {
-      const response = await apiRequest(`${API_BASE}/transactions/${transactionId}/status`, {
-        method: 'PATCH',
-        data: { status, notes },
-      });
+      const response = await apiRequest(
+        'PATCH',
+        `${API_BASE}/transactions/${transactionId}/status`,
+        { status, notes }
+      );
       return response;
     },
     onSuccess: (_, variables) => {
@@ -151,10 +153,11 @@ export function usePayoutAccounts() {
       accountId: string; 
       verificationData: { isVerified: boolean; notes?: string }
     }) => {
-      const response = await apiRequest(`${API_BASE}/accounts/${accountId}/verify`, {
-        method: 'PATCH',
-        data: verificationData,
-      });
+      const response = await apiRequest(
+        'PATCH',
+        `${API_BASE}/accounts/${accountId}/verify`,
+        verificationData
+      );
       return response;
     },
     onSuccess: (_, variables) => {
@@ -213,10 +216,11 @@ export function usePayoutDisputes() {
       resolution: string;
       notes?: string;
     }) => {
-      const response = await apiRequest(`${API_BASE}/disputes/${disputeId}/resolve`, {
-        method: 'PATCH',
-        data: { resolution, notes },
-      });
+      const response = await apiRequest(
+        'PATCH',
+        `${API_BASE}/disputes/${disputeId}/resolve`,
+        { resolution, notes }
+      );
       return response;
     },
     onSuccess: (_, variables) => {
@@ -266,10 +270,11 @@ export function usePayoutSettings() {
   // Mutation for updating settings
   const { mutate: updateSettings, isPending: isUpdating } = useMutation({
     mutationFn: async (settingsData: Partial<PayoutSettings>) => {
-      const response = await apiRequest(`${API_BASE}/settings`, {
-        method: 'PATCH',
-        data: settingsData,
-      });
+      const response = await apiRequest(
+        'PATCH',
+        `${API_BASE}/settings`,
+        settingsData
+      );
       return response;
     },
     onSuccess: () => {
