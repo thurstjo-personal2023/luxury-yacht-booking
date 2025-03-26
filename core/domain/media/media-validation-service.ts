@@ -6,7 +6,7 @@
  */
 
 import { MediaType, getMediaTypeFromUrl, getMediaTypeFromMime, isMediaTypeMatch } from './media-type';
-import { isPlaceholderUrl, getPlaceholderMediaType } from './placeholder-handler';
+import { isPlaceholderUrl, getPlaceholderMediaType, formatPlaceholderUrl } from './placeholder-handler';
 
 /**
  * Media validation result interface
@@ -51,11 +51,22 @@ export async function validateMediaUrl(
     return result;
   }
   
-  // Handle placeholder URLs
+  // Handle placeholder URLs - also fix any production URLs to use development URLs
   if (isPlaceholderUrl(url)) {
+    // Format the URL to ensure it's using the correct development URL
+    const formattedUrl = formatPlaceholderUrl(url);
+    
+    // If the URL was changed, log it and update the result URL
+    if (formattedUrl !== url) {
+      console.log(`Fixing placeholder URL: ${url} → ${formattedUrl}`);
+      result.url = formattedUrl;
+    }
+    
     result.isValid = true;
-    result.actualType = getPlaceholderMediaType(url);
+    result.actualType = getPlaceholderMediaType(formattedUrl);
     result.contentType = result.actualType === MediaType.VIDEO ? 'video/mp4' : 'image/jpeg';
+    result.status = 200;
+    result.statusText = 'OK';
     return result;
   }
   
@@ -88,8 +99,10 @@ export async function validateMediaUrl(
     // Process relative URLs
     let resolvedUrl = url;
     if (url.startsWith('/') && !url.startsWith('//')) {
-      const BASE_URL = process.env.BASE_URL || 'https://etoile-yachts.replit.app';
+      // Use the Replit URL for development
+      const BASE_URL = 'https://491f404d-c45b-465e-abd0-1bf1a522988f-00-1vx2q8nj9olr6.janeway.replit.dev';
       resolvedUrl = `${BASE_URL}${url}`;
+      console.log(`Resolving relative URL: ${url} → ${resolvedUrl}`);
     }
     
     // Make the request

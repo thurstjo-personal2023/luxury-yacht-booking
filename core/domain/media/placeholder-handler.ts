@@ -58,6 +58,12 @@ export function isPlaceholderUrl(url: string): boolean {
     return true;
   }
   
+  // Check if URL is on our Replit development URL with placeholder path
+  if (lowerUrl.includes('janeway.replit.dev/images/') && 
+      lowerUrl.includes('placeholder')) {
+    return true;
+  }
+  
   // Check for relative placeholder paths
   if ((lowerUrl.startsWith('/images/') || lowerUrl.startsWith('images/')) && 
       lowerUrl.includes('placeholder')) {
@@ -103,7 +109,9 @@ export function formatPlaceholderUrl(url: string): string {
   // Known production URLs that need conversion to development URLs
   if (url.includes('etoile-yachts.replit.app') || 
       url.includes('etoileyachts.com') ||
-      url.includes('firebasestorage.googleapis.com')) {
+      url.includes('firebasestorage.googleapis.com') ||
+      // Check if it's already a Replit URL but with the wrong format
+      (url.includes('janeway.replit.dev') && !url.includes(DEV_URL_BASE))) {
     
     // Handle different placeholder types based on filename
     if (filename.includes('yacht')) {
