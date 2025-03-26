@@ -11,6 +11,41 @@
  */
 import { adminDb } from '../firebase-admin';
 import { Timestamp, FieldValue } from 'firebase-admin/firestore';
+
+// For type compatibility between admin-side and client-side Timestamps
+// We create utility functions that handle the conversion appropriately
+// This solves the type mismatch between firebase-admin/firestore and firebase/firestore Timestamps
+
+/**
+ * Converts a server-side admin Timestamp to a client-compatible Timestamp
+ * Use this when returning data to clients or storing to Firestore
+ * 
+ * @param adminTimestamp Firebase Admin Timestamp
+ * @returns Client-compatible Timestamp (as type assertion)
+ */
+function toClientTimestamp(adminTimestamp: FirebaseFirestore.Timestamp): Timestamp {
+  // At runtime, the Timestamps are compatible, but TypeScript needs this assertion
+  return adminTimestamp as unknown as Timestamp;
+}
+
+/**
+ * Creates a new admin Timestamp that's compatible with client schema
+ * 
+ * @returns Client-compatible now Timestamp
+ */
+function clientNow(): Timestamp {
+  return toClientTimestamp(Timestamp.now());
+}
+
+/**
+ * Converts a Date to a client-compatible Timestamp
+ * 
+ * @param date JavaScript Date object
+ * @returns Client-compatible Timestamp
+ */
+function dateToClientTimestamp(date: Date): Timestamp {
+  return toClientTimestamp(Timestamp.fromDate(date));
+}
 import { 
   PayoutAccount,
   PayoutTransaction,
@@ -139,8 +174,8 @@ export class PayoutService {
           currency: account.currency || 'USD',
           isActive: true,
           isVerified: false,
-          createdAt: Timestamp.fromDate(now.toDate()),
-          updatedAt: Timestamp.fromDate(now.toDate()),
+          createdAt: now,
+          updatedAt: now,
           preferredFrequency: account.preferredFrequency || 'monthly',
           ...account
         };
@@ -183,7 +218,7 @@ export class PayoutService {
       availableBalance: 0,
       onHoldBalance: 0,
       currency: 'USD',
-      lastUpdatedAt: Timestamp.fromDate(now.toDate())
+      lastUpdatedAt: now
     };
     
     await this.earningsSummariesCollection.doc(summaryId).set(summary);
@@ -465,7 +500,7 @@ export class PayoutService {
       
       const snapshot = await query.get();
       
-      return snapshot.docs.map(doc => doc.data() as PayoutTransaction);
+      return snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as PayoutTransaction);
     } catch (error) {
       console.error('Error getting payout transactions:', error);
       throw new Error('Failed to retrieve payout transactions');
@@ -572,7 +607,7 @@ export class PayoutService {
       
       const snapshot = await query.get();
       
-      return snapshot.docs.map(doc => doc.data() as PayoutDispute);
+      return snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => doc.data() as PayoutDispute);
     } catch (error) {
       console.error('Error getting payout disputes:', error);
       throw new Error('Failed to retrieve payout disputes');
