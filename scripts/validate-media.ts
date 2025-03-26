@@ -240,7 +240,10 @@ async function testMediaUrl(
     'service-placeholder.jpg',
     'product-placeholder.jpg', 
     'user-placeholder.jpg',
-    'placeholder'
+    'placeholder',
+    'etoile-yachts.replit.app', // Production URLs
+    'etoileyachts.com',
+    'janeway.replit.dev'  // Development URL
   ];
   
   if (placeholderPatterns.some(pattern => url.includes(pattern))) {
@@ -296,7 +299,11 @@ async function testMediaUrl(
   const videoPatterns = [
     '.mp4', '.mov', '.webm', '.avi', '.m4v', '.mkv', '.mpg', '.mpeg', '.3gp',
     'video', 'Dynamic motion', '-SBV-', 'video-preview', 'preview.mp4', 
-    'preview-video', 'yacht-video', '/video/', '/videos/'
+    'preview-video', 'yacht-video', '/video/', '/videos/',
+    'tourist-luxury-yacht-during-vacation-holidays',
+    'night-town-tivat-in-porto-montenegro-hotel-and-sailing-boats-in-the-boka-bay',
+    'SBV-309363270', 'SBV-347241353', 
+    '309363270-preview', '347241353-preview'
   ];
   
   if (mediaType === 'image') {
@@ -316,7 +323,15 @@ async function testMediaUrl(
   const isRelative = url.startsWith('/') && !url.startsWith('//');
   
   if (isRelative) {
-    const BASE_URL = process.env.BASE_URL || 'https://etoile-yachts.replit.app';
+    // Handle both development and production environments
+    const replitId = '491f404d-c45b-465e-abd0-1bf1a522988f-00-1vx2q8nj9olr6';
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    
+    // Set base URL based on environment
+    const BASE_URL = isDevelopment 
+      ? `https://${replitId}.janeway.replit.dev`
+      : (process.env.BASE_URL || 'https://etoile-yachts.replit.app');
+      
     resolvedUrl = `${BASE_URL}${url}`;
     console.log(`Resolved relative URL: ${url} -> ${resolvedUrl}`);
   }
