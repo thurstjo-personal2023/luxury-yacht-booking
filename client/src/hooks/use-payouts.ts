@@ -78,7 +78,7 @@ export function usePayoutTransactions() {
       notes?: string;
     }) => {
       const response = await apiRequest(
-        'PATCH',
+        'PUT',
         `${API_BASE}/transactions/${transactionId}/status`,
         { status, notes }
       );
@@ -154,7 +154,7 @@ export function usePayoutAccounts() {
       verificationData: { isVerified: boolean; notes?: string }
     }) => {
       const response = await apiRequest(
-        'PATCH',
+        'PUT',
         `${API_BASE}/accounts/${accountId}/verify`,
         verificationData
       );
@@ -217,7 +217,7 @@ export function usePayoutDisputes() {
       notes?: string;
     }) => {
       const response = await apiRequest(
-        'PATCH',
+        'PUT',
         `${API_BASE}/disputes/${disputeId}/resolve`,
         { resolution, notes }
       );
@@ -271,7 +271,7 @@ export function usePayoutSettings() {
   const { mutate: updateSettings, isPending: isUpdating } = useMutation({
     mutationFn: async (settingsData: Partial<PayoutSettings>) => {
       const response = await apiRequest(
-        'PATCH',
+        'PUT',
         `${API_BASE}/settings`,
         settingsData
       );

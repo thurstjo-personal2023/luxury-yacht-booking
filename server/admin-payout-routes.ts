@@ -124,8 +124,8 @@ router.get('/accounts/:accountId', verifyAuth, verifyFinanceAdmin, async (req: R
   }
 });
 
-// Update a payout account verification status
-router.patch('/accounts/:accountId/verify', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+// Handler for updating a payout account verification status
+const updateAccountVerificationHandler = async (req: Request, res: Response) => {
   try {
     const { accountId } = req.params;
     const statusSchema = z.object({
@@ -148,7 +148,11 @@ router.patch('/accounts/:accountId/verify', verifyAuth, verifyFinanceAdmin, asyn
     console.error('Error updating account verification status:', error);
     return res.status(500).json({ error: 'Failed to update account verification status' });
   }
-});
+};
+
+// Register both PATCH and PUT methods for account verification
+router.patch('/accounts/:accountId/verify', verifyAuth, verifyFinanceAdmin, updateAccountVerificationHandler);
+router.put('/accounts/:accountId/verify', verifyAuth, verifyFinanceAdmin, updateAccountVerificationHandler);
 
 // Get all payout transactions with optional filtering
 router.get('/transactions', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
@@ -223,8 +227,8 @@ router.post('/transactions', verifyAuth, verifyFinanceAdmin, async (req: Request
   }
 });
 
-// Update a transaction status
-router.patch('/transactions/:transactionId/status', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+// Handler for updating a transaction status
+const updateTransactionStatusHandler = async (req: Request, res: Response) => {
   try {
     const { transactionId } = req.params;
     const statusSchema = z.object({
@@ -249,7 +253,11 @@ router.patch('/transactions/:transactionId/status', verifyAuth, verifyFinanceAdm
     console.error('Error updating transaction status:', error);
     return res.status(500).json({ error: 'Failed to update transaction status' });
   }
-});
+};
+
+// Register both PATCH and PUT methods for transaction status updates
+router.patch('/transactions/:transactionId/status', verifyAuth, verifyFinanceAdmin, updateTransactionStatusHandler);
+router.put('/transactions/:transactionId/status', verifyAuth, verifyFinanceAdmin, updateTransactionStatusHandler);
 
 // Get all payout disputes
 router.get('/disputes', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
@@ -268,8 +276,8 @@ router.get('/disputes', verifyAuth, verifyFinanceAdmin, async (req: Request, res
   }
 });
 
-// Update a dispute status
-router.patch('/disputes/:disputeId/status', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+// Handler for updating a dispute status
+const updateDisputeStatusHandler = async (req: Request, res: Response) => {
   try {
     const { disputeId } = req.params;
     const statusSchema = z.object({
@@ -294,7 +302,11 @@ router.patch('/disputes/:disputeId/status', verifyAuth, verifyFinanceAdmin, asyn
     console.error('Error updating dispute status:', error);
     return res.status(500).json({ error: 'Failed to update dispute status' });
   }
-});
+};
+
+// Register both PATCH and PUT methods for dispute status updates
+router.patch('/disputes/:disputeId/status', verifyAuth, verifyFinanceAdmin, updateDisputeStatusHandler);
+router.put('/disputes/:disputeId/status', verifyAuth, verifyFinanceAdmin, updateDisputeStatusHandler);
 
 // Get earning summaries
 router.get('/earnings', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
