@@ -87,7 +87,7 @@ const PayoutSettingsForm: React.FC<PayoutSettingsFormProps> = ({ settings }) => 
   // Create form with default values from settings
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
-    defaultValues: settings ? {
+    defaultValues: settings && settings.payoutMethods ? {
       payoutSchedule: settings.payoutSchedule,
       minimumPayoutAmount: settings.minimumPayoutAmount,
       platformFeePercentage: settings.platformFeePercentage,
@@ -121,7 +121,11 @@ const PayoutSettingsForm: React.FC<PayoutSettingsFormProps> = ({ settings }) => 
     const settingsData: Partial<PayoutSettings> = {
       ...data,
       // Ensure payoutMethods is typed correctly
-      payoutMethods: data.payoutMethods as PayoutMethod[]
+      payoutMethods: data.payoutMethods as PayoutMethod[],
+      // Include existing id if available, otherwise use 'default'
+      id: settings?.id || 'default',
+      // Add updatedBy field 
+      updatedBy: settings?.updatedBy || 'admin'
     };
     
     updateSettings(
@@ -149,6 +153,7 @@ const PayoutSettingsForm: React.FC<PayoutSettingsFormProps> = ({ settings }) => 
             No payout settings have been configured yet.
           </p>
           <Button onClick={() => updateSettings({
+            id: 'default',
             payoutSchedule: 'monthly',
             minimumPayoutAmount: 50,
             platformFeePercentage: 5,
@@ -158,7 +163,9 @@ const PayoutSettingsForm: React.FC<PayoutSettingsFormProps> = ({ settings }) => 
             withdrawalFee: 1,
             earlyPayoutFee: 2,
             supportContact: 'payments@etoileyachts.com',
-            payoutMethods: ['paypal', 'bank_account'] as PayoutMethod[]
+            payoutMethods: ['paypal', 'bank_account'] as PayoutMethod[],
+            updatedBy: 'admin',
+            updatedAt: new Date()
           }, {})}>
             Initialize Settings
           </Button>
@@ -470,10 +477,10 @@ const PayoutSettingsForm: React.FC<PayoutSettingsFormProps> = ({ settings }) => 
         </CardContent>
         <CardFooter className="flex justify-between border-t pt-4">
           <div className="text-xs text-muted-foreground">
-            Last updated: {formatTimestamp(settings.updatedAt)}
+            Last updated: {settings.updatedAt ? formatTimestamp(settings.updatedAt) : 'N/A'}
           </div>
           <div className="text-xs text-muted-foreground">
-            Updated by: {settings.updatedBy}
+            Updated by: {settings.updatedBy || 'System'}
           </div>
         </CardFooter>
       </Card>
