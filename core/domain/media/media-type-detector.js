@@ -5,53 +5,27 @@
  * for files and URLs to ensure proper categorization as images or videos.
  */
 
-const { MediaType } = require('./media-type.cjs');
+const { MediaType, VideoFileExtensions, VideoUrlPatterns } = require('./media-type.cjs');
 
 // Common image extensions and patterns
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.tiff', '.ico'];
 const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/webp', 'image/svg+xml', 'image/tiff', 'image/x-icon'];
 
-// Common video extensions and patterns
-const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.wmv', '.flv', '.mkv', '.m4v'];
+// Common video extensions and patterns - use the shared constants
+const VIDEO_EXTENSIONS = VideoFileExtensions;
 const VIDEO_MIME_TYPES = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-msvideo', 'video/x-ms-wmv', 'video/x-flv', 'video/x-matroska'];
 
-// Video patterns in URLs that indicate the asset might be a video
+// Use the shared video URL patterns to ensure consistency
 const VIDEO_URL_PATTERNS = [
-  '-SBV-',                // Stock video pattern from providers
-  'Dynamic motion',       // Common description in video filenames
-  'dynamic-motion',
-  '.mp4',
-  '.mov',
-  '.avi',
-  '.webm',
-  '.mkv',
-  '.flv',
-  '.wmv',
-  '.m4v',
-  '.mpg',
-  '.mpeg',
-  '.3gp',
+  ...VideoUrlPatterns,
+  // Add any additional patterns specific to this detector
   'video/',
   'videos/',
   'media/video',
-  'video-preview',
-  'preview.mp4',          // Common video preview naming pattern
-  'preview-video',
-  'yacht-video',
-  '-preview.mp4',         // Another common video preview pattern
-  'tourist-luxury-yacht', // Specific stock video filename pattern
-  'sailing-boats',        // Common video content descriptor
-  'porto-montenegro',     // Specific location for video content
-  'in-the-boka-bay',      // Common description in marina videos
-  'vacation-holidays',    // Travel content indicator
-  'luxury-yacht-during-vacation-holidays', // Specific patterns from validation logs
-  'tourist-luxury-yacht-during-vacation-holidays',
+  'in-the-boka-bay',    // Common description in marina videos
+  'vacation-holidays',  // Travel content indicator
   'night-town-tivat',
-  'sailing-boats-in-the-boka-bay',
-  '309363270-preview',    // Specific video ID patterns
-  '347241353-preview',
-  'SBV-309363270',        // Stock provider video IDs
-  'SBV-347241353'
+  'sailing-boats-in-the-boka-bay'
 ];
 
 /**

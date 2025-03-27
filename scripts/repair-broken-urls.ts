@@ -7,7 +7,8 @@
  */
 import { adminDb } from '../server/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { VideoFileExtensions, VideoUrlPatterns } from '../core/domain/media/media-type';
+import { MediaType, VideoFileExtensions, VideoUrlPatterns } from '../core/domain/media/media-type';
+import { formatPlaceholderUrl, getPlaceholderMediaType, isPlaceholderUrl } from '../core/domain/media/placeholder-handler';
 
 interface BrokenUrlDetail {
   docId: string;
@@ -119,38 +120,35 @@ async function findBrokenUrls(): Promise<BrokenUrlDetail[]> {
  * This function will update the document with a placeholder URL
  */
 async function repairBrokenUrl(
-  brokenUrl: BrokenUrlDetail,
-  defaultImageUrl: string = 'https://491f404d-c45b-465e-abd0-1bf1a522988f-00-1vx2q8nj9olr6.janeway.replit.dev/images/yacht-placeholder.jpg',
-  defaultVideoUrl: string = 'https://491f404d-c45b-465e-abd0-1bf1a522988f-00-1vx2q8nj9olr6.janeway.replit.dev/images/video-placeholder.mp4'
+  brokenUrl: BrokenUrlDetail
 ): Promise<{ success: boolean; newUrl: string }> {
   try {
     const { docId, collection, field, subField, url, mediaType } = brokenUrl;
     
-    // Determine placeholder based on URL and mediaType
-    let placeholderUrl = defaultImageUrl; // Default to image
+    // Skip if already a placeholder URL
+    if (isPlaceholderUrl(url)) {
+      console.log(`URL is already a placeholder, skipping: ${url}`);
+      return { success: false, newUrl: url };
+    }
+    
+    // Determine the appropriate media type for the placeholder
+    let placeholderType: MediaType;
     
     if (mediaType === 'video') {
-      placeholderUrl = defaultVideoUrl;
-    } else if (!mediaType) {
-      // Use shared patterns for consistency across the application
-      const isVideoPattern = VideoUrlPatterns.some(pattern => 
-        url.toLowerCase().includes(pattern.toLowerCase())
-      );
+      placeholderType = MediaType.VIDEO;
+    } else if (mediaType === 'image') {
+      placeholderType = MediaType.IMAGE;
+    } else {
+      // Use our shared placeholder handler to detect media type
+      placeholderType = getPlaceholderMediaType(url);
       
-      const isVideoFileExtension = VideoFileExtensions.some(ext => 
-        url.toLowerCase().endsWith(ext) || 
-        url.toLowerCase().includes(`${ext}?`) || 
-        url.toLowerCase().includes(`${ext}&`) || 
-        url.toLowerCase().includes(`${ext}/`)
-      );
-      
-      const isVideo = isVideoPattern || isVideoFileExtension;
-      
-      if (isVideo) {
+      if (placeholderType === MediaType.VIDEO) {
         console.log(`Detected video URL pattern: ${url}`);
-        placeholderUrl = defaultVideoUrl;
       }
     }
+    
+    // Generate the appropriate placeholder URL using our shared handler
+    const placeholderUrl = formatPlaceholderUrl(placeholderType);
     
     // Get document reference
     const docRef = adminDb.collection(collection).doc(docId);

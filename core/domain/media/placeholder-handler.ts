@@ -8,9 +8,12 @@
 import { MediaType } from './media-type';
 
 /**
- * Development URL base (Replit environment)
+ * Development URL bases (Replit environment)
+ * The Replit URL can change when the application restarts,
+ * so we maintain a list of possible base URLs
  */
 const DEV_URL_BASE = 'https://491f404d-c45b-465e-abd0-1bf1a522988f-00-1vx2q8nj9olr6.janeway.replit.dev';
+const REPLIT_APP_BASE = 'https://etoile-yachts.replit.app';
 
 /**
  * Map of placeholder images by type
@@ -25,6 +28,17 @@ export const PLACEHOLDER_IMAGES = {
 };
 
 /**
+ * Map of placeholder images for alternative Replit URLs
+ */
+export const REPLIT_APP_PLACEHOLDER_IMAGES = {
+  yacht: `${REPLIT_APP_BASE}/images/yacht-placeholder.jpg`,
+  service: `${REPLIT_APP_BASE}/images/service-placeholder.jpg`,
+  product: `${REPLIT_APP_BASE}/images/product-placeholder.jpg`,
+  user: `${REPLIT_APP_BASE}/images/user-placeholder.jpg`,
+  default: `${REPLIT_APP_BASE}/images/yacht-placeholder.jpg`
+};
+
+/**
  * Map of placeholder videos by type
  * Using development URLs while in Replit environment
  */
@@ -32,6 +46,15 @@ export const PLACEHOLDER_VIDEOS = {
   yacht: `${DEV_URL_BASE}/images/video-placeholder.mp4`,
   service: `${DEV_URL_BASE}/images/video-placeholder.mp4`,
   default: `${DEV_URL_BASE}/images/video-placeholder.mp4`
+};
+
+/**
+ * Map of placeholder videos for alternative Replit URLs
+ */
+export const REPLIT_APP_PLACEHOLDER_VIDEOS = {
+  yacht: `${REPLIT_APP_BASE}/images/video-placeholder.mp4`,
+  service: `${REPLIT_APP_BASE}/images/video-placeholder.mp4`,
+  default: `${REPLIT_APP_BASE}/images/video-placeholder.mp4`
 };
 
 /**
@@ -101,6 +124,10 @@ export function isPlaceholderUrl(url: string): boolean {
     lowerUrl === placeholder.toLowerCase()
   ) || Object.values(PLACEHOLDER_VIDEOS).some(placeholder => 
     lowerUrl === placeholder.toLowerCase()
+  ) || Object.values(REPLIT_APP_PLACEHOLDER_IMAGES).some(placeholder => 
+    lowerUrl === placeholder.toLowerCase()
+  ) || Object.values(REPLIT_APP_PLACEHOLDER_VIDEOS).some(placeholder => 
+    lowerUrl === placeholder.toLowerCase()
   // Simple 'placeholder' keyword check as a fallback
   ) || lowerUrl.includes('placeholder') || lowerUrl.includes('video-placeholder');
 }
@@ -123,9 +150,13 @@ export function getPlaceholderMediaType(url: string): MediaType {
   }
   
   // Check if it matches any of our video placeholders
-  const isVideoPlaceholder = Object.values(PLACEHOLDER_VIDEOS).some(placeholder => 
-    lowerUrl === placeholder.toLowerCase()
-  );
+  const isVideoPlaceholder = 
+    Object.values(PLACEHOLDER_VIDEOS).some(placeholder => 
+      lowerUrl === placeholder.toLowerCase()
+    ) || 
+    Object.values(REPLIT_APP_PLACEHOLDER_VIDEOS).some(placeholder => 
+      lowerUrl === placeholder.toLowerCase()
+    );
   
   return isVideoPlaceholder ? MediaType.VIDEO : MediaType.IMAGE;
 }
@@ -149,12 +180,27 @@ export function formatPlaceholderUrl(url: string): string {
                  lowerFilename.endsWith('.webm') ||
                  lowerFilename.includes('video');
   
-  // Known production URLs that need conversion to development URLs
+  // Known URLs that need conversion to the current Replit environment URL
   if (url.includes('etoile-yachts.replit.app') || 
       url.includes('etoileyachts.com') ||
       url.includes('firebasestorage.googleapis.com') ||
       // Check if it's already a Replit URL but with the wrong format
       (url.includes('janeway.replit.dev') && !url.includes(DEV_URL_BASE))) {
+      
+    // Special case: handle 404 errors from replit.app URLs by using our current DEV_URL_BASE
+    if (url.includes('etoile-yachts.replit.app')) {
+      const path = url.split('etoile-yachts.replit.app')[1] || '';
+      if (path) {
+        // Use our current Replit environment URL instead
+        console.log(`Converting replit.app URL to current environment: ${url} → ${DEV_URL_BASE}${path}`);
+        // If it's a video, use video placeholder, otherwise use image placeholder
+        if (isVideo) {
+          return PLACEHOLDER_VIDEOS.default;
+        } else {
+          return PLACEHOLDER_IMAGES.default;
+        }
+      }
+    }
     
     // Return video placeholders if it's a video
     if (isVideo) {
