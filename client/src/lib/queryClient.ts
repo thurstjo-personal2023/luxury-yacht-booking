@@ -319,14 +319,36 @@ export async function apiRequest(
   } catch (error) {
     console.error('apiRequest: Error during request:', error);
     
-    // Enhance error message for common issues with admin routes
+    // Extract error message
     const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes('HTML instead of expected') && url.includes('/admin/')) {
+    const errorStatus = errorMessage.match(/^(\d{3}):/)?.[1] || null;
+    
+    // Special handling for different errors
+    if (errorStatus === '403' && (url.includes('/admin/') || url.includes('/api/admin/'))) {
+      console.error('apiRequest: 403 Forbidden error on admin route - likely permission issue');
+      console.log('apiRequest: User role information:', await getUserRoleFromToken());
+      
+      // Enhance error for admin routes
+      throw new Error(`Permission denied (403): You do not have permission to access this admin resource. This might be due to insufficient role permissions or an inactive admin account.`);
+    }
+    else if (errorMessage.includes('HTML instead of expected') && url.includes('/admin/')) {
       // Suggest checking the API path for admin routes
       console.error(`apiRequest: This might be an API routing issue. Check if the path should be /api/admin/ instead of /admin/`);
       
       // Add helpful context to the error
       throw new Error(`${errorMessage} (This may be a routing issue - try using /api/admin/ in the URL)`);
+    }
+    else if (errorStatus === '401') {
+      console.error('apiRequest: 401 Unauthorized error - authentication issue');
+      throw new Error(`Authentication error (401): You need to be logged in to access this resource. Your session may have expired.`);
+    }
+    
+    // More descriptive errors for common status codes
+    if (errorStatus === '404') {
+      throw new Error(`Resource not found (404): The requested endpoint "${url}" does not exist or has been moved.`);
+    }
+    else if (errorStatus === '500') {
+      throw new Error(`Server error (500): The server encountered an error while processing your request. Please try again later.`);
     }
     
     throw error;

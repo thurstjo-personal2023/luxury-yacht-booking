@@ -218,8 +218,12 @@ export function usePayoutDisputes() {
     }) => {
       const response = await apiRequest(
         'PUT',
-        `${API_BASE}/disputes/${disputeId}/resolve`,
-        { resolution, notes }
+        `${API_BASE}/disputes/${disputeId}/status`,
+        { 
+          status: resolution === 'resolved' ? 'resolved' : 'rejected',
+          resolution,
+          adminNotes: notes
+        }
       );
       return response;
     },
@@ -238,11 +242,23 @@ export function usePayoutDisputes() {
       });
     },
     onError: (error: any) => {
-      toast({
-        title: 'Failed to resolve dispute',
-        description: error.message || 'An error occurred while processing the dispute.',
-        variant: 'destructive',
-      });
+      console.error('Dispute resolution error:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'An error occurred while processing the dispute.';
+      
+      // Check for specific error conditions
+      if (error.status === 403) {
+        toast({
+          title: 'Permission Denied',
+          description: 'You do not have permission to resolve disputes. Contact an administrator.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Failed to resolve dispute',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+      }
     },
   });
   
