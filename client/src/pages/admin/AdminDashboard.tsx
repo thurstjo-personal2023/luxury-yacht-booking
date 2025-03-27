@@ -11,7 +11,8 @@ import {
   X,
   FileWarning,
   FileSpreadsheet,
-  Image
+  Image,
+  CreditCard
 } from 'lucide-react';
 
 // UI Components
@@ -82,6 +83,12 @@ export default function AdminDashboard() {
         break;
       case 'media-validation':
         setLocation('/admin/media-validation');
+        break;
+      case 'payouts':
+        setLocation('/admin/payouts');
+        break;
+      case 'reports':
+        setLocation('/admin/reports');
         break;
       case 'dashboard':
         // Already on dashboard, no need to navigate
@@ -237,6 +244,12 @@ export default function AdminDashboard() {
               onClick={() => setLocation('/admin/users')}
             />
             <SidebarLink
+              icon={<CreditCard className="h-5 w-5" />}
+              label="Payouts"
+              active={activeSection === 'payouts'}
+              onClick={() => setLocation('/admin/payouts')}
+            />
+            <SidebarLink
               icon={<FileSpreadsheet className="h-5 w-5" />}
               label="Reports"
               active={activeSection === 'reports'}
@@ -316,6 +329,15 @@ export default function AdminDashboard() {
                   label="User Management"
                   active={activeSection === 'users'}
                   onClick={() => setLocation('/admin/users')}
+                />
+                <SidebarLink
+                  icon={<CreditCard className="h-5 w-5" />}
+                  label="Payouts"
+                  active={activeSection === 'payouts'}
+                  onClick={() => {
+                    setLocation('/admin/payouts');
+                    setMobileMenuOpen(false);
+                  }}
                 />
                 <SidebarLink
                   icon={<FileSpreadsheet className="h-5 w-5" />}
