@@ -11,7 +11,9 @@
  */
 import React, { useState } from 'react';
 import { useLocation } from 'wouter';
+import { Helmet } from 'react-helmet';
 import { Loader2, CreditCard, Wallet, Shield, Settings, AlertTriangle, PlusCircle } from 'lucide-react';
+import withAdminLayout from '@/components/admin/withAdminLayout';
 
 import {
   Tabs,
@@ -64,7 +66,7 @@ import {
   PayoutTransaction,
   PayoutAccount,
   PayoutDispute
-} from '../../shared/payment-schema';
+} from '@/shared/payment-schema';
 
 // Optional status badge for overall system health
 const StatusBadge: React.FC<{ isHealthy: boolean }> = ({ isHealthy }) => (
@@ -200,16 +202,13 @@ const PayoutsPage: React.FC = () => {
   
   return (
     <div className="container mx-auto py-6 space-y-6">
+      <Helmet>
+        <title>Payout Management - Etoile Yachts Admin</title>
+      </Helmet>
+      
       <PageHeader
         title="Payout Management"
         description="Manage payouts, accounts, and disputes across the platform"
-        actions={
-          <div className="flex items-center gap-2">
-            <Button onClick={handleBackToDashboard} variant="outline" size="sm">
-              Back to Dashboard
-            </Button>
-          </div>
-        }
       />
       
       <Breadcrumb>
@@ -336,4 +335,4 @@ const PayoutsPage: React.FC = () => {
   );
 };
 
-export default PayoutsPage;
+export default withAdminLayout(PayoutsPage);
