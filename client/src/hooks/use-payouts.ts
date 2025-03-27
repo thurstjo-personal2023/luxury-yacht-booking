@@ -14,7 +14,7 @@ import {
   PayoutSettings, 
   PayoutDispute,
   PayoutStatus 
-} from '../../shared/payment-schema';
+} from '../../../shared/payment-schema';
 
 // API base path for payouts
 const API_BASE = '/api/admin/payouts';

@@ -50,7 +50,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
-import { PayoutDispute, UserType } from '../../../../shared/payment-schema';
+import { PayoutDispute, UserType } from '../../../../../shared/payment-schema';
 import { usePayoutDisputes } from '@/hooks/use-payouts';
 
 // Helper function to format timestamp
@@ -143,14 +143,14 @@ const ResolveDisputeDialog: React.FC<ResolveDisputeDialogProps> = ({
           </div>
           
           <div className="grid grid-cols-4 gap-4 items-center">
-            <Label className="text-right">Payout ID</Label>
-            <div className="col-span-3 font-mono text-sm">{dispute.payoutId}</div>
+            <Label className="text-right">Transaction ID</Label>
+            <div className="col-span-3 font-mono text-sm">{dispute.transactionId}</div>
           </div>
           
           <div className="grid grid-cols-4 gap-4 items-center">
-            <Label className="text-right">Amount</Label>
+            <Label className="text-right">Reason</Label>
             <div className="col-span-3 font-semibold">
-              {formatCurrency(dispute.amount, dispute.currency)}
+              {dispute.reason.replace('_', ' ')}
             </div>
           </div>
           
@@ -256,8 +256,8 @@ const DisputeDetailsDialog: React.FC<DisputeDetailsDialogProps> = ({
                   <span className="font-mono">{dispute.id}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Payout ID:</span>
-                  <span className="font-mono">{dispute.payoutId}</span>
+                  <span className="text-muted-foreground">Transaction ID:</span>
+                  <span className="font-mono">{dispute.transactionId}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Status:</span>
@@ -290,15 +290,15 @@ const DisputeDetailsDialog: React.FC<DisputeDetailsDialogProps> = ({
                   <span>{formatUserType(dispute.userType)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount:</span>
+                  <span className="text-muted-foreground">Reason:</span>
                   <span className="font-semibold">
-                    {formatCurrency(dispute.amount, dispute.currency)}
+                    {dispute.reason.replace('_', ' ')}
                   </span>
                 </div>
-                {dispute.resolvedBy && (
+                {dispute.resolvedAt && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Resolved By:</span>
-                    <span className="font-mono">{dispute.resolvedBy}</span>
+                    <span className="text-muted-foreground">Resolved At:</span>
+                    <span className="font-mono">{formatTimestamp(dispute.resolvedAt)}</span>
                   </div>
                 )}
               </CardContent>
@@ -325,25 +325,25 @@ const DisputeDetailsDialog: React.FC<DisputeDetailsDialogProps> = ({
             </Card>
           )}
           
-          {dispute.notes && (
+          {dispute.adminNotes && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Notes</CardTitle>
+                <CardTitle className="text-sm font-medium">Admin Notes</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm whitespace-pre-line">{dispute.notes}</p>
+                <p className="text-sm whitespace-pre-line">{dispute.adminNotes}</p>
               </CardContent>
             </Card>
           )}
           
-          {dispute.attachments && dispute.attachments.length > 0 && (
+          {dispute.supportingDocuments && dispute.supportingDocuments.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Attachments</CardTitle>
+                <CardTitle className="text-sm font-medium">Supporting Documents</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {dispute.attachments.map((url: string, index: number) => (
+                  {dispute.supportingDocuments.map((url: string, index: number) => (
                     <Button 
                       key={index} 
                       variant="outline" 
@@ -351,7 +351,7 @@ const DisputeDetailsDialog: React.FC<DisputeDetailsDialogProps> = ({
                       onClick={() => window.open(url, '_blank')}
                     >
                       <FileText className="mr-2 h-4 w-4" />
-                      <span className="truncate">Attachment {index + 1}</span>
+                      <span className="truncate">Document {index + 1}</span>
                     </Button>
                   ))}
                 </div>
@@ -402,7 +402,7 @@ const PayoutDisputesTable: React.FC<PayoutDisputesTableProps> = ({ disputes }) =
               <TableRow>
                 <TableHead>ID</TableHead>
                 <TableHead>User</TableHead>
-                <TableHead>Amount</TableHead>
+                <TableHead>Transaction ID</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Reason</TableHead>
@@ -429,7 +429,9 @@ const PayoutDisputesTable: React.FC<PayoutDisputesTableProps> = ({ disputes }) =
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">
-                      {formatCurrency(dispute.amount, dispute.currency)}
+                      <span className="truncate max-w-[120px] text-xs font-mono">
+                        {dispute.transactionId.substring(0, 8)}...
+                      </span>
                     </TableCell>
                     <TableCell>{getStatusBadge(dispute.status)}</TableCell>
                     <TableCell>{formatTimestamp(dispute.createdAt)}</TableCell>

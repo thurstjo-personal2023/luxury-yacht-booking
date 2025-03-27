@@ -56,7 +56,7 @@ import { useForm } from 'react-hook-form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
-import { PayoutTransaction, PayoutStatus, PayoutAccount } from '../../../../shared/payment-schema';
+import { PayoutTransaction, PayoutStatus, PayoutAccount } from '../../../../../shared/payment-schema';
 import { usePayoutTransactions, usePayoutAccounts } from '@/hooks/use-payouts';
 
 // Helper function to format timestamp

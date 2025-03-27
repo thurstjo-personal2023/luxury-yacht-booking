@@ -67,7 +67,7 @@ import {
   PayoutTransaction,
   PayoutAccount,
   PayoutDispute
-} from '../../../shared/payment-schema';
+} from '../../../../shared/payment-schema';
 
 // Optional status badge for overall system health
 const StatusBadge: React.FC<{ isHealthy: boolean }> = ({ isHealthy }) => (
@@ -197,9 +197,12 @@ const PayoutsPage: React.FC = () => {
   } = usePayoutDisputes();
   
   const { 
-    data: settings, 
+    data: settingsData, 
     isLoading: isLoadingSettings 
   } = usePayoutSettings();
+  
+  // Ensure settings is always null when undefined to match component prop types
+  const settings = settingsData || null;
   
   // Determine if everything is loading
   const isLoading = isLoadingTransactions || isLoadingAccounts || isLoadingDisputes || isLoadingSettings;
