@@ -50,6 +50,7 @@ import PayoutTransactionsTable from '@/components/admin/payouts/PayoutTransactio
 import PayoutAccountsTable from '@/components/admin/payouts/PayoutAccountsTable';
 import PayoutSettingsForm from '@/components/admin/payouts/PayoutSettingsForm';
 import PayoutDisputesTable from '@/components/admin/payouts/PayoutDisputesTable';
+import PayoutDetailsView from '@/components/admin/payouts/PayoutDetailsView';
 import NewTransactionDialog from '@/components/admin/payouts/NewTransactionDialog';
 
 // Hooks for data fetching and mutations
@@ -165,6 +166,8 @@ const PayoutsPage: React.FC = () => {
   const [location, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState('transactions');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<PayoutTransaction | null>(null);
+  const [detailsViewOpen, setDetailsViewOpen] = useState(false);
   
   // Fetch data using custom hooks
   const { 
@@ -198,6 +201,18 @@ const PayoutsPage: React.FC = () => {
   // Navigate to admin dashboard
   const handleBackToDashboard = () => {
     setLocation('/admin-dashboard');
+  };
+  
+  // Handle viewing transaction details
+  const handleViewTransactionDetails = (transaction: PayoutTransaction) => {
+    setSelectedTransaction(transaction);
+    setDetailsViewOpen(true);
+  };
+  
+  // Handle closing transaction details view
+  const handleCloseDetailsView = () => {
+    setDetailsViewOpen(false);
+    setSelectedTransaction(null);
   };
   
   return (
@@ -276,16 +291,32 @@ const PayoutsPage: React.FC = () => {
             </div>
             
             <TabsContent value="transactions" className="space-y-4">
-              {transactions.length === 0 ? (
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>No transactions found</AlertTitle>
-                  <AlertDescription>
-                    No payout transactions have been created yet. Use the "New Transaction" button to create one.
-                  </AlertDescription>
-                </Alert>
+              {detailsViewOpen && selectedTransaction ? (
+                <PayoutDetailsView 
+                  transaction={selectedTransaction}
+                  onClose={handleCloseDetailsView}
+                  onUpdateStatus={(newStatus) => {
+                    // Optionally refresh data or update local state on status change
+                    handleCloseDetailsView();
+                  }}
+                />
               ) : (
-                <PayoutTransactionsTable transactions={transactions} />
+                <>
+                  {transactions.length === 0 ? (
+                    <Alert>
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>No transactions found</AlertTitle>
+                      <AlertDescription>
+                        No payout transactions have been created yet. Use the "New Transaction" button to create one.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <PayoutTransactionsTable 
+                      transactions={transactions} 
+                      onViewDetails={handleViewTransactionDetails}
+                    />
+                  )}
+                </>
               )}
             </TabsContent>
             

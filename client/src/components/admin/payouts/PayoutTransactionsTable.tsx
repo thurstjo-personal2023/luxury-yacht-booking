@@ -55,7 +55,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
-import { PayoutTransaction, PayoutStatus, UserType } from '../../../../shared/payment-schema';
+import { PayoutTransaction, PayoutStatus, UserType } from '@/shared/payment-schema';
 import { usePayoutTransactions } from '@/hooks/use-payouts';
 
 // Helper function to format timestamp
@@ -102,6 +102,7 @@ const statusLabels: Record<string, string> = {
 
 interface PayoutTransactionsTableProps {
   transactions: PayoutTransaction[];
+  onViewDetails?: (transaction: PayoutTransaction) => void;
 }
 
 interface StatusUpdateDialogProps {
@@ -410,7 +411,10 @@ const TransactionDetailsDialog: React.FC<TransactionDetailsDialogProps> = ({
   );
 };
 
-const PayoutTransactionsTable: React.FC<PayoutTransactionsTableProps> = ({ transactions }) => {
+const PayoutTransactionsTable: React.FC<PayoutTransactionsTableProps> = ({ 
+  transactions,
+  onViewDetails
+}) => {
   const [selectedTransaction, setSelectedTransaction] = useState<PayoutTransaction | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -421,8 +425,12 @@ const PayoutTransactionsTable: React.FC<PayoutTransactionsTableProps> = ({ trans
   };
   
   const handleViewDetails = (transaction: PayoutTransaction) => {
-    setSelectedTransaction(transaction);
-    setDetailsDialogOpen(true);
+    if (onViewDetails) {
+      onViewDetails(transaction);
+    } else {
+      setSelectedTransaction(transaction);
+      setDetailsDialogOpen(true);
+    }
   };
   
   const closeStatusDialog = () => {

@@ -1,25 +1,28 @@
-import React, { ReactNode } from 'react';
+/**
+ * Page Header Component
+ * 
+ * This component provides a consistent page header with title and optional description.
+ */
+import React from 'react';
 
 interface PageHeaderProps {
   title: string;
   description?: string;
-  actions?: ReactNode;
+  children?: React.ReactNode;
 }
 
-export function PageHeader({ title, description, actions }: PageHeaderProps) {
+export const PageHeader: React.FC<PageHeaderProps> = ({ 
+  title, 
+  description, 
+  children 
+}) => {
   return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-        {description && (
-          <p className="text-muted-foreground">{description}</p>
-        )}
-      </div>
-      {actions && (
-        <div className="flex items-center gap-2">
-          {actions}
-        </div>
+    <div className="flex flex-col gap-1 mb-6">
+      <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+      {description && (
+        <p className="text-muted-foreground">{description}</p>
       )}
+      {children}
     </div>
   );
-}
+};

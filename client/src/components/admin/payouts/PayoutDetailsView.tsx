@@ -56,7 +56,7 @@ import { useForm } from 'react-hook-form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
-import { PayoutTransaction, PayoutStatus, PayoutAccount } from '../../../../shared/payment-schema';
+import { PayoutTransaction, PayoutStatus, PayoutAccount } from '@/shared/payment-schema';
 import { usePayoutTransactions, usePayoutAccounts } from '@/hooks/use-payouts';
 
 // Helper function to format timestamp
@@ -430,7 +430,7 @@ const PayoutDetailsView: React.FC<PayoutDetailsViewProps> = ({
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {transaction.bookingIds.map((bookingId, idx) => (
+                  {transaction.bookingIds.map((bookingId: string, idx: number) => (
                     <Card key={idx} className="overflow-hidden">
                       <div className="flex items-center p-4">
                         <div className="flex-1 space-y-1">
