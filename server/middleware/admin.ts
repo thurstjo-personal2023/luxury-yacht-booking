@@ -6,6 +6,7 @@
  */
 import { Request, Response, NextFunction } from 'express';
 import { adminDb } from '../firebase-admin';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 // Define the admin roles types
 type AdminRole = 'SUPER_ADMIN' | 'ADMIN' | 'MODERATOR' | 'FINANCE_ADMIN' | 'SUPPORT_ADMIN';
@@ -46,18 +47,36 @@ export function verifyAdminRole(roles: AdminRole[]) {
       
       console.log(`[ADMIN MIDDLEWARE] Found admin profile with role: ${adminProfile.role}`);
       
-      // Verify that the admin profile is active
-      if (!adminProfile.isActive) {
-        console.log(`[ADMIN MIDDLEWARE] Admin account is inactive: ${req.user.uid}`);
-        return res.status(403).json({ error: 'Forbidden: Admin account is inactive' });
-      }
-      
       // Special case: SUPER_ADMIN always has access to everything
+      // Check role first before checking isActive status
       if (adminProfile.role === 'SUPER_ADMIN') {
         console.log('[ADMIN MIDDLEWARE] SUPER_ADMIN detected - granting access to all admin routes');
+        
+        // Important: If the account is inactive, automatically activate it for SUPER_ADMIN
+        if (!adminProfile.isActive) {
+          console.log(`[ADMIN MIDDLEWARE] Auto-activating inactive SUPER_ADMIN account: ${req.user.uid}`);
+          try {
+            await adminDb.collection('admin_profiles').doc(req.user.uid).update({
+              isActive: true,
+              updatedAt: FieldValue.serverTimestamp()
+            });
+            // Update the local copy after the change
+            adminProfile.isActive = true;
+          } catch (updateError) {
+            console.error('[ADMIN MIDDLEWARE] Error activating SUPER_ADMIN account:', updateError);
+            // Continue anyway - we'll grant access even if the update fails
+          }
+        }
+        
         // Add admin profile to the request for use in route handlers
         (req as any).adminProfile = adminProfile;
         return next();
+      }
+      
+      // For non-SUPER_ADMIN roles, verify that the admin profile is active
+      if (!adminProfile.isActive) {
+        console.log(`[ADMIN MIDDLEWARE] Admin account is inactive: ${req.user.uid}`);
+        return res.status(403).json({ error: 'Forbidden: Admin account is inactive' });
       }
       
       // For all other roles, check if the user has any of the allowed roles
