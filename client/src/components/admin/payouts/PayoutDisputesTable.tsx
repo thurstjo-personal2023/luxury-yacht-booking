@@ -111,16 +111,19 @@ const ResolveDisputeDialog: React.FC<ResolveDisputeDialogProps> = ({
   const { resolveDispute, isResolving } = usePayoutDisputes();
   
   const handleSubmit = () => {
-    resolveDispute({
-      disputeId: dispute.id,
-      resolution,
-      notes: notes.trim() || undefined
-    }, {
-      onSuccess: () => {
-        onClose();
-        setNotes('');
+    resolveDispute(
+      {
+        disputeId: dispute.id,
+        resolution,
+        notes: notes.trim() || undefined
+      }, 
+      {
+        onSuccess: () => {
+          onClose();
+          setNotes('');
+        }
       }
-    });
+    );
   };
   
   return (

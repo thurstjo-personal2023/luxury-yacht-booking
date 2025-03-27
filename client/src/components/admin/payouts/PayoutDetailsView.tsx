@@ -118,10 +118,10 @@ const PayoutDetailsView: React.FC<PayoutDetailsViewProps> = ({
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [emailContent, setEmailContent] = useState('');
   const { updateTransactionStatus, isUpdatingStatus } = usePayoutTransactions();
-  const { accounts = [] } = usePayoutAccounts();
+  const { data: accounts = [] } = usePayoutAccounts();
   
   // Find the associated account
-  const account = accounts.find(acc => acc.id === transaction.accountId);
+  const account = Array.isArray(accounts) ? accounts.find(acc => acc.id === transaction.accountId) : null;
   
   // Get status update timestamps
   const timelineEvents = [
@@ -140,17 +140,19 @@ const PayoutDetailsView: React.FC<PayoutDetailsViewProps> = ({
   
   // Handle status update
   const handleStatusUpdate = (newStatus: PayoutStatus, notes?: string) => {
-    updateTransactionStatus({
-      transactionId: transaction.id,
-      status: newStatus,
-      notes
-    }, {
-      onSuccess: () => {
-        setStatusDialogOpen(false);
-        if (onUpdateStatus) {
-          onUpdateStatus(newStatus);
-        }
-        toast({
+    updateTransactionStatus(
+      {
+        transactionId: transaction.id,
+        status: newStatus,
+        notes
+      }, 
+      {
+        onSuccess: () => {
+          setStatusDialogOpen(false);
+          if (onUpdateStatus) {
+            onUpdateStatus(newStatus);
+          }
+          toast({
           title: 'Status updated',
           description: `Transaction status updated to ${statusLabels[newStatus]}`
         });

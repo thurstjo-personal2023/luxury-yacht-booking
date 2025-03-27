@@ -113,7 +113,7 @@ export function usePayoutTransactions() {
   });
   
   return {
-    transactions: data,
+    data,
     isLoading,
     isError,
     getPayoutTransaction,
@@ -184,7 +184,7 @@ export function usePayoutAccounts() {
   });
   
   return {
-    accounts: data,
+    data,
     isLoading,
     isError,
     getPayoutAccount,
@@ -263,7 +263,7 @@ export function usePayoutDisputes() {
   });
   
   return {
-    disputes: data,
+    data,
     isLoading,
     isError,
     resolveDispute,
@@ -312,7 +312,7 @@ export function usePayoutSettings() {
   });
   
   return {
-    settings: data,
+    data,
     isLoading,
     isError,
     updateSettings,

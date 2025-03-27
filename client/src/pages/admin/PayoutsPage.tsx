@@ -85,22 +85,33 @@ const StatusBadge: React.FC<{ isHealthy: boolean }> = ({ isHealthy }) => (
 
 // Page statistics display
 const PayoutStats: React.FC<{
-  transactions: PayoutTransaction[];
-  accounts: PayoutAccount[];
-  disputes: PayoutDispute[];
-  settings: PayoutSettingsType | null;
-}> = ({ transactions, accounts, disputes, settings }) => {
+  transactions: PayoutTransaction[] | null | undefined;
+  accounts: PayoutAccount[] | null | undefined;
+  disputes: PayoutDispute[] | null | undefined;
+  settings: PayoutSettingsType | null | undefined;
+}> = ({ transactions = [], accounts = [], disputes = [], settings }) => {
   // Calculate key metrics
-  const pendingPayouts = transactions.filter(t => t.status === 'pending' || t.status === 'approved').length;
-  const totalPaidThisMonth = transactions
-    .filter(t => {
-      const date = t.completedAt?.toDate ? t.completedAt.toDate() : new Date(t.completedAt || 0);
-      const now = new Date();
-      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear() && t.status === 'completed';
-    })
-    .reduce((sum, t) => sum + t.amount, 0);
-  const pendingDisputes = disputes.filter(d => d.status === 'open').length;
-  const unverifiedAccounts = accounts.filter(a => !a.isVerified).length;
+  const pendingPayouts = Array.isArray(transactions) 
+    ? transactions.filter(t => t.status === 'pending' || t.status === 'approved').length
+    : 0;
+    
+  const totalPaidThisMonth = Array.isArray(transactions)
+    ? transactions
+        .filter(t => {
+          const date = t.completedAt?.toDate ? t.completedAt.toDate() : new Date(t.completedAt || 0);
+          const now = new Date();
+          return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear() && t.status === 'completed';
+        })
+        .reduce((sum, t) => sum + t.amount, 0)
+    : 0;
+    
+  const pendingDisputes = Array.isArray(disputes)
+    ? disputes.filter(d => d.status === 'open').length
+    : 0;
+    
+  const unverifiedAccounts = Array.isArray(accounts)
+    ? accounts.filter(a => !a.isVerified).length
+    : 0;
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -130,7 +141,7 @@ const PayoutStats: React.FC<{
             }).format(totalPaidThisMonth)}
           </div>
           <p className="text-xs text-muted-foreground">
-            {transactions.filter(t => t.status === 'completed').length} completed transactions
+            {Array.isArray(transactions) ? transactions.filter(t => t.status === 'completed').length : 0} completed transactions
           </p>
         </CardContent>
       </Card>
@@ -171,22 +182,22 @@ const PayoutsPage: React.FC = () => {
   
   // Fetch data using custom hooks
   const { 
-    transactions = [], 
+    data: transactions = [], 
     isLoading: isLoadingTransactions 
   } = usePayoutTransactions();
   
   const { 
-    accounts = [], 
+    data: accounts = [], 
     isLoading: isLoadingAccounts 
   } = usePayoutAccounts();
   
   const { 
-    disputes = [], 
+    data: disputes = [], 
     isLoading: isLoadingDisputes 
   } = usePayoutDisputes();
   
   const { 
-    settings, 
+    data: settings, 
     isLoading: isLoadingSettings 
   } = usePayoutSettings();
   
@@ -257,7 +268,7 @@ const PayoutsPage: React.FC = () => {
               <TabsList>
                 <TabsTrigger value="transactions" className="relative">
                   Transactions
-                  {transactions.filter((t: any) => t.status === 'pending').length > 0 && (
+                  {Array.isArray(transactions) && transactions.filter((t: any) => t.status === 'pending').length > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
                       {transactions.filter((t: any) => t.status === 'pending').length}
                     </span>
@@ -265,7 +276,7 @@ const PayoutsPage: React.FC = () => {
                 </TabsTrigger>
                 <TabsTrigger value="accounts" className="relative">
                   Accounts
-                  {accounts.filter((a: any) => !a.isVerified).length > 0 && (
+                  {Array.isArray(accounts) && accounts.filter((a: any) => !a.isVerified).length > 0 && (
                     <span className="absolute -top-1 -right-1 bg-yellow-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
                       {accounts.filter((a: any) => !a.isVerified).length}
                     </span>
@@ -273,7 +284,7 @@ const PayoutsPage: React.FC = () => {
                 </TabsTrigger>
                 <TabsTrigger value="disputes" className="relative">
                   Disputes
-                  {disputes.filter((d: any) => d.status === 'open').length > 0 && (
+                  {Array.isArray(disputes) && disputes.filter((d: any) => d.status === 'open').length > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">
                       {disputes.filter((d: any) => d.status === 'open').length}
                     </span>
@@ -302,7 +313,7 @@ const PayoutsPage: React.FC = () => {
                 />
               ) : (
                 <>
-                  {transactions.length === 0 ? (
+                  {!Array.isArray(transactions) || transactions.length === 0 ? (
                     <Alert>
                       <AlertTriangle className="h-4 w-4" />
                       <AlertTitle>No transactions found</AlertTitle>
@@ -321,7 +332,7 @@ const PayoutsPage: React.FC = () => {
             </TabsContent>
             
             <TabsContent value="accounts" className="space-y-4">
-              {accounts.length === 0 ? (
+              {!Array.isArray(accounts) || accounts.length === 0 ? (
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>No accounts found</AlertTitle>
@@ -335,7 +346,7 @@ const PayoutsPage: React.FC = () => {
             </TabsContent>
             
             <TabsContent value="disputes" className="space-y-4">
-              {disputes.length === 0 ? (
+              {!Array.isArray(disputes) || disputes.length === 0 ? (
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>No disputes found</AlertTitle>

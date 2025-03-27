@@ -113,12 +113,15 @@ const PayoutSettingsForm: React.FC<PayoutSettingsFormProps> = ({ settings }) => 
   
   // Handle form submission
   const onSubmit = (data: FormData) => {
-    updateSettings(data, {
-      onSuccess: () => {
-        setIsAlertVisible(true);
-        setTimeout(() => setIsAlertVisible(false), 3000);
+    updateSettings(
+      data,
+      {
+        onSuccess: () => {
+          setIsAlertVisible(true);
+          setTimeout(() => setIsAlertVisible(false), 3000);
+        }
       }
-    });
+    );
   };
   
   if (!settings) {
@@ -134,7 +137,7 @@ const PayoutSettingsForm: React.FC<PayoutSettingsFormProps> = ({ settings }) => 
           <p className="text-muted-foreground mb-4">
             No payout settings have been configured yet.
           </p>
-          <Button onClick={() => updateSettings({})}>
+          <Button onClick={() => updateSettings({}, {})}>
             Initialize Settings
           </Button>
         </CardContent>
