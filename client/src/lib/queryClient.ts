@@ -5,14 +5,49 @@ import { syncAuthClaims } from "./user-profile-utils";
 
 /**
  * Helper function to check if a response is ok and throw an error if not
+ * Includes enhanced handling for HTML responses which may indicate server-side issues
  */
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    // Check content type to identify HTML responses (usually errors)
+    const contentType = res.headers.get('content-type');
+    const isHtmlResponse = contentType && contentType.includes('text/html');
+    
     // Try to get error text from response
     let errorMessage;
     try {
       const text = await res.text();
-      errorMessage = text || res.statusText;
+      
+      // For HTML responses, try to extract a more meaningful error
+      if (isHtmlResponse) {
+        console.warn('throwIfResNotOk: Received HTML response instead of JSON/text on error');
+        
+        // Try to extract useful information from the HTML
+        const titleMatch = text.match(/<title>(.*?)<\/title>/);
+        const errorTitle = titleMatch ? titleMatch[1] : 'Unknown error';
+        
+        // Log additional debug info
+        console.error(`throwIfResNotOk: HTML error page title: ${errorTitle}`);
+        console.error('throwIfResNotOk: First 200 characters of HTML:', text.substring(0, 200));
+        
+        // Use a more descriptive error message
+        errorMessage = `Server returned HTML instead of expected response format. Error: ${errorTitle}`;
+      } else {
+        // Normal error handling for non-HTML responses
+        errorMessage = text || res.statusText;
+        
+        // Try to parse as JSON if it looks like JSON
+        if (text.trim().startsWith('{') && text.trim().endsWith('}')) {
+          try {
+            const jsonError = JSON.parse(text);
+            if (jsonError.error || jsonError.message) {
+              errorMessage = jsonError.error || jsonError.message;
+            }
+          } catch (jsonParseError) {
+            // Keep original text if JSON parsing fails
+          }
+        }
+      }
     } catch (e) {
       errorMessage = res.statusText;
     }
@@ -237,11 +272,63 @@ export async function apiRequest(
       }
     }
     
+    // Check for HTML response even on success (could indicate server-side issue)
+    const contentType = res.headers.get('content-type');
+    if (contentType && contentType.includes('text/html') && !url.includes('/auth/')) {
+      console.warn(`apiRequest: Received HTML response from ${url} (status ${res.status})`);
+      
+      // For admin API endpoints, try alternative URL format
+      if (url.includes('/admin/') || url.includes('/api/admin/')) {
+        // Create a corrected URL
+        let correctedUrl = url;
+        
+        // Test if we need to add or fix /api/ prefix
+        if (!url.includes('/api/admin/') && url.includes('/admin/')) {
+          console.log('apiRequest: Attempting to correct admin URL by adding /api/ prefix');
+          correctedUrl = url.replace('/admin/', '/api/admin/');
+        }
+        
+        // Fix double slashes and protocol issues
+        correctedUrl = correctedUrl
+          .replace(/\/\/+/g, '/') // Replace multiple slashes with a single one
+          .replace('http:/', 'http://') // Fix protocol if affected
+          .replace('https:/', 'https://'); // Fix protocol if affected
+        
+        if (correctedUrl !== url) {
+          console.log(`apiRequest: Retrying with corrected URL: ${correctedUrl}`);
+          
+          // Update request options with new URL
+          const retryOptions = { ...requestOptions };
+          
+          // Make a new request with the corrected URL
+          const retryRes = await fetch(correctedUrl, retryOptions);
+          
+          if (retryRes.ok) {
+            console.log('apiRequest: Retry with corrected URL succeeded!');
+            return retryRes;
+          } else {
+            console.error('apiRequest: Retry with corrected URL also failed');
+          }
+        }
+      }
+    }
+    
     // Handle response
     await throwIfResNotOk(res);
     return res;
   } catch (error) {
     console.error('apiRequest: Error during request:', error);
+    
+    // Enhance error message for common issues with admin routes
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('HTML instead of expected') && url.includes('/admin/')) {
+      // Suggest checking the API path for admin routes
+      console.error(`apiRequest: This might be an API routing issue. Check if the path should be /api/admin/ instead of /admin/`);
+      
+      // Add helpful context to the error
+      throw new Error(`${errorMessage} (This may be a routing issue - try using /api/admin/ in the URL)`);
+    }
+    
     throw error;
   }
 }
@@ -250,11 +337,19 @@ export async function apiRequest(
  * TanStack Query fetcher function with auth support and role detection
  */
 type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
+
+/**
+ * Create a query function for TanStack Query with auth support
+ * @template TQueryFnData The type of data returned by the query function
+ * @param options Configuration options for the query function
+ * @returns A QueryFunction that can be used with TanStack Query
+ */
+export function getQueryFn<TQueryFnData = any>(options: {
   on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
+}): QueryFunction<TQueryFnData> {
+  const { on401: unauthorizedBehavior } = options;
+  
+  return async ({ queryKey }): Promise<TQueryFnData> => {
     // Enable debug logging
     const enableDebug = true;
     
@@ -270,7 +365,7 @@ export const getQueryFn: <T>(options: {
     
     // Determine required role based on URL pattern
     const requiredRole = isProducerEndpoint ? 'producer' : 
-                         isPartnerEndpoint ? 'partner' : undefined;
+                       isPartnerEndpoint ? 'partner' : undefined;
     
     // If this is a role-protected endpoint, verify the user has the correct role
     if (requiredRole) {
@@ -357,7 +452,7 @@ export const getQueryFn: <T>(options: {
         
         if (unauthorizedBehavior === "returnNull") {
           console.log('QueryFn: Returning null for 401 as configured');
-          return null;
+          return null as unknown as TQueryFnData;
         }
       }
   
@@ -385,12 +480,13 @@ export const getQueryFn: <T>(options: {
           console.error(`QueryFn: URL path that returned HTML: ${queryKey[0]}`);
           
           // For producer API endpoints, try fallback URL pattern if needed
-          if (queryKey[0].toString().includes('/api/producer/')) {
+          const queryKeyStr = String(queryKey[0]);
+          if (queryKeyStr.includes('/api/producer/')) {
             console.log('QueryFn: Detected producer API endpoint, will retry with corrected path');
             
             // Create a corrected version of the URL by removing any double slashes
             // This typically happens with route confusion in the Express server
-            const correctedUrl = queryKey[0].toString()
+            const correctedUrl = queryKeyStr
               .replace(/\/\/+/g, '/') // Replace multiple consecutive slashes with a single slash
               .replace('http:/', 'http://') // Fix protocol if affected
               .replace('https:/', 'https://'); // Fix protocol if affected
@@ -406,7 +502,7 @@ export const getQueryFn: <T>(options: {
               
               if (retryRes.ok) {
                 console.log('QueryFn: Retry with corrected URL succeeded!');
-                return await retryRes.json();
+                return await retryRes.json() as TQueryFnData;
               } else {
                 console.error('QueryFn: Retry with corrected URL also failed');
               }
@@ -431,7 +527,7 @@ export const getQueryFn: <T>(options: {
           }
         }
         
-        return data;
+        return data as TQueryFnData;
       } catch (jsonError) {
         console.error('QueryFn: Error parsing JSON response:', jsonError);
         console.error('QueryFn: Response content-type:', contentType);
@@ -451,6 +547,7 @@ export const getQueryFn: <T>(options: {
       throw error;
     }
   };
+}
 
 /**
  * Configure and export query client
