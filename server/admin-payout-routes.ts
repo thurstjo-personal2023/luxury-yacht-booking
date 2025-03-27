@@ -18,9 +18,37 @@ const router = Router();
 // Initialize the payout service
 const payoutService = new PayoutService();
 
+// Root route handler - return API information
+router.get('/', verifyAuth, verifyFinanceAdmin, (req: Request, res: Response) => {
+  console.log('Root payout route accessed:', {
+    method: req.method,
+    headers: req.headers,
+    path: req.path
+  });
+  return res.json({
+    api: 'Payout Management API',
+    version: '1.0.0',
+    endpoints: [
+      'GET /settings',
+      'PUT|PATCH /settings',
+      'GET /transactions',
+      'POST /transactions',
+      'GET /transactions/:id',
+      'PATCH /transactions/:id/status',
+      'GET /accounts',
+      'GET /accounts/:id',
+      'PATCH /accounts/:id/verify',
+      'GET /disputes',
+      'PATCH /disputes/:id/status',
+      'GET /earnings'
+    ]
+  });
+});
+
 // Get payout settings
 router.get('/settings', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
   try {
+    console.log('GET payout settings request received');
     const settings = await payoutService.getPayoutSettings();
     return res.json(settings);
   } catch (error) {
@@ -29,20 +57,26 @@ router.get('/settings', verifyAuth, verifyFinanceAdmin, async (req: Request, res
   }
 });
 
-// Update payout settings
-router.put('/settings', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {
+// Update payout settings (support both PUT and PATCH for client compatibility)
+const updatePayoutSettingsHandler = async (req: Request, res: Response) => {
   try {
     const settingsSchema = z.object({
-      automaticPayoutsEnabled: z.boolean(),
-      minimumPayoutAmount: z.number().positive(),
-      payoutSchedule: z.enum(['daily', 'weekly', 'biweekly', 'monthly']),
-      platformFeePercentage: z.number().min(0).max(100),
-      withdrawalFee: z.number().min(0),
-      payoutMethods: z.array(z.enum(['paypal', 'stripe', 'bank_account', 'crypto_wallet'])),
-      maxRetryAttempts: z.number().int().positive(),
-      supportContact: z.string().email(),
-      allowEarlyPayout: z.boolean(),
-      earlyPayoutFee: z.number().min(0)
+      automaticPayoutsEnabled: z.boolean().optional(),
+      minimumPayoutAmount: z.number().positive().optional(),
+      payoutSchedule: z.enum(['daily', 'weekly', 'biweekly', 'monthly']).optional(),
+      platformFeePercentage: z.number().min(0).max(100).optional(),
+      withdrawalFee: z.number().min(0).optional(),
+      payoutMethods: z.array(z.enum(['paypal', 'stripe', 'bank_account', 'crypto_wallet'])).optional(),
+      maxRetryAttempts: z.number().int().positive().optional(),
+      supportContact: z.string().email().optional(),
+      allowEarlyPayout: z.boolean().optional(),
+      earlyPayoutFee: z.number().min(0).optional()
+    });
+
+    console.log('Update payout settings request received:', {
+      method: req.method,
+      contentType: req.headers['content-type'],
+      body: req.body
     });
 
     const validatedData = settingsSchema.parse(req.body);
@@ -50,12 +84,17 @@ router.put('/settings', verifyAuth, verifyFinanceAdmin, async (req: Request, res
     return res.json(updatedSettings);
   } catch (error) {
     if (error instanceof z.ZodError) {
+      console.error('Settings validation error:', error.errors);
       return res.status(400).json({ error: 'Invalid settings data', details: error.errors });
     }
     console.error('Error updating payout settings:', error);
     return res.status(500).json({ error: 'Failed to update payout settings' });
   }
-});
+};
+
+// Register both PUT and PATCH methods for settings updates
+router.put('/settings', verifyAuth, verifyFinanceAdmin, updatePayoutSettingsHandler);
+router.patch('/settings', verifyAuth, verifyFinanceAdmin, updatePayoutSettingsHandler);
 
 // Get all payout accounts
 router.get('/accounts', verifyAuth, verifyFinanceAdmin, async (req: Request, res: Response) => {

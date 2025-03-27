@@ -55,7 +55,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
-import { PayoutTransaction, PayoutStatus, UserType } from '@/shared/payment-schema';
+import { PayoutTransaction, PayoutStatus, UserType } from '../../../../shared/payment-schema';
 import { usePayoutTransactions } from '@/hooks/use-payouts';
 
 // Helper function to format timestamp
