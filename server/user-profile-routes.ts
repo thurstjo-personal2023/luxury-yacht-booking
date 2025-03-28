@@ -163,17 +163,25 @@ export function registerUserProfileRoutes(app: Express) {
       
       // Get all fields that can be updated from request body
       const { 
+        // Core user fields (harmonized_users)
         name,
         phoneNumber,
+        
+        // Consumer-specific fields (user_profiles_tourist)
         address,
         preferences,
         profilePhoto,
         wishlist,
         communicationPreferences,
         loyaltyTier,
+        loyaltyPoints,
         dietaryRestrictions,
         accessibilityNeeds,
-        favoriteDestinations
+        favoriteDestinations,
+        activityPreferences,
+        paymentMethods,
+        emergencyContact,
+        rewardsHistory
       } = req.body;
       
       // Core user data updates (harmonized_users collection)
@@ -195,18 +203,21 @@ export function registerUserProfileRoutes(app: Express) {
         lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
       };
       
-      // Only consumer-specific fields go in user_profiles_tourist
+      // Update all consumer-specific fields
+      if (address !== undefined) profileUpdates.address = address;
       if (preferences !== undefined) profileUpdates.preferences = preferences;
       if (profilePhoto !== undefined) profileUpdates.profilePhoto = profilePhoto;
       if (wishlist !== undefined) profileUpdates.wishlist = wishlist;
-      if (address !== undefined) profileUpdates.address = address;
       if (communicationPreferences !== undefined) profileUpdates.communicationPreferences = communicationPreferences;
       if (loyaltyTier !== undefined) profileUpdates.loyaltyTier = loyaltyTier;
+      if (loyaltyPoints !== undefined) profileUpdates.loyaltyPoints = loyaltyPoints;
       if (dietaryRestrictions !== undefined) profileUpdates.dietaryRestrictions = dietaryRestrictions;
       if (accessibilityNeeds !== undefined) profileUpdates.accessibilityNeeds = accessibilityNeeds;
       if (favoriteDestinations !== undefined) profileUpdates.favoriteDestinations = favoriteDestinations;
-      if (address !== undefined) profileUpdates.address = address;
-      if (communicationPreferences !== undefined) profileUpdates.communicationPreferences = communicationPreferences;
+      if (activityPreferences !== undefined) profileUpdates.activityPreferences = activityPreferences;
+      if (paymentMethods !== undefined) profileUpdates.paymentMethods = paymentMethods;
+      if (emergencyContact !== undefined) profileUpdates.emergencyContact = emergencyContact;
+      if (rewardsHistory !== undefined) profileUpdates.rewardsHistory = rewardsHistory;
       
       // Check if profile exists
       const profileDoc = await adminDb.collection('user_profiles_tourist').doc(req.user.uid).get();
