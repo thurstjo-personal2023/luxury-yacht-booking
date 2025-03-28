@@ -37,6 +37,8 @@ import { YachtCarousel } from "@/components/YachtCarousel";
 import { AlertCircle } from "lucide-react";
 import axios from 'axios';
 import { cn } from "@/lib/utils";
+import { EditProfileModal } from "@/components/modals/EditProfileModal";
+import { useUpdateProfile } from "@/hooks/use-profile";
 
 // Add Google Maps type declaration
 declare global {
@@ -111,6 +113,10 @@ export default function ConsumerDashboard() {
   const { toast } = useToast();
   const { user, profileData } = useAuthService();
   const userRole = profileData?.harmonizedUser?.role || 'consumer';
+  
+  // State for edit profile modal
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+  const updateProfileMutation = useUpdateProfile();
   
   // Role verification - ensure user has consumer role
   useEffect(() => {
@@ -766,7 +772,7 @@ export default function ConsumerDashboard() {
                     </div>
 
                     <div className="flex justify-end">
-                      <Button>Edit Profile</Button>
+                      <Button onClick={() => setIsEditProfileModalOpen(true)}>Edit Profile</Button>
                     </div>
                   </div>
                 ) : (
@@ -782,6 +788,33 @@ export default function ConsumerDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Edit Profile Modal */}
+      {profile && (
+        <EditProfileModal
+          isOpen={isEditProfileModalOpen}
+          onClose={() => setIsEditProfileModalOpen(false)}
+          profile={profile}
+          onSave={async (updatedProfile) => {
+            try {
+              await updateProfileMutation.mutateAsync(updatedProfile);
+              toast({
+                title: "Profile Updated",
+                description: "Your profile has been successfully updated.",
+              });
+              return Promise.resolve();
+            } catch (error) {
+              console.error("Error updating profile:", error);
+              toast({
+                title: "Update Failed",
+                description: "There was an error updating your profile. Please try again.",
+                variant: "destructive",
+              });
+              return Promise.reject(error);
+            }
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 }
