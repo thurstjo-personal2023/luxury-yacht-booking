@@ -169,27 +169,19 @@ export function registerUserProfileRoutes(app: Express) {
         preferences,
         profilePhoto,
         wishlist,
-        communicationPreferences 
+        communicationPreferences,
+        loyaltyTier,
+        dietaryRestrictions,
+        accessibilityNeeds,
+        favoriteDestinations
       } = req.body;
       
-      // Update the harmonized user with core data
+      // Core user data updates (harmonized_users collection)
       const coreUpdates: Partial<HarmonizedUser> = {
         updatedAt: FieldValue.serverTimestamp() as ServerTimestamp
       };
       
-      if (name) coreUpdates.name = name;
-      if (phoneNumber) coreUpdates.phone = phoneNumber;
-      
-      // Update core data in harmonized_users
-      if (Object.keys(coreUpdates).length > 1) { // If there's more than just the timestamp
-        await adminDb.collection('harmonized_users').doc(req.user.uid).update(coreUpdates);
-      }
-      
-      // Separate updates for harmonized_users (core data)
-      const coreUpdates: Partial<HarmonizedUser> = {
-        updatedAt: FieldValue.serverTimestamp() as ServerTimestamp
-      };
-      
+      // Only update core fields in harmonized_users
       if (name) coreUpdates.name = name;
       if (phoneNumber) coreUpdates.phone = phoneNumber;
       
@@ -198,7 +190,7 @@ export function registerUserProfileRoutes(app: Express) {
         await adminDb.collection('harmonized_users').doc(req.user.uid).update(coreUpdates);
       }
       
-      // Tourist-specific profile updates
+      // Consumer-specific profile updates (user_profiles_tourist collection)
       const profileUpdates: Partial<TouristProfile> = {
         lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
       };
@@ -207,6 +199,12 @@ export function registerUserProfileRoutes(app: Express) {
       if (preferences !== undefined) profileUpdates.preferences = preferences;
       if (profilePhoto !== undefined) profileUpdates.profilePhoto = profilePhoto;
       if (wishlist !== undefined) profileUpdates.wishlist = wishlist;
+      if (address !== undefined) profileUpdates.address = address;
+      if (communicationPreferences !== undefined) profileUpdates.communicationPreferences = communicationPreferences;
+      if (loyaltyTier !== undefined) profileUpdates.loyaltyTier = loyaltyTier;
+      if (dietaryRestrictions !== undefined) profileUpdates.dietaryRestrictions = dietaryRestrictions;
+      if (accessibilityNeeds !== undefined) profileUpdates.accessibilityNeeds = accessibilityNeeds;
+      if (favoriteDestinations !== undefined) profileUpdates.favoriteDestinations = favoriteDestinations;
       if (address !== undefined) profileUpdates.address = address;
       if (communicationPreferences !== undefined) profileUpdates.communicationPreferences = communicationPreferences;
       
