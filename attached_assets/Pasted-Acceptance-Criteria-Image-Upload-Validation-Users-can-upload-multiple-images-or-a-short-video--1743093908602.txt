@@ -1,0 +1,21 @@
+Acceptance Criteria:
+
+Image Upload & Validation:
+Users can upload multiple images (or a short video) of the yacht.
+The system validates the images against best practices for equirectangular panorama creation (e.g., sufficient overlap between shots, proper exposure, consistent white balance, minimum resolution, and an approximate 2:1 aspect ratio).
+Clear guidance and in-app tips are provided to help users capture images correctly (e.g., recommended number of images, overlap percentage, camera settings).
+AI-Powered Stitching API Integration:
+The uploaded images are sent to an AI-based stitching service via an API.
+The system leverages either an existing commercial solution (e.g., Adobe Photoshop API leveraging Adobe Sensei technology) or a custom microservice built on open-source stitching tools (e.g., a wrapped version of Hugin) to process and merge the images into a seamless equirectangular panorama.
+The API returns a high-resolution 360° panoramic image that meets the equirectangular standard (with a 2:1 aspect ratio).
+Panorama Display with Pannellum:
+The generated panoramic image is stored in the platform’s media storage (e.g., Firebase Storage).
+The application integrates with Pannellum to render the 360° panorama on both web and mobile devices.
+Users (consumers, producers, and partners) can interact with the panorama (e.g., zoom, pan, rotate) in a responsive viewer.
+Error Handling & Feedback:
+The system provides clear error messages if the image stitching fails (e.g., due to insufficient overlap or poor image quality) and offers guidance on how to retake images.
+If the AI API or stitching service is unavailable, the system falls back to a cached version or prompts the user to try again later.
+Simplicity & Automation:
+The entire process—from image upload, through automatic stitching, to panorama display—is designed to minimize manual intervention.
+A progress indicator keeps the user informed while the panorama is being generated.
+Once complete, the panorama is automatically linked to the yacht’s listing on the platform.

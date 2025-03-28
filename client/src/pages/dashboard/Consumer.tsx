@@ -1,6 +1,7 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,6 +101,7 @@ export default function ConsumerDashboard() {
       }
     }
   }, [user, userRole, toast]);
+  const [, navigate] = useLocation();
   const [location, setLocation] = useState<string>("");
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
@@ -407,7 +409,12 @@ export default function ConsumerDashboard() {
                             <p className="text-sm text-gray-500 line-clamp-2">{yacht.description}</p>
                             <div className="flex justify-between items-center mt-2">
                               <div className="font-semibold">${yacht.pricing || yacht.price}</div>
-                              <Button size="sm">View Details</Button>
+                              <Button 
+                                size="sm" 
+                                onClick={() => yacht.id && navigate(`/yacht/${yacht.id}`)}
+                              >
+                                View Details
+                              </Button>
                             </div>
                           </CardContent>
                         </Card>
@@ -511,7 +518,13 @@ export default function ConsumerDashboard() {
                                   />
                                 </div>
                               )}
-                              <Button size="sm" variant="outline">View Details</Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => booking.packageId && navigate(`/yacht/${booking.packageId}`)}
+                              >
+                                View Details
+                              </Button>
                             </div>
                           </div>
                         </CardContent>
@@ -521,7 +534,13 @@ export default function ConsumerDashboard() {
                 ) : (
                   <div className="text-center py-6">
                     <p>You don't have any bookings yet</p>
-                    <Button className="mt-4" variant="outline">Explore Yachts</Button>
+                    <Button 
+                      className="mt-4" 
+                      variant="outline"
+                      onClick={() => navigate("/")}
+                    >
+                      Explore Yachts
+                    </Button>
                   </div>
                 )}
               </CardContent>
