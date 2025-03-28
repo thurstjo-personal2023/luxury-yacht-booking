@@ -185,15 +185,25 @@ export function registerUserProfileRoutes(app: Express) {
         await adminDb.collection('harmonized_users').doc(req.user.uid).update(coreUpdates);
       }
       
-      // Update tourist profile
+      // Separate updates for harmonized_users (core data)
+      const coreUpdates: Partial<HarmonizedUser> = {
+        updatedAt: FieldValue.serverTimestamp() as ServerTimestamp
+      };
+      
+      if (name) coreUpdates.name = name;
+      if (phoneNumber) coreUpdates.phone = phoneNumber;
+      
+      // Update harmonized_users if there are core field changes
+      if (Object.keys(coreUpdates).length > 1) { // More than just timestamp
+        await adminDb.collection('harmonized_users').doc(req.user.uid).update(coreUpdates);
+      }
+      
+      // Tourist-specific profile updates
       const profileUpdates: Partial<TouristProfile> = {
         lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
       };
       
-      // Fields that go in harmonized_users but we mirror here for convenience
-      // Not directly setting name as it's not in TouristProfile schema (removed)
-      // We also don't set phoneNumber since it's not in the TouristProfile schema
-      
+      // Only consumer-specific fields go in user_profiles_tourist
       if (preferences !== undefined) profileUpdates.preferences = preferences;
       if (profilePhoto !== undefined) profileUpdates.profilePhoto = profilePhoto;
       if (wishlist !== undefined) profileUpdates.wishlist = wishlist;
