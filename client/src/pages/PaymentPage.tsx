@@ -72,6 +72,11 @@ export default function PaymentPage() {
         }
         
         setBookingData(parsedData);
+        
+        // Store the tab we'll return to (defaults to bookings)
+        if (!sessionStorage.getItem('returnToTab')) {
+          sessionStorage.setItem('returnToTab', 'bookings');
+        }
       } else {
         // If no booking data, redirect back to home
         toast({
@@ -212,12 +217,15 @@ export default function PaymentPage() {
 
       // 5. Clear booking data from session storage
       sessionStorage.removeItem('bookingSummaryData');
+      
+      // 6. Store the tab we want to return to (bookings tab) for the dashboard
+      sessionStorage.setItem('returnToTab', 'bookings');
 
-      // 6. Set payment as complete
+      // 7. Set payment as complete
       setPaymentComplete(true);
       setIsProcessingBooking(false);
 
-      // 7. Show success toast
+      // 8. Show success toast
       toast({
         title: "Booking confirmed!",
         description: "Your booking has been successfully confirmed. Check your email for details.",
@@ -239,6 +247,10 @@ export default function PaymentPage() {
       description: "Your payment has been cancelled. You can try again later.",
     });
     setLocation("/booking-summary");
+    
+    // Store the return tab preference in case user wants to return to dashboard
+    const returnTab = sessionStorage.getItem('returnToTab') || 'bookings'; 
+    sessionStorage.setItem('returnToTab', returnTab);
   };
 
   if (!bookingData || !bookingData.yacht) {
@@ -271,7 +283,12 @@ export default function PaymentPage() {
           <Button 
             variant="ghost" 
             className="mb-6 hover:bg-transparent p-0 flex items-center"
-            onClick={() => setLocation("/booking-summary")}
+            onClick={() => {
+              // Preserve the tab information before going back
+              const returnTab = sessionStorage.getItem('returnToTab') || 'bookings'; 
+              sessionStorage.setItem('returnToTab', returnTab);
+              setLocation("/booking-summary");
+            }}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             <span>Back to Booking Summary</span>
@@ -302,6 +319,8 @@ export default function PaymentPage() {
                     <p className="font-medium text-green-800">Confirmation Number</p>
                     <p className="text-green-600 font-mono text-lg">{confirmationId || "CONF-" + Math.random().toString(36).substring(2, 10).toUpperCase()}</p>
                   </div>
+
+
                   
                   <div className="space-y-4 pt-2">
                     <h3 className="font-medium">Booking Details</h3>
@@ -343,7 +362,7 @@ export default function PaymentPage() {
                         setLocation(`/dashboard/consumer?tab=${returnTab}`);
                       }}
                     >
-                      Go to My Bookings
+                      Return to Dashboard
                     </Button>
                   </div>
                 </CardContent>

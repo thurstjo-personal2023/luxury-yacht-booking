@@ -73,7 +73,7 @@ export default function Register() {
     if (user && harmonizedUser) {
       console.log("User already authenticated, redirecting to dashboard");
       const role = harmonizedUser.role?.toLowerCase() || 'consumer';
-      let dashboardUrl = '/dashboard/consumer'; // Default
+      let dashboardUrl = '/dashboard/consumer?tab=explore'; // Default
       
       switch (role) {
         case 'producer':
@@ -84,7 +84,7 @@ export default function Register() {
           break;
         case 'consumer':
         default:
-          dashboardUrl = '/dashboard/consumer';
+          dashboardUrl = '/dashboard/consumer?tab=explore';
           break;
       }
       
@@ -184,7 +184,7 @@ export default function Register() {
       
       // Determine dashboard URL
       const dashboardRoutes = {
-        [UserRole.CONSUMER]: "/dashboard/consumer",
+        [UserRole.CONSUMER]: "/dashboard/consumer?tab=explore",
         [UserRole.PRODUCER]: "/dashboard/producer",
         [UserRole.PARTNER]: "/dashboard/partner",
       };

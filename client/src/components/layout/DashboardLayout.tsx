@@ -73,10 +73,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   ];
 
   const bottomNavItems = [
-    { icon: Home, label: "Home", href: "/dashboard/consumer" },
-    { icon: Search, label: "Explore", href: "/explore" },
-    { icon: BookOpen, label: "Bookings", href: "/dashboard/bookings" },
-    { icon: User, label: "Profile", href: "/dashboard/profile" },
+    { icon: Home, label: "Home", href: "/dashboard/consumer?tab=explore" },
+    { icon: Search, label: "Explore", href: "/dashboard/consumer?tab=explore" },
+    { icon: BookOpen, label: "Bookings", href: "/dashboard/consumer?tab=bookings" },
+    { icon: User, label: "Profile", href: "/dashboard/consumer?tab=profile" },
   ];
 
   return (

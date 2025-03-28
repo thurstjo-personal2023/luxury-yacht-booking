@@ -57,7 +57,7 @@ export default function Login() {
       const role = harmonizedUser.role?.toLowerCase() || 'consumer';
       
       // Determine dashboard URL based on role
-      let dashboardUrl = '/dashboard/consumer'; // Default
+      let dashboardUrl = '/dashboard/consumer?tab=explore'; // Default
       
       switch (role) {
         case 'producer':
@@ -68,7 +68,7 @@ export default function Login() {
           break;
         case 'consumer':
         default:
-          dashboardUrl = '/dashboard/consumer';
+          dashboardUrl = '/dashboard/consumer?tab=explore';
           break;
       }
       
@@ -275,12 +275,14 @@ export default function Login() {
                 Sign up here
               </Link>
             </div>
-            <Alert variant="outline" className="border-primary/20 bg-primary/5">
-              <Info className="h-4 w-4 text-primary" />
-              <AlertDescription className="text-xs text-muted-foreground">
-                For technical support, contact <span className="font-semibold">support@etoileyachts.com</span>
-              </AlertDescription>
-            </Alert>
+            <div className="border rounded-md p-3 border-primary/20 bg-primary/5">
+              <div className="flex gap-2 items-start">
+                <Info className="h-4 w-4 text-primary mt-0.5" />
+                <p className="text-xs text-muted-foreground">
+                  For technical support, contact <span className="font-semibold">support@etoileyachts.com</span>
+                </p>
+              </div>
+            </div>
           </CardFooter>
         </Card>
       </div>
