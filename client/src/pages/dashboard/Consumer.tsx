@@ -18,7 +18,16 @@ import { CalendarDateRangePicker } from "@/components/ui/date-range-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import type { YachtExperience } from "@shared/firestore-schema";
-import { getDocs, query, where, limit, collection, doc, getDoc } from "firebase/firestore";
+import { 
+  getDocs, 
+  query, 
+  where, 
+  limit, 
+  collection, 
+  doc, 
+  getDoc,
+  Firestore
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuthService } from "@/services/auth/use-auth-service";
 import { DateRange } from "react-day-picker";
@@ -27,6 +36,7 @@ import { PlacesAutocomplete } from "@/components/ui/places-autocomplete";
 import { YachtCarousel } from "@/components/YachtCarousel";
 import { AlertCircle } from "lucide-react";
 import axios from 'axios';
+import { cn } from "@/lib/utils";
 
 // Add Google Maps type declaration
 declare global {
