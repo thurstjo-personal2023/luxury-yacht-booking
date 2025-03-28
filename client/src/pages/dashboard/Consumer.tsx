@@ -27,6 +27,25 @@ import { PlacesAutocomplete } from "@/components/ui/places-autocomplete";
 import { YachtCarousel } from "@/components/YachtCarousel";
 import axios from 'axios';
 
+// Add Google Maps type declaration
+declare global {
+  namespace google {
+    namespace maps {
+      namespace places {
+        interface PlaceResult {
+          formatted_address?: string;
+          geometry?: {
+            location?: {
+              lat(): number;
+              lng(): number;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 interface LocationOption {
   address: string;
   latitude: number;
@@ -115,10 +134,27 @@ export default function ConsumerDashboard() {
   
   // Check for tab parameter in URL on component mount
   useEffect(() => {
+    // First priority: Check URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams.get('tab');
+    
+    // Second priority: Check for returnToTab in sessionStorage (set by YachtDetails or other components)
+    const returnToTab = sessionStorage.getItem('returnToTab');
+    
     if (tabParam && ['explore', 'bookings', 'profile'].includes(tabParam)) {
+      // URL parameter has highest priority
       setActiveTab(tabParam);
+    } else if (returnToTab && ['explore', 'bookings', 'profile'].includes(returnToTab)) {
+      // Use returnToTab if available and no URL parameter
+      setActiveTab(returnToTab);
+      
+      // Update URL to match the selected tab
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', returnToTab);
+      window.history.pushState({}, '', url.toString());
+      
+      // Clear the returnToTab from sessionStorage once used
+      sessionStorage.removeItem('returnToTab');
     }
   }, []);
 
@@ -497,7 +533,7 @@ export default function ConsumerDashboard() {
                   </div>
                 ) : bookings && bookings.length > 0 ? (
                   <div className="space-y-4">
-                    {bookings.map((booking) => (
+                    {bookings.map((booking: Booking) => (
                       <Card key={booking.id}>
                         <CardContent className="p-4">
                           <div className="flex justify-between items-center">
@@ -626,7 +662,7 @@ export default function ConsumerDashboard() {
                         <h3 className="font-semibold mb-2">Preferences</h3>
                         <div className="flex flex-wrap gap-2">
                           {profile.preferences && profile.preferences.length > 0 ? (
-                            profile.preferences.map((pref, index) => (
+                            profile.preferences.map((pref: string, index: number) => (
                               <span key={index} className="bg-primary/10 text-primary text-sm px-2 py-1 rounded">
                                 {pref}
                               </span>

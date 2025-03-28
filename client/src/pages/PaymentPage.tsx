@@ -8,7 +8,18 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import type { YachtExperience } from "@shared/firestore-schema";
-import { BookingPayment, PaymentMethod } from "@shared/payment-schema";
+// Use a simple payment type definition as those aren't available in payment-schema.ts
+interface BookingPayment {
+  id: string;
+  bookingId: string;
+  userId: string;
+  amount: number;
+  currency: string;
+  method: string;
+  status: string;
+  transactionId?: string;
+  createdAt: any;
+}
 import { auth, db } from "@/lib/firebase";
 import { collection, addDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -325,7 +336,12 @@ export default function PaymentPage() {
                   <div className="pt-4">
                     <Button 
                       className="w-full" 
-                      onClick={() => setLocation("/dashboard/consumer?tab=bookings")}
+                      onClick={() => {
+                        // Use the previously stored tab or default to 'bookings'
+                        // No need to set it here as it should have been set earlier in the flow
+                        const returnTab = sessionStorage.getItem('returnToTab') || 'bookings';
+                        setLocation(`/dashboard/consumer?tab=${returnTab}`);
+                      }}
                     >
                       Go to My Bookings
                     </Button>

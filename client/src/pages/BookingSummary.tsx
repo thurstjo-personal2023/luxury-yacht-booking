@@ -137,6 +137,13 @@ export default function BookingSummary() {
         description: "Redirecting to payment gateway...",
       });
       
+      // Ensure the tab state is preserved for returning to dashboard after payment
+      const returnTab = sessionStorage.getItem('returnToTab');
+      if (!returnTab) {
+        // If no tab is set, default to the bookings tab after payment
+        sessionStorage.setItem('returnToTab', 'bookings');
+      }
+      
       // Redirect to the payment page which will handle the Stripe payment process
       setLocation("/payment");
     } else {
@@ -187,7 +194,18 @@ export default function BookingSummary() {
         <Button 
           variant="ghost" 
           className="mb-6 hover:bg-transparent p-0 flex items-center"
-          onClick={() => setLocation(`/yacht/${yacht.id}`)}
+          onClick={() => {
+            // Maintain tab state when returning to yacht details
+            const returnTab = sessionStorage.getItem('returnToTab');
+            if (returnTab) {
+              // Keep the returnToTab in sessionStorage for later use
+              setLocation(`/yacht/${yacht.id}`);
+            } else {
+              // Default to storing 'explore' tab if no previous tab was set
+              sessionStorage.setItem('returnToTab', 'explore');
+              setLocation(`/yacht/${yacht.id}`);
+            }
+          }}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           <span>Back to Package Details</span>
