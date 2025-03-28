@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
@@ -33,6 +34,12 @@ interface EditProfileModalProps {
     address?: string; 
     email?: string;
     preferences?: string[];
+    communicationPreferences?: {
+      email?: boolean;
+      sms?: boolean;
+      push?: boolean;
+      marketingEmails?: boolean;
+    };
     [key: string]: any;
   };
   onSave: (updatedProfile: any) => Promise<void>;
@@ -45,7 +52,13 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
     phoneNumber: "",
     address: "",
     preferences: [] as string[],
-    newPreference: ""
+    newPreference: "",
+    communicationPreferences: {
+      email: false,
+      sms: false,
+      push: false,
+      marketingEmails: false
+    }
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -57,7 +70,13 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
         phoneNumber: profile.phoneNumber || "",
         address: profile.address || "",
         preferences: profile.preferences || [],
-        newPreference: ""
+        newPreference: "",
+        communicationPreferences: {
+          email: profile.communicationPreferences?.email || false,
+          sms: profile.communicationPreferences?.sms || false,
+          push: profile.communicationPreferences?.push || false,
+          marketingEmails: profile.communicationPreferences?.marketingEmails || false
+        }
       });
     }
   }, [profile, isOpen]);
@@ -69,6 +88,16 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleSwitchChange = (name: string, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      communicationPreferences: {
+        ...prev.communicationPreferences,
+        [name]: checked
+      }
+    }));
   };
   
   const handleAddPreference = () => {
@@ -107,6 +136,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
         name: formData.name,
         // Profile specific fields
         preferences: formData.preferences,
+        communicationPreferences: formData.communicationPreferences,
         lastUpdated: new Date()
       };
 
@@ -184,6 +214,47 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                 placeholder="Your address"
                 rows={3}
               />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label>Communication Preferences</Label>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="email-pref" className="cursor-pointer">Email notifications</Label>
+                  <Switch 
+                    id="email-pref"
+                    checked={formData.communicationPreferences.email}
+                    onCheckedChange={(checked) => handleSwitchChange('email', checked)}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="sms-pref" className="cursor-pointer">SMS notifications</Label>
+                  <Switch 
+                    id="sms-pref"
+                    checked={formData.communicationPreferences.sms}
+                    onCheckedChange={(checked) => handleSwitchChange('sms', checked)}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="push-pref" className="cursor-pointer">Push notifications</Label>
+                  <Switch 
+                    id="push-pref"
+                    checked={formData.communicationPreferences.push}
+                    onCheckedChange={(checked) => handleSwitchChange('push', checked)}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="marketing-pref" className="cursor-pointer">Marketing emails</Label>
+                  <Switch 
+                    id="marketing-pref"
+                    checked={formData.communicationPreferences.marketingEmails}
+                    onCheckedChange={(checked) => handleSwitchChange('marketingEmails', checked)}
+                  />
+                </div>
+              </div>
             </div>
             
             <div className="grid gap-2">

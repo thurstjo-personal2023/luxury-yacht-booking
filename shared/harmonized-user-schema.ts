@@ -70,9 +70,22 @@ export interface TouristProfile {
   // Link to core user (this matches the id in harmonized_users)
   id: string;
   
+  // Basic information (mirrors harmonized_users for convenience)
+  name?: string;                 // User's full name
+  phoneNumber?: string;          // Contact phone number
+  address?: string;              // Mailing/residential address
+  
   // Profile customization
   profilePhoto?: string;         // URL to profile image
   loyaltyTier?: string;          // Loyalty program tier (e.g., Gold, Silver)
+  
+  // Communication preferences
+  communicationPreferences?: {
+    email?: boolean;
+    sms?: boolean;
+    push?: boolean;
+    marketingEmails?: boolean;
+  };
   
   // Preferences and history
   preferences?: string[];        // User interests and preferences
@@ -132,8 +145,17 @@ export interface ServiceProviderProfile {
 export function normalizeConsumerProfile(profile: any): TouristProfile {
   return {
     id: profile.id || profile.userId || '',
+    name: profile.name || '',
+    phoneNumber: profile.phoneNumber || profile.phone || '',
+    address: profile.address || '',
     profilePhoto: profile.profilePhoto || '',
     loyaltyTier: profile.loyaltyTier || 'Standard',
+    communicationPreferences: {
+      email: profile.communicationPreferences?.email || false,
+      sms: profile.communicationPreferences?.sms || false,
+      push: profile.communicationPreferences?.push || false,
+      marketingEmails: profile.communicationPreferences?.marketingEmails || false
+    },
     preferences: Array.isArray(profile.preferences) ? profile.preferences : [],
     wishlist: Array.isArray(profile.wishlist) ? profile.wishlist : [],
     bookingHistory: Array.isArray(profile.bookingHistory) ? profile.bookingHistory : [],
