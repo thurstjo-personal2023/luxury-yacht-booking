@@ -109,6 +109,18 @@ export default function ConsumerDashboard() {
   const [duration, setDuration] = useState<string>("");
   const [isSearching, setIsSearching] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<LocationOption | null>(null);
+  
+  // Add state for active tab
+  const [activeTab, setActiveTab] = useState<string>("explore");
+  
+  // Check for tab parameter in URL on component mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam && ['explore', 'bookings', 'profile'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, []);
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.uid],
@@ -278,7 +290,17 @@ export default function ConsumerDashboard() {
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">Welcome, {profile?.name || user?.displayName || "Guest"}</h1>
       
-        <Tabs defaultValue="explore" className="w-full">
+        <Tabs 
+          value={activeTab} 
+          onValueChange={(value) => {
+            setActiveTab(value);
+            // Update URL with tab parameter without full page reload
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', value);
+            window.history.pushState({}, '', url.toString());
+          }} 
+          className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="explore">Explore Yachts</TabsTrigger>
             <TabsTrigger value="bookings">My Bookings</TabsTrigger>
@@ -299,11 +321,13 @@ export default function ConsumerDashboard() {
                       <PlacesAutocomplete
                         onPlaceSelect={(place) => {
                           if (place) {
-                            setLocation(place.formatted_address || "");
+                            // Use type assertion for Google Maps place object
+                            const googlePlace = place as google.maps.places.PlaceResult;
+                            setLocation(googlePlace.formatted_address || "");
                             setSelectedLocation({
-                              address: place.formatted_address || "",
-                              latitude: place.geometry?.location?.lat() || 0,
-                              longitude: place.geometry?.location?.lng() || 0
+                              address: googlePlace.formatted_address || "",
+                              latitude: googlePlace.geometry?.location?.lat() || 0,
+                              longitude: googlePlace.geometry?.location?.lng() || 0
                             });
                           }
                         }}
@@ -394,24 +418,30 @@ export default function ConsumerDashboard() {
                         <Card key={yacht.id} className="overflow-hidden">
                           <div className="aspect-video relative">
                             <img 
-                              src={(yacht.media && yacht.media[0]?.url) || yacht.imageUrl || "https://images.unsplash.com/photo-1577032229840-33197764440d?w=800"} 
+                              src={(yacht.media && yacht.media[0]?.url) || (yacht as any).imageUrl || "https://images.unsplash.com/photo-1577032229840-33197764440d?w=800"} 
                               alt={yacht.title} 
                               className="w-full h-full object-cover"
                             />
-                            {(yacht.featured || yacht.isFeatured) && (
+                            {(yacht.featured || (yacht as any).isFeatured) && (
                               <div className="absolute top-2 right-2 bg-primary text-white text-xs px-2 py-1 rounded">
                                 Featured
                               </div>
                             )}
                           </div>
                           <CardContent className="p-4">
-                            <h3 className="font-semibold text-lg">{yacht.title || yacht.name}</h3>
+                            <h3 className="font-semibold text-lg">{yacht.title || (yacht as any).name}</h3>
                             <p className="text-sm text-gray-500 line-clamp-2">{yacht.description}</p>
                             <div className="flex justify-between items-center mt-2">
-                              <div className="font-semibold">${yacht.pricing || yacht.price}</div>
+                              <div className="font-semibold">${yacht.pricing || (yacht as any).price}</div>
                               <Button 
                                 size="sm" 
-                                onClick={() => yacht.id && navigate(`/yacht/${yacht.id}`)}
+                                onClick={() => {
+                                  if (yacht.id) {
+                                    // Store the current tab in sessionStorage for returning after booking
+                                    sessionStorage.setItem('returnToTab', 'bookings');
+                                    navigate(`/yacht/${yacht.id}`);
+                                  }
+                                }}
                               >
                                 View Details
                               </Button>
@@ -521,7 +551,13 @@ export default function ConsumerDashboard() {
                               <Button 
                                 size="sm" 
                                 variant="outline"
-                                onClick={() => booking.packageId && navigate(`/yacht/${booking.packageId}`)}
+                                onClick={() => {
+                                  if (booking.packageId) {
+                                    // Store the current tab to return to
+                                    sessionStorage.setItem('returnToTab', 'bookings');
+                                    navigate(`/yacht/${booking.packageId}`);
+                                  }
+                                }}
                               >
                                 View Details
                               </Button>
@@ -537,7 +573,14 @@ export default function ConsumerDashboard() {
                     <Button 
                       className="mt-4" 
                       variant="outline"
-                      onClick={() => navigate("/")}
+                      onClick={() => {
+                        // Switch to explore tab directly within the dashboard
+                        setActiveTab('explore');
+                        // Update URL with tab parameter
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('tab', 'explore');
+                        window.history.pushState({}, '', url.toString());
+                      }}
                     >
                       Explore Yachts
                     </Button>

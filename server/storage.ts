@@ -1549,11 +1549,22 @@ export class FirestoreStorage implements IStorage {
     try {
       console.log(`Getting bookings for user ${userId}`);
       
-      const bookingsSnapshot = await adminDb
-        .collection('bookings')
-        .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
-        .get();
+      let bookingsSnapshot;
+      try {
+        // Try with the index-requiring query first
+        bookingsSnapshot = await adminDb
+          .collection('bookings')
+          .where('userId', '==', userId)
+          .orderBy('createdAt', 'desc')
+          .get();
+      } catch (indexError) {
+        console.log('Index error occurred, using fallback query:', indexError);
+        // Fallback query that doesn't require the composite index
+        bookingsSnapshot = await adminDb
+          .collection('bookings')
+          .where('userId', '==', userId)
+          .get();
+      }
       
       if (bookingsSnapshot.empty) {
         console.log(`No bookings found for user ${userId}`);

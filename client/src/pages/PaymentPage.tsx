@@ -325,7 +325,7 @@ export default function PaymentPage() {
                   <div className="pt-4">
                     <Button 
                       className="w-full" 
-                      onClick={() => setLocation("/dashboard/consumer")}
+                      onClick={() => setLocation("/dashboard/consumer?tab=bookings")}
                     >
                       Go to My Bookings
                     </Button>

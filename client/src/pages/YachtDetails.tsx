@@ -418,7 +418,7 @@ export default function YachtDetails() {
           <p className="text-muted-foreground mb-6">
             The yacht experience you're looking for couldn't be found or has been removed.
           </p>
-          <Link href="/dashboard/consumer">
+          <Link href="/dashboard/consumer?tab=explore">
             <Button>Return to Dashboard</Button>
           </Link>
         </div>
@@ -520,7 +520,7 @@ export default function YachtDetails() {
     <DashboardLayout>
       <div className="container mx-auto p-4 md:p-8">
         {/* Back button */}
-        <Link href="/dashboard/consumer">
+        <Link href="/dashboard/consumer?tab=explore">
           <Button variant="ghost" className="mb-6 hover:bg-transparent p-0 flex items-center">
             <ArrowLeft className="mr-2 h-4 w-4" />
             <span>Back to Search</span>
