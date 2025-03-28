@@ -18,13 +18,14 @@ import { CalendarDateRangePicker } from "@/components/ui/date-range-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import type { YachtExperience } from "@shared/firestore-schema";
-import { getDocs, query, where, limit, collection } from "firebase/firestore";
+import { getDocs, query, where, limit, collection, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuthService } from "@/services/auth/use-auth-service";
 import { DateRange } from "react-day-picker";
 import { Progress } from "@/components/ui/progress";
 import { PlacesAutocomplete } from "@/components/ui/places-autocomplete";
 import { YachtCarousel } from "@/components/YachtCarousel";
+import { AlertCircle } from "lucide-react";
 import axios from 'axios';
 
 // Add Google Maps type declaration
@@ -158,16 +159,71 @@ export default function ConsumerDashboard() {
     }
   }, []);
 
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", user?.uid],
     queryFn: async () => {
       if (!user) return null;
-      const doc = await getDocs(query(
-        collectionRefs.touristProfiles,
-        where("userId", "==", user.uid),
-        limit(1)
-      ));
-      return doc.docs[0]?.data();
+      
+      console.log("=== Fetching User Profile ===");
+      try {
+        // First try to get profile via document ID (recommended approach)
+        const userProfileRef = doc(db, "user_profiles_tourist", user.uid);
+        const userProfileDoc = await getDoc(userProfileRef);
+        
+        if (userProfileDoc.exists()) {
+          console.log("Found user profile by ID");
+          return userProfileDoc.data();
+        }
+        
+        // Fallback to query if direct lookup fails
+        console.log("Direct profile lookup failed, trying query...");
+        const profileQuery = await getDocs(query(
+          collectionRefs.touristProfiles,
+          // Try both ID field structures for backward compatibility
+          where("id", "==", user.uid),
+          limit(1)
+        ));
+        
+        if (!profileQuery.empty) {
+          console.log("Found user profile by query on id field");
+          return profileQuery.docs[0].data();
+        }
+        
+        // Try the userId field as last resort
+        console.log("Query on id field failed, trying userId field...");
+        const legacyQuery = await getDocs(query(
+          collectionRefs.touristProfiles,
+          where("userId", "==", user.uid),
+          limit(1)
+        ));
+        
+        if (!legacyQuery.empty) {
+          console.log("Found user profile by query on userId field");
+          return legacyQuery.docs[0].data();
+        }
+        
+        // If no profile found, return a default profile to avoid undefined issues
+        console.log("No user profile found, returning default structure");
+        return {
+          id: user.uid,
+          name: user.displayName || 'User',
+          preferences: [],
+          wishlist: [],
+          reviewsProvided: [],
+          loyaltyTier: 'Standard'
+        };
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+        // Return default profile on error to avoid undefined issues
+        return {
+          id: user.uid,
+          name: user.displayName || 'User',
+          preferences: [],
+          wishlist: [],
+          reviewsProvided: [],
+          loyaltyTier: 'Standard'
+        };
+      }
     },
     enabled: !!user
   });
@@ -633,7 +689,14 @@ export default function ConsumerDashboard() {
                 <CardDescription>Your personal information and preferences</CardDescription>
               </CardHeader>
               <CardContent>
-                {profile ? (
+                {profileLoading ? (
+                  <div className="text-center py-6">
+                    <div className="flex flex-col items-center justify-center space-y-4">
+                      <Progress value={60} className="w-2/3" />
+                      <p>Loading profile information...</p>
+                    </div>
+                  </div>
+                ) : profile ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -698,7 +761,10 @@ export default function ConsumerDashboard() {
                   </div>
                 ) : (
                   <div className="text-center py-6">
-                    <p>Loading profile information...</p>
+                    <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-2" />
+                    <p className="text-gray-600">No profile information available.</p>
+                    <p className="text-sm text-gray-500 mt-1">Please complete your profile setup.</p>
+                    <Button className="mt-4" variant="outline" size="sm">Create Profile</Button>
                   </div>
                 )}
               </CardContent>
