@@ -190,12 +190,14 @@ export function registerUserProfileRoutes(app: Express) {
         lastUpdated: FieldValue.serverTimestamp() as ServerTimestamp
       };
       
-      if (name) profileUpdates.name = name; // Keep name in sync
+      // Fields that go in harmonized_users but we mirror here for convenience
+      // Not directly setting name as it's not in TouristProfile schema (removed)
+      // We also don't set phoneNumber since it's not in the TouristProfile schema
+      
       if (preferences !== undefined) profileUpdates.preferences = preferences;
       if (profilePhoto !== undefined) profileUpdates.profilePhoto = profilePhoto;
       if (wishlist !== undefined) profileUpdates.wishlist = wishlist;
       if (address !== undefined) profileUpdates.address = address;
-      if (phoneNumber !== undefined) profileUpdates.phoneNumber = phoneNumber;
       if (communicationPreferences !== undefined) profileUpdates.communicationPreferences = communicationPreferences;
       
       // Check if profile exists

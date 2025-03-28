@@ -38,6 +38,22 @@ export interface HarmonizedUser {
   email: string;                 // User's email address
   phone: string;                 // Contact phone number
   
+  // Demographics (applies to all user types)
+  dateOfBirth?: string;          // Date of birth in ISO format
+  gender?: string;               // Gender (optional)
+  nationality?: string;          // User's nationality
+  
+  // Account preferences (applies to all user types)
+  preferredLanguage?: string;    // Preferred language for communications
+  preferredCurrency?: string;    // Preferred currency for transactions
+  
+  // Emergency contact (applies to all user types)
+  emergencyContact?: {
+    name: string;                // Name of emergency contact
+    phoneNumber: string;         // Phone number of emergency contact
+    relationship?: string;       // Relationship to user
+  };
+  
   // Role and status
   role: 'consumer' | 'producer' | 'partner';   // User role in the system
   emailVerified: boolean;        // Whether email has been verified
@@ -70,14 +86,26 @@ export interface TouristProfile {
   // Link to core user (this matches the id in harmonized_users)
   id: string;
   
-  // Basic information (mirrors harmonized_users for convenience)
-  name?: string;                 // User's full name
-  phoneNumber?: string;          // Contact phone number
-  address?: string;              // Mailing/residential address
-  
   // Profile customization
   profilePhoto?: string;         // URL to profile image
-  loyaltyTier?: string;          // Loyalty program tier (e.g., Gold, Silver)
+  address?: string;              // Mailing/residential address (specific to tourist profiles)
+  
+  // Loyalty Program Information
+  loyaltyTier?: string;          // Loyalty tier (e.g., Bronze, Silver, Gold)
+  loyaltyPoints?: number;        // Current loyalty points balance
+  rewardsHistory?: {             // History of rewards earned/redeemed
+    id: string;
+    type: 'earned' | 'redeemed';
+    points: number;
+    description: string;
+    date: Timestamp | ServerTimestamp;
+  }[];
+  
+  // Travel Preferences (consumer-specific)
+  activityPreferences?: string[];  // Preferred activities (e.g., snorkeling, luxury dining)
+  dietaryRestrictions?: string[];  // Food preferences/restrictions
+  accessibilityNeeds?: string[];   // Accessibility requirements
+  favoriteDestinations?: string[]; // Favorite marinas or regions
   
   // Communication preferences
   communicationPreferences?: {
@@ -87,7 +115,18 @@ export interface TouristProfile {
     marketingEmails?: boolean;
   };
   
-  // Preferences and history
+  // Payment Information (secured/tokenized)
+  paymentMethods?: {
+    id: string;
+    type: string;               // Card type or payment method type
+    lastFour?: string;          // Last 4 digits (for cards)
+    expiryMonth?: string;       // Expiry month (for cards)
+    expiryYear?: string;        // Expiry year (for cards)
+    isDefault?: boolean;        // Whether this is the default payment method
+    billingAddress?: string;    // Billing address for this payment method
+  }[];
+  
+  // Booking and Interaction History
   preferences?: string[];        // User interests and preferences
   wishlist?: string[];           // Saved experiences/packages
   bookingHistory?: string[];     // IDs of past bookings
@@ -145,21 +184,40 @@ export interface ServiceProviderProfile {
 export function normalizeConsumerProfile(profile: any): TouristProfile {
   return {
     id: profile.id || profile.userId || '',
-    name: profile.name || '',
-    phoneNumber: profile.phoneNumber || profile.phone || '',
-    address: profile.address || '',
+    
+    // Profile information
     profilePhoto: profile.profilePhoto || '',
+    address: profile.address || '',
+    
+    // Loyalty information
     loyaltyTier: profile.loyaltyTier || 'Standard',
+    loyaltyPoints: typeof profile.loyaltyPoints === 'number' ? profile.loyaltyPoints : 0,
+    rewardsHistory: Array.isArray(profile.rewardsHistory) ? profile.rewardsHistory : [],
+    
+    // Travel preferences
+    activityPreferences: Array.isArray(profile.activityPreferences) ? profile.activityPreferences : [],
+    dietaryRestrictions: Array.isArray(profile.dietaryRestrictions) ? profile.dietaryRestrictions : [],
+    accessibilityNeeds: Array.isArray(profile.accessibilityNeeds) ? profile.accessibilityNeeds : [],
+    favoriteDestinations: Array.isArray(profile.favoriteDestinations) ? profile.favoriteDestinations : [],
+    
+    // Communication preferences
     communicationPreferences: {
       email: profile.communicationPreferences?.email || false,
       sms: profile.communicationPreferences?.sms || false,
       push: profile.communicationPreferences?.push || false,
       marketingEmails: profile.communicationPreferences?.marketingEmails || false
     },
+    
+    // Payment methods (secured/tokenized)
+    paymentMethods: Array.isArray(profile.paymentMethods) ? profile.paymentMethods : [],
+    
+    // Booking and preferences history
     preferences: Array.isArray(profile.preferences) ? profile.preferences : [],
     wishlist: Array.isArray(profile.wishlist) ? profile.wishlist : [],
     bookingHistory: Array.isArray(profile.bookingHistory) ? profile.bookingHistory : [],
     reviewsProvided: Array.isArray(profile.reviewsProvided) ? profile.reviewsProvided : [],
+    
+    // Timestamps
     lastUpdated: profile.lastUpdated || null
   };
 }
