@@ -35,7 +35,7 @@ import { ServiceProviderProfile, YachtExperience, Review, ProducerBooking } from
 export default function ProducerDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { user, profileData, isLoading } = useAuthService();
+  const { user: firebaseUser, profileData, isLoading } = useAuthService();
   const userRole = profileData?.harmonizedUser?.role || 'producer';
   const [activeTab, setActiveTab] = useState("overview");
   const [profileCompletion, setProfileCompletion] = useState(0);
@@ -44,19 +44,25 @@ export default function ProducerDashboard() {
   const queryTimestamp = useRef(Date.now());
 
   // Queries for producer data
-  const { data: yachts, isLoading: yachtsLoading, error: yachtsError } = useQuery<YachtExperience[]>({
-    queryKey: ["/api/producer/yachts", { producerId: profileData?.producerId || user?.uid, timestamp: queryTimestamp.current }],
-    staleTime: 0,
-    cacheTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
-    retry: 2,
-    retryDelay: 1000,
-    enabled: !!(profileData?.producerId || user?.uid),
-    onSuccess: (data) => {
-      queryClient.setQueryData(["/api/producer/yachts", { producerId: profileData?.producerId || user?.uid }], data);
+  const { data: yachtsResponse, isLoading: yachtsLoading, error: yachtsError } = useQuery({
+    queryKey: ['/api/producer/yachts', { 
+      producerId: profileData?.producerId || firebaseUser?.uid,
+      timestamp: Date.now() // For cache busting
+    }],
+    queryFn: async () => {
+      const response = await fetch('/api/producer/yachts', {
+        headers: {
+          'Authorization': `Bearer ${await firebaseUser?.getIdToken()}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch yachts');
+      }
+      return response.json();
     }
   });
+
+  const producerYachts = yachtsResponse?.yachts || [];
 
   const { data: bookings, isLoading: bookingsLoading } = useQuery<ProducerBooking[]>({
     queryKey: ["/api/producer/bookings"],
@@ -75,7 +81,7 @@ export default function ProducerDashboard() {
       }
 
       // Check if user exists and has the producer role
-      if (!user || userRole !== 'producer') {
+      if (!firebaseUser || userRole !== 'producer') {
         console.error('User does not have producer role access');
 
         // Show toast notification with error message
@@ -92,8 +98,8 @@ export default function ProducerDashboard() {
       }
 
       // User has producer role, fetch their profile
-      if (user) {
-        const profileDocRef = doc(db, "user_profiles_service_provider", user.uid);
+      if (firebaseUser) {
+        const profileDocRef = doc(db, "user_profiles_service_provider", firebaseUser.uid);
         try {
           const profileDoc = await getDoc(profileDocRef);
           if (profileDoc.exists()) {
@@ -147,7 +153,7 @@ export default function ProducerDashboard() {
     };
 
     checkProducerAccessAndFetchProfile();
-  }, [user, userRole, isLoading, setLocation, toast]);
+  }, [firebaseUser, userRole, isLoading, setLocation, toast]);
 
   // Calculate dashboard statistics
   const totalBookings = bookings?.length || 0;
@@ -392,12 +398,12 @@ export default function ProducerDashboard() {
               <CardHeader>
                 <CardTitle>My Yachts</CardTitle>
                 <CardDescription>
-                  Your yacht listings ({yachts?.length || 0} total)
+                  Your yacht listings ({producerYachts?.length || 0} total)
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <YachtCarousel 
-                  yachts={yachts || []} 
+                  yachts={producerYachts} 
                   isLoading={yachtsLoading} 
                   error={yachtsError} // Added error prop
                 />
