@@ -108,6 +108,55 @@ export default function YachtForm() {
   const [activeTab, setActiveTab] = useState("basic");
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [canProgress, setCanProgress] = useState(false);
+  
+  // Form steps configuration
+  const formSteps = ["basic", "details", "addons", "partner-addons", "media"];
+  
+  // Validate current step before navigation
+  const validateStep = async (step: string) => {
+    const formData = form.getValues();
+    
+    switch(step) {
+      case "basic":
+        return !!formData.title && !!formData.description && !!formData.category;
+      case "details":
+        return !!formData.pricing && !!formData.duration && !!formData.capacity;
+      case "addons":
+        return true; // Optional step
+      case "partner-addons":
+        return true; // Optional step
+      case "media":
+        return media.length > 0;
+      default:
+        return false;
+    }
+  };
+
+  // Handle navigation between steps
+  const handleStepChange = async (nextStep: string) => {
+    const isValid = await validateStep(activeTab);
+    
+    if (!isValid) {
+      toast({
+        title: "Validation Error",
+        description: "Please complete all required fields before proceeding.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setActiveTab(nextStep);
+  };
+
+  // Get next/previous steps
+  const getAdjacentSteps = () => {
+    const currentIndex = formSteps.indexOf(activeTab);
+    return {
+      prev: currentIndex > 0 ? formSteps[currentIndex - 1] : null,
+      next: currentIndex < formSteps.length - 1 ? formSteps[currentIndex + 1] : null
+    };
+  };
   const [initialLoading, setInitialLoading] = useState(false);
   const [yachtData, setYachtData] = useState<YachtExperience | null>(null);
   // Always use the unified collection for all operations
@@ -1674,22 +1723,47 @@ export default function YachtForm() {
                         : 'Complete the form to add this yacht to your fleet.'}
                     </p>
                   </div>
-                  <div className="flex gap-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={navigateBack}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={loading}
-                      className="px-6"
-                    >
-                      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      {editMode ? 'Update Yacht' : 'Create Yacht'}
-                    </Button>
+                  <div className="flex justify-between items-center w-full">
+                    <div className="flex gap-4">
+                      {activeTab !== formSteps[0] && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleStepChange(getAdjacentSteps().prev!)}
+                        >
+                          Previous
+                        </Button>
+                      )}
+                      {activeTab === formSteps[0] && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={navigateBack}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex gap-4">
+                      {activeTab !== formSteps[formSteps.length - 1] && (
+                        <Button
+                          type="button"
+                          onClick={() => handleStepChange(getAdjacentSteps().next!)}
+                        >
+                          Next
+                        </Button>
+                      )}
+                      {activeTab === formSteps[formSteps.length - 1] && (
+                        <Button
+                          type="submit"
+                          disabled={loading}
+                          className="px-6"
+                        >
+                          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          {editMode ? 'Update Yacht' : 'Create Yacht'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>
