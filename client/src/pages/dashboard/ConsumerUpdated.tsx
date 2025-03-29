@@ -92,6 +92,29 @@ export default function ConsumerDashboard() {
     queryKey: ["bookings", user?.uid],
     queryFn: async () => {
       if (!user) return [];
+
+  const updateProfileField = async (field: string, value: any) => {
+    try {
+      if (!user?.uid) return;
+      
+      const response = await axios.post('/api/user/update-profile', {
+        [field]: value
+      });
+      
+      if (response.data.success) {
+        // Refresh profile data
+        refreshUserData();
+      }
+    } catch (error) {
+      console.error('Error updating profile field:', error);
+      toast({
+        title: "Update Failed",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
       const q = query(collectionRefs.bookings, where("userId", "==", user.uid));
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Booking[];
@@ -454,38 +477,68 @@ export default function ConsumerDashboard() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <h3 className="font-semibold mb-2">Personal Information</h3>
-                        <div className="space-y-2">
-                          <div className="flex">
-                            <span className="font-medium w-32">Name:</span>
-                            <span>{profile.name}</span>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <label className="font-medium">Name</label>
+                            <Input 
+                              defaultValue={profile.name}
+                              onChange={(e) => updateProfileField('name', e.target.value)}
+                            />
                           </div>
-                          <div className="flex">
-                            <span className="font-medium w-32">Email:</span>
-                            <span>{user?.email}</span>
+                          <div className="space-y-2">
+                            <label className="font-medium">Email</label>
+                            <Input value={user?.email} disabled />
                           </div>
-                          <div className="flex">
-                            <span className="font-medium w-32">Phone:</span>
-                            <span>{profile.phoneNumber || "Not provided"}</span>
+                          <div className="space-y-2">
+                            <label className="font-medium">Phone</label>
+                            <Input 
+                              defaultValue={profile.phoneNumber || ""}
+                              onChange={(e) => updateProfileField('phoneNumber', e.target.value)}
+                              placeholder="Enter phone number"
+                            />
                           </div>
-                          <div className="flex">
-                            <span className="font-medium w-32">Loyalty Tier:</span>
-                            <span>{profile.loyaltyTier || "Standard"}</span>
+                          <div className="space-y-2">
+                            <label className="font-medium">Loyalty Tier</label>
+                            <Select 
+                              defaultValue={profile.loyaltyTier || "standard"}
+                              onValueChange={(value) => updateProfileField('loyaltyTier', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select tier" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="standard">Standard</SelectItem>
+                                <SelectItem value="silver">Silver</SelectItem>
+                                <SelectItem value="gold">Gold</SelectItem>
+                                <SelectItem value="platinum">Platinum</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
                       </div>
 
                       <div>
                         <h3 className="font-semibold mb-2">Preferences</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {profile.preferences && profile.preferences.length > 0 ? (
-                            profile.preferences.map((pref, index) => (
-                              <span key={index} className="bg-primary/10 text-primary text-sm px-2 py-1 rounded">
-                                {pref}
-                              </span>
-                            ))
-                          ) : (
-                            <p className="text-gray-500">No preferences set</p>
-                          )}
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-2">
+                            {['luxury', 'family', 'adventure', 'fishing', 'diving', 'watersports'].map((pref) => (
+                              <div key={pref} className="flex items-center space-x-2">
+                                <Checkbox 
+                                  id={`pref-${pref}`}
+                                  checked={profile.preferences?.includes(pref)}
+                                  onCheckedChange={(checked) => {
+                                    const newPrefs = checked 
+                                      ? [...(profile.preferences || []), pref]
+                                      : (profile.preferences || []).filter(p => p !== pref);
+                                    updateProfileField('preferences', newPrefs);
+                                  }}
+                                />
+                                <label htmlFor={`pref-${pref}`} className="capitalize">
+                                  {pref}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -509,7 +562,15 @@ export default function ConsumerDashboard() {
                     </div>
 
                     <div className="flex justify-end">
-                      <Button>Edit Profile</Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => toast({
+                          title: "Profile Updated",
+                          description: "Your changes have been saved automatically."
+                        })}
+                      >
+                        Save Changes
+                      </Button>
                     </div>
                   </div>
                 ) : (
