@@ -310,13 +310,13 @@ export default function AssetManagement() {
 
   // Get current user to determine producer ID
   const [firebaseUser] = useAuthState(auth);
-
-  // Get fresh auth token for role debugging
+  
+  // Get fresh auth token for role debugging and API calls
   useEffect(() => {
     const getAuthToken = async () => {
-      if (auth.currentUser) {
+      if (firebaseUser) {
         try {
-          const token = await auth.currentUser.getIdToken(true);
+          const token = await firebaseUser.getIdToken(true);
           setAuthHeader(`Bearer ${token}`);
         } catch (error) {
           console.error('Failed to get auth token:', error);
@@ -325,7 +325,7 @@ export default function AssetManagement() {
     };
 
     getAuthToken();
-  }, []);
+  }, [firebaseUser]);
   const [producerData, setProducerData] = useState<{
     producerId: string;
     providerId: string;
