@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthService } from "@/services/auth/use-auth-service";
@@ -40,14 +40,22 @@ export default function ProducerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [producerProfile, setProducerProfile] = useState<ServiceProviderProfile | null>(null);
+  const queryClient = useQueryClient(); // Added queryClient
+  const queryTimestamp = useRef(Date.now());
 
   // Queries for producer data
-  const { data: yachts, isLoading: yachtsLoading } = useQuery<YachtExperience[]>({
-    queryKey: ["/api/producer/yachts", { producerId: profileData?.producerId || user?.uid }],
+  const { data: yachts, isLoading: yachtsLoading, error: yachtsError } = useQuery<YachtExperience[]>({
+    queryKey: ["/api/producer/yachts", { producerId: profileData?.producerId || user?.uid, timestamp: queryTimestamp.current }],
     staleTime: 0,
     cacheTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnMount: true,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: true,
+    retry: 2,
+    retryDelay: 1000,
+    enabled: !!(profileData?.producerId || user?.uid),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["/api/producer/yachts", { producerId: profileData?.producerId || user?.uid }], data);
+    }
   });
 
   const { data: bookings, isLoading: bookingsLoading } = useQuery<ProducerBooking[]>({
@@ -65,11 +73,11 @@ export default function ProducerDashboard() {
       if (isLoading) {
         return;
       }
-      
+
       // Check if user exists and has the producer role
       if (!user || userRole !== 'producer') {
         console.error('User does not have producer role access');
-        
+
         // Show toast notification with error message
         toast({
           title: 'Access Denied',
@@ -77,12 +85,12 @@ export default function ProducerDashboard() {
           variant: 'destructive',
           duration: 4000,
         });
-        
+
         // Redirect to home if user doesn't have producer role
         setLocation('/');
         return;
       }
-      
+
       // User has producer role, fetch their profile
       if (user) {
         const profileDocRef = doc(db, "user_profiles_service_provider", user.uid);
@@ -91,7 +99,7 @@ export default function ProducerDashboard() {
           if (profileDoc.exists()) {
             const profileData = profileDoc.data() as ServiceProviderProfile;
             setProducerProfile(profileData);
-            
+
             // Calculate profile completion percentage
             const requiredFields = [
               'businessName', 
@@ -100,7 +108,7 @@ export default function ProducerDashboard() {
               'servicesOffered',
               'certifications'
             ];
-            
+
             const optionalFields = [
               'yearsOfExperience',
               'industryAffiliations',
@@ -108,28 +116,28 @@ export default function ProducerDashboard() {
               'communicationPreferences',
               'complianceDocuments'
             ];
-            
+
             let completedRequired = 0;
             let completedOptional = 0;
-            
+
             requiredFields.forEach(field => {
               if (profileData[field as keyof ServiceProviderProfile]) {
                 completedRequired++;
               }
             });
-            
+
             optionalFields.forEach(field => {
               if (profileData[field as keyof ServiceProviderProfile]) {
                 completedOptional++;
               }
             });
-            
+
             const requiredWeight = 0.7; // 70% weight for required fields
             const optionalWeight = 0.3; // 30% weight for optional fields
-            
+
             const requiredScore = (completedRequired / requiredFields.length) * requiredWeight;
             const optionalScore = (completedOptional / optionalFields.length) * optionalWeight;
-            
+
             setProfileCompletion(Math.round((requiredScore + optionalScore) * 100));
           }
         } catch (error) {
@@ -137,22 +145,22 @@ export default function ProducerDashboard() {
         }
       }
     };
-    
+
     checkProducerAccessAndFetchProfile();
   }, [user, userRole, isLoading, setLocation, toast]);
-  
+
   // Calculate dashboard statistics
   const totalBookings = bookings?.length || 0;
   const confirmedBookings = bookings?.filter(b => b.status === 'confirmed').length || 0;
   const pendingBookings = bookings?.filter(b => b.status === 'pending').length || 0;
-  
+
   const currentMonthBookings = bookings?.filter(booking => {
     const bookingDate = new Date(booking.startDate);
     const now = new Date();
     return bookingDate.getMonth() === now.getMonth() && 
            bookingDate.getFullYear() === now.getFullYear();
   }).length || 0;
-  
+
   const currentMonthRevenue = bookings?.filter(booking => {
     const bookingDate = new Date(booking.startDate);
     const now = new Date();
@@ -160,13 +168,13 @@ export default function ProducerDashboard() {
            bookingDate.getFullYear() === now.getFullYear() &&
            booking.status !== 'cancelled';
   }).reduce((sum, booking) => sum + booking.totalPrice, 0) || 0;
-  
+
   const upcomingBookings = bookings?.filter(booking => {
     const bookingDate = new Date(booking.startDate);
     const now = new Date();
     return bookingDate > now && booking.status !== 'cancelled';
   }).slice(0, 5) || [];
-  
+
   const averageRating = reviews?.length 
     ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1) 
     : 'N/A';
@@ -188,7 +196,7 @@ export default function ProducerDashboard() {
               Manage your yacht profiles, bookings, and business details
             </p>
           </div>
-          
+
           <Card className="w-full md:w-auto">
             <CardContent className="p-4">
               <div className="flex items-center gap-4">
@@ -228,7 +236,7 @@ export default function ProducerDashboard() {
                   </p>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">
@@ -242,7 +250,7 @@ export default function ProducerDashboard() {
                   </p>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">
@@ -256,7 +264,7 @@ export default function ProducerDashboard() {
                   </p>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">
@@ -274,7 +282,7 @@ export default function ProducerDashboard() {
                 </CardContent>
               </Card>
             </div>
-            
+
             {/* Quick Links */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={navigateToProfile}>
@@ -284,7 +292,7 @@ export default function ProducerDashboard() {
                   <p className="text-sm text-muted-foreground">Manage your business profile</p>
                 </CardContent>
               </Card>
-              
+
               <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={navigateToAssets}>
                 <CardContent className="p-6 flex flex-col items-center justify-center text-center">
                   <Sailboat className="h-8 w-8 mb-2 text-primary" />
@@ -292,7 +300,7 @@ export default function ProducerDashboard() {
                   <p className="text-sm text-muted-foreground">Manage your assets and offerings</p>
                 </CardContent>
               </Card>
-              
+
               <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={navigateToAvailability}>
                 <CardContent className="p-6 flex flex-col items-center justify-center text-center">
                   <Calendar className="h-8 w-8 mb-2 text-primary" />
@@ -300,7 +308,7 @@ export default function ProducerDashboard() {
                   <p className="text-sm text-muted-foreground">Set availability and pricing</p>
                 </CardContent>
               </Card>
-              
+
               <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={navigateToCompliance}>
                 <CardContent className="p-6 flex flex-col items-center justify-center text-center">
                   <FileText className="h-8 w-8 mb-2 text-primary" />
@@ -309,7 +317,7 @@ export default function ProducerDashboard() {
                 </CardContent>
               </Card>
             </div>
-            
+
             {/* Upcoming Bookings */}
             <Card>
               <CardHeader>
@@ -378,7 +386,7 @@ export default function ProducerDashboard() {
                 </Button>
               </CardFooter>
             </Card>
-            
+
             {/* Featured Yachts */}
             <Card>
               <CardHeader>
@@ -391,6 +399,7 @@ export default function ProducerDashboard() {
                 <YachtCarousel 
                   yachts={yachts || []} 
                   isLoading={yachtsLoading} 
+                  error={yachtsError} // Added error prop
                 />
               </CardContent>
               <CardFooter className="border-t px-6 py-4">
@@ -425,7 +434,7 @@ export default function ProducerDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="yachts">
             <Card>
               <CardHeader>
@@ -444,7 +453,7 @@ export default function ProducerDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="earnings">
             <Card>
               <CardHeader>
@@ -463,7 +472,7 @@ export default function ProducerDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="reviews">
             <Card>
               <CardHeader>
