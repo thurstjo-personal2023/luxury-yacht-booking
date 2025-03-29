@@ -4,6 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { ChevronDown, Pencil } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -466,15 +470,230 @@ export default function ConsumerDashboard() {
           </TabsContent>
 
           <TabsContent value="profile">
-            <Card>
-              <CardHeader>
-                <CardTitle>My Profile</CardTitle>
-                <CardDescription>Your personal information and preferences</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {profile ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-6">
+              {/* Basic Information Card */}
+              <Card className="overflow-hidden">
+                <CardHeader className="relative bg-gradient-to-r from-primary/10 to-primary/5 pb-24">
+                  <CardTitle>My Profile</CardTitle>
+                  <CardDescription>Your personal information and preferences</CardDescription>
+                </CardHeader>
+                <CardContent className="relative -mt-12">
+                  {profile ? (
+                    <div className="space-y-6">
+                      {/* Profile Header with Image */}
+                      <div className="flex items-center gap-6">
+                        <div className="relative">
+                          <Avatar className="w-24 h-24 border-4 border-background">
+                            <AvatarImage src={profile.profilePhoto} />
+                            <AvatarFallback>{profile.name?.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <Button size="icon" variant="outline" className="absolute -bottom-2 -right-2 rounded-full w-8 h-8">
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <div className="space-y-1">
+                          <h3 className="text-2xl font-semibold">{profile.name}</h3>
+                          <p className="text-muted-foreground">{user?.email}</p>
+                        </div>
+                      </div>
+
+                      {/* Basic Information Section */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Full Name</label>
+                          <div className="relative">
+                            <Input 
+                              defaultValue={profile.name}
+                              onChange={(e) => updateProfileField('name', e.target.value)}
+                              className="pr-10"
+                            />
+                            <Pencil className="w-4 h-4 absolute right-3 top-3 text-muted-foreground" />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Phone Number</label>
+                          <div className="relative">
+                            <Input 
+                              defaultValue={profile.phoneNumber || ""}
+                              onChange={(e) => updateProfileField('phoneNumber', e.target.value)}
+                              className="pr-10"
+                              placeholder="+1 (555) 000-0000"
+                            />
+                            <Pencil className="w-4 h-4 absolute right-3 top-3 text-muted-foreground" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Demographics Section */}
+                      <div className="border rounded-lg p-6 space-y-4">
+                        <div className="flex justify-between items-center">
+                          <h3 className="font-semibold">Demographics</h3>
+                          <ChevronDown className="w-5 h-5" />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Date of Birth</label>
+                            <Input 
+                              type="date" 
+                              defaultValue={profile.dateOfBirth}
+                              onChange={(e) => updateProfileField('dateOfBirth', e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Gender (Optional)</label>
+                            <Select 
+                              defaultValue={profile.gender}
+                              onValueChange={(value) => updateProfileField('gender', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select gender" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="male">Male</SelectItem>
+                                <SelectItem value="female">Female</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                                <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Nationality</label>
+                            <Input 
+                              defaultValue={profile.nationality}
+                              onChange={(e) => updateProfileField('nationality', e.target.value)}
+                              placeholder="Enter your nationality"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Account Preferences */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Account Preferences</CardTitle>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Preferred Language</label>
+                            <Select 
+                              defaultValue={profile.preferredLanguage || "en"}
+                              onValueChange={(value) => updateProfileField('preferredLanguage', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select language" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="en">English</SelectItem>
+                                <SelectItem value="ar">Arabic</SelectItem>
+                                <SelectItem value="fr">French</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Preferred Currency</label>
+                            <Select 
+                              defaultValue={profile.preferredCurrency || "USD"}
+                              onValueChange={(value) => updateProfileField('preferredCurrency', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select currency" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="USD">USD ($)</SelectItem>
+                                <SelectItem value="EUR">EUR (€)</SelectItem>
+                                <SelectItem value="AED">AED (د.إ)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Travel & Experience Preferences */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Travel & Experience Preferences</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                          <div className="space-y-4">
+                            <label className="font-medium">Activity Preferences</label>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                              {['luxury', 'family', 'adventure', 'fishing', 'diving', 'watersports'].map((pref) => (
+                                <div key={pref} className="flex items-center space-x-2">
+                                  <Checkbox 
+                                    id={`pref-${pref}`}
+                                    checked={profile.preferences?.includes(pref)}
+                                    onCheckedChange={(checked) => {
+                                      const newPrefs = checked 
+                                        ? [...(profile.preferences || []), pref]
+                                        : (profile.preferences || []).filter(p => p !== pref);
+                                      updateProfileField('preferences', newPrefs);
+                                    }}
+                                  />
+                                  <label htmlFor={`pref-${pref}`} className="capitalize">
+                                    {pref}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <label className="font-medium">Dietary Restrictions</label>
+                            <Input 
+                              defaultValue={profile.dietaryRestrictions}
+                              onChange={(e) => updateProfileField('dietaryRestrictions', e.target.value)}
+                              placeholder="Enter any dietary restrictions"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <label className="font-medium">Accessibility Needs</label>
+                            <Input 
+                              defaultValue={profile.accessibilityNeeds}
+                              onChange={(e) => updateProfileField('accessibilityNeeds', e.target.value)}
+                              placeholder="Enter any accessibility requirements"
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Loyalty Program */}
+                      <Card className="bg-gradient-to-r from-primary/5 to-primary/10">
+                        <CardHeader>
+                          <CardTitle className="text-lg">Loyalty Program</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-semibold">{profile.loyaltyTier || 'Standard'} Member</h4>
+                              <p className="text-sm text-muted-foreground">
+                                {profile.loyaltyPoints || 0} points earned
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="bg-primary/20">
+                              {profile.loyaltyTier || 'Standard'}
+                            </Badge>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>Progress to next tier</span>
+                              <span>{profile.loyaltyPoints || 0}/1000</span>
+                            </div>
+                            <Progress value={(profile.loyaltyPoints || 0) / 10} className="h-2" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <p>Loading profile information...</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
                       <div>
                         <h3 className="font-semibold mb-2">Personal Information</h3>
                         <div className="space-y-4">
