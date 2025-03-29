@@ -1,0 +1,52 @@
+To update the Profile Section in the Consumer Dashboard (ConsumerUpdated.tsx) to align with the luxury-themed design requirements and profile fields, here’s a detailed layout for the necessary changes:
+
+1. Structural Changes
+Redesign Layout:
+Implement a two-column layout for desktops and a single-column layout for mobile.
+Use cards with soft shadows and rounded corners for each section.
+Integrate accordion-style collapsible sections for secondary details (e.g., Demographics).
+Add hover animations and subtle transitions to interactive elements.
+2. Updated Profile Sections
+Basic Information (Always Visible at the Top)
+Large profile picture with an upload option (drag & drop or click-to-upload).
+Full name, email, and phone number displayed prominently.
+Use editable input fields with real-time validation (e.g., email format).
+Demographics (Collapsible Section)
+Fields: Date of Birth, Gender (optional), Nationality
+Minimalist dropdowns and date-picker components.
+Collapsed by default for a cleaner UI.
+Account Preferences (Card-Style Format)
+Preferred language and currency with dropdown selectors.
+Dark mode toggle switch for personalization.
+Save button with real-time confirmation messages.
+Travel & Experience Preferences (Interactive Elements)
+Multi-select chips for activity preferences (e.g., snorkeling, luxury dining).
+Checkboxes/toggles for dietary restrictions and accessibility needs.
+Editable favorite destinations (with a suggested destinations dropdown).
+Loyalty Program (Visually Engaging UI)
+Progress bar for loyalty tier (Bronze → Silver → Gold).
+Badge icons for achievements.
+Rewards history displayed in a scrollable list with icons.
+Booking & Past Interactions (Collapsible Section)
+Display past bookings in a timeline view.
+List reviews & ratings submitted with interactive filters.
+Payment Information (Collapsible, Securely Stored)
+Saved payment methods (credit card masked, edit/delete options).
+Billing address (inline editable fields).
+Emergency Contact (Collapsible Section)
+Fields: Name, Phone Number
+Editable in case of last-minute updates.
+3. Interactive Enhancements
+Edit icons next to each section for quick modifications.
+Inline validation messages (e.g., "Invalid email format" in red text).
+Tooltips for helper text in empty fields (e.g., "Add your favorite destinations").
+Save & Cancel buttons appear dynamically when fields are modified.
+4. Visual Styling Upgrades
+Luxury-inspired color palette (dark navy, gold accents, white backgrounds).
+Subtle gradient effects on buttons and card headers.
+Hover animations for buttons and icons.
+Elegant font selection (e.g., Playfair Display for headers, Montserrat for body text).
+Next Steps
+Implement these changes in ConsumerUpdated.tsx.
+Ensure the design is fully responsive.
+Test real-time validation for all fields.
