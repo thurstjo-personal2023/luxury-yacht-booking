@@ -32,7 +32,23 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   phone: z.string().min(6, "Phone number must be at least 6 characters"),
+  address: z.string().optional(),
   preferences: z.array(z.string()).optional(),
+  dietaryRestrictions: z.array(z.string()).optional(),
+  accessibilityNeeds: z.array(z.string()).optional(),
+  favoriteDestinations: z.array(z.string()).optional(),
+  activityPreferences: z.array(z.string()).optional(),
+  communicationPreferences: z.object({
+    email: z.boolean().optional(),
+    sms: z.boolean().optional(),
+    push: z.boolean().optional(),
+    marketingEmails: z.boolean().optional()
+  }).optional(),
+  emergencyContact: z.object({
+    name: z.string(),
+    phoneNumber: z.string(),
+    relationship: z.string().optional()
+  }).optional()
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -43,6 +59,10 @@ export default function ConsumerProfileForm() {
   const { harmonizedUser, touristProfile } = profileData;
   const [isLoading, setIsLoading] = useState(false);
   const [newPreference, setNewPreference] = useState("");
+  const [newDietary, setNewDietary] = useState("");
+  const [newAccessibility, setNewAccessibility] = useState("");
+  const [newDestination, setNewDestination] = useState("");
+  const [newActivity, setNewActivity] = useState("");
 
   // Form with default values from user profile
   const form = useForm<ProfileFormValues>({
@@ -50,7 +70,23 @@ export default function ConsumerProfileForm() {
     defaultValues: {
       name: harmonizedUser?.name || "",
       phone: harmonizedUser?.phone || "",
+      address: touristProfile?.address || "",
       preferences: touristProfile?.preferences || [],
+      dietaryRestrictions: touristProfile?.dietaryRestrictions || [],
+      accessibilityNeeds: touristProfile?.accessibilityNeeds || [],
+      favoriteDestinations: touristProfile?.favoriteDestinations || [],
+      activityPreferences: touristProfile?.activityPreferences || [],
+      communicationPreferences: touristProfile?.communicationPreferences || {
+        email: true,
+        sms: true,
+        push: true,
+        marketingEmails: false
+      },
+      emergencyContact: touristProfile?.emergencyContact || {
+        name: "",
+        phoneNumber: "",
+        relationship: ""
+      }
     },
   });
   

@@ -165,7 +165,7 @@ export function registerUserProfileRoutes(app: Express) {
       const { 
         // Core user fields (harmonized_users)
         name,
-        phoneNumber,
+        phone: phoneNumber, // Map phone to phoneNumber for consistency
         
         // Consumer-specific fields (user_profiles_tourist)
         address,
@@ -183,6 +183,14 @@ export function registerUserProfileRoutes(app: Express) {
         emergencyContact,
         rewardsHistory
       } = req.body;
+
+      // Validate emergency contact if provided
+      if (emergencyContact && (!emergencyContact.name || !emergencyContact.phoneNumber)) {
+        return res.status(400).json({ 
+          error: 'Invalid emergency contact details',
+          message: 'Emergency contact must include name and phone number'
+        });
+      }
       
       // Core user data updates (harmonized_users collection)
       const coreUpdates: Partial<HarmonizedUser> = {
