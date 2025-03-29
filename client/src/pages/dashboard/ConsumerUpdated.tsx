@@ -231,7 +231,7 @@ export default function ConsumerDashboard() {
     dateOfBirth: '',
     gender: '',
     nationality: '',
-    language: '',
+    language: 'English',
     currency: 'USD',
     dietaryRestrictions: '',
     accessibility: '',
@@ -256,7 +256,7 @@ export default function ConsumerDashboard() {
     }
   }, [profileData]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -280,11 +280,11 @@ export default function ConsumerDashboard() {
   const updateProfileField = async (field: string, value: any) => {
     try {
       if (!user?.uid) return;
-      
+
       const response = await axios.post('/api/user/update-profile', {
         [field]: value
       });
-      
+
       if (response.data.success) {
         // Refresh profile data
         //refreshUserData(); //This function is not defined in the original code.  Removed for now.
@@ -529,81 +529,136 @@ export default function ConsumerDashboard() {
 
           <TabsContent value="profile">
             <div className="container mx-auto px-4 py-6 space-y-6">
-              {/* Basic Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Basic Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="h-20 w-20">
+              {/* Profile Header with Image */}
+              <div className="relative bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-6 mb-8">
+                <div className="flex flex-col md:flex-row items-center gap-6">
+                  <div className="relative group">
+                    <Avatar className="h-24 w-24 ring-2 ring-offset-2 ring-primary">
                       <AvatarImage src={profileData?.profilePhoto} />
                       <AvatarFallback>{formData.name?.charAt(0)}</AvatarFallback>
                     </Avatar>
-                    <Input type="file" className="w-auto" onChange={(e) => updateProfileField('profilePhoto', e.target.files[0])} />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                      <label htmlFor="profile-photo" className="cursor-pointer p-2">
+                        <Pencil className="h-5 w-5 text-white" />
+                      </label>
+                      <input 
+                        id="profile-photo" 
+                        type="file" 
+                        className="hidden" 
+                        accept="image/*"
+                        onChange={(e) => updateProfileField('profilePhoto', e.target.files?.[0])} 
+                      />
+                    </div>
                   </div>
+                  <div className="flex-1">
+                    <h2 className="text-2xl font-bold mb-2">{formData.name || 'Your Profile'}</h2>
+                    <p className="text-muted-foreground">Member since {profileData?.createdAt ? new Date(profileData.createdAt).toLocaleDateString() : 'N/A'}</p>
+                  </div>
+                  <Badge variant="outline" className="bg-primary/10">
+                    {profileData?.membershipTier || 'Standard'} Member
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Basic Information */}
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle>Basic Information</CardTitle>
+                    <Button variant="ghost" size="icon" onClick={() => setIsEditing(!isEditing)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      placeholder="Full Name"
-                      onBlur={(e) => updateProfileField('name', e.target.value)}
-                    />
-                    <Input
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      placeholder="Email"
-                      type="email"
-                      disabled
-                    />
-                    <Input
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      placeholder="Phone Number"
-                      onBlur={(e) => updateProfileField('phoneNumber', e.target.value)}
-                    />
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Full Name</label>
+                      <Input
+                        name="name"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        disabled={!isEditing}
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Email</label>
+                      <Input
+                        name="email"
+                        value={formData.email}
+                        disabled
+                        className="bg-muted"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Phone Number</label>
+                      <Input
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleInputChange}
+                        disabled={!isEditing}
+                        className="bg-background"
+                      />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Demographics */}
-              <Collapsible>
+              <Collapsible defaultOpen>
                 <CollapsibleTrigger className="w-full">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>Demographics</CardTitle>
-                      <ChevronDown className="h-6 w-6" />
+                      <ChevronDown className="h-6 w-6 transition-transform ui-expanded:rotate-180" />
                     </CardHeader>
                   </Card>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <Card className="mt-2">
-                    <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Input
-                        name="dateOfBirth"
-                        value={formData.dateOfBirth}
-                        onChange={handleInputChange}
-                        placeholder="Date of Birth"
-                        type="date"
-                        onBlur={(e) => updateProfileField('dateOfBirth', e.target.value)}
-                      />
-                      <Input
-                        name="gender"
-                        value={formData.gender}
-                        onChange={handleInputChange}
-                        placeholder="Gender (Optional)"
-                        onBlur={(e) => updateProfileField('gender', e.target.value)}
-                      />
-                      <Input
-                        name="nationality"
-                        value={formData.nationality}
-                        onChange={handleInputChange}
-                        placeholder="Nationality"
-                        onBlur={(e) => updateProfileField('nationality', e.target.value)}
-                      />
+                    <CardContent className="pt-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Date of Birth</label>
+                          <Input
+                            name="dateOfBirth"
+                            type="date"
+                            value={formData.dateOfBirth}
+                            onChange={handleInputChange}
+                            disabled={!isEditing}
+                            className="bg-background"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Gender</label>
+                          <Select 
+                            disabled={!isEditing}
+                            value={formData.gender}
+                            onValueChange={(value) => handleInputChange({ target: { name: 'gender', value }})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select gender" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="male">Male</SelectItem>
+                              <SelectItem value="female">Female</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                              <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Nationality</label>
+                          <Input
+                            name="nationality"
+                            value={formData.nationality}
+                            onChange={handleInputChange}
+                            disabled={!isEditing}
+                            className="bg-background"
+                          />
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
                 </CollapsibleContent>
@@ -612,52 +667,124 @@ export default function ConsumerDashboard() {
               {/* Preferences */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Account Preferences</CardTitle>
+                  <div className="flex justify-between items-center">
+                    <CardTitle>Preferences</CardTitle>
+                    <Button variant="ghost" size="icon" onClick={() => setIsEditing(!isEditing)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input
-                      name="language"
-                      value={formData.language}
-                      onChange={handleInputChange}
-                      placeholder="Preferred Language"
-                      onBlur={(e) => updateProfileField('preferredLanguage', e.target.value)}
-                    />
-                    <Input
-                      name="currency"
-                      value={formData.currency}
-                      onChange={handleInputChange}
-                      placeholder="Preferred Currency"
-                      onBlur={(e) => updateProfileField('preferredCurrency', e.target.value)}
-                    />
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Preferred Language</label>
+                      <Select 
+                        disabled={!isEditing}
+                        value={formData.language}
+                        onValueChange={(value) => handleInputChange({ target: { name: 'language', value }})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select language" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="english">English</SelectItem>
+                          <SelectItem value="arabic">Arabic</SelectItem>
+                          <SelectItem value="french">French</SelectItem>
+                          <SelectItem value="spanish">Spanish</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Preferred Currency</label>
+                      <Select 
+                        disabled={!isEditing}
+                        value={formData.currency}
+                        onValueChange={(value) => handleInputChange({ target: { name: 'currency', value }})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select currency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="EUR">EUR</SelectItem>
+                          <SelectItem value="GBP">GBP</SelectItem>
+                          <SelectItem value="AED">AED</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Dietary Restrictions</label>
+                      <Input
+                        name="dietaryRestrictions"
+                        value={formData.dietaryRestrictions}
+                        onChange={handleInputChange}
+                        disabled={!isEditing}
+                        placeholder="Enter any dietary restrictions"
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Accessibility Requirements</label>
+                      <Input
+                        name="accessibility"
+                        value={formData.accessibility}
+                        onChange={handleInputChange}
+                        disabled={!isEditing}
+                        placeholder="Enter any accessibility requirements"
+                        className="bg-background"
+                      />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Loyalty Program */}
-              <Card>
+              <Card className="bg-gradient-to-r from-primary/5 to-primary/10">
                 <CardHeader>
                   <CardTitle>Loyalty Program</CardTitle>
+                  <CardDescription>Track your rewards and membership status</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <span>Loyalty Points</span>
-                      <span className="font-bold">{formData.loyaltyPoints}</span>
+                      <div>
+                        <p className="text-sm font-medium">Current Points</p>
+                        <p className="text-2xl font-bold">{formData.loyaltyPoints}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Next Tier</p>
+                        <p className="text-sm">{profileData?.nextTier || 'Gold'}</p>
+                      </div>
                     </div>
-                    <Progress value={45} className="h-2" />
-                    <p className="text-sm text-muted-foreground">
-                      Progress to next tier: 45%
-                    </p>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Progress to next tier</span>
+                        <span>45%</span>
+                      </div>
+                      <Progress value={45} className="h-2" />
+                    </div>
+                    <div className="bg-primary/5 rounded-lg p-4">
+                      <p className="text-sm text-muted-foreground">
+                        Earn 500 more points to reach Gold tier and unlock exclusive benefits
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <div className="flex justify-end">
-                <Button onClick={handleSave} className="w-full md:w-auto">
-                  Save Changes
-                </Button>
-              </div>
+              {isEditing && (
+                <div className="flex justify-end gap-4">
+                  <Button variant="outline" onClick={() => setIsEditing(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSave}>
+                    Save Changes
+                  </Button>
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>
