@@ -109,14 +109,14 @@ export default function YachtForm() {
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [canProgress, setCanProgress] = useState(false);
-  
+
   // Form steps configuration
   const formSteps = ["basic", "details", "addons", "partner-addons", "media"];
-  
+
   // Validate current step before navigation
   const validateStep = async (step: string) => {
     const formData = form.getValues();
-    
+
     switch(step) {
       case "basic":
         return !!formData.title && !!formData.description && !!formData.category;
@@ -136,7 +136,7 @@ export default function YachtForm() {
   // Handle navigation between steps
   const handleStepChange = async (nextStep: string) => {
     const isValid = await validateStep(activeTab);
-    
+
     if (!isValid) {
       toast({
         title: "Validation Error",
@@ -145,7 +145,7 @@ export default function YachtForm() {
       });
       return;
     }
-    
+
     setActiveTab(nextStep);
   };
 
@@ -182,7 +182,7 @@ export default function YachtForm() {
   // Add state for add-ons
   const [includedAddOns, setIncludedAddOns] = useState<AddOnReference[]>([]);
   const [optionalAddOns, setOptionalAddOns] = useState<AddOnReference[]>([]);
-  
+
   // Initialize form with default values
   const form = useForm<YachtFormValues>({
     resolver: zodResolver(yachtFormSchema),
@@ -202,7 +202,7 @@ export default function YachtForm() {
       virtual_tour_enabled: false,
     },
   });
-  
+
   // Yacht categories
   const categoryOptions = [
     "Luxury Charter",
@@ -216,7 +216,7 @@ export default function YachtForm() {
     "Island Hopping",
     "Diving Adventure"
   ];
-  
+
   // Fetch producer data from harmonized_users collection
   useEffect(() => {
     if (auth.currentUser) {
@@ -231,28 +231,28 @@ export default function YachtForm() {
       fetchYachtDetails(params.id);
     }
   }, [params.id]);
-  
+
   // Fetch producer details from harmonized_users collection
   const fetchProducerData = async (userId: string) => {
     try {
       console.log(`Fetching producer data for user ID: ${userId}`);
-      
+
       // Create a query to find the user in the harmonized_users collection
       const usersRef = collection(db, "harmonized_users");
       const q = query(usersRef, where("userId", "==", userId));
-      
+
       // Execute the query
       const querySnapshot = await getDocs(q);
-      
+
       if (!querySnapshot.empty) {
         // Get the first matching document
         const userDoc = querySnapshot.docs[0];
         const userData = userDoc.data();
-        
+
         // Check if the user is a producer
         if (userData.role === 'producer') {
           console.log("Found producer data:", userData);
-          
+
           // Set the producerId and providerId from the harmonized_users collection
           setProducerData({
             producerId: userData.producerId || userData.id,
@@ -283,7 +283,7 @@ export default function YachtForm() {
       });
     }
   };
-  
+
   // Fetch yacht details for editing
   const fetchYachtDetails = async (yachtId: string) => {
     setInitialLoading(true);
@@ -291,14 +291,14 @@ export default function YachtForm() {
       // Only use the unified collection - no legacy collections
       const collectionName = "unified_yacht_experiences";
       console.log(`Searching for yacht ID ${yachtId} in ${collectionName} collection...`);
-      
+
       const yachtRef = doc(db, collectionName, yachtId);
       const yachtDoc = await getDoc(yachtRef);
-      
+
       if (yachtDoc && yachtDoc.exists()) {
         const data = yachtDoc.data() as YachtExperience;
         console.log("Found yacht data:", data);
-        
+
         // Normalize data to handle both formats
         const normalizedData = {
           // Create a normalized data structure with both field names
@@ -333,13 +333,13 @@ export default function YachtForm() {
             port_marina: ""
           }
         };
-        
+
         // Set the normalized data
         setYachtData(normalizedData);
         setMedia(normalizedData.media || []);
         setCustomizationOptions(normalizedData.customization_options || []);
         setLocation_(normalizedData.location);
-        
+
         // Set add-on data if present
         if (data.includedAddOns) {
           setIncludedAddOns(data.includedAddOns);
@@ -347,7 +347,7 @@ export default function YachtForm() {
         if (data.optionalAddOns) {
           setOptionalAddOns(data.optionalAddOns);
         }
-        
+
         // Set form values using the normalized data
         form.reset({
           title: normalizedData.title,
@@ -383,40 +383,40 @@ export default function YachtForm() {
       setInitialLoading(false);
     }
   };
-  
+
   // Handle media file upload
   // File size constants
   const MAX_FILE_SIZE_MB = 50;
   const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024; // 50MB in bytes
-  
+
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !auth.currentUser) return;
-    
+
     setUploadingMedia(true);
     const newMedia: Media[] = [...media];
     const uploadedMedia: Media[] = [];
     const skippedFiles: string[] = [];
-    
+
     try {
       // Get auth token for the API request
       const authToken = await auth.currentUser.getIdToken();
-      
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const isVideo = file.type.startsWith('video/');
-        
+
         // Client-side file size validation
         if (file.size > MAX_FILE_SIZE_BYTES) {
           console.warn(`File "${file.name}" exceeds maximum size limit of ${MAX_FILE_SIZE_MB}MB`);
           skippedFiles.push(file.name);
           continue; // Skip this file and move to the next one
         }
-        
+
         // Create FormData for the file upload
         const formData = new FormData();
         formData.append('file', file);
-        
+
         try {
           // Upload the file through the server proxy
           const uploadResponse = await axios.post('/api/upload/media', formData, {
@@ -425,7 +425,7 @@ export default function YachtForm() {
               'Content-Type': 'multipart/form-data'
             }
           });
-          
+
           if (uploadResponse.data.success) {
             // Add to uploaded media array using the response data
             uploadedMedia.push({
@@ -443,10 +443,10 @@ export default function YachtForm() {
           continue;
         }
       }
-      
+
       // Determine if this is the first upload (no existing media)
       const isFirstUpload = newMedia.length === 0;
-      
+
       // Display appropriate toast message based on results
       if (uploadedMedia.length === 0 && skippedFiles.length > 0) {
         // All files failed
@@ -464,7 +464,7 @@ export default function YachtForm() {
           // Add successful uploads to existing media
           setMedia([...newMedia, ...uploadedMedia]);
         }
-        
+
         toast({
           title: "⚠️ Partial Upload",
           description: `Uploaded ${uploadedMedia.length} file(s) successfully. ${skippedFiles.length} file(s) were skipped due to size limits (max ${MAX_FILE_SIZE_MB}MB).`,
@@ -475,7 +475,7 @@ export default function YachtForm() {
         if (isFirstUpload) {
           // If this is the first upload, these become our media with first image as cover
           setMedia([...uploadedMedia, ...newMedia]);
-          
+
           toast({
             title: "Upload Complete",
             description: `Successfully uploaded ${uploadedMedia.length} file(s). First image set as cover.`,
@@ -483,7 +483,7 @@ export default function YachtForm() {
         } else {
           // Otherwise add to end of existing media
           setMedia([...newMedia, ...uploadedMedia]);
-          
+
           toast({
             title: "Upload Complete",
             description: `Successfully uploaded ${uploadedMedia.length} file(s). Use "Set as Cover" to make any image the cover image.`,
@@ -503,20 +503,20 @@ export default function YachtForm() {
       e.target.value = '';
     }
   };
-  
+
   // Handle media deletion
   const handleDeleteMedia = async (index: number) => {
     if (index < 0 || index >= media.length || !auth.currentUser) return;
-    
+
     try {
       const mediaItem = media[index];
       const fileUrl = mediaItem.url;
-      
+
       // Extract the path from the URL
       // Sample URL: https://storage.googleapis.com/etoile-yachts.appspot.com/yacht_media/user123/12345_image.jpg
       const urlParts = fileUrl.split('/');
       const bucketIndex = urlParts.findIndex(part => part.includes('.appspot.com') || part.includes('.firebasestorage.app'));
-      
+
       if (bucketIndex === -1) {
         console.warn("Could not determine file path from URL:", fileUrl);
         // Continue with UI removal even if server deletion fails
@@ -525,10 +525,10 @@ export default function YachtForm() {
         setMedia(newMedia);
         return;
       }
-      
+
       // Reconstruct the path starting after the bucket name
       const filePath = urlParts.slice(bucketIndex + 1).join('/');
-      
+
       if (!filePath) {
         console.warn("Empty file path from URL:", fileUrl);
         // Continue with UI removal even if server deletion fails
@@ -537,10 +537,10 @@ export default function YachtForm() {
         setMedia(newMedia);
         return;
       }
-      
+
       // Get auth token for the API request
       const authToken = await auth.currentUser.getIdToken();
-      
+
       // Call server-side endpoint to delete the file
       const deleteResponse = await axios.delete('/api/upload/media', {
         headers: {
@@ -551,13 +551,13 @@ export default function YachtForm() {
           filePath: filePath
         }
       });
-      
+
       if (deleteResponse.data.success) {
         // Remove the media item from the UI array
         const newMedia = [...media];
         newMedia.splice(index, 1);
         setMedia(newMedia);
-        
+
         toast({
           title: "Media Deleted",
           description: "The media file has been successfully deleted."
@@ -567,12 +567,12 @@ export default function YachtForm() {
       }
     } catch (error) {
       console.error("Error deleting media:", error);
-      
+
       // Continue with UI removal even if server deletion fails
       const newMedia = [...media];
       newMedia.splice(index, 1);
       setMedia(newMedia);
-      
+
       toast({
         title: "Warning",
         description: "Media removed from list, but there was an issue deleting the file from storage.",
@@ -580,26 +580,26 @@ export default function YachtForm() {
       });
     }
   };
-  
+
   // Set an image as cover image (move to first position in array)
   const setCoverImage = (index: number) => {
     if (index < 0 || index >= media.length || index === 0) return;
-    
+
     // Make a copy of the media array
     const newMedia = [...media];
-    
+
     // Move the selected image to the first position (as cover image)
     const [selectedImage] = newMedia.splice(index, 1);
     newMedia.unshift(selectedImage);
-    
+
     setMedia(newMedia);
-    
+
     toast({
       title: "Cover Image Set",
       description: "The selected image will be used as the cover image",
     });
   };
-  
+
   // Handle location selection
   const handleLocationSelect = (place: {
     address: string;
@@ -615,38 +615,38 @@ export default function YachtForm() {
       port_marina: place.port_marina || ""
     });
   };
-  
+
   // Determine region based on address
   const determineRegion = (address: string): "dubai" | "abu-dhabi" => {
     const lowerCaseAddress = address.toLowerCase();
     return lowerCaseAddress.includes("dubai") ? "dubai" : "abu-dhabi";
   };
-  
+
   // Handle adding a tag
   const handleAddTag = () => {
     const tagValue = tagInput.trim();
     if (!tagValue) return;
-    
+
     // Get current tags, ensure it's an array
     const currentTags = Array.isArray(form.getValues().tags) ? form.getValues().tags : [];
-    
+
     // Only add if tag doesn't already exist
     if (!currentTags.includes(tagValue)) {
       form.setValue('tags', [...currentTags, tagValue]);
     }
-    
+
     setTagInput("");
   };
-  
+
   // Handle removing a tag
   const handleRemoveTag = (tag: string) => {
     // Get current tags, ensure it's an array
     const currentTags = Array.isArray(form.getValues().tags) ? form.getValues().tags : [];
-    
+
     // Filter out the tag to remove
     form.setValue('tags', currentTags.filter(t => t !== tag));
   };
-  
+
   // Handle adding a customization option
   const handleAddCustomizationOption = () => {
     if (
@@ -665,14 +665,14 @@ export default function YachtForm() {
       setCustomizationOptionInput({ name: "", price: "", product_id: "" });
     }
   };
-  
+
   // Handle removing a customization option
   const handleRemoveCustomizationOption = (index: number) => {
     const newOptions = [...customizationOptions];
     newOptions.splice(index, 1);
     setCustomizationOptions(newOptions);
   };
-  
+
   // Form submission handler
   const onSubmit = async (values: YachtFormValues) => {
     if (!auth.currentUser) {
@@ -683,7 +683,7 @@ export default function YachtForm() {
       });
       return;
     }
-    
+
     // Switch to media tab if no media uploaded
     if (media.length === 0 && activeTab !== "media") {
       toast({
@@ -693,7 +693,7 @@ export default function YachtForm() {
       setActiveTab("media");
       return;
     }
-    
+
     // Switch to basic tab if no location selected
     if (!location && activeTab !== "basic") {
       toast({
@@ -703,7 +703,7 @@ export default function YachtForm() {
       setActiveTab("basic");
       return;
     }
-    
+
     // Final validation before submission
     if (!location) {
       toast({
@@ -713,7 +713,7 @@ export default function YachtForm() {
       });
       return;
     }
-    
+
     if (media.length === 0) {
       toast({
         title: "Media Required",
@@ -722,15 +722,15 @@ export default function YachtForm() {
       });
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
       // Create or update yacht experience object
       const packageId = editMode && yachtData 
         ? yachtData.package_id 
         : `yacht-${auth.currentUser.uid}-${Date.now()}`;
-      
+
       const yachtObject: YachtExperience = {
         package_id: packageId,
         title: values.title,
@@ -755,16 +755,16 @@ export default function YachtForm() {
           scenes: editMode && yachtData?.virtual_tour?.scenes ? yachtData.virtual_tour.scenes : []
         }
       };
-      
+
       // Log the object being saved
       console.log('Saving yacht with data:', yachtObject);
-      
+
       // Always use the unified collection for all operations
       const collectionName = "unified_yacht_experiences";
-      
+
       // Log that we're exclusively using the unified collection
       console.log(`Using unified collection (${collectionName}) for all yacht operations`)
-      
+
       // Create a comprehensive data object with all field naming conventions
       const newYachtData: Record<string, any> = {
         // Core unified schema fields
@@ -798,7 +798,7 @@ export default function YachtForm() {
           isEnabled: values.virtual_tour_enabled, // unified field
           scenes: editMode && yachtData?.virtual_tour?.scenes ? yachtData.virtual_tour.scenes : []
         },
-        
+
         // Legacy fields for backward compatibility
         package_id: packageId,
         yacht_type: values.yacht_type,
@@ -814,16 +814,28 @@ export default function YachtForm() {
         features: values.tags,
         max_guests: values.capacity,
       };
-      
+
       // Add timestamp fields for client submission
       const now = new Date().toISOString();
       newYachtData._lastUpdated = Date.now(); // Cache busting timestamp
-      
+
+      // Optimistic update
+      const producerId = producerData?.producerId || auth.currentUser?.uid;
+      queryClient.setQueryData(["/api/producer/yachts", { producerId }], (oldYachts: YachtExperience[] = []) => {
+        const optimisticYacht = {
+          ...newYachtData,
+          id: `temp-${Date.now()}`, // temporary ID
+          createdAt: new Date(),
+        };
+        return [...oldYachts, optimisticYacht];
+      });
+
+
       if (editMode) {
         try {
           console.log(`Attempting to update yacht with ID ${packageId} via server API`);
           console.log('Update data:', newYachtData);
-          
+
           // Use the server-side API endpoint for yacht updates
           const response = await fetch(`/api/producer/yacht/update/${packageId}`, {
             method: 'POST',
@@ -833,23 +845,28 @@ export default function YachtForm() {
             },
             body: JSON.stringify(newYachtData)
           });
-          
+
           // Check if the request was successful
           if (!response.ok) {
             // Try to get the error message from the response
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.message || `Server returned ${response.status}: ${response.statusText}`);
           }
-          
+
           const responseData = await response.json();
           console.log('Update successful via server API:', responseData);
-          
+
           toast({
             title: "Yacht Updated",
             description: "Your yacht has been successfully updated.",
           });
         } catch (error) {
           console.error('Error updating yacht via API:', error);
+          // Rollback optimistic update on error (this part is crucial)
+          queryClient.invalidateQueries({
+            queryKey: ["/api/producer/yachts", {producerId}],
+            refetchType: 'all'
+          });
           throw error; // re-throw to trigger the error handling below
         }
       } else {
@@ -857,7 +874,7 @@ export default function YachtForm() {
         try {
           console.log('Creating new yacht via server API');
           console.log('Create data:', newYachtData);
-          
+
           // Use the server-side API endpoint for yacht creation
           const response = await fetch('/api/producer/yacht/create', {
             method: 'POST',
@@ -867,36 +884,41 @@ export default function YachtForm() {
             },
             body: JSON.stringify(newYachtData)
           });
-          
+
           // Check if the request was successful
           if (!response.ok) {
             // Try to get the error message from the response
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.message || `Server returned ${response.status}: ${response.statusText}`);
           }
-          
+
           const responseData = await response.json();
           console.log('Successfully created yacht via server API:', responseData);
-          
+
           toast({
             title: "Yacht Created",
             description: "Your yacht has been successfully created.",
           });
         } catch (error) {
           console.error('Error creating new yacht via API:', error);
+          // Rollback optimistic update on error
+          queryClient.invalidateQueries({
+            queryKey: ["/api/producer/yachts", {producerId}],
+            refetchType: 'all'
+          });
           throw error; // re-throw to trigger the error handling below
         }
       }
 
       // Invalidate all yacht queries to ensure all cached data is refreshed
       console.log('Invalidating all yacht queries to refresh data...');
-      
+
       // Perform aggressive cache invalidation for all possible data sources
       console.log("Performing comprehensive cache invalidation after yacht update...");
-      
+
       // First, reset the entire cache to ensure fresh data from all endpoints
       queryClient.resetQueries();
-      
+
       // Then, explicitly invalidate specific endpoint queries
       // Producer yacht queries (main asset management page)
       queryClient.removeQueries({ queryKey: ['/api/producer/yachts'] });
@@ -904,7 +926,7 @@ export default function YachtForm() {
         queryKey: ['/api/producer/yachts'],
         refetchType: 'all'
       });
-      
+
       // Paginated yacht queries
       for (let page = 1; page <= 10; page++) { // Higher safety margin
         queryClient.invalidateQueries({
@@ -912,13 +934,13 @@ export default function YachtForm() {
           refetchType: 'all'
         });
       }
-      
+
       // General experiences endpoints
       queryClient.invalidateQueries({
         queryKey: ['/api/experiences'],
         refetchType: 'all'
       });
-      
+
       // Specific yacht query by ID
       if (packageId) {
         queryClient.invalidateQueries({
@@ -926,19 +948,19 @@ export default function YachtForm() {
           refetchType: 'all'
         });
       }
-      
+
       // Featured experiences
       queryClient.invalidateQueries({ 
         queryKey: ['/api/experiences/featured'],
         refetchType: 'all'
       });
-      
+
       // Unified yacht queries
       queryClient.invalidateQueries({
         queryKey: ['/api/unified/yachts'],
         refetchType: 'all'
       });
-      
+
       // Navigate back to asset management
       navigateBack();
     } catch (error) {
@@ -952,10 +974,10 @@ export default function YachtForm() {
       setLoading(false);
     }
   };
-  
+
   // Navigation
   const navigateBack = () => setLocation("/dashboard/producer/assets");
-  
+
   if (initialLoading) {
     return (
       <DashboardLayout>
@@ -970,7 +992,7 @@ export default function YachtForm() {
       </DashboardLayout>
     );
   }
-  
+
   return (
     <DashboardLayout>
       <div className="container mx-auto px-4 py-6">
@@ -983,13 +1005,13 @@ export default function YachtForm() {
             <ArrowLeft className="h-4 w-4" />
             Back to Assets
           </Button>
-          
+
           <h1 className="text-3xl font-bold">{editMode ? 'Edit Yacht' : 'Add New Yacht'}</h1>
           <p className="text-muted-foreground">
             {editMode ? 'Update your yacht information' : 'Add a new yacht to your fleet'}
           </p>
         </div>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <Tabs 
@@ -1006,7 +1028,7 @@ export default function YachtForm() {
                 <TabsTrigger value="addons">Add-ons</TabsTrigger>
                 <TabsTrigger value="media">Media & Settings</TabsTrigger>
               </TabsList>
-              
+
               {/* Basic Information Tab */}
               <TabsContent value="basic" className="space-y-6">
                 <Card>
@@ -1016,7 +1038,7 @@ export default function YachtForm() {
                       Enter the basic details of your yacht experience
                     </CardDescription>
                   </CardHeader>
-                  
+
                   <CardContent className="space-y-6">
                     {/* Title */}
                     <FormField
@@ -1035,7 +1057,7 @@ export default function YachtForm() {
                         </FormItem>
                       )}
                     />
-                    
+
                     {/* Description */}
                     <FormField
                       control={form.control}
@@ -1057,7 +1079,7 @@ export default function YachtForm() {
                         </FormItem>
                       )}
                     />
-                    
+
                     {/* Category */}
                     <FormField
                       control={form.control}
@@ -1085,7 +1107,7 @@ export default function YachtForm() {
                         </FormItem>
                       )}
                     />
-                    
+
                     {/* Yacht Type */}
                     <FormField
                       control={form.control}
@@ -1103,7 +1125,7 @@ export default function YachtForm() {
                         </FormItem>
                       )}
                     />
-                    
+
                     {/* Location */}
                     <div className="space-y-2">
                       <FormLabel>Location</FormLabel>
@@ -1138,10 +1160,10 @@ export default function YachtForm() {
                         Select the marina or port where your yacht is located
                       </FormDescription>
                     </div>
-                    
+
                     <div className="flex justify-between mt-6">
                       {/* No Previous button on first tab */}
-                      
+
                       <Button 
                         type="button" 
                         onClick={() => setActiveTab("details")}
@@ -1154,7 +1176,7 @@ export default function YachtForm() {
                   </CardContent>
                 </Card>
               </TabsContent>
-              
+
               {/* Details & Pricing Tab */}
               <TabsContent value="details" className="space-y-6">
                 <Card>
@@ -1164,7 +1186,7 @@ export default function YachtForm() {
                       Set up the capacity, duration, and pricing for your yacht experience
                     </CardDescription>
                   </CardHeader>
-                  
+
                   <CardContent className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {/* Duration */}
@@ -1184,7 +1206,7 @@ export default function YachtForm() {
                           </FormItem>
                         )}
                       />
-                      
+
                       {/* Capacity */}
                       <FormField
                         control={form.control}
@@ -1202,7 +1224,7 @@ export default function YachtForm() {
                           </FormItem>
                         )}
                       />
-                      
+
                       {/* Base Price */}
                       <FormField
                         control={form.control}
@@ -1221,7 +1243,7 @@ export default function YachtForm() {
                         )}
                       />
                     </div>
-                    
+
                     {/* Pricing Model */}
                     <FormField
                       control={form.control}
@@ -1243,7 +1265,7 @@ export default function YachtForm() {
                                 Fixed Price
                               </label>
                             </div>
-                            
+
                             <div className="flex items-center space-x-2">
                               <input
                                 type="radio"
@@ -1265,13 +1287,13 @@ export default function YachtForm() {
                         </FormItem>
                       )}
                     />
-                    
+
                     {/* Customization Options */}
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
                         <FormLabel>Customization Options</FormLabel>
                       </div>
-                      
+
                       <div className="flex flex-col gap-3">
                         {customizationOptions.map((option, index) => (
                           <div key={index} className="flex items-center gap-2 p-3 border rounded-md">
@@ -1291,7 +1313,7 @@ export default function YachtForm() {
                           </div>
                         ))}
                       </div>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
                         <div className="md:col-span-2">
                           <FormLabel className="text-sm">Option Name</FormLabel>
@@ -1329,12 +1351,12 @@ export default function YachtForm() {
                           </Button>
                         </div>
                       </div>
-                      
+
                       <FormDescription>
                         Add optional extras that guests can add to their booking
                       </FormDescription>
                     </div>
-                    
+
                     {/* Tags */}
                     <div className="space-y-4">
                       <FormField
@@ -1387,7 +1409,7 @@ export default function YachtForm() {
                         )}
                       />
                     </div>
-                    
+
                     <div className="flex justify-between mt-6">
                       <Button 
                         type="button" 
@@ -1398,7 +1420,7 @@ export default function YachtForm() {
                         <ArrowLeft className="h-4 w-4" />
                         Back to Basic Information
                       </Button>
-                      
+
                       <Button 
                         type="button" 
                         onClick={() => setActiveTab("addons")}
@@ -1411,7 +1433,7 @@ export default function YachtForm() {
                   </CardContent>
                 </Card>
               </TabsContent>
-              
+
               {/* Add-ons Tab */}
               <TabsContent value="addons" className="space-y-6">
                 <Card>
@@ -1421,7 +1443,7 @@ export default function YachtForm() {
                       Bundle your own add-ons and partner services with your yacht experience
                     </CardDescription>
                   </CardHeader>
-                  
+
                   <CardContent className="space-y-6">
                     {/* Add-on selector component */}
                     <AddOnSelector 
@@ -1432,7 +1454,7 @@ export default function YachtForm() {
                       producerId={producerData?.producerId || auth.currentUser?.uid || ''}
                       disabled={loading}
                     />
-                    
+
                     <div className="flex justify-between mt-6">
                       <Button 
                         type="button" 
@@ -1443,7 +1465,7 @@ export default function YachtForm() {
                         <ArrowLeft className="h-4 w-4" />
                         Back to Details & Pricing
                       </Button>
-                      
+
                       <Button 
                         type="button" 
                         onClick={() => setActiveTab("media")}
@@ -1456,7 +1478,7 @@ export default function YachtForm() {
                   </CardContent>
                 </Card>
               </TabsContent>
-              
+
               {/* Media & Settings Tab */}
               <TabsContent value="media" className="space-y-6">
                 <Card>
@@ -1466,7 +1488,7 @@ export default function YachtForm() {
                       Upload photos and videos of your yacht
                     </CardDescription>
                   </CardHeader>
-                  
+
                   <CardContent className="space-y-6">
                     {/* File size limit alert */}
                     <Alert>
@@ -1476,7 +1498,7 @@ export default function YachtForm() {
                         Maximum file size is {MAX_FILE_SIZE_MB}MB per file. Larger files will be skipped automatically.
                       </AlertDescription>
                     </Alert>
-                    
+
                     {/* Media Uploader */}
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
@@ -1498,14 +1520,14 @@ export default function YachtForm() {
                           disabled={uploadingMedia}
                         />
                       </div>
-                      
+
                       {uploadingMedia && (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Loader2 className="h-4 w-4 animate-spin" />
                           Uploading media...
                         </div>
                       )}
-                      
+
                       {media.length === 0 ? (
                         <div className="border-2 border-dashed rounded-md p-10 text-center">
                           <Camera className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
@@ -1532,7 +1554,7 @@ export default function YachtForm() {
                                   controls={false}
                                 />
                               )}
-                              
+
                               <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 {index !== 0 && (
                                   <Button
@@ -1557,7 +1579,7 @@ export default function YachtForm() {
                                   Remove
                                 </Button>
                               </div>
-                              
+
                               {index === 0 && (
                                 <div className="absolute top-2 left-2 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium shadow-sm">
                                   Cover Photo
@@ -1571,13 +1593,13 @@ export default function YachtForm() {
                         The first image will be used as the cover photo for your listing
                       </FormDescription>
                     </div>
-                    
+
                     <Separator className="my-6" />
-                    
+
                     {/* Settings */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-medium">Publishing Settings</h3>
-                      
+
                       {/* Availability Status */}
                       <FormField
                         control={form.control}
@@ -1599,7 +1621,7 @@ export default function YachtForm() {
                           </FormItem>
                         )}
                       />
-                      
+
                       {/* Featured Status */}
                       <FormField
                         control={form.control}
@@ -1621,7 +1643,7 @@ export default function YachtForm() {
                           </FormItem>
                         )}
                       />
-                      
+
                       {/* Published Status */}
                       <FormField
                         control={form.control}
@@ -1643,7 +1665,7 @@ export default function YachtForm() {
                           </FormItem>
                         )}
                       />
-                      
+
                       {/* Virtual Tour */}
                       <FormField
                         control={form.control}
@@ -1665,7 +1687,7 @@ export default function YachtForm() {
                           </FormItem>
                         )}
                       />
-                      
+
                       {form.getValues().virtual_tour_enabled && (
                         <Alert>
                           <Info className="h-4 w-4" />
@@ -1691,7 +1713,7 @@ export default function YachtForm() {
                           Previous
                         </Button>
                       )}
-                      
+
                       {activeTab !== "media" && (
                         <Button 
                           type="button" 
@@ -1710,7 +1732,7 @@ export default function YachtForm() {
                 </Card>
               </TabsContent>
             </Tabs>
-            
+
             {/* Form Actions - Always visible at bottom of form */}
             <Card className="mt-8 shadow-md">
               <CardContent className="pt-6">

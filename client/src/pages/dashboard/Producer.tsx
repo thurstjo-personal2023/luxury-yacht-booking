@@ -43,7 +43,11 @@ export default function ProducerDashboard() {
 
   // Queries for producer data
   const { data: yachts, isLoading: yachtsLoading } = useQuery<YachtExperience[]>({
-    queryKey: ["/api/producer/yachts"],
+    queryKey: ["/api/producer/yachts", { producerId: profileData?.producerId || user?.uid }],
+    staleTime: 0,
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const { data: bookings, isLoading: bookingsLoading } = useQuery<ProducerBooking[]>({
