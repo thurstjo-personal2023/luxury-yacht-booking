@@ -64,6 +64,39 @@ export default function ConsumerProfileForm() {
   const [newDestination, setNewDestination] = useState("");
   const [newActivity, setNewActivity] = useState("");
 
+  const onSubmit = async (values: ProfileFormValues) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/user/update-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(values)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update profile');
+      }
+
+      await refreshUserData();
+      
+      toast({
+        title: "Success",
+        description: "Your profile has been updated successfully.",
+      });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update your profile. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Form with default values from user profile
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -200,6 +233,230 @@ export default function ConsumerProfileForm() {
           </div>
 
           <Separator className="my-6" />
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Basic Information</h3>
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Preferences */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Travel Preferences</h3>
+                
+                <div className="flex flex-wrap gap-2">
+                  {form.watch('preferences')?.map((pref, index) => (
+                    <Badge key={index} variant="secondary" className="px-3 py-1">
+                      {pref}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = form.getValues('preferences') || [];
+                          form.setValue('preferences', current.filter((_, i) => i !== index));
+                        }}
+                        className="ml-2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+                
+                <div className="flex gap-2">
+                  <Input
+                    value={newPreference}
+                    onChange={(e) => setNewPreference(e.target.value)}
+                    placeholder="Add a preference"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (newPreference.trim()) {
+                        const current = form.getValues('preferences') || [];
+                        form.setValue('preferences', [...current, newPreference.trim()]);
+                        setNewPreference('');
+                      }
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Dietary Restrictions */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Dietary Restrictions</h3>
+                <div className="flex flex-wrap gap-2">
+                  {form.watch('dietaryRestrictions')?.map((restriction, index) => (
+                    <Badge key={index} variant="secondary" className="px-3 py-1">
+                      {restriction}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = form.getValues('dietaryRestrictions') || [];
+                          form.setValue('dietaryRestrictions', current.filter((_, i) => i !== index));
+                        }}
+                        className="ml-2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+                
+                <div className="flex gap-2">
+                  <Input
+                    value={newDietary}
+                    onChange={(e) => setNewDietary(e.target.value)}
+                    placeholder="Add dietary restriction"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (newDietary.trim()) {
+                        const current = form.getValues('dietaryRestrictions') || [];
+                        form.setValue('dietaryRestrictions', [...current, newDietary.trim()]);
+                        setNewDietary('');
+                      }
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Emergency Contact */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Emergency Contact</h3>
+                <FormField
+                  control={form.control}
+                  name="emergencyContact.name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="emergencyContact.phoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Phone</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="emergencyContact.relationship"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Relationship</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Communication Preferences */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Communication Preferences</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="communicationPreferences.email"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-2">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormLabel className="!mt-0">Email Updates</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="communicationPreferences.sms"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-2">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormLabel className="!mt-0">SMS Notifications</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <Button type="submit" disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Changes
+              </Button>
+            </form>
+          </Form>
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
