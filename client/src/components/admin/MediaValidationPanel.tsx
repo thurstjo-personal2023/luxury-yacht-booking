@@ -257,8 +257,8 @@ const MediaValidationPanel: React.FC = () => {
 
     return (
       <div className="space-y-4">
-        {collectionSummaries.map((summary) => (
-          <Card key={summary.collection}>
+        {collectionSummaries.map((summary, index) => (
+          <Card key={`${summary.collection}-${index}`}>
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle className="text-base">

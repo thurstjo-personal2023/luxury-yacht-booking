@@ -601,9 +601,9 @@ export default function PartnerDashboard() {
                           </div>
                         ) : (
                           <div className="space-y-4">
-                            {earningStats.addOnUsage.map((addon) => (
+                            {earningStats.addOnUsage.map((addon, index) => (
                               <div 
-                                key={addon.addOnId} 
+                                key={`${addon.addOnId}-${index}`} 
                                 className="p-4 border rounded-lg"
                               >
                                 <div className="flex justify-between items-center mb-2">

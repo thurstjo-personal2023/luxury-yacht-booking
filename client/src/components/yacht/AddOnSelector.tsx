@@ -295,9 +295,9 @@ export default function AddOnSelector({
           <AlertDescription>
             <p className="mb-1">You can bundle partner-created add-ons with your yacht experiences. The commission slider lets you control how much of the add-on price goes to the partner.</p>
             <ul className="list-disc list-inside text-sm space-y-1 mt-2">
-              <li>Required add-ons default to 15% commission</li>
-              <li>Optional add-ons default to 10% commission</li>
-              <li>Commission rates can be adjusted between 5-30%</li>
+              <li key="commission-1">Required add-ons default to 15% commission</li>
+              <li key="commission-2">Optional add-ons default to 10% commission</li>
+              <li key="commission-3">Commission rates can be adjusted between 5-30%</li>
             </ul>
           </AlertDescription>
         </Alert>
