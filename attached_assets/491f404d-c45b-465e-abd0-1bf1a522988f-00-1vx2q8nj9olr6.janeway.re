@@ -60,12 +60,12 @@ overrideMethod @ installHook.js:1
  useAuthService: Auth state changed: User signed in
  useAuthService: Auth state changed: User signed in
  [DEBUG-AUTH] Storing new auth token in localStorage, tokenLength: 985
+ AdminAuthProvider: User is not an admin
  [DEBUG-AUTH] AuthService.onIdTokenChanged: Token updated
  [DEBUG-AUTH] ID token updated for user: Object
  AuthService: Stored fresh auth token in localStorage after login
  Login component: Successfully logged in user: E7mliUbeaYZbHzF7sYeTKaJjcJH3
  [DEBUG-AUTH] Storing new auth token in localStorage, tokenLength: 985
- AdminAuthProvider: User is not an admin
  AuthService: Roles are in sync: producer
  AuthService: Roles are in sync: producer
  Login component: User already authenticated, redirecting to dashboard
@@ -94,16 +94,24 @@ overrideMethod @ installHook.js:1
  [DEBUG-AUTH] AuthService.onIdTokenChanged: Token updated
  [DEBUG-AUTH] ID token updated for user: Object
  Successfully obtained fresh auth token
- QueryFn: Using token: eyJhbGciOi...qETbA
+ QueryFn: Using token: eyJhbGciOi...y_VwQ
  QueryFn: Sending fetch request...
  [DEBUG-AUTH] Storing new auth token in localStorage, tokenLength: 985
+ AuthService: Roles are in sync: producer
+ Warning: Encountered two children with the same key, `/dashboard/consumer?tab=explore`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+overrideMethod @ installHook.js:1
+ Warning: Encountered two children with the same key, `/dashboard/consumer?tab=explore`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+overrideMethod @ installHook.js:1
  Successfully obtained fresh auth token
- QueryFn: Using token: eyJhbGciOi...qETbA
- QueryFn: Sending fetch request...
+queryClient.ts:435 QueryFn: Using token: eyJhbGciOi...y_VwQ
+queryClient.ts:442 QueryFn: Sending fetch request...
 queryClient.ts:93 Successfully obtained fresh auth token
-queryClient.ts:435 QueryFn: Using token: eyJhbGciOi...qETbA
+queryClient.ts:435 QueryFn: Using token: eyJhbGciOi...y_VwQ
 queryClient.ts:442 QueryFn: Sending fetch request...
 auth-service.ts:521 AuthService: Roles are in sync: producer
+queryClient.ts:450 QueryFn: Response status: 200 OK
+queryClient.ts:546 QueryFn: Successfully parsed JSON response with 0 keys
+queryClient.ts:548 QueryFn: Array response with 0 items
 hook.js:608 Warning: Encountered two children with the same key, `/dashboard/consumer?tab=explore`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. Error Component Stack
     at div (<anonymous>)
     at div (<anonymous>)
@@ -123,26 +131,6 @@ hook.js:608 Warning: Encountered two children with the same key, `/dashboard/con
     at QueryClientProvider (@tanstack_react-query.js?v=3f1f7aa6:2805:3)
     at App (App.tsx:95:3)
 overrideMethod @ hook.js:608
-hook.js:608 Warning: Encountered two children with the same key, `/dashboard/consumer?tab=explore`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. Error Component Stack
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at nav (<anonymous>)
-    at div (<anonymous>)
-    at DashboardLayout (DashboardLayout.tsx:29:35)
-    at ProducerDashboard (Producer.tsx:36:27)
-    at PrivateRoute (PrivateRoute.tsx:29:3)
-    at Route (wouter.js?v=3f1f7aa6:323:16)
-    at Switch (wouter.js?v=3f1f7aa6:379:17)
-    at Suspense (<anonymous>)
-    at main (<anonymous>)
-    at div (<anonymous>)
-    at AdminAuthProvider (use-admin-auth.ts:100:3)
-    at AdminAuthProvider (AdminAuthProvider.tsx:10:3)
-    at AuthProvider (auth-provider.tsx:26:32)
-    at QueryClientProvider (@tanstack_react-query.js?v=3f1f7aa6:2805:3)
-    at App (App.tsx:95:3)
-overrideMethod @ hook.js:608
-auth-service.ts:521 AuthService: Roles are in sync: producer
 queryClient.ts:450 QueryFn: Response status: 200 OK
 queryClient.ts:546 QueryFn: Successfully parsed JSON response with 0 keys
 queryClient.ts:548 QueryFn: Array response with 0 items
@@ -167,28 +155,6 @@ hook.js:608 Warning: Encountered two children with the same key, `/dashboard/con
 overrideMethod @ hook.js:608
 queryClient.ts:450 QueryFn: Response status: 200 OK
 queryClient.ts:546 QueryFn: Successfully parsed JSON response with 2 keys
-hook.js:608 Warning: Encountered two children with the same key, `/dashboard/consumer?tab=explore`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. Error Component Stack
-    at div (<anonymous>)
-    at div (<anonymous>)
-    at nav (<anonymous>)
-    at div (<anonymous>)
-    at DashboardLayout (DashboardLayout.tsx:29:35)
-    at ProducerDashboard (Producer.tsx:36:27)
-    at PrivateRoute (PrivateRoute.tsx:29:3)
-    at Route (wouter.js?v=3f1f7aa6:323:16)
-    at Switch (wouter.js?v=3f1f7aa6:379:17)
-    at Suspense (<anonymous>)
-    at main (<anonymous>)
-    at div (<anonymous>)
-    at AdminAuthProvider (use-admin-auth.ts:100:3)
-    at AdminAuthProvider (AdminAuthProvider.tsx:10:3)
-    at AuthProvider (auth-provider.tsx:26:32)
-    at QueryClientProvider (@tanstack_react-query.js?v=3f1f7aa6:2805:3)
-    at App (App.tsx:95:3)
-overrideMethod @ hook.js:608
-queryClient.ts:450 QueryFn: Response status: 200 OK
-queryClient.ts:546 QueryFn: Successfully parsed JSON response with 0 keys
-queryClient.ts:548 QueryFn: Array response with 0 items
 hook.js:608 Warning: Encountered two children with the same key, `/dashboard/consumer?tab=explore`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. Error Component Stack
     at div (<anonymous>)
     at div (<anonymous>)
