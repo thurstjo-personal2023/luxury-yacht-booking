@@ -6,39 +6,19 @@
 
 import { IAddonService, AddonValidationResult, AddonMediaValidationResult } from '../../core/domain/services/addon-service';
 import { Addon } from '../../core/domain/addon/addon';
-import { IAddOnFormValidator } from '../../core/domain/interfaces/IAddOnFormValidator';
 import * as https from 'https';
 import * as http from 'http';
 import { URL } from 'url';
 
-export class AddonServiceError extends Error {
-  constructor(message: string, public code: string) {
-    super(message);
-    this.name = 'AddonServiceError';
-  }
-}
-
-export class AddonService implements IAddonService {
-  private formValidator: IAddOnFormValidator;
-
-  constructor(formValidator: IAddOnFormValidator) {
-    this.formValidator = formValidator;
-  }
-
-  async validateAndUploadMedia(mediaItems: Array<{type: string, url: string}>) {
-    try {
-      const validationResult = await this.formValidator.validateMediaItems(mediaItems);
-      if (!validationResult.isValid) {
-        throw new AddonServiceError('Media validation failed', 'MEDIA_VALIDATION_ERROR');
-      }
-      // Media upload logic here
-    } catch (error) {
-      throw new AddonServiceError(
-        error instanceof Error ? error.message : 'Media upload failed',
-        'MEDIA_UPLOAD_ERROR'
-      );
-    }
-  }
+/**
+ * Implementation of the Add-on Service
+ */
+export class AddonServiceImpl implements IAddonService {
+  /**
+   * Validate an add-on entity
+   * @param addon The add-on to validate
+   * @returns Validation result
+   */
   validateAddon(addon: Addon): AddonValidationResult {
     const errors: string[] = [];
     const addonData = addon.toObject();
@@ -87,6 +67,11 @@ export class AddonService implements IAddonService {
     };
   }
   
+  /**
+   * Validate an add-on's media
+   * @param addon The add-on with media to validate
+   * @returns Validation result with a promise
+   */
   async validateAddonMedia(addon: Addon): Promise<AddonMediaValidationResult> {
     const errors: string[] = [];
     const addonData = addon.toObject();
@@ -139,6 +124,12 @@ export class AddonService implements IAddonService {
     };
   }
   
+  /**
+   * Validate a URL by checking if it's accessible and has the expected content type
+   * @param url The URL to validate
+   * @param expectedContentTypePrefix The expected content type prefix
+   * @returns Validation result
+   */
   private async validateUrl(url: string, expectedContentTypePrefix: string): Promise<{ valid: boolean; reason?: string }> {
     return new Promise((resolve) => {
       const urlObj = new URL(url);
