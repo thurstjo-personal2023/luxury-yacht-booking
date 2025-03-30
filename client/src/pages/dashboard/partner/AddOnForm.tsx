@@ -1,112 +1,103 @@
+
 import { FC, useState } from 'react';
-import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { toast } from '@/hooks/use-toast';
+import { useNavigate } from 'wouter';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { Form } from '@/components/ui/form';
+import { useToast } from '@/hooks/use-toast';
 import { useAuthService } from '@/services/auth';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { PartnerSidebar } from '@/components/layout/PartnerSidebar';
 import { AddOnFormPresenter } from '@/adapters/presenters/AddOnFormPresenter';
-import { useAddOnService } from '@/hooks/partner/useAddOnService';
-
-const ADDON_CATEGORIES = [
-  'Fishing Equipment',
-  'Water Sports',
-  'Catering',
-  'Entertainment',
-  'Tour Guide',
-  'Photography'
-];
 
 const formSchema = z.object({
   name: z.string().min(3, 'Name must be at least 3 characters'),
   description: z.string().min(10, 'Description must be at least 10 characters'),
   category: z.string().min(1, 'Category is required'),
   pricing: z.number().min(0, 'Price must be positive'),
+  media: z.array(z.object({
+    type: z.string(),
+    url: z.string().url()
+  }))
 });
 
-const AddOnForm: FC = () => {
-  const [, navigate] = useLocation();
-  const { user } = useAuthService();
-  const addOnService = useAddOnService();
-  const [media, setMedia] = useState<{ type: string; url: string }[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
+type FormData = z.infer<typeof formSchema>;
 
-  const form = useForm({
+const AddOnForm: FC = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuthService();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const presenter = new AddOnFormPresenter();
+
+  const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
       description: '',
       category: '',
       pricing: 0,
-    },
+      media: []
+    }
   });
 
-  const handleSubmit = async (data: z.infer<typeof formSchema>) => {
+  const onSubmit = async (data: FormData) => {
     try {
-      if (!user?.uid) {
-        toast({ title: 'Error', description: 'User not authenticated' });
-        return;
-      }
-
-      if (media.length === 0) {
-        toast({ title: 'Error', description: 'At least one media item is required' });
-        return;
-      }
-
-      const result = await addOnService.createAddOn({
-        ...data,
-        media,
-        partnerId: user.uid,
+      setIsLoading(true);
+      await presenter.createAddOn(data, user?.uid || '');
+      toast({
+        title: 'Success',
+        description: 'Add-on created successfully'
       });
-
-      if (result) {
-        toast({ title: 'Success', description: 'Service added successfully' });
-        navigate('/dashboard/partner');
-      }
+      navigate('/dashboard/partner/addons');
     } catch (error) {
-      toast({ 
-        title: 'Error', 
-        description: error instanceof Error ? error.message : 'Failed to create service' 
-      });
-    }
-  };
-
-  const handleMediaSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    try {
-      const result = await addOnService.uploadMedia(file);
-      setMedia([...media, result]);
-    } catch (error) {
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to upload media' 
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
       });
     } finally {
-      setIsUploading(false);
+      setIsLoading(false);
     }
-  };
-
-  const removeMedia = (index: number) => {
-    setMedia(media.filter((_, i) => i !== index));
   };
 
   return (
-    <DashboardLayout sidebar={<PartnerSidebar />}>
-      <AddOnFormPresenter
-        onSubmit={form.handleSubmit(handleSubmit)}
-        formSchema={form}
-        media={media}
-        removeMedia={removeMedia}
-        handleMediaSelect={handleMediaSelect}
-        isUploading={isUploading}
-        ADDON_CATEGORIES={ADDON_CATEGORIES}
-      />
-    </DashboardLayout>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <Input
+          label="Name"
+          {...form.register('name')}
+          error={form.formState.errors.name?.message}
+        />
+        <Textarea
+          label="Description"
+          {...form.register('description')}
+          error={form.formState.errors.description?.message}
+        />
+        <Select
+          label="Category"
+          {...form.register('category')}
+          error={form.formState.errors.category?.message}
+          options={[
+            { value: 'equipment', label: 'Equipment' },
+            { value: 'service', label: 'Service' },
+            { value: 'experience', label: 'Experience' }
+          ]}
+        />
+        <Input
+          type="number"
+          label="Price"
+          {...form.register('pricing', { valueAsNumber: true })}
+          error={form.formState.errors.pricing?.message}
+        />
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? 'Creating...' : 'Create Add-on'}
+        </Button>
+      </form>
+    </Form>
   );
 };
 
