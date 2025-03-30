@@ -28,7 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuthService } from "@/services/auth";
 import { useCreateAddon } from "@/hooks/partner/usePartnerQueries";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PartnerSidebar } from "@/components/layout/PartnerSidebar";
