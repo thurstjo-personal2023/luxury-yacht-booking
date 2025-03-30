@@ -18,7 +18,7 @@ export class AddonServiceError extends Error {
   }
 }
 
-export class AddonServiceImpl implements IAddonService {
+export class AddonService implements IAddonService {
   private formValidator: IAddOnFormValidator;
 
   constructor(formValidator: IAddOnFormValidator) {
@@ -39,17 +39,6 @@ export class AddonServiceImpl implements IAddonService {
       );
     }
   }
-}
-
-/**
- * Implementation of the Add-on Service
- */
-export class AddonServiceImpl implements IAddonService {
-  /**
-   * Validate an add-on entity
-   * @param addon The add-on to validate
-   * @returns Validation result
-   */
   validateAddon(addon: Addon): AddonValidationResult {
     const errors: string[] = [];
     const addonData = addon.toObject();
@@ -98,11 +87,6 @@ export class AddonServiceImpl implements IAddonService {
     };
   }
   
-  /**
-   * Validate an add-on's media
-   * @param addon The add-on with media to validate
-   * @returns Validation result with a promise
-   */
   async validateAddonMedia(addon: Addon): Promise<AddonMediaValidationResult> {
     const errors: string[] = [];
     const addonData = addon.toObject();
@@ -155,12 +139,6 @@ export class AddonServiceImpl implements IAddonService {
     };
   }
   
-  /**
-   * Validate a URL by checking if it's accessible and has the expected content type
-   * @param url The URL to validate
-   * @param expectedContentTypePrefix The expected content type prefix
-   * @returns Validation result
-   */
   private async validateUrl(url: string, expectedContentTypePrefix: string): Promise<{ valid: boolean; reason?: string }> {
     return new Promise((resolve) => {
       const urlObj = new URL(url);
