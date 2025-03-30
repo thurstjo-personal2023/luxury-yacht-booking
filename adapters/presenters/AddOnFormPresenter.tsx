@@ -1,54 +1,76 @@
-
 import React from 'react';
-import { AddOnFormData } from '@/core/application/interfaces/IAddOnService';
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
+import { AddOnFormData } from '@/core/domain/addon/addon-types';
 
 interface AddOnFormPresenterProps {
   onSubmit: (data: AddOnFormData) => void;
+  formSchema: any;
   media: { type: string; url: string }[];
-  setMedia: (media: { type: string; url: string }[]) => void;
   removeMedia: (index: number) => void;
   handleMediaSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   isUploading: boolean;
-  setIsUploading: (value: boolean) => void;
-  tags: string[];
-  setTags: (tags: string[]) => void;
-  addTag: (tag: string) => void;
-  removeTag: (index: number) => void;
-  tagInput: string;
-  setTagInput: (value: string) => void;
   ADDON_CATEGORIES: string[];
-  formSchema: any;
 }
 
 export const AddOnFormPresenter: React.FC<AddOnFormPresenterProps> = ({
   onSubmit,
+  formSchema,
   media,
   removeMedia,
   handleMediaSelect,
   isUploading,
-  tags,
-  addTag,
-  removeTag,
-  tagInput,
-  setTagInput,
-  ADDON_CATEGORIES,
-  formSchema
+  ADDON_CATEGORIES
 }) => {
   return (
     <div className="container mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">Add New Service</h1>
       <Form {...formSchema}>
         <form onSubmit={onSubmit} className="space-y-6">
-          {/* Form fields implementation */}
           <div className="grid gap-4">
-            {/* Media upload section */}
+            <div className="space-y-2">
+              <Input 
+                type="text" 
+                name="name" 
+                placeholder="Service Name"
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <select 
+                name="category"
+                className="w-full p-2 border rounded"
+              >
+                <option value="">Select Category</option>
+                {ADDON_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <textarea
+                name="description"
+                placeholder="Service Description"
+                className="w-full p-2 border rounded"
+                rows={4}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Input
+                type="number"
+                name="pricing"
+                placeholder="Price"
+                className="w-full"
+              />
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium">Media</label>
               <div className="flex gap-2 flex-wrap">
@@ -69,68 +91,21 @@ export const AddOnFormPresenter: React.FC<AddOnFormPresenterProps> = ({
                 <label className="w-24 h-24 border-2 border-dashed rounded flex items-center justify-center cursor-pointer">
                   <input
                     type="file"
-                    accept="image/*,video/*"
-                    onChange={handleMediaSelect}
                     className="hidden"
+                    onChange={handleMediaSelect}
+                    accept="image/*,video/*"
+                    disabled={isUploading}
                   />
-                  {isUploading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    <Upload className="w-6 h-6" />
-                  )}
+                  <div className="text-center">
+                    <span className="block text-sm">Upload</span>
+                  </div>
                 </label>
-              </div>
-            </div>
-
-            {/* Tags section */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Tags</label>
-              <div className="flex gap-2 flex-wrap">
-                {tags.map((tag, index) => (
-                  <Badge key={index} variant="secondary">
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(index)}
-                      className="ml-2"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  placeholder="Add a tag"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      if (tagInput.trim()) {
-                        addTag(tagInput.trim());
-                        setTagInput('');
-                      }
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  onClick={() => {
-                    if (tagInput.trim()) {
-                      addTag(tagInput.trim());
-                      setTagInput('');
-                    }
-                  }}
-                >
-                  Add
-                </Button>
               </div>
             </div>
           </div>
 
           <Button type="submit" className="w-full">
-            Create Service Add-on
+            Create Service
           </Button>
         </form>
       </Form>
