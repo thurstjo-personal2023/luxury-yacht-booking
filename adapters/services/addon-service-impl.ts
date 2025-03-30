@@ -6,9 +6,40 @@
 
 import { IAddonService, AddonValidationResult, AddonMediaValidationResult } from '../../core/domain/services/addon-service';
 import { Addon } from '../../core/domain/addon/addon';
+import { IAddOnFormValidator } from '../../core/domain/interfaces/IAddOnFormValidator';
 import * as https from 'https';
 import * as http from 'http';
 import { URL } from 'url';
+
+export class AddonServiceError extends Error {
+  constructor(message: string, public code: string) {
+    super(message);
+    this.name = 'AddonServiceError';
+  }
+}
+
+export class AddonServiceImpl implements IAddonService {
+  private formValidator: IAddOnFormValidator;
+
+  constructor(formValidator: IAddOnFormValidator) {
+    this.formValidator = formValidator;
+  }
+
+  async validateAndUploadMedia(mediaItems: Array<{type: string, url: string}>) {
+    try {
+      const validationResult = await this.formValidator.validateMediaItems(mediaItems);
+      if (!validationResult.isValid) {
+        throw new AddonServiceError('Media validation failed', 'MEDIA_VALIDATION_ERROR');
+      }
+      // Media upload logic here
+    } catch (error) {
+      throw new AddonServiceError(
+        error instanceof Error ? error.message : 'Media upload failed',
+        'MEDIA_UPLOAD_ERROR'
+      );
+    }
+  }
+}
 
 /**
  * Implementation of the Add-on Service
