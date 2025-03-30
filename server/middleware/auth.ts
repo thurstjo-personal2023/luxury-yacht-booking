@@ -1,97 +1,118 @@
-/**
- * Authentication Middleware
- *
- * This middleware verifies Firebase authentication tokens
- * and attaches the user information to the request.
- */
-import { Request, Response, NextFunction } from 'express';
-import { adminAuth } from '../firebase-admin';
 
-/**
- * Middleware to verify authentication tokens
- * Adds user information to the request if authentication is successful
- */
+import { Request, Response, NextFunction } from 'express';
+import { FirebaseAuthService } from '../../adapters/auth/FirebaseAuthService';
+import { adminAuth, adminDb } from '../firebase-admin';
+
+const authService = new FirebaseAuthService();
+
 export const verifyAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Get the authorization header
     const authHeader = req.headers.authorization;
     
-    // If no auth header is present, return unauthorized
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Unauthorized: No token provided' });
+    if (!authHeader) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        details: "Missing Authorization header",
+        path: req.path,
+        method: req.method
+      });
     }
-    
-    // Extract the token
+
+    if (!authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        error: "Unauthorized", 
+        details: "Invalid Authorization format",
+        path: req.path,
+        method: req.method
+      });
+    }
+
     const token = authHeader.split('Bearer ')[1];
-    
-    if (!token) {
-      return res.status(401).json({ error: 'Unauthorized: Invalid token format' });
+
+    if (!authService.validateTokenFormat(token)) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        details: "Invalid token format",
+        path: req.path,
+        method: req.method
+      });
     }
-    
+
     try {
-      // Verify the token with Firebase Admin
-      const decodedToken = await adminAuth.verifyIdToken(token);
+      const isValid = await authService.verifyToken(token);
+      if (!isValid) {
+        throw new Error('Invalid token');
+      }
+
+      const claims = await authService.getTokenClaims(token);
       
-      // Attach the user info to the request
-      (req as any).user = {
-        uid: decodedToken.uid,
-        email: decodedToken.email,
-        emailVerified: decodedToken.email_verified,
-        role: decodedToken.role || 'user'
+      // Store user info in request
+      req.user = {
+        uid: claims.uid,
+        role: claims.role
       };
-      
-      // Continue to the next middleware/route handler
+
+      // Role synchronization check
+      if (!req.path.includes('/api/user/sync-auth-claims')) {
+        const userDoc = await adminDb.collection('harmonized_users').doc(claims.uid).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          const firestoreRole = userData?.role;
+          
+          if (firestoreRole && firestoreRole !== claims.role) {
+            await adminAuth.setCustomUserClaims(claims.uid, { role: firestoreRole });
+            req.user.role = firestoreRole;
+            req.user._roleSynchronized = true;
+          }
+        }
+      }
+
       next();
-    } catch (tokenError) {
-      console.error('Token verification failed:', tokenError);
-      return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+    } catch (error: any) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        details: error.message,
+        path: req.path,
+        method: req.method
+      });
     }
-  } catch (error) {
-    console.error('Authentication error:', error);
-    return res.status(500).json({ error: 'Server error during authentication' });
+  } catch (error: any) {
+    return res.status(500).json({
+      error: "Server Error",
+      details: "Error processing authentication",
+      path: req.path,
+      method: req.method
+    });
   }
 };
 
-/**
- * Optional auth middleware - attaches user if token is valid but doesn't require it
- */
 export const optionalAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Get the authorization header
     const authHeader = req.headers.authorization;
     
-    // If no auth header is present, continue without user info
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return next();
     }
-    
-    // Extract the token
+
     const token = authHeader.split('Bearer ')[1];
     
-    if (!token) {
+    if (!token || !authService.validateTokenFormat(token)) {
       return next();
     }
-    
+
     try {
-      // Verify the token with Firebase Admin
-      const decodedToken = await adminAuth.verifyIdToken(token);
-      
-      // Attach the user info to the request
-      (req as any).user = {
-        uid: decodedToken.uid,
-        email: decodedToken.email,
-        emailVerified: decodedToken.email_verified,
-        role: decodedToken.role || 'user'
+      const claims = await authService.getTokenClaims(token);
+      req.user = {
+        uid: claims.uid,
+        role: claims.role
       };
-    } catch (tokenError) {
+    } catch (error) {
       // Continue without user info if token is invalid
-      console.warn('Invalid token provided, continuing as guest:', tokenError.message);
+      console.warn('Invalid token in optional auth, continuing as guest');
     }
     
-    // Continue to the next middleware/route handler
     next();
   } catch (error) {
-    console.error('Optional auth error:', error);
     // Continue without auth in case of error
     next();
   }
